@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Gerenciador de Times de Mato Real</title>
     
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -16,8 +16,21 @@
         body { background: #121212; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding-bottom: 80px; margin: 0; }
         .container { padding: 15px; }
         
+        /* CORREÇÃO DAS IMAGENS */
         .team-logo { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #00E676; background: #333; }
         .rank-logo { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; margin-right: 10px; background: #333; }
+        
+        /* CLASSE NOVA PARA O LOGO NO LOGIN NÃO ESTOURAR */
+        .login-logo-img { 
+            width: 120px; 
+            height: 120px; 
+            object-fit: contain; 
+            border-radius: 50%; 
+            border: 3px solid #00E676; 
+            margin: 0 auto 15px auto; 
+            display: block; 
+            background: #1e1e1e;
+        }
 
         .card { background: #1E1E1E; padding: 15px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #333; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .player-header { display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 5px; }
@@ -41,6 +54,7 @@
         .btn-green { background: #00E676; color: black; } .btn-red { background: #d32f2f; color: white; }
         .btn-blue { background: #2196F3; color: white; } .btn-gold { background: #FFD700; color: black; }
         .btn-purple { background: #9C27B0; color: white; } .btn-orange { background: #FF5722; color: white; } 
+        .btn-outline { background: transparent; border: 1px solid #666; color: #ccc; }
         
         .input-field { width: 100%; padding: 12px; background: #2C2C2C; border: 1px solid #333; color: white; border-radius: 8px; margin-bottom: 10px; box-sizing: border-box; }
         .file-input { width: 100%; padding: 10px; background: #333; color: #aaa; border-radius: 8px; margin-bottom: 10px; }
@@ -50,7 +64,21 @@
         .nav-item i { font-size: 18px; margin-bottom: 2px; display: block; }
         .nav-item.active { color: #00E676; }
         .header { background: #1E1E1E; padding: 15px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; border-bottom: 1px solid #333; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
-        .modal-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 99; display: flex; justify-content: center; align-items: center; }
+        
+        /* CORREÇÃO DO MODAL PARA CELULAR */
+        .modal-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 99; display: flex; justify-content: center; align-items: center; }
+        .modal-card { 
+            width: 90%; 
+            max-width: 400px; 
+            max-height: 90vh; /* Nunca passa de 90% da altura da tela */
+            overflow-y: auto; /* Permite rolar se for muito grande */
+            background: #1E1E1E; 
+            padding: 20px; 
+            border-radius: 12px; 
+            border: 1px solid #333;
+            box-sizing: border-box;
+        }
+
         .login-tabs { display: flex; margin-bottom: 20px; border-bottom: 1px solid #333; }
         .tab { flex: 1; padding: 15px; text-align: center; color: #888; cursor: pointer; }
         .tab.active { color: #00E676; border-bottom: 2px solid #00E676; font-weight: bold; }
@@ -90,8 +118,8 @@
 
         function App() {
             const [userTeam, setUserTeam] = useState(null);
-            const [isAdmin, setIsAdmin] = useState(false); // MODO ADM
-            const [isVisitor, setIsVisitor] = useState(false); // MODO TORCIDA
+            const [isAdmin, setIsAdmin] = useState(false);
+            const [isVisitor, setIsVisitor] = useState(false);
             const [teams, setTeams] = useState([]);
             const [players, setPlayers] = useState([]);
             const [offers, setOffers] = useState([]); 
@@ -430,11 +458,11 @@
                     </div>
 
                     {showAdmin && !isAdmin && !isVisitor && <AdminModal currName={userTeam.name} currSerie={userTeam.serie} currLogo={userTeam.logo} stadiumLvl={userTeam.stadiumLevel || 1} onSaveData={updateClubData} onFinance={updateClubFinance} onUpgradeStadium={upgradeStadium} onClose={()=>setShowAdmin(false)} onLogout={doLogout} onUpload={handleImageUpload} />}
-                    {showAdmin && isAdmin && <div className="modal-bg"><div className="card"><button className="btn btn-red" onClick={doLogout}>SAIR DO MODO ADMIN</button><button className="btn" onClick={()=>setShowAdmin(false)}>FECHAR</button></div></div>}
+                    {showAdmin && isAdmin && <div className="modal-bg"><div className="modal-card"><button className="btn btn-red" onClick={doLogout}>SAIR DO MODO ADMIN</button><button className="btn" onClick={()=>setShowAdmin(false)}>FECHAR</button></div></div>}
                     
                     {showNotif && (
                         <div className="modal-bg">
-                            <div className="card" style={{width:'85%', maxHeight:'80vh', overflowY:'auto'}}>
+                            <div className="modal-card">
                                 <h3>Propostas ({offers.length})</h3>
                                 {offers.map(o => (
                                     <div key={o.id} style={{background:'#252525', padding:10, marginBottom:10}}>
@@ -519,7 +547,7 @@
                         ) : (
                             <div>
                                 <label style={{fontSize:12, color:'#888'}}>Escudo do Time (Opcional)</label>
-                                {logo && <img src={logo} className="team-logo-large" style={{marginBottom:10}} />}
+                                {logo && <img src={logo} className="login-logo-img" style={{marginBottom:10}} />}
                                 <input type="file" className="file-input" accept="image/*" onChange={(e) => onUpload(e, (base64) => setLogo(base64))} />
                                 <input className="input-field" placeholder="Nome" value={n} onChange={e=>setN(e.target.value)} />
                                 <input className="input-field" type="number" placeholder="Saldo" value={b} onChange={e=>setB(e.target.value)} />
@@ -533,8 +561,9 @@
                     </div>
                     {selectedTeam && (
                         <div className="modal-bg">
-                            <div className="card" style={{width:'80%', textAlign:'center'}}>
-                                {selectedTeam.logo && <img src={selectedTeam.logo} className="team-logo-large" style={{marginBottom:10}} />}
+                            <div className="modal-card" style={{textAlign:'center'}}>
+                                {/* LOGO CORRIGIDO AQUI EMBAIXO */}
+                                {selectedTeam.logo && <img src={selectedTeam.logo} className="login-logo-img" />}
                                 <h3>{selectedTeam.name}</h3><p>Senha:</p>
                                 <input className="input-field" type="password" value={loginPass} onChange={e=>setLoginPass(e.target.value)} />
                                 <button className="btn btn-green" onClick={()=>{ if(onLogin(selectedTeam, loginPass)) setSelectedTeam(null); }}>ENTRAR</button>
@@ -580,7 +609,7 @@
                     )}
                     {editP && (
                         <div className="modal-bg">
-                            <div className="card" style={{width:'85%'}}>
+                            <div className="modal-card">
                                 <h3>Editar {editP.name}</h3>
                                 <label style={{fontSize:12, color:'#888'}}>Status:</label><select className="input-field" value={ep.s} onChange={e=>setEp({...ep, s:e.target.value})}><option value="NAO_A_VENDA">Bloqueado</option><option value="VENDA">À Venda</option><option value="EMPRESTIMO">Empréstimo</option></select>
                                 <label style={{fontSize:12, color:'#888'}}>Posição:</label><select className="input-field" value={ep.pos} onChange={e=>setEp({...ep, pos:e.target.value})}>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select>
@@ -614,11 +643,11 @@
             const isMax = stadiumLvl >= 5;
             return (
                 <div className="modal-bg">
-                    <div className="card" style={{width:'90%', maxHeight:'90vh', overflowY:'auto'}}>
+                    <div className="modal-card">
                         <h3 style={{textAlign:'center'}}>Gestão do Clube</h3>
                         <div className="login-tabs" style={{marginBottom:15}}><div className={`tab ${tab==='DATA'?'active':''}`} onClick={()=>setTab('DATA')}>DADOS</div><div className={`tab ${tab==='MONEY'?'active':''}`} onClick={()=>setTab('MONEY')}>FINANÇAS</div></div>
                         {tab === 'DATA' ? (
-                            <div>{logo && <img src={logo} className="team-logo-large" style={{marginBottom:10}} />}<label>Alterar Escudo (Max 200KB)</label><input type="file" className="file-input" accept="image/*" onChange={(e) => onUpload(e, (base64) => setLogo(base64))} /><label>Nome do Clube</label><input className="input-field" value={n} onChange={e=>setN(e.target.value)} /><label>Série</label><select className="input-field" value={s} onChange={e=>setS(e.target.value)}><option>A</option><option>B</option><option>C</option><option>D</option></select><button className="btn btn-blue" onClick={()=>onSaveData(n, s, logo)}>SALVAR DADOS</button><hr style={{borderColor:'#444', margin:'15px 0'}}/><div style={{background:'#2a1b2a', padding:10, borderRadius:8, border:'1px solid #9C27B0'}}><h4 style={{margin:'0 0 10px 0', color:'#9C27B0'}}>🏟 Obras do Estádio</h4><p style={{fontSize:12}}>Atual: <b>{STADIUM_NAMES[stadiumLvl-1]}</b></p>{!isMax ? (<div><p style={{fontSize:12}}>Evoluir para: <b>{nextName}</b></p><button className="btn btn-purple" onClick={onUpgradeStadium}>PAGAR R$ {nextCost.toLocaleString()}</button></div>) : <p style={{color:'#00E676', fontSize:12}}>Nível Máximo Atingido!</p>}</div></div>
+                            <div>{logo && <img src={logo} className="login-logo-img" style={{marginBottom:10}} />}<label>Alterar Escudo (Max 200KB)</label><input type="file" className="file-input" accept="image/*" onChange={(e) => onUpload(e, (base64) => setLogo(base64))} /><label>Nome do Clube</label><input className="input-field" value={n} onChange={e=>setN(e.target.value)} /><label>Série</label><select className="input-field" value={s} onChange={e=>setS(e.target.value)}><option>A</option><option>B</option><option>C</option><option>D</option></select><button className="btn btn-blue" onClick={()=>onSaveData(n, s, logo)}>SALVAR DADOS</button><hr style={{borderColor:'#444', margin:'15px 0'}}/><div style={{background:'#2a1b2a', padding:10, borderRadius:8, border:'1px solid #9C27B0'}}><h4 style={{margin:'0 0 10px 0', color:'#9C27B0'}}>🏟 Obras do Estádio</h4><p style={{fontSize:12}}>Atual: <b>{STADIUM_NAMES[stadiumLvl-1]}</b></p>{!isMax ? (<div><p style={{fontSize:12}}>Evoluir para: <b>{nextName}</b></p><button className="btn btn-purple" onClick={onUpgradeStadium}>PAGAR R$ {nextCost.toLocaleString()}</button></div>) : <p style={{color:'#00E676', fontSize:12}}>Nível Máximo Atingido!</p>}</div></div>
                         ) : (
                             <div><label>Valor (R$)</label><input className="input-field" type="number" placeholder="Ex: 500000" value={amount} onChange={e=>setAmount(e.target.value)} /><label>Motivo</label><input className="input-field" placeholder="Ex: Salários..." value={reason} onChange={e=>setReason(e.target.value)} /><div style={{display:'flex', gap:10}}><button className="btn btn-green" onClick={()=>onFinance('ENTRADA', amount, reason)}>+ ENTRADA</button><button className="btn btn-red" onClick={()=>onFinance('SAIDA', amount, reason)}>- SAÍDA</button></div></div>
                         )}
@@ -634,7 +663,7 @@
             const [seas, setSeas] = useState('1');
             return (
                 <div className="modal-bg">
-                    <div className="card" style={{width:'90%'}}>
+                    <div className="modal-card">
                         <h3>Negociar {target.name}</h3>
                         <div style={{display:'flex', gap:5, marginBottom:15}}>
                             <button className="btn" style={{background: type==='COMPRA'?'#00E676':'#333', color: type==='COMPRA'?'black':'white', padding:8, fontSize:10}} onClick={()=>setType('COMPRA')}>COMPRA</button>

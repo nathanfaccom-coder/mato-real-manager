@@ -209,7 +209,6 @@
             };
 
             const handleLogin = (team, inputPassword) => {
-                // TRAVA DE SEGURANÇA: Só entra se for APPROVED
                 if(team.status === 'PENDING') {
                     alert("🚫 TIME EM ANÁLISE!\n\nAguarde a autorização da Federação (ADM) para acessar.");
                     return false;
@@ -243,7 +242,6 @@
                 const exist = teams.find(t => t.name.toLowerCase() === name.toLowerCase());
                 if(exist) { alert(`Já existe!`); return; }
                 
-                // CRIA COMO PENDENTE
                 await db.collection('teams').add({ 
                     name, balance: parseFloat(bal), serie, password, stadiumLevel: 1, logo: logo || null, sponsorship: null, status: 'PENDING' 
                 });
@@ -251,7 +249,6 @@
                 alert("✅ TIME CRIADO COM SUCESSO!\n\nAgora aguarde o ADM aprovar sua conta para você conseguir logar.");
             };
 
-            // FUNÇÃO PARA ADM APROVAR TIME
             const adminApproveTeam = async (team) => {
                 if(!confirm(`Aprovar a entrada do ${team.name}?`)) return;
                 await db.collection('teams').doc(team.id).update({ status: 'APPROVED' });
@@ -273,7 +270,6 @@
                 alert("Solicitação enviada para a Federação (ADM)!");
             };
 
-            // USER PAGA DESPESA (SAI NA HORA)
             const userPayBill = async (amount, reason) => {
                 const val = parseFloat(amount);
                 if (!val || !reason) return alert("Preencha valor e motivo!");
@@ -299,7 +295,7 @@
 
                 if (req.type === 'INJECTION') {
                     const teamDoc = teams.find(t => t.id === req.teamId);
-                    const newBal = (teamDoc.balance || 0) + req.amount;
+                    const newBal = (teamDoc ? teamDoc.balance : 0) + req.amount;
                     batch.update(teamRef, { balance: newBal });
                     postNews(`💰 **INJEÇÃO DE CAPITAL**\n\nO **${req.teamName}** recebeu um aporte de ${fmt(req.amount)}.\n📝 Motivo: ${req.details}`, 'plus');
                 } else if (req.type === 'SPONSORSHIP') {
@@ -446,6 +442,9 @@
                 let desc = "", swapPName = "";
                 let offerValue = parseFloat(value || 0);
                 
+                if(type === 'COMPRA' && (isNaN(parseInt(seasons)) || seasons < 1)) return alert("Defina o contrato!");
+                if(type === 'EMPRESTIMO' && !seasons) return alert("Defina o tempo de empréstimo!");
+
                 if(type === 'COMPRA') desc = `Compra: ${fmt(offerValue)}\n📄 Contrato: ${seasons} T.`;
                 if(type === 'EMPRESTIMO') {
                     let dur = seasons === '0.5' ? 'Meia Temporada' : seasons + ' Temporada(s)';
@@ -469,7 +468,8 @@
                     sellerId: recipientId,
                     type,
                     value: offerValue, swapPlayerId: swapPlayerId || null, swapPlayerName: swapPName || null,
-                    offerContract: seasons, description: desc
+                    offerContract: seasons, 
+                    description: desc
                 });
 
                 await batch.commit();
@@ -842,7 +842,7 @@
         }
 
         function Market({ me, teams, ps, onOpenOffer, onPayClause, onPreContract, isVisitor, marketOpen }) {
-            const [viewMode, setViewMode] = useState('SERIES'); // SERIES ou GLOBAL
+            const [viewMode, setViewMode] = useState('SERIES'); 
             const [serie, setSerie] = useState(''); 
             const [selTeam, setSelTeam] = useState(null);
             const [filter, setFilter] = useState('ALL');
@@ -850,7 +850,7 @@
             const isUserAdminOrVisitor = me === 'admin_user' || me === 'visitor_user';
             const POS_ORDER = { 'GOL': 1, 'ZAG': 2, 'LD': 3, 'LE': 4, 'VOL': 5, 'MC': 6, 'MEI': 7, 'ATA': 8 };
 
-            // TELA INICIAL DO MERCADO
+            // TELA INICIAL DO MERCADO (AGORA COM BOTÃO GLOBAL)
             if(viewMode === 'SERIES' && !serie) return (
                 <div>
                     <h3>Mercado</h3>
@@ -861,8 +861,8 @@
                 </div>
             );
 
-            // MODO DE NAVEGAÇÃO POR CLUBE (SÉRIE)
             if(viewMode === 'SERIES' && !selTeam) {
+                // Filtra times aprovados e exclui o próprio time
                 const list = teams.filter(t => t.serie === serie && t.status === 'APPROVED' && (isUserAdminOrVisitor || t.id !== me));
                 return (
                     <div>
@@ -881,19 +881,16 @@
                 );
             }
 
-            // LISTA DE JOGADORES (Pode ser Global ou de um Time específico)
             let playersToShow = [];
             let headerTitle = "";
             let backAction = null;
 
             if (viewMode === 'GLOBAL') {
-                // Pega todos os jogadores de todos os times APROVADOS (menos o meu)
                 const validTeamsIds = teams.filter(t => t.status === 'APPROVED' && (isUserAdminOrVisitor || t.id !== me)).map(t => t.id);
                 playersToShow = ps.filter(p => validTeamsIds.includes(p.teamId));
                 headerTitle = "🌎 Mercado Global";
                 backAction = () => setViewMode('SERIES');
             } else {
-                // Modo Time Específico
                 playersToShow = ps.filter(p => p.teamId === selTeam.id);
                 headerTitle = selTeam.name;
                 backAction = () => setSelTeam(null);
@@ -919,7 +916,7 @@
                         <div className={`filter-btn ${filter==='BLOQUEADO'?'active':''}`} onClick={()=>setFilter('BLOQUEADO')}>Bloqueados</div>
                     </div>
 
-                    {playersToShow.slice(0, 100).map(p => ( // Limite de 100 pra não travar se tiver muitos
+                    {playersToShow.slice(0, 100).map(p => (
                         <div key={p.id} className="card">
                             <div className="player-header">
                                 <span className="player-name">

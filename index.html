@@ -179,7 +179,6 @@
                 const v = parseFloat(value||0);
                 let desc = "";
                 
-                // Formatação bonita da proposta na notícia
                 if(type==='COMPRA') desc = `Compra: ${fmt(v)} | ${con} Anos` + (meta?.sellOn > 0 ? `\n+${meta.sellOn}% Revenda` : '');
                 if(type==='EMPRESTIMO') desc = `Emp: ${fmt(v)} | ${con} Temp` + (meta?.buyOpt > 0 ? `\nOpção: ${fmt(meta.buyOpt)}` : '');
                 if(type==='TROCA') { 
@@ -189,12 +188,13 @@
                 
                 const pl = {
                     playerId: target.id, playerName: target.name, buyerId: user.data.id, buyerName: user.data.name,
-                    sellerId: old ? old.buyerId : target.teamId, type, value: v, swapPlayerIds: swapIds || [],
+                    sellerId: (old && old.buyerId) ? old.buyerId : target.teamId, // Correção: Garante que SellerId seja válido
+                    type, value: v, swapPlayerIds: swapIds || [],
                     offerContract: con, description: desc, meta: meta || {}, date: Date.now()
                 };
                 
                 const b = db.batch();
-                if(old) b.delete(db.collection('offers').doc(old.id));
+                if(old && old.id) b.delete(db.collection('offers').doc(old.id)); // Correção: Verifica ID antes de deletar
                 b.set(db.collection('offers').doc(), pl);
                 await b.commit();
                 postNews(`🚨 **PROPOSTA**\n${user.data.name} > **${target.name}**\n${desc}`, 'transfer');
@@ -268,7 +268,7 @@
                     if(!confirm("Virar Semana?")) return;
                     setLoading(true); const b = db.batch();
                     teams.forEach(t => {
-                        const wage = players.filter(p=>p.teamId===t.id).reduce((acc,p)=>acc+(p.salary||0),0); // Simplificado
+                        const wage = players.filter(p=>p.teamId===t.id).reduce((acc,p)=>acc+(p.salary||0),0); 
                         const spon = t.sponsorship ? t.sponsorship.value : 0;
                         b.update(db.collection('teams').doc(t.id), {balance: (t.balance||0) + spon - wage});
                     });
@@ -393,6 +393,7 @@
                         <div style={{flex:1}}><label>Posição</label><select className="input-field" value={f.position} onChange={e=>setF({...f, position:e.target.value})}>{POS.map(p=><option key={p} value={p}>{p}</option>)}</select></div>
                         <div style={{flex:1}}><label>Overall</label><input className="input-field" type="number" value={f.overall} onChange={e=>setF({...f, overall:e.target.value})} disabled={!isAdmin && initial} /></div>
                     </div>
+                    {/* Campos editáveis */}
                     <div style={{display:'flex', gap:5}}>
                         <div style={{flex:1}}><label>Valor</label><input className="input-field" type="number" value={f.value} onChange={e=>setF({...f, value:e.target.value})} /></div>
                         <div style={{flex:1}}><label>Salário</label><input className="input-field" type="number" value={f.salary} onChange={e=>setF({...f, salary:e.target.value})} /></div>
@@ -445,7 +446,6 @@
             );
         };
 
-        // --- FIXED OFFER FORM ---
         const OfferForm = ({ target, myPlayers, onSend }) => {
             const old = target.oldOffer || {};
             const [t, setT] = useState(old.type || 'COMPRA'); 
@@ -470,7 +470,7 @@
                     {t==='COMPRA' && <div><label>Revenda: {meta.sellOn}%</label><input type="range" style={{width:'100%'}} min="0" max="50" value={meta.sellOn} onChange={e=>setMeta({...meta, sellOn:e.target.value})} /></div>}
 
                     {t==='EMPRESTIMO' && <div style={{background:'#333', padding:10, borderRadius:8, marginBottom:10}}>
-                        <label>Eu pago {meta.wageSplit}% do salário</label><input type="range" style={{width:'100%'}} min="0" max="100" value={meta.wageSplit} onChange={e=>setMeta({...meta, wageSplit:e.target.value})} />
+                        <label>Divisão Salarial (Eu pago {meta.wageSplit}%)</label><input type="range" style={{width:'100%'}} min="0" max="100" value={meta.wageSplit} onChange={e=>setMeta({...meta, wageSplit:e.target.value})} />
                         <label>Opção de Compra</label><input className="input-field" type="number" value={meta.buyOpt} onChange={e=>setMeta({...meta, buyOpt:e.target.value})} />
                     </div>}
 
@@ -505,18 +505,16 @@
             </div>
         );
 
-        // --- FIXED SETTINGS FORM ---
         const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq }) => {
-            const [form, setF] = useState({name: team.name, logo: team.logo, balance: team.balance});
-            
-            // Effect para atualizar caso o time mude (ex: admin mudando de time)
-            useEffect(() => { setF({name: team.name, logo: team.logo, balance: team.balance}); }, [team]);
+            const [form, setF] = useState({name: team.name, logo: team.logo, balance: team.balance, serie: team.serie});
+            useEffect(() => { setF({name: team.name, logo: team.logo, balance: team.balance, serie: team.serie}); }, [team]);
 
             return (
                 <div>
                     <label>Nome</label><input className="input-field" value={form.name} onChange={e=>setF({...form, name:e.target.value})} />
                     <label>Logo (URL)</label><input className="input-field" value={form.logo} onChange={e=>setF({...form, logo:e.target.value})} />
                     {isAdmin && <label>Saldo (ADM)</label>} {isAdmin && <input className="input-field" type="number" value={form.balance} onChange={e=>setF({...form, balance:parseFloat(e.target.value)})} />}
+                    <label>Série</label><select className="input-field" value={form.serie} onChange={e=>setF({...form, serie:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>{s}</option>)}</select>
                     <button className="btn btn-blue" onClick={()=>onUp(form)}>SALVAR</button>
                     <hr style={{borderColor:'#444'}}/>
                     <p>Estádio Nível {team.stadiumLevel||1}</p><button className="btn btn-purple" onClick={onUpgrade}>EVOLUIR (₣ {fmt(COSTS[team.stadiumLevel]||0).replace('₣ ','')})</button>
@@ -528,7 +526,7 @@
         };
 
         const OffersScreen = ({ offers, onAccept, onReject, onCounter }) => (
-            <div><h3>Propostas</h3>{offers.map(o=><div key={o.id} className="card" style={{borderLeft:'4px solid gold'}}><b style={{color:'var(--primary)'}}>{o.playerName}</b><br/><small>De: {o.buyerName}</small><p style={{background:'#333', padding:5, borderRadius:5, fontSize:12, whiteSpace:'pre-wrap'}}>{o.description}</p><div style={{display:'flex', gap:5}}><button className="btn btn-green" onClick={()=>onAccept(o)}>ACEITAR</button><button className="btn btn-blue" onClick={()=>onCounter(o)}>CONTRA</button><button className="btn btn-red" onClick={()=>onReject(o.id)}>RECUSAR</button></div></div>)}</div>
+            <div><h3>Propostas</h3>{offers.map(o=><div key={o.id} className="card" style={{borderLeft:'4px solid gold'}}><b style={{color:'var(--primary)'}}>{o.playerName}</b><br/><small>De: {o.buyerName}</small><p style={{background:'#333', padding:5, borderRadius:5}}>{o.description}</p><div style={{display:'flex', gap:5}}><button className="btn btn-green" onClick={()=>onAccept(o)}>ACEITAR</button><button className="btn btn-blue" onClick={()=>onCounter(o)}>CONTRA</button><button className="btn btn-red" onClick={()=>onReject(o.id)}>RECUSAR</button></div></div>)}</div>
         );
 
         const Ranking = ({ teams, players }) => (

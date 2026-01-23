@@ -173,7 +173,6 @@
                 if(savedId && teams.length > 0) {
                     const found = teams.find(t => t.id === savedId);
                     if(found) {
-                        // VERIFICAÇÃO SE O TIME FOI APROVADO ENQUANTO O USER ESTAVA OFFLINE
                         if(found.status !== 'APPROVED') { localStorage.removeItem('myTeamId'); } 
                         else { setUserTeam(found); }
                     } 
@@ -442,9 +441,6 @@
                 let desc = "", swapPName = "";
                 let offerValue = parseFloat(value || 0);
                 
-                if(type === 'COMPRA' && (isNaN(parseInt(seasons)) || seasons < 1)) return alert("Defina o contrato!");
-                if(type === 'EMPRESTIMO' && !seasons) return alert("Defina o tempo de empréstimo!");
-
                 if(type === 'COMPRA') desc = `Compra: ${fmt(offerValue)}\n📄 Contrato: ${seasons} T.`;
                 if(type === 'EMPRESTIMO') {
                     let dur = seasons === '0.5' ? 'Meia Temporada' : seasons + ' Temporada(s)';
@@ -468,8 +464,7 @@
                     sellerId: recipientId,
                     type,
                     value: offerValue, swapPlayerId: swapPlayerId || null, swapPlayerName: swapPName || null,
-                    offerContract: seasons, 
-                    description: desc
+                    offerContract: seasons, description: desc
                 });
 
                 await batch.commit();
@@ -850,7 +845,6 @@
             const isUserAdminOrVisitor = me === 'admin_user' || me === 'visitor_user';
             const POS_ORDER = { 'GOL': 1, 'ZAG': 2, 'LD': 3, 'LE': 4, 'VOL': 5, 'MC': 6, 'MEI': 7, 'ATA': 8 };
 
-            // TELA INICIAL DO MERCADO (AGORA COM BOTÃO GLOBAL)
             if(viewMode === 'SERIES' && !serie) return (
                 <div>
                     <h3>Mercado</h3>
@@ -862,7 +856,6 @@
             );
 
             if(viewMode === 'SERIES' && !selTeam) {
-                // Filtra times aprovados e exclui o próprio time
                 const list = teams.filter(t => t.serie === serie && t.status === 'APPROVED' && (isUserAdminOrVisitor || t.id !== me));
                 return (
                     <div>
@@ -896,12 +889,10 @@
                 backAction = () => setSelTeam(null);
             }
 
-            // APLICA FILTROS
             if (filter === 'VENDA') playersToShow = playersToShow.filter(p => p.status === 'VENDA');
             if (filter === 'EMPRESTIMO') playersToShow = playersToShow.filter(p => p.status === 'EMPRESTIMO');
             if (filter === 'BLOQUEADO') playersToShow = playersToShow.filter(p => p.status === 'INTRANSFERIVEL');
             
-            // ORDENA
             playersToShow = playersToShow.sort((a,b) => (POS_ORDER[a.position]||99) - (POS_ORDER[b.position]||99));
 
             return (

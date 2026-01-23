@@ -15,42 +15,33 @@
     <style>
         body { background: #121212; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding-bottom: 80px; margin: 0; }
         .container { padding: 15px; }
-        
         .team-logo { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #00E676; background: #333; }
         .rank-logo { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; margin-right: 10px; background: #333; }
         .login-logo-img { width: 120px; height: 120px; object-fit: contain; border-radius: 50%; border: 3px solid #00E676; margin: 0 auto 15px auto; display: block; background: #1e1e1e; }
-
         .card { background: #1E1E1E; padding: 15px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #333; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .player-header { display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 5px; }
         .player-name { font-size: 16px; font-weight: bold; color: white; }
-        
         .pos-badge { font-size: 10px; color: white; padding: 2px 5px; border-radius: 4px; font-weight: bold; margin-right: 5px; vertical-align: middle; text-shadow: 1px 1px 1px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); }
         .mood-icon { font-size: 14px; margin-left: 5px; }
-
         .player-ov { font-size: 16px; font-weight: bold; color: #00E676; background: #003300; padding: 2px 6px; border-radius: 4px; }
         .player-details { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; font-size: 11px; color: #aaa; }
-
         .news-card { background: #252525; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid #888; font-size: 13px; line-height: 1.6; white-space: pre-line; }
         .news-money-plus { border-left-color: #00E676; } .news-money-minus { border-left-color: #d32f2f; } 
         .news-transfer { border-left-color: #2196F3; } .news-new-player { border-left-color: #FFD700; background: #2a2a20; } 
         .news-season { border-left-color: #FF5722; background: #2a1b1b; } .news-infra { border-left-color: #9C27B0; } 
         .news-admin { border-left-color: #ffffff; background: #333; }
         .news-date { font-size: 10px; color: #888; display: block; margin-bottom: 5px; border-bottom: 1px solid #444; padding-bottom: 5px; }
-
         .rank-item { padding: 15px; border-bottom: 1px solid #333; background: #1E1E1E; margin-bottom: 5px; border-radius: 8px; }
         .rank-pos { font-size: 18px; font-weight: bold; color: #666; width: 30px; }
         .rank-1 { color: #FFD700; } .rank-2 { color: #C0C0C0; } .rank-3 { color: #CD7F32; }
         .rank-details { display: flex; justify-content: space-between; font-size: 11px; color: #aaa; margin-top: 5px; border-top: 1px solid #333; padding-top: 5px; }
-
         .btn { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; margin-top: 10px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; }
         .btn-green { background: #00E676; color: black; } .btn-red { background: #d32f2f; color: white; }
         .btn-blue { background: #2196F3; color: white; } .btn-gold { background: #FFD700; color: black; }
         .btn-purple { background: #9C27B0; color: white; } .btn-orange { background: #FF5722; color: white; } 
         .btn-outline { background: transparent; border: 1px solid #666; color: #ccc; }
-        
         .input-field { width: 100%; padding: 12px; background: #2C2C2C; border: 1px solid #333; color: white; border-radius: 8px; margin-bottom: 10px; box-sizing: border-box; }
         .file-input { width: 100%; padding: 10px; background: #333; color: #aaa; border-radius: 8px; margin-bottom: 10px; }
-        
         .bottom-nav { position: fixed; bottom: 0; width: 100%; background: #1a1a1a; display: flex; padding: 10px 0; border-top: 1px solid #333; z-index: 100; }
         .nav-item { flex: 1; text-align: center; color: #888; font-size: 10px; position: relative; }
         .nav-item i { font-size: 18px; margin-bottom: 2px; display: block; }
@@ -58,16 +49,13 @@
         .header { background: #1E1E1E; padding: 15px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; border-bottom: 1px solid #333; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
         .modal-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 99; display: flex; justify-content: center; align-items: center; }
         .modal-card { width: 90%; max-width: 400px; max-height: 90vh; overflow-y: auto; background: #1E1E1E; padding: 20px; border-radius: 12px; border: 1px solid #333; box-sizing: border-box; }
-
         .login-tabs { display: flex; margin-bottom: 20px; border-bottom: 1px solid #333; }
         .tab { flex: 1; padding: 15px; text-align: center; color: #888; cursor: pointer; }
         .tab.active { color: #00E676; border-bottom: 2px solid #00E676; font-weight: bold; }
         .team-list-item { padding: 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-        
         .badge-count { background: #d32f2f; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; position: absolute; top: -5px; right: -5px; }
         .news-badge { position: absolute; top: 5px; right: 28%; width: 10px; height: 10px; background: #FFD700; border-radius: 50%; border: 2px solid #1a1a1a; animation: pulse 2s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
-
         .status-tag { font-size: 10px; padding: 2px 5px; border-radius: 3px; font-weight: bold; display: inline-block; margin-top: 5px;}
         .st-venda { background: #003300; color: #00E676; border: 1px solid #00E676; }
         .st-block { background: #333; color: #888; }
@@ -77,15 +65,12 @@
         .expired-tag { color: #FF5722; font-weight: bold; font-size: 11px; margin-left: 5px; animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.5; } }
         .dev-credits { text-align: center; font-size: 10px; color: #444; margin-top: 20px; padding: 10px; font-weight: bold; letter-spacing: 1px; }
-        
         .switch { position: relative; display: inline-block; width: 40px; height: 20px; vertical-align: middle; margin-left: 10px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 20px; }
         .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider { background-color: #00E676; }
         input:checked + .slider:before { transform: translateX(20px); }
-
-        /* Filtros do Mercado */
         .market-filters { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 10px; }
         .filter-btn { padding: 8px 12px; background: #333; color: #888; border-radius: 20px; font-size: 11px; white-space: nowrap; border: 1px solid #444; cursor: pointer; }
         .filter-btn.active { background: #00E676; color: black; border-color: #00E676; font-weight: bold; }
@@ -572,7 +557,6 @@
                                             </button>
                                         </div>
 
-                                        {/* APROVAÇÃO DE TIMES PENDENTES */}
                                         <div style={{background:'#2a1b1b', padding:10, borderRadius:8, marginBottom:15, border:'1px solid #FF5722'}}>
                                             <h4 style={{margin:0, marginBottom:5, color:'#FF5722'}}>Análise de Novos Times</h4>
                                             {teams.filter(t => t.status === 'PENDING').length === 0 && <p style={{fontSize:12, color:'#666'}}>Nenhum time pendente.</p>}

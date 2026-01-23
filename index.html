@@ -15,33 +15,42 @@
     <style>
         body { background: #121212; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding-bottom: 80px; margin: 0; }
         .container { padding: 15px; }
+        
         .team-logo { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #00E676; background: #333; }
         .rank-logo { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; margin-right: 10px; background: #333; }
         .login-logo-img { width: 120px; height: 120px; object-fit: contain; border-radius: 50%; border: 3px solid #00E676; margin: 0 auto 15px auto; display: block; background: #1e1e1e; }
+
         .card { background: #1E1E1E; padding: 15px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #333; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .player-header { display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 5px; }
         .player-name { font-size: 16px; font-weight: bold; color: white; }
+        
         .pos-badge { font-size: 10px; color: white; padding: 2px 5px; border-radius: 4px; font-weight: bold; margin-right: 5px; vertical-align: middle; text-shadow: 1px 1px 1px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); }
         .mood-icon { font-size: 14px; margin-left: 5px; }
+
         .player-ov { font-size: 16px; font-weight: bold; color: #00E676; background: #003300; padding: 2px 6px; border-radius: 4px; }
         .player-details { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; font-size: 11px; color: #aaa; }
+
         .news-card { background: #252525; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid #888; font-size: 13px; line-height: 1.6; white-space: pre-line; }
         .news-money-plus { border-left-color: #00E676; } .news-money-minus { border-left-color: #d32f2f; } 
         .news-transfer { border-left-color: #2196F3; } .news-new-player { border-left-color: #FFD700; background: #2a2a20; } 
         .news-season { border-left-color: #FF5722; background: #2a1b1b; } .news-infra { border-left-color: #9C27B0; } 
         .news-admin { border-left-color: #ffffff; background: #333; }
         .news-date { font-size: 10px; color: #888; display: block; margin-bottom: 5px; border-bottom: 1px solid #444; padding-bottom: 5px; }
+
         .rank-item { padding: 15px; border-bottom: 1px solid #333; background: #1E1E1E; margin-bottom: 5px; border-radius: 8px; }
         .rank-pos { font-size: 18px; font-weight: bold; color: #666; width: 30px; }
         .rank-1 { color: #FFD700; } .rank-2 { color: #C0C0C0; } .rank-3 { color: #CD7F32; }
         .rank-details { display: flex; justify-content: space-between; font-size: 11px; color: #aaa; margin-top: 5px; border-top: 1px solid #333; padding-top: 5px; }
+
         .btn { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; margin-top: 10px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; }
         .btn-green { background: #00E676; color: black; } .btn-red { background: #d32f2f; color: white; }
         .btn-blue { background: #2196F3; color: white; } .btn-gold { background: #FFD700; color: black; }
         .btn-purple { background: #9C27B0; color: white; } .btn-orange { background: #FF5722; color: white; } 
         .btn-outline { background: transparent; border: 1px solid #666; color: #ccc; }
+        
         .input-field { width: 100%; padding: 12px; background: #2C2C2C; border: 1px solid #333; color: white; border-radius: 8px; margin-bottom: 10px; box-sizing: border-box; }
         .file-input { width: 100%; padding: 10px; background: #333; color: #aaa; border-radius: 8px; margin-bottom: 10px; }
+        
         .bottom-nav { position: fixed; bottom: 0; width: 100%; background: #1a1a1a; display: flex; padding: 10px 0; border-top: 1px solid #333; z-index: 100; }
         .nav-item { flex: 1; text-align: center; color: #888; font-size: 10px; position: relative; }
         .nav-item i { font-size: 18px; margin-bottom: 2px; display: block; }
@@ -49,13 +58,16 @@
         .header { background: #1E1E1E; padding: 15px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; border-bottom: 1px solid #333; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
         .modal-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 99; display: flex; justify-content: center; align-items: center; }
         .modal-card { width: 90%; max-width: 400px; max-height: 90vh; overflow-y: auto; background: #1E1E1E; padding: 20px; border-radius: 12px; border: 1px solid #333; box-sizing: border-box; }
+
         .login-tabs { display: flex; margin-bottom: 20px; border-bottom: 1px solid #333; }
         .tab { flex: 1; padding: 15px; text-align: center; color: #888; cursor: pointer; }
         .tab.active { color: #00E676; border-bottom: 2px solid #00E676; font-weight: bold; }
         .team-list-item { padding: 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        
         .badge-count { background: #d32f2f; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; position: absolute; top: -5px; right: -5px; }
         .news-badge { position: absolute; top: 5px; right: 28%; width: 10px; height: 10px; background: #FFD700; border-radius: 50%; border: 2px solid #1a1a1a; animation: pulse 2s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+
         .status-tag { font-size: 10px; padding: 2px 5px; border-radius: 3px; font-weight: bold; display: inline-block; margin-top: 5px;}
         .st-venda { background: #003300; color: #00E676; border: 1px solid #00E676; }
         .st-block { background: #333; color: #888; }
@@ -65,12 +77,18 @@
         .expired-tag { color: #FF5722; font-weight: bold; font-size: 11px; margin-left: 5px; animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.5; } }
         .dev-credits { text-align: center; font-size: 10px; color: #444; margin-top: 20px; padding: 10px; font-weight: bold; letter-spacing: 1px; }
+        
         .switch { position: relative; display: inline-block; width: 40px; height: 20px; vertical-align: middle; margin-left: 10px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 20px; }
         .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider { background-color: #00E676; }
         input:checked + .slider:before { transform: translateX(20px); }
+
+        /* Filtros do Mercado */
+        .market-filters { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 10px; }
+        .filter-btn { padding: 8px 12px; background: #333; color: #888; border-radius: 20px; font-size: 11px; white-space: nowrap; border: 1px solid #444; cursor: pointer; }
+        .filter-btn.active { background: #00E676; color: black; border-color: #00E676; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -93,6 +111,8 @@
         const STADIUM_COSTS = [0, 5000000, 20000000, 50000000, 100000000];
         const STADIUM_NAMES = ["Campo de Várzea", "Estádio Pequeno", "Arena Moderna", "Arena Mundial", "Templo do Futebol"];
         const POSITIONS = ['GOL', 'ZAG', 'LD', 'LE', 'VOL', 'MC', 'MEI', 'ATA'];
+        const POS_ORDER = { 'GOL': 1, 'ZAG': 2, 'LD': 3, 'LE': 4, 'VOL': 5, 'MC': 6, 'MEI': 7, 'ATA': 8 };
+
         const getPosColor = (pos) => {
             if(!pos) return '#777';
             if(pos === 'GOL') return '#FFD700'; 
@@ -110,6 +130,7 @@
             const [players, setPlayers] = useState([]);
             const [offers, setOffers] = useState([]); 
             const [news, setNews] = useState([]); 
+            const [financeRequests, setFinanceRequests] = useState([]); // PEDIDOS FINANCEIROS
             const [screen, setScreen] = useState('HOME');
             const [loading, setLoading] = useState(true);
             const [showAdmin, setShowAdmin] = useState(false); 
@@ -138,7 +159,12 @@
                     if(snap.exists) setSystemConfig(snap.data());
                     else db.collection('config').doc('system').set({ marketOpen: true });
                 });
-                return () => { unsubT(); unsubP(); unsubN(); unsubC(); }
+                // Escutar pedidos financeiros (apenas se for admin ou para o próprio time)
+                const unsubF = db.collection('financeRequests').onSnapshot(snap => {
+                    setFinanceRequests(snap.docs.map(d => ({id: d.id, ...d.data()})));
+                });
+
+                return () => { unsubT(); unsubP(); unsubN(); unsubC(); unsubF(); }
             }, []);
 
             useEffect(() => {
@@ -208,11 +234,80 @@
             const handleCreateTeam = async (name, bal, serie, password, logo) => {
                 const exist = teams.find(t => t.name.toLowerCase() === name.toLowerCase());
                 if(exist) { alert(`Já existe!`); return; }
-                const ref = await db.collection('teams').add({ name, balance: parseFloat(bal), serie, password, stadiumLevel: 1, logo: logo || null });
+                const ref = await db.collection('teams').add({ name, balance: parseFloat(bal), serie, password, stadiumLevel: 1, logo: logo || null, sponsorship: null });
                 postNews(`🛡️ **NASCE UM GIGANTE!**\n\nO **${name}** acaba de ser fundado!\n💰 Investimento Inicial: ${fmt(bal)}\n🏆 Série: ${serie}`, 'infra');
                 localStorage.setItem('myTeamId', ref.id);
-                setUserTeam({ id: ref.id, name, balance: parseFloat(bal), serie, password, stadiumLevel: 1, logo: logo || null });
+                setUserTeam({ id: ref.id, name, balance: parseFloat(bal), serie, password, stadiumLevel: 1, logo: logo || null, sponsorship: null });
             };
+
+            // --- SISTEMA FINANCEIRO NOVO ---
+            // 1. Clube pede patrocínio ou injeção
+            const requestFinance = async (type, amount, nameOrReason) => {
+                if (!amount || !nameOrReason) return alert("Preencha todos os campos!");
+                await db.collection('financeRequests').add({
+                    teamId: userTeam.id,
+                    teamName: userTeam.name,
+                    type, // 'SPONSORSHIP' ou 'INJECTION'
+                    amount: parseFloat(amount),
+                    details: nameOrReason,
+                    status: 'PENDING',
+                    date: Date.now()
+                });
+                alert("Solicitação enviada para a Federação (ADM)!");
+            };
+
+            // 2. ADM aprova ou recusa
+            const handleFinanceRequest = async (req, action) => {
+                if (action === 'REJECT') {
+                    await db.collection('financeRequests').doc(req.id).update({ status: 'REJECTED' });
+                    return;
+                }
+                // APROVAR
+                const batch = db.batch();
+                const teamRef = db.collection('teams').doc(req.teamId);
+                const reqRef = db.collection('financeRequests').doc(req.id);
+
+                if (req.type === 'INJECTION') {
+                    // Injeção cai na hora
+                    const teamDoc = teams.find(t => t.id === req.teamId);
+                    const newBal = (teamDoc.balance || 0) + req.amount;
+                    batch.update(teamRef, { balance: newBal });
+                    postNews(`💰 **INJEÇÃO DE CAPITAL**\n\nO **${req.teamName}** recebeu um aporte de ${fmt(req.amount)}.\n📝 Motivo: ${req.details}`, 'plus');
+                } else if (req.type === 'SPONSORSHIP') {
+                    // Patrocínio fixa no time (não cai grana agora, só domingo)
+                    batch.update(teamRef, { sponsorship: { name: req.details, value: req.amount } });
+                    postNews(`🤝 **NOVO PATROCÍNIO**\n\nO **${req.teamName}** fechou contrato com **${req.details}**.\n💵 Valor Semanal: ${fmt(req.amount)}`, 'infra');
+                }
+                
+                batch.update(reqRef, { status: 'APPROVED' });
+                await batch.commit();
+                alert("Aprovado com sucesso!");
+            };
+
+            // 3. BOTÃO DE DOMINGO (ADM) - Processa tudo
+            const processWeeklyFinances = async () => {
+                if(!confirm("TEM CERTEZA? Isso vai pagar patrocínios e COBRAR SALÁRIOS de todos os times!")) return;
+                setLoading(true);
+                const batch = db.batch();
+                
+                teams.forEach(t => {
+                    const teamPlayers = players.filter(p => p.teamId === t.id);
+                    const totalSalary = teamPlayers.reduce((acc, p) => acc + (p.salary || 0), 0);
+                    const sponsorIncome = t.sponsorship ? t.sponsorship.value : 0;
+                    
+                    const netChange = sponsorIncome - totalSalary;
+                    const newBalance = (t.balance || 0) + netChange;
+                    
+                    const teamRef = db.collection('teams').doc(t.id);
+                    batch.update(teamRef, { balance: newBalance });
+                });
+
+                await batch.commit();
+                postNews(`📅 **VIRADA DE SEMANA FINANCEIRA**\n\n✅ Patrocínios pagos.\n🔻 Salários debitados.\n\nConfiram seus caixas!`, 'admin');
+                setLoading(false);
+                alert("Semana processada com sucesso!");
+            };
+            // -------------------------------
 
             const adminUpdateBalance = (team) => {
                 const newVal = prompt(`Saldo Atual de ${team.name}: ${fmt(team.balance)}\n\nDigite o NOVO valor exato:`);
@@ -264,18 +359,6 @@
                 db.collection('teams').doc(userTeam.id).update(updateData);
                 setUserTeam({...userTeam, ...updateData});
                 alert("Atualizado!"); setShowAdmin(false);
-            };
-
-            const updateClubFinance = (type, amount, reason) => {
-                const val = parseFloat(amount);
-                let newBal = userTeam.balance;
-                let newsText = "", newsType = "";
-                if(type === 'ENTRADA') { newBal += val; newsText = `💰 **CAIXA CHEIO!**\n${userTeam.name} registrou entrada de ${fmt(val)}.\n📝 Ref: ${reason}`; newsType = 'plus'; }
-                else { newBal -= val; newsText = `💸 **PAGAMENTO EFETUADO**\n${userTeam.name} registrou saída de ${fmt(val)}.\n📝 Ref: ${reason}`; newsType = 'minus'; }
-                db.collection('teams').doc(userTeam.id).update({ balance: newBal });
-                setUserTeam({...userTeam, balance: newBal});
-                postNews(newsText, newsType);
-                alert("Sucesso!"); setShowAdmin(false);
             };
 
             const upgradeStadium = () => {
@@ -367,7 +450,8 @@
                     sellerId: recipientId,
                     type,
                     value: offerValue, swapPlayerId: swapPlayerId || null, swapPlayerName: swapPName || null,
-                    offerContract: seasons, description: desc
+                    offerContract: seasons, 
+                    description: desc
                 });
 
                 await batch.commit();
@@ -464,18 +548,37 @@
                                 {isAdmin ? (
                                     <div className="card">
                                         <h3>👑 PAINEL MASTER</h3>
-                                        <p style={{color:'#888', fontSize:12}}>Gerencie o mundo do futebol.</p>
+                                        <p style={{color:'#888', fontSize:12}}>Gerencie dinheiro, exclua times ou edite elencos.</p>
                                         
-                                        <div style={{background:'#252525', padding:10, borderRadius:8, marginBottom:15, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                            <span style={{color: systemConfig.marketOpen ? '#00E676' : '#FF5722', fontWeight:'bold'}}>
-                                                {systemConfig.marketOpen ? '🟢 MERCADO ABERTO' : '🔴 MERCADO FECHADO'}
-                                            </span>
-                                            <button className="btn" style={{width:'auto', margin:0, padding:'5px 10px', background: systemConfig.marketOpen ? '#d32f2f' : '#00E676'}} onClick={toggleMarket}>
-                                                {systemConfig.marketOpen ? 'FECHAR' : 'ABRIR'}
-                                            </button>
+                                        <div style={{background:'#252525', padding:10, borderRadius:8, marginBottom:15}}>
+                                            <h4 style={{margin:0, marginBottom:10}}>Solicitações Pendentes</h4>
+                                            {financeRequests.filter(r => r.status === 'PENDING').length === 0 && <p style={{fontSize:12, color:'#666'}}>Nenhuma solicitação.</p>}
+                                            {financeRequests.filter(r => r.status === 'PENDING').map(req => (
+                                                <div key={req.id} style={{borderBottom:'1px solid #444', paddingBottom:5, marginBottom:5}}>
+                                                    <div style={{fontSize:12}}><b>{req.teamName}</b> pede {req.type === 'SPONSORSHIP' ? 'Patrocínio' : 'Injeção'}:</div>
+                                                    <div style={{color:'#00E676'}}>{fmt(req.amount)}</div>
+                                                    <div style={{fontSize:11, color:'#aaa'}}>"{req.details}"</div>
+                                                    <div style={{display:'flex', gap:5, marginTop:5}}>
+                                                        <button className="btn-green" style={{padding:'2px 8px', fontSize:10}} onClick={()=>handleFinanceRequest(req, 'APPROVE')}>✔ APROVAR</button>
+                                                        <button className="btn-red" style={{padding:'2px 8px', fontSize:10}} onClick={()=>handleFinanceRequest(req, 'REJECT')}>✖ NEGAR</button>
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
 
-                                        <button className="btn btn-red" onClick={advanceSeason}>VIRAR TEMPORADA AGORA</button>
+                                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                                            <div style={{background:'#252525', padding:10, borderRadius:8, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center'}}>
+                                                <span style={{color: systemConfig.marketOpen ? '#00E676' : '#FF5722', fontWeight:'bold', fontSize:10, marginBottom:5}}>
+                                                    {systemConfig.marketOpen ? 'MERCADO ABERTO' : 'MERCADO FECHADO'}
+                                                </span>
+                                                <button className="btn" style={{width:'100%', margin:0, padding:'5px', fontSize:10, background: systemConfig.marketOpen ? '#d32f2f' : '#00E676'}} onClick={toggleMarket}>
+                                                    {systemConfig.marketOpen ? 'FECHAR JANELA' : 'ABRIR JANELA'}
+                                                </button>
+                                            </div>
+                                            <button className="btn btn-purple" style={{margin:0, fontSize:10}} onClick={processWeeklyFinances}>📅 VIRAR SEMANA (DOMINGO)</button>
+                                        </div>
+
+                                        <button className="btn btn-red" style={{marginTop:15}} onClick={advanceSeason}>VIRAR TEMPORADA AGORA</button>
                                         <div style={{marginTop:15}}>
                                             {teams.map(t => (
                                                 <div key={t.id} style={{padding:10, borderBottom:'1px solid #333', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
@@ -547,7 +650,7 @@
                         </div>
                     </div>
 
-                    {showAdmin && !isAdmin && !isVisitor && <AdminModal currName={userTeam.name} currSerie={userTeam.serie} currLogo={userTeam.logo} stadiumLvl={userTeam.stadiumLevel || 1} onSaveData={updateClubData} onFinance={updateClubFinance} onUpgradeStadium={upgradeStadium} onClose={()=>setShowAdmin(false)} onLogout={doLogout} onUpload={handleImageUpload} />}
+                    {showAdmin && !isAdmin && !isVisitor && <AdminModal currName={userTeam.name} currSerie={userTeam.serie} currLogo={userTeam.logo} stadiumLvl={userTeam.stadiumLevel || 1} onSaveData={updateClubData} onFinanceReq={requestFinance} onUpgradeStadium={upgradeStadium} onClose={()=>setShowAdmin(false)} onLogout={doLogout} onUpload={handleImageUpload} sponsorship={userTeam.sponsorship} />}
                     {showAdmin && isAdmin && <div className="modal-bg"><div className="modal-card"><button className="btn btn-red" onClick={doLogout}>SAIR DO MODO ADMIN</button><button className="btn" onClick={()=>setShowAdmin(false)}>FECHAR</button></div></div>}
                     
                     {showNotif && (
@@ -558,7 +661,7 @@
                                     <div key={o.id} style={{background:'#252525', padding:10, marginBottom:10}}>
                                         <div style={{color:'#00E676'}}>{o.playerName}</div>
                                         <div style={{fontSize:12}}>De: <b>{o.buyerName}</b></div>
-                                        <div style={{fontSize:14, margin:'5px 0', borderLeft: '2px solid #00E676', paddingLeft: 5}}>{o.description}</div>
+                                        <div style={{fontSize:14, margin:'5px 0'}}>{o.description}</div>
                                         <div style={{display:'flex', gap:10}}>
                                             <button className="btn btn-green" style={{fontSize:10}} onClick={()=>acceptOffer(o)}>ACEITAR</button>
                                             <button className="btn btn-blue" style={{fontSize:10}} onClick={()=>handleCounterOffer(o)}>🔄 CONTRAPROPOSTA</button>
@@ -574,6 +677,9 @@
                 </div>
             );
         }
+
+        // --- SUB-COMPONENTES ATUALIZADOS ---
+
         function Ranking({ teams, players }) {
             const list = teams.map(t => {
                 const teamPlayers = players.filter(p => p.teamId === t.id);
@@ -605,22 +711,202 @@
             );
         }
 
-        function AdminModal({ currName, currSerie, currLogo, stadiumLvl, onSaveData, onFinance, onUpgradeStadium, onClose, onLogout, onUpload }) {
+        function LoginScreen({ teams, onLogin, onCreate, onUpload, onAdminLogin, onVisitorLogin }) {
+            const [mode, setMode] = useState('LOGIN'); 
+            const [n, setN] = useState(''); const [b, setB] = useState('10000000');
+            const [s, setS] = useState('A'); const [p, setP] = useState(''); 
+            const [logo, setLogo] = useState(null); 
+            const [selectedTeam, setSelectedTeam] = useState(null); const [loginPass, setLoginPass] = useState('');
+            return (
+                <div style={{padding:0, minHeight:'100vh', background:'#121212'}}>
+                    <div style={{padding:30, paddingBottom:10, textAlign:'center'}}><h1 style={{color:'#00E676', fontSize:24}}>Gerenciador de Times<br/>de Mato Real</h1></div>
+                    <div className="login-tabs">
+                        <div className={`tab ${mode==='LOGIN'?'active':''}`} onClick={()=>setMode('LOGIN')}>ENTRAR</div>
+                        <div className={`tab ${mode==='CREATE'?'active':''}`} onClick={()=>setMode('CREATE')}>CRIAR NOVO</div>
+                    </div>
+                    <div style={{padding:20}}>
+                        {mode === 'LOGIN' ? (
+                            <div>
+                                {teams.length === 0 && <p style={{textAlign:'center'}}>Nenhum time.</p>}
+                                {teams.map(t => (
+                                    <div key={t.id} className="team-list-item" onClick={()=>setSelectedTeam(t)}>
+                                        <div style={{display:'flex', alignItems:'center', gap:10}}>
+                                            {t.logo ? <img src={t.logo} className="team-logo" /> : <div className="team-logo" style={{background:'#555'}}></div>}
+                                            <div><b>{t.name}</b> <br/><small style={{color:'#666'}}>Série {t.serie}</small></div>
+                                        </div>
+                                        <i className="fas fa-lock" style={{color:'#444'}}></i>
+                                    </div>
+                                ))}
+                                <hr style={{borderColor:'#333', margin:'20px 0'}}/>
+                                <button className="btn btn-blue" onClick={onVisitorLogin}>👀 ENTRAR COMO VISITANTE (TORCIDA)</button>
+                                <button className="btn btn-outline" style={{marginTop:10, fontSize:10}} onClick={onAdminLogin}>SOU ADM (MASTER)</button>
+                            </div>
+                        ) : (
+                            <div>
+                                <label style={{fontSize:12, color:'#888'}}>Escudo do Time (Opcional)</label>
+                                {logo && <img src={logo} className="login-logo-img" style={{marginBottom:10}} />}
+                                <input type="file" className="file-input" accept="image/*" onChange={(e) => onUpload(e, (base64) => setLogo(base64))} />
+                                <input className="input-field" placeholder="Nome" value={n} onChange={e=>setN(e.target.value)} />
+                                <input className="input-field" type="number" placeholder="Saldo" value={b} onChange={e=>setB(e.target.value)} />
+                                <select className="input-field" value={s} onChange={e=>setS(e.target.value)}><option>A</option><option>B</option><option>C</option><option>D</option></select>
+                                <p style={{color:'#00E676', fontSize:12, marginTop:10}}>Crie senha (PIN):</p>
+                                <input className="input-field" type="number" placeholder="Senha" value={p} onChange={e=>setP(e.target.value)} />
+                                <button className="btn btn-green" onClick={()=>{ if(n && p) onCreate(n,b,s,p,logo); else alert("Nome e Senha obrigatórios!"); }}>CRIAR</button>
+                            </div>
+                        )}
+                        <div className="dev-credits">Desenvolvido por Nathan Reis</div>
+                    </div>
+                    {selectedTeam && (
+                        <div className="modal-bg">
+                            <div className="modal-card" style={{textAlign:'center'}}>
+                                {selectedTeam.logo && <img src={selectedTeam.logo} className="login-logo-img" />}
+                                <h3>{selectedTeam.name}</h3><p>Senha:</p>
+                                <input className="input-field" type="password" value={loginPass} onChange={e=>setLoginPass(e.target.value)} />
+                                <button className="btn btn-green" onClick={()=>{ if(onLogin(selectedTeam, loginPass)) setSelectedTeam(null); }}>ENTRAR</button>
+                                <button className="btn" style={{marginTop:10, background:'transparent', color:'#888'}} onClick={()=>setSelectedTeam(null)}>Cancelar</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function MyTeam({ ps, onAdd, onUpd, onDel, readOnly, isAdmin, allTeams }) {
+            const [add, setAdd] = useState(false); const [editP, setEditP] = useState(null);
+            const [np, setNp] = useState({n:'', o:'', v:'', sal:'', clause:'', contract:'', pos:'GOL', mood:'😐'}); 
+            const [ep, setEp] = useState({s:'', v:'', o:'', sal:'', clause:'', contract:'', pos:'', forcedTeam:'', mood:''}); 
+            const POSITIONS = ['GOL', 'ZAG', 'LD', 'LE', 'VOL', 'MC', 'MEI', 'ATA'];
+            const POS_ORDER = { 'GOL': 1, 'ZAG': 2, 'LD': 3, 'LE': 4, 'VOL': 5, 'MC': 6, 'MEI': 7, 'ATA': 8 };
+
+            const sortedPlayers = [...ps].sort((a, b) => {
+                const orderA = POS_ORDER[a.position] || 99;
+                const orderB = POS_ORDER[b.position] || 99;
+                return orderA - orderB;
+            });
+
+            if(readOnly) return (
+                <div>
+                    {sortedPlayers.map(p => (
+                        <div key={p.id} className="card">
+                            <div className="player-header"><span className="player-name"><span className="pos-badge" style={{background: getPosColor(p.position)}}>{p.position || '??'}</span>{p.name} {p.loan && <span className="loan-tag">(EMP)</span>} <span className="mood-icon">{p.mood || '😐'}</span></span><span className="player-ov">{p.overall}</span></div>
+                            <div className="player-details"><div className="detail-item">💰 Sal: ₣ {parseFloat(p.salary||0).toLocaleString()}</div><div className="detail-item">💵 Pas: ₣ {parseFloat(p.value||0).toLocaleString()}</div><div className="detail-item">{p.status === 'EXPIRADO' || p.contract === 0 ? <span className="expired-tag">⚠ EXPIRADO</span> : <span>📄 Con: {p.contract} T.</span>}</div><div className="detail-item">🔒 Mul: {p.clause > 0 ? '₣ '+parseFloat(p.clause).toLocaleString() : '--'}</div></div>
+                        </div>
+                    ))}
+                </div>
+            );
+
+            return (
+                <div>
+                    <button className="btn btn-green" style={{background:'#333', color:'white', marginBottom:15}} onClick={()=>setAdd(!add)}>{add ? 'Cancelar' : '+ Novo Jogador'}</button>
+                    {add && (
+                        <div className="card">
+                            <input className="input-field" placeholder="Nome" value={np.n} onChange={e=>setNp({...np, n:e.target.value})} />
+                            <select className="input-field" value={np.pos} onChange={e=>setNp({...np, pos:e.target.value})}>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select>
+                            <input className="input-field" placeholder="Over" type="number" value={np.o} onChange={e=>setNp({...np, o:e.target.value})} />
+                            <input className="input-field" placeholder="Valor" type="number" value={np.v} onChange={e=>setNp({...np, v:e.target.value})} />
+                            <input className="input-field" placeholder="Salário" type="number" value={np.sal} onChange={e=>setNp({...np, sal:e.target.value})} />
+                            <input className="input-field" placeholder="Multa (Opcional)" type="number" value={np.clause} onChange={e=>setNp({...np, clause:e.target.value})} />
+                            <input className="input-field" placeholder="Temporadas (1-10)" type="number" value={np.contract} onChange={e=>setNp({...np, contract:e.target.value})} />
+                            <label style={{color:'#aaa', fontSize:12}}>Humor Inicial:</label>
+                            <select className="input-field" value={np.mood} onChange={e=>setNp({...np, mood:e.target.value})}>
+                                <option value="🤩">🤩 Feliz (Satisfeito)</option>
+                                <option value="😐">😐 Neutro (Normal)</option>
+                                <option value="😡">😡 Indignado (Insatisfeito)</option>
+                            </select>
+                            <button className="btn btn-green" onClick={()=>{onAdd(np.n, np.pos, np.o, np.v, np.sal, np.clause, np.contract, np.mood); setAdd(false);}}>SALVAR</button>
+                        </div>
+                    )}
+                    {editP && (
+                        <div className="modal-bg">
+                            <div className="modal-card">
+                                <h3>Editar {editP.name}</h3>
+                                <label style={{fontSize:12, color:'#888'}}>Status:</label>
+                                <select className="input-field" value={ep.s} onChange={e=>setEp({...ep, s:e.target.value})}>
+                                    <option value="NAO_A_VENDA">Disponível (Não Listado)</option>
+                                    <option value="VENDA">À Venda (Listado)</option>
+                                    <option value="EMPRESTIMO">Para Empréstimo</option>
+                                    <option value="INTRANSFERIVEL">⛔ INTRANSFERÍVEL (Bloqueado)</option>
+                                </select>
+                                <label style={{fontSize:12, color:'#888'}}>Posição:</label><select className="input-field" value={ep.pos} onChange={e=>setEp({...ep, pos:e.target.value})}>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select>
+                                <label style={{fontSize:12, color:'#888'}}>Humor:</label>
+                                <select className="input-field" value={ep.mood} onChange={e=>setEp({...ep, mood:e.target.value})}>
+                                    <option value="🤩">🤩 Feliz</option>
+                                    <option value="😐">😐 Neutro</option>
+                                    <option value="😡">😡 Indignado</option>
+                                </select>
+
+                                <label style={{fontSize:12, color:'#888'}}>Passe:</label><input className="input-field" type="number" value={ep.v} onChange={e=>setEp({...ep, v:e.target.value})} />
+                                <label style={{fontSize:12, color:'#888'}}>Salário:</label><input className="input-field" type="number" value={ep.sal} onChange={e=>setEp({...ep, sal:e.target.value})} />
+                                <label style={{fontSize:12, color:'#FFD700'}}>Multa:</label><input className="input-field" type="number" value={ep.clause} onChange={e=>setEp({...ep, clause:e.target.value})} />
+                                <label style={{fontSize:12, color:'#2196F3'}}>Contrato (Anos):</label><input className="input-field" type="number" value={ep.contract} onChange={e=>setEp({...ep, contract:e.target.value})} />
+                                <label style={{fontSize:12, color:'#888'}}>Over:</label><input className="input-field" type="number" value={ep.o} onChange={e=>setEp({...ep, o:e.target.value})} />
+                                
+                                {isAdmin && (
+                                    <div style={{marginTop:10, padding:10, border:'1px solid #FF5722', borderRadius:8}}>
+                                        <label style={{color:'#FF5722', fontWeight:'bold'}}>⚠ FORÇAR TRANSFERÊNCIA (ADM)</label>
+                                        <select className="input-field" value={ep.forcedTeam} onChange={e=>setEp({...ep, forcedTeam:e.target.value})}>
+                                            <option value="">Manter no time atual</option>
+                                            {allTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                        </select>
+                                    </div>
+                                )}
+
+                                <div style={{display:'flex', gap:10, marginTop:10}}><button className="btn btn-green" onClick={()=>{onUpd(editP.id, ep.s, ep.pos, ep.v, ep.o, ep.sal, ep.clause, ep.contract, ep.forcedTeam, ep.mood); setEditP(null);}}>SALVAR</button><button className="btn btn-red" onClick={()=>{onDel(editP.id); setEditP(null);}}>EXCLUIR</button></div>
+                                <button className="btn" style={{background:'#444', color:'white', marginTop:10}} onClick={()=>setEditP(null)}>CANCELAR</button>
+                            </div>
+                        </div>
+                    )}
+                    {sortedPlayers.map(p => (
+                        <div key={p.id} className="card" onClick={()=>{setEditP(p); setEp({s:p.status, v:p.value, o:p.overall, sal:p.salary||0, clause:p.clause||0, contract:p.contract||0, pos:p.position||'GOL', forcedTeam:'', mood:p.mood||'😐'});}}>
+                            <div className="player-header"><span className="player-name"><span className="pos-badge" style={{background: getPosColor(p.position)}}>{p.position || '??'}</span>{p.name} {p.loan && <span className="loan-tag">(EMP)</span>} <span className="mood-icon">{p.mood || '😐'}</span></span><span className="player-ov">{p.overall}</span></div>
+                            <div className="player-details"><div className="detail-item">💰 Sal: ₣ {parseFloat(p.salary||0).toLocaleString()}</div><div className="detail-item">💵 Pas: ₣ {parseFloat(p.value||0).toLocaleString()}</div><div className="detail-item">{p.status === 'EXPIRADO' || p.contract === 0 ? <span className="expired-tag">⚠ EXPIRADO</span> : <span>📄 Con: {p.contract} T.</span>}</div><div className="detail-item">🔒 Mul: {p.clause > 0 ? '₣ '+parseFloat(p.clause).toLocaleString() : '--'}</div></div>
+                            <div style={{textAlign:'right', marginTop:5}}><small className={`status-tag ${p.status === 'VENDA' ? 'st-venda' : p.status==='INTRANSFERIVEL'?'st-lock':p.status==='EXPIRADO'?'st-exp':'st-block'}`}>{p.status === 'VENDA' ? 'À VENDA' : p.status === 'EMPRESTIMO' ? 'EMPRÉSTIMO' : p.status === 'INTRANSFERIVEL' ? '⛔ BLOQUEADO' : p.status === 'EXPIRADO' ? 'RENOVAR' : 'NORMAL'}</small></div>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        function AdminModal({ currName, currSerie, currLogo, stadiumLvl, onSaveData, onFinanceReq, onUpgradeStadium, onClose, onLogout, onUpload, sponsorship }) {
             const [tab, setTab] = useState('DATA'); 
             const [n, setN] = useState(currName); const [s, setS] = useState(currSerie); const [logo, setLogo] = useState(currLogo); 
-            const [amount, setAmount] = useState(''); const [reason, setReason] = useState('');
+            
+            // Novos States para Pedidos
+            const [reqType, setReqType] = useState('INJECTION'); // ou SPONSORSHIP
+            const [reqAmount, setReqAmount] = useState('');
+            const [reqDetails, setReqDetails] = useState('');
+
             const nextCost = STADIUM_COSTS[stadiumLvl] || 0;
             const nextName = STADIUM_NAMES[stadiumLvl] || "Máximo";
             const isMax = stadiumLvl >= 5;
+            
             return (
                 <div className="modal-bg">
                     <div className="modal-card">
                         <h3 style={{textAlign:'center'}}>Gestão do Clube</h3>
                         <div className="login-tabs" style={{marginBottom:15}}><div className={`tab ${tab==='DATA'?'active':''}`} onClick={()=>setTab('DATA')}>DADOS</div><div className={`tab ${tab==='MONEY'?'active':''}`} onClick={()=>setTab('MONEY')}>FINANÇAS</div></div>
+                        
                         {tab === 'DATA' ? (
                             <div>{logo && <img src={logo} className="login-logo-img" style={{marginBottom:10}} />}<label>Alterar Escudo (Max 200KB)</label><input type="file" className="file-input" accept="image/*" onChange={(e) => onUpload(e, (base64) => setLogo(base64))} /><label>Nome do Clube</label><input className="input-field" value={n} onChange={e=>setN(e.target.value)} /><label>Série</label><select className="input-field" value={s} onChange={e=>setS(e.target.value)}><option>A</option><option>B</option><option>C</option><option>D</option></select><button className="btn btn-blue" onClick={()=>onSaveData(n, s, logo)}>SALVAR DADOS</button><hr style={{borderColor:'#444', margin:'15px 0'}}/><div style={{background:'#2a1b2a', padding:10, borderRadius:8, border:'1px solid #9C27B0'}}><h4 style={{margin:'0 0 10px 0', color:'#9C27B0'}}>🏟 Obras do Estádio</h4><p style={{fontSize:12}}>Atual: <b>{STADIUM_NAMES[stadiumLvl-1]}</b></p>{!isMax ? (<div><p style={{fontSize:12}}>Evoluir para: <b>{nextName}</b></p><button className="btn btn-purple" onClick={onUpgradeStadium}>PAGAR ₣ {nextCost.toLocaleString()}</button></div>) : <p style={{color:'#00E676', fontSize:12}}>Nível Máximo Atingido!</p>}</div></div>
                         ) : (
-                            <div><label>Valor (₣)</label><input className="input-field" type="number" placeholder="Ex: 500000" value={amount} onChange={e=>setAmount(e.target.value)} /><label>Motivo</label><input className="input-field" placeholder="Ex: Salários..." value={reason} onChange={e=>setReason(e.target.value)} /><div style={{display:'flex', gap:10}}><button className="btn btn-green" onClick={()=>onFinance('ENTRADA', amount, reason)}>+ ENTRADA</button><button className="btn btn-red" onClick={()=>onFinance('SAIDA', amount, reason)}>- SAÍDA</button></div></div>
+                            <div>
+                                <div style={{background:'#222', padding:10, borderRadius:5, marginBottom:15}}>
+                                    <small style={{color:'#aaa'}}>Patrocínio Atual:</small><br/>
+                                    {sponsorship ? <span style={{color:'#00E676', fontWeight:'bold'}}>{sponsorship.name} (₣ {parseFloat(sponsorship.value).toLocaleString()}/sem)</span> : <span style={{color:'#666'}}>Nenhum.</span>}
+                                </div>
+
+                                <h4 style={{margin:'0 0 10px 0'}}>Solicitar Verba</h4>
+                                <select className="input-field" value={reqType} onChange={e=>setReqType(e.target.value)}>
+                                    <option value="INJECTION">💰 Injeção Rápida (Cai na hora)</option>
+                                    <option value="SPONSORSHIP">🤝 Novo Patrocínio (Semanal)</option>
+                                </select>
+                                <label>Valor (₣)</label>
+                                <input className="input-field" type="number" placeholder="Ex: 500000" value={reqAmount} onChange={e=>setReqAmount(e.target.value)} />
+                                <label>{reqType === 'SPONSORSHIP' ? 'Nome do Patrocinador' : 'Motivo da Injeção'}</label>
+                                <input className="input-field" placeholder={reqType === 'SPONSORSHIP' ? 'Ex: Nike' : 'Ex: Premiação Título'} value={reqDetails} onChange={e=>setReqDetails(e.target.value)} />
+                                
+                                <button className="btn btn-green" onClick={()=>{onFinanceReq(reqType, reqAmount, reqDetails); onClose();}}>ENVIAR SOLICITAÇÃO</button>
+                            </div>
                         )}
                         <hr style={{borderColor:'#444', margin:'15px 0'}}/><button className="btn" style={{background:'#444', color:'white'}} onClick={onClose}>FECHAR</button><button className="btn btn-red" style={{marginTop:10}} onClick={onLogout}>SAIR (LOGOUT)</button>
                     </div>
@@ -671,7 +957,7 @@
 
         function Market({ me, teams, ps, onOpenOffer, onPayClause, onPreContract, isVisitor, marketOpen }) {
             const [serie, setSerie] = useState(''); const [selTeam, setSelTeam] = useState(null);
-            const [filter, setFilter] = useState('ALL');
+            const [filter, setFilter] = useState('ALL'); // NOVO FILTRO
             
             const isUserAdminOrVisitor = me === 'admin_user' || me === 'visitor_user';
             const POS_ORDER = { 'GOL': 1, 'ZAG': 2, 'LD': 3, 'LE': 4, 'VOL': 5, 'MC': 6, 'MEI': 7, 'ATA': 8 };
@@ -697,6 +983,7 @@
                 );
             }
             
+            // LÓGICA DO FILTRO DE JOGADORES
             let teamPlayers = ps.filter(p => p.teamId === selTeam.id);
             if (filter === 'VENDA') teamPlayers = teamPlayers.filter(p => p.status === 'VENDA');
             if (filter === 'EMPRESTIMO') teamPlayers = teamPlayers.filter(p => p.status === 'EMPRESTIMO');
@@ -709,6 +996,7 @@
                     <button className="btn" style={{background:'#333', color:'white', marginBottom:10}} onClick={()=>setSelTeam(null)}>Voltar</button>
                     <h3>{selTeam.name} {marketOpen ? '' : '(🚫 FECHADO)'}</h3>
                     
+                    {/* BARRA DE FILTROS */}
                     <div className="market-filters">
                         <div className={`filter-btn ${filter==='ALL'?'active':''}`} onClick={()=>setFilter('ALL')}>Todos</div>
                         <div className={`filter-btn ${filter==='VENDA'?'active':''}`} onClick={()=>setFilter('VENDA')}>Venda</div>

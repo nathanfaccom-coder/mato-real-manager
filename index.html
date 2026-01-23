@@ -137,7 +137,6 @@
                     stadiumLevel: 1, logo: logo||null, status: 'PENDING' 
                 });
                 alert("Time criado com sucesso! Aguarde a aprovação da Federação para entrar.");
-                // Não loga automaticamente, volta pra tela de login
             };
 
             const approveTeam = async (teamId, finalBalance) => {
@@ -148,6 +147,20 @@
                 const t = teams.find(x=>x.id===teamId);
                 postNews(`🛡️ **NOVO CLUBE!**\nO **${t.name}** foi aprovado na Série ${t.serie}.`, 'infra');
                 alert("Time aprovado!");
+            };
+
+            const deleteTeam = async (teamId) => {
+                if(!confirm("⚠️ PERIGO: Tem certeza que deseja EXCLUIR este time? Todos os jogadores serão apagados!")) return;
+                const batch = db.batch();
+                // Excluir time
+                batch.delete(db.collection('teams').doc(teamId));
+                // Excluir jogadores
+                const snap = await db.collection('players').where('teamId', '==', teamId).get();
+                snap.docs.forEach(doc => batch.delete(doc.ref));
+                
+                await batch.commit();
+                postNews("🚫 **CLUBE EXTINTO**\nUm time encerrou suas atividades.", 'infra');
+                alert("Time excluído!");
             };
 
             const updateBalance = async (teamId, newBal) => {
@@ -283,7 +296,7 @@
                     <div className="container">
                         {screen === 'HOME' && (
                             user.type === 'ADMIN' ? 
-                            <AdminPanel teams={teams} reqs={reqs} config={conf} onAct={adminAction} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{const b=db.batch(); if(r.type==='INJECTION')b.update(db.collection('teams').doc(r.teamId),{balance:(teams.find(t=>t.id===r.teamId).balance||0)+r.amount}); else b.update(db.collection('teams').doc(r.teamId),{sponsorship:{name:r.details,value:r.amount}}); b.delete(db.collection('financeRequests').doc(r.id)); await b.commit();}} onReject={(rid)=>db.collection('financeRequests').doc(rid).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} /> 
+                            <AdminPanel teams={teams} reqs={reqs} config={conf} onAct={adminAction} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{const b=db.batch(); if(r.type==='INJECTION')b.update(db.collection('teams').doc(r.teamId),{balance:(teams.find(t=>t.id===r.teamId).balance||0)+r.amount}); else b.update(db.collection('teams').doc(r.teamId),{sponsorship:{name:r.details,value:r.amount}}); b.delete(db.collection('financeRequests').doc(r.id)); await b.commit();}} onReject={(rid)=>db.collection('financeRequests').doc(rid).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam} /> 
                             : user.type === 'VISITOR' ? <div style={{textAlign:'center', marginTop:50, color:'#888'}}><h3>Bem-vindo, Visitante!</h3>Use o menu abaixo para navegar.</div>
                             : <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} isVisitor={user.type==='VISITOR'} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />
                         )}
@@ -426,7 +439,7 @@
             );
         };
 
-        const AdminPanel = ({ teams, reqs, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal }) => (
+        const AdminPanel = ({ teams, reqs, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam }) => (
             <div>
                 <h3>Painel Master</h3>
                 <div className="card">
@@ -444,6 +457,7 @@
                         <div style={{display:'flex', gap:5, marginTop:5}}>
                             <input className="input-field" style={{marginBottom:0, width:100}} defaultValue={t.balance} id={`bal-${t.id}`} />
                             <button className="btn btn-green" style={{marginBottom:0}} onClick={()=>onApproveTeam(t.id, document.getElementById(`bal-${t.id}`).value)}>APROVAR</button>
+                            <button className="btn btn-red" style={{marginBottom:0, marginLeft:5}} onClick={()=>onDeleteTeam(t.id)}>X</button>
                         </div>
                     </div>
                 ))}
@@ -458,6 +472,7 @@
                         <div>
                             <button className="btn btn-green" style={{width:'auto', marginRight:5}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button>
                             <button className="btn btn-purple" style={{width:'auto'}} onClick={()=>onEditT(t)}>ELENCO</button>
+                            <button className="btn btn-red" style={{width:'auto', marginLeft:5}} onClick={()=>onDeleteTeam(t.id)}><i className="fas fa-trash"></i></button>
                         </div>
                     </div>
                 ))}

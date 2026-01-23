@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mato Real Manager - Definitive</title>
+    <title>Gerenciador de Times de Mato Real</title>
     
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -86,6 +86,7 @@
             const [modal, setModal] = useState(null);
             const [loading, setLoading] = useState(true);
             const [newNews, setNewNews] = useState(false);
+            const [adminTeam, setAdminTeam] = useState(null); // Time sendo editado pelo admin
 
             useEffect(() => {
                 const unsubs = [
@@ -129,10 +130,11 @@
             };
 
             const savePlayer = async (d) => {
+                const targetTeamId = (user.type==='ADMIN' && adminTeam) ? adminTeam.id : user.data.id;
                 const payload = {
                     name: d.name, position: d.position, overall: parseInt(d.overall), value: parseFloat(d.value),
                     salary: parseFloat(d.salary), clause: parseFloat(d.clause), contract: parseInt(d.contract),
-                    mood: d.mood, status: d.status, teamId: d.teamId || user.data.id, loan: false
+                    mood: d.mood, status: d.status, teamId: d.teamId || targetTeamId, loan: false
                 };
                 if(d.id) {
                     const old = players.find(p=>p.id===d.id);
@@ -143,7 +145,7 @@
                     await db.collection('players').doc(d.id).update(payload);
                 } else {
                     await db.collection('players').add(payload);
-                    postNews(`🆕 **REFORÇO**\n${user.data.name} contrata **${d.name}**.`, 'transfer');
+                    postNews(`🆕 **REFORÇO**\n${(teams.find(t=>t.id===payload.teamId)||{}).name} contrata **${d.name}**.`, 'transfer');
                 }
                 setModal(null);
             };
@@ -201,6 +203,16 @@
 
             const adminAction = async (act, data) => {
                 if(act==='MARKET') { db.collection('config').doc('system').update({marketOpen: data}); postNews(data?"📢 JANELA ABERTA":"🔒 JANELA FECHADA", 'infra'); }
+                if(act==='WEEK') {
+                    if(!confirm("Processar pagamentos semanais?")) return;
+                    setLoading(true); const b = db.batch();
+                    teams.forEach(t => {
+                        const wage = players.filter(p=>p.teamId===t.id).reduce((acc,p)=>acc+(p.salary||0),0);
+                        const spon = t.sponsorship ? t.sponsorship.value : 0;
+                        b.update(db.collection('teams').doc(t.id), {balance: (t.balance||0) + spon - wage});
+                    });
+                    await b.commit(); setLoading(false); postNews("📅 **VIRADA DE SEMANA**\nSalários pagos e patrocínios recebidos.", 'infra'); alert("Semana Virada!");
+                }
                 if(act==='SEASON') {
                     if(!confirm("Virar temporada?")) return;
                     setLoading(true); const b = db.batch(); let m=0;
@@ -217,7 +229,7 @@
 
             // --- RENDER ---
             if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
-            if(!user) return <LoginScreen teams={teams} onLogin={login} onCreate={createTeam} onAdmin={()=>setUser({type:'ADMIN'})} onVisitor={()=>setUser({type:'VISITOR'})} />;
+            if(!user) return <LoginScreen teams={teams} onLogin={login} onCreate={createTeam} onAdmin={()=>setUser({type:'ADMIN'})} onVisitor={()=>{setUser({type:'VISITOR'}); setScreen('RANKING');}} />;
 
             return (
                 <div>
@@ -245,8 +257,17 @@
                     <div className="container">
                         {screen === 'HOME' && (
                             user.type === 'ADMIN' ? 
-                            <AdminPanel teams={teams} reqs={reqs} config={conf} onAct={adminAction} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{const b=db.batch(); if(r.type==='INJECTION')b.update(db.collection('teams').doc(r.teamId),{balance:(teams.find(t=>t.id===r.teamId).balance||0)+r.amount}); else b.update(db.collection('teams').doc(r.teamId),{sponsorship:{name:r.details,value:r.amount}}); b.delete(db.collection('financeRequests').doc(r.id)); await b.commit();}} onReject={(rid)=>db.collection('financeRequests').doc(rid).delete()} onEditT={(t)=>{setUser({type:'ADMIN', data:t}); /*Hack to use User View as Admin*/}} /> 
-                            : <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} isVisitor={user.type==='VISITOR'} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />
+                            <AdminPanel teams={teams} reqs={reqs} config={conf} onAct={adminAction} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{const b=db.batch(); if(r.type==='INJECTION')b.update(db.collection('teams').doc(r.teamId),{balance:(teams.find(t=>t.id===r.teamId).balance||0)+r.amount}); else b.update(db.collection('teams').doc(r.teamId),{sponsorship:{name:r.details,value:r.amount}}); b.delete(db.collection('financeRequests').doc(r.id)); await b.commit();}} onReject={(rid)=>db.collection('financeRequests').doc(rid).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} /> 
+                            : user.type === 'VISITOR' ? <div style={{textAlign:'center', marginTop:50, color:'#888'}}><h3>Bem-vindo, Visitante!</h3>Use o menu abaixo para navegar.</div>
+                            : <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />
+                        )}
+
+                        {screen === 'ADMIN_TEAM' && adminTeam && (
+                            <div>
+                                <button className="btn" style={{background:'#333', marginBottom:10}} onClick={()=>{setAdminTeam(null); setScreen('HOME');}}>⬅ VOLTAR</button>
+                                <h3 style={{color:'var(--purple)'}}>Editando: {adminTeam.name}</h3>
+                                <TeamDashboard team={adminTeam} players={players.filter(p=>p.teamId===adminTeam.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />
+                            </div>
                         )}
 
                         {screen === 'MARKET' && <Market me={user.data?.id} teams={teams} players={players} open={conf.marketOpen} isVis={user.type==='VISITOR'} onNeg={(p)=>setModal({type:'OFFER', data:p})} onPayClause={(p)=>{ if(user.data.balance<p.clause)return alert("Sem saldo"); const b=db.batch(); b.update(db.collection('teams').doc(user.data.id),{balance:user.data.balance-p.clause}); b.update(db.collection('teams').doc(p.teamId),{balance:(teams.find(t=>t.id===p.teamId).balance||0)+p.clause}); b.update(db.collection('players').doc(p.id),{teamId:user.data.id, contract:3, status:'NAO_A_VENDA', loan:false}); b.commit(); postNews(`💣 **MULTA PAGA**\n${user.data.name} roubou ${p.name}!`, 'transfer'); }} onPre={(p)=>{ if(confirm("Pré-contrato?")) { db.collection('players').doc(p.id).update({preContract:{teamId:user.data.id}}); postNews(`📜 **ASSINOU**\n${p.name} vai pro ${user.data.name}.`,'transfer'); } }} />}
@@ -257,7 +278,7 @@
                     </div>
 
                     <div className="bottom-nav">
-                        <div className={`nav-item ${screen==='HOME'?'active':''}`} onClick={()=>setScreen('HOME')}><i className="fas fa-home"></i>{user.type==='ADMIN'?'ADM':'CLUBE'}</div>
+                        <div className={`nav-item ${screen==='HOME'||screen==='ADMIN_TEAM'?'active':''}`} onClick={()=>setScreen('HOME')}><i className="fas fa-home"></i>{user.type==='ADMIN'?'ADM':'CLUBE'}</div>
                         <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>
                         <div className={`nav-item ${screen==='RANKING'?'active':''}`} onClick={()=>setScreen('RANKING')}><i className="fas fa-trophy"></i>RANK</div>
                         <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={()=>{setScreen('NEWS'); setNewNews(false); localStorage.setItem('lastRead', Date.now());}}><i className="fas fa-newspaper"></i>{newNews && <span style={{color:'red'}}>●</span>} NEWS</div>
@@ -280,7 +301,7 @@
             const handleUpload = (e) => { const file=e.target.files[0]; const reader=new FileReader(); reader.onloadend=()=>setF({...f, l:reader.result}); if(file) reader.readAsDataURL(file); };
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
-                    <h1 style={{color:'var(--primary)'}}>MANAGER <span style={{color:'white'}}>DEFINITIVE</span></h1>
+                    <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
                     <div className="login-tabs"><div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div><div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR</div></div>
                     {tab==='LOGIN' ? <div>{teams.map(t=><div key={t.id} className="card" onClick={()=>setSel(t)} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}<div style={{marginTop:20}}><button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button><button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button></div></div> 
                     : <div><input type="file" className="file-input" onChange={handleUpload} /><input className="input-field" placeholder="Nome" value={f.n} onChange={e=>setF({...f, n:e.target.value})} /><input className="input-field" type="number" placeholder="Saldo" value={f.b} onChange={e=>setF({...f, b:e.target.value})} /><select className="input-field" value={f.s} onChange={e=>setF({...f, s:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>Série {s}</option>)}</select><input className="input-field" type="number" placeholder="Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} /><button className="btn btn-green" onClick={()=>onCreate(f.n, f.b, f.s, f.p, f.l)}>CRIAR</button></div>}
@@ -309,9 +330,9 @@
                     <label>Nome</label><input className="input-field" value={f.name} onChange={e=>setF({...f, name:e.target.value})} />
                     <div style={{display:'flex', gap:5}}>
                         <div style={{flex:1}}><label>Posição</label><select className="input-field" value={f.position} onChange={e=>setF({...f, position:e.target.value})}>{POS.map(p=><option key={p} value={p}>{p}</option>)}</select></div>
-                        {isAdmin && <div style={{flex:1}}><label>Overall (Adm)</label><input className="input-field" type="number" value={f.overall} onChange={e=>setF({...f, overall:e.target.value})} /></div>}
+                        <div style={{flex:1}}><label>Overall</label><input className="input-field" type="number" value={f.overall} onChange={e=>setF({...f, overall:e.target.value})} disabled={!isAdmin && initial} /></div>
                     </div>
-                    {/* Owner can edit these now per request */}
+                    {/* Campos editáveis para Dono e Admin */}
                     <div style={{display:'flex', gap:5}}>
                         <div style={{flex:1}}><label>Valor</label><input className="input-field" type="number" value={f.value} onChange={e=>setF({...f, value:e.target.value})} /></div>
                         <div style={{flex:1}}><label>Salário</label><input className="input-field" type="number" value={f.salary} onChange={e=>setF({...f, salary:e.target.value})} /></div>
@@ -384,6 +405,7 @@
                 <h3>Painel Master</h3>
                 <div className="card">
                     <button className={`btn ${config.marketOpen?'btn-red':'btn-green'}`} onClick={()=>onAct('MARKET', !config.marketOpen)}>{config.marketOpen?'FECHAR MERCADO':'ABRIR MERCADO'}</button>
+                    <button className="btn btn-purple" onClick={()=>onAct('WEEK')}>VIRAR SEMANA</button>
                     <button className="btn btn-red" onClick={()=>onAct('SEASON')}>VIRAR TEMPORADA</button>
                     <button className="btn btn-gold" onClick={()=>{ const t=prompt("Título"); const b=prompt("Texto"); if(t)onPost(t,b,'admin'); }}>COMUNICADO</button>
                 </div>

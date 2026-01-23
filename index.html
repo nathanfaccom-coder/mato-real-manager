@@ -238,6 +238,7 @@
                 localStorage.setItem('myTeamId', ref.id);
                 setUserTeam({ id: ref.id, name, balance: parseFloat(bal), serie, password, stadiumLevel: 1, logo: logo || null, sponsorship: null });
             };
+
             // --- SISTEMA FINANCEIRO ---
             const requestFinance = async (type, amount, nameOrReason) => {
                 if (!amount || !nameOrReason) return alert("Preencha todos os campos!");
@@ -294,8 +295,9 @@
                 });
             };
 
-            const updatePlayer = (pid, st, pos, val, ov, sal, clause, seasons, forcedTeamId, mood) => {
-                let updateData = { status: st, position: pos, value: parseFloat(val), overall: parseInt(ov), salary: parseFloat(sal), clause: parseFloat(clause), contract: parseInt(seasons), mood: mood };
+            // FUNÇÃO ATUALIZADA: AGORA ACEITA O NOME (name) PARA EDIÇÃO
+            const updatePlayer = (pid, name, st, pos, val, ov, sal, clause, seasons, forcedTeamId, mood) => {
+                let updateData = { name, status: st, position: pos, value: parseFloat(val), overall: parseInt(ov), salary: parseFloat(sal), clause: parseFloat(clause), contract: parseInt(seasons), mood: mood };
                 if (isAdmin && forcedTeamId) {
                     updateData.teamId = forcedTeamId; updateData.loan = false;
                     postNews(`👮‍♂️ **INTERVENÇÃO DA FEDERAÇÃO**\n\nTransferência compulsória realizada.`, 'admin');
@@ -477,6 +479,7 @@
                             </div>
                         )}
                     </div>
+
                     <div className="bottom-nav">
                         <div className={`nav-item ${screen==='HOME'?'active':''}`} onClick={()=>setScreen('HOME')}><i className="fas fa-home"></i>{isAdmin ? 'ADMIN' : isVisitor ? 'INÍCIO' : 'MEU TIME'}</div>
                         <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>
@@ -693,7 +696,7 @@
         function MyTeam({ ps, onAdd, onUpd, onDel, readOnly, isAdmin, allTeams }) {
             const [add, setAdd] = useState(false); const [editP, setEditP] = useState(null);
             const [np, setNp] = useState({n:'', o:'', v:'', sal:'', clause:'', contract:'', pos:'GOL', mood:'😐'}); 
-            const [ep, setEp] = useState({s:'', v:'', o:'', sal:'', clause:'', contract:'', pos:'', forcedTeam:'', mood:''}); 
+            const [ep, setEp] = useState({n:'', s:'', v:'', o:'', sal:'', clause:'', contract:'', pos:'', forcedTeam:'', mood:''}); 
             const POSITIONS = ['GOL', 'ZAG', 'LD', 'LE', 'VOL', 'MC', 'MEI', 'ATA'];
 
             if(readOnly) return <div>{ps.map(p => <div key={p.id} className="card"><div className="player-header"><span className="player-name"><span className="pos-badge" style={{background: getPosColor(p.position)}}>{p.position}</span>{p.name}</span><span className="player-ov">{p.overall}</span></div></div>)}</div>;
@@ -702,8 +705,8 @@
                 <div>
                     <button className="btn btn-green" style={{background:'#333', color:'white', marginBottom:15}} onClick={()=>setAdd(!add)}>{add ? 'Cancelar' : '+ Novo Jogador'}</button>
                     {add && <div className="card"><input className="input-field" placeholder="Nome" value={np.n} onChange={e=>setNp({...np, n:e.target.value})} /><select className="input-field" value={np.pos} onChange={e=>setNp({...np, pos:e.target.value})}>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select><input className="input-field" placeholder="Over" type="number" value={np.o} onChange={e=>setNp({...np, o:e.target.value})} /><input className="input-field" placeholder="Valor" type="number" value={np.v} onChange={e=>setNp({...np, v:e.target.value})} /><input className="input-field" placeholder="Salário" type="number" value={np.sal} onChange={e=>setNp({...np, sal:e.target.value})} /><input className="input-field" placeholder="Multa" type="number" value={np.clause} onChange={e=>setNp({...np, clause:e.target.value})} /><input className="input-field" placeholder="Contrato" type="number" value={np.contract} onChange={e=>setNp({...np, contract:e.target.value})} /><button className="btn btn-green" onClick={()=>{onAdd(np.n, np.pos, np.o, np.v, np.sal, np.clause, np.contract, np.mood); setAdd(false);}}>SALVAR</button></div>}
-                    {editP && <div className="modal-bg"><div className="modal-card"><h3>Editar {editP.name}</h3><select className="input-field" value={ep.s} onChange={e=>setEp({...ep, s:e.target.value})}><option value="NAO_A_VENDA">Normal</option><option value="VENDA">À Venda</option><option value="EMPRESTIMO">Empréstimo</option><option value="INTRANSFERIVEL">Bloqueado</option></select><input className="input-field" value={ep.v} onChange={e=>setEp({...ep, v:e.target.value})} placeholder="Valor" /><input className="input-field" value={ep.clause} onChange={e=>setEp({...ep, clause:e.target.value})} placeholder="Multa" /><div style={{display:'flex', gap:10}}><button className="btn btn-green" onClick={()=>{onUpd(editP.id, ep.s, ep.pos, ep.v, ep.o, ep.sal, ep.clause, ep.contract, ep.forcedTeam, ep.mood); setEditP(null);}}>SALVAR</button><button className="btn btn-red" onClick={()=>{onDel(editP.id); setEditP(null);}}>EXCLUIR</button></div><button className="btn" style={{marginTop:10}} onClick={()=>setEditP(null)}>CANCELAR</button></div></div>}
-                    {ps.sort((a,b)=>b.overall-a.overall).map(p => <div key={p.id} className="card" onClick={()=>{setEditP(p); setEp({s:p.status, v:p.value, o:p.overall, sal:p.salary||0, clause:p.clause||0, contract:p.contract||0, pos:p.position||'GOL', forcedTeam:'', mood:p.mood||'😐'});}}><div className="player-header"><span className="player-name"><span className="pos-badge" style={{background: getPosColor(p.position)}}>{p.position}</span>{p.name}</span><span className="player-ov">{p.overall}</span></div><div className="player-details"><div className="detail-item">💰 {parseFloat(p.salary||0).toLocaleString()}</div><div className="detail-item">💵 {parseFloat(p.value||0).toLocaleString()}</div></div><div style={{textAlign:'right', marginTop:5}}><small className={`status-tag ${p.status === 'VENDA' ? 'st-venda' : p.status==='INTRANSFERIVEL'?'st-lock':'st-block'}`}>{p.status}</small></div></div>)}
+                    {editP && <div className="modal-bg"><div className="modal-card"><h3>Editar Jogador</h3><label>Nome:</label><input className="input-field" value={ep.n} onChange={e=>setEp({...ep, n:e.target.value})} /><label>Status:</label><select className="input-field" value={ep.s} onChange={e=>setEp({...ep, s:e.target.value})}><option value="NAO_A_VENDA">Normal</option><option value="VENDA">À Venda</option><option value="EMPRESTIMO">Empréstimo</option><option value="INTRANSFERIVEL">Bloqueado</option></select><label>Posição:</label><select className="input-field" value={ep.pos} onChange={e=>setEp({...ep, pos:e.target.value})}>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select><label>Over:</label><input className="input-field" value={ep.o} onChange={e=>setEp({...ep, o:e.target.value})} /><label>Valor:</label><input className="input-field" value={ep.v} onChange={e=>setEp({...ep, v:e.target.value})} /><label>Salário:</label><input className="input-field" value={ep.sal} onChange={e=>setEp({...ep, sal:e.target.value})} /><label>Multa:</label><input className="input-field" value={ep.clause} onChange={e=>setEp({...ep, clause:e.target.value})} /><div style={{display:'flex', gap:10}}><button className="btn btn-green" onClick={()=>{onUpd(editP.id, ep.n, ep.s, ep.pos, ep.v, ep.o, ep.sal, ep.clause, ep.contract, ep.forcedTeam, ep.mood); setEditP(null);}}>SALVAR TUDO</button><button className="btn btn-red" onClick={()=>{onDel(editP.id); setEditP(null);}}>EXCLUIR</button></div><button className="btn" style={{marginTop:10}} onClick={()=>setEditP(null)}>CANCELAR</button></div></div>}
+                    {ps.sort((a,b)=>b.overall-a.overall).map(p => <div key={p.id} className="card" onClick={()=>{setEditP(p); setEp({n:p.name, s:p.status, v:p.value, o:p.overall, sal:p.salary||0, clause:p.clause||0, contract:p.contract||0, pos:p.position||'GOL', forcedTeam:'', mood:p.mood||'😐'});}}><div className="player-header"><span className="player-name"><span className="pos-badge" style={{background: getPosColor(p.position)}}>{p.position}</span>{p.name}</span><span className="player-ov">{p.overall}</span></div><div className="player-details"><div className="detail-item">💰 {parseFloat(p.salary||0).toLocaleString()}</div><div className="detail-item">💵 {parseFloat(p.value||0).toLocaleString()}</div></div><div style={{textAlign:'right', marginTop:5}}><small className={`status-tag ${p.status === 'VENDA' ? 'st-venda' : p.status==='INTRANSFERIVEL'?'st-lock':'st-block'}`}>{p.status}</small></div></div>)}
                 </div>
             );
         }

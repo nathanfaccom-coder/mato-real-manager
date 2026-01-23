@@ -18,8 +18,6 @@
         
         .team-logo { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #00E676; background: #333; }
         .rank-logo { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; margin-right: 10px; background: #333; }
-        
-        /* CORREÇÃO DO LOGO NO LOGIN */
         .login-logo-img { width: 120px; height: 120px; object-fit: contain; border-radius: 50%; border: 3px solid #00E676; margin: 0 auto 15px auto; display: block; background: #1e1e1e; }
 
         .card { background: #1E1E1E; padding: 15px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #333; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
@@ -50,12 +48,10 @@
         .file-input { width: 100%; padding: 10px; background: #333; color: #aaa; border-radius: 8px; margin-bottom: 10px; }
         
         .bottom-nav { position: fixed; bottom: 0; width: 100%; background: #1a1a1a; display: flex; padding: 10px 0; border-top: 1px solid #333; z-index: 100; }
-        .nav-item { flex: 1; text-align: center; color: #888; font-size: 10px; }
+        .nav-item { flex: 1; text-align: center; color: #888; font-size: 10px; position: relative; }
         .nav-item i { font-size: 18px; margin-bottom: 2px; display: block; }
         .nav-item.active { color: #00E676; }
         .header { background: #1E1E1E; padding: 15px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; border-bottom: 1px solid #333; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
-        
-        /* CORREÇÃO DO MODAL MOBILE */
         .modal-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 99; display: flex; justify-content: center; align-items: center; }
         .modal-card { width: 90%; max-width: 400px; max-height: 90vh; overflow-y: auto; background: #1E1E1E; padding: 20px; border-radius: 12px; border: 1px solid #333; box-sizing: border-box; }
 
@@ -63,8 +59,12 @@
         .tab { flex: 1; padding: 15px; text-align: center; color: #888; cursor: pointer; }
         .tab.active { color: #00E676; border-bottom: 2px solid #00E676; font-weight: bold; }
         .team-list-item { padding: 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-        .badge-count { background: #d32f2f; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; position: absolute; top: -5px; right: -5px; }
         
+        /* BOLINHAS DE NOTIFICAÇÃO */
+        .badge-count { background: #d32f2f; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; position: absolute; top: -5px; right: -5px; }
+        .news-badge { position: absolute; top: 5px; right: 28%; width: 10px; height: 10px; background: #FFD700; border-radius: 50%; border: 2px solid #1a1a1a; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+
         .status-tag { font-size: 10px; padding: 2px 5px; border-radius: 3px; font-weight: bold; display: inline-block; margin-top: 5px;}
         .st-venda { background: #003300; color: #00E676; border: 1px solid #00E676; }
         .st-block { background: #333; color: #888; }
@@ -109,17 +109,28 @@
             const [showAdmin, setShowAdmin] = useState(false); 
             const [showNotif, setShowNotif] = useState(false); 
             const [offerModal, setOfferModal] = useState(null);
+            const [hasNewNews, setHasNewNews] = useState(false); // NOVA BOLINHA
 
             const fmt = (v) => "R$ " + parseFloat(v||0).toLocaleString();
 
             useEffect(() => {
                 const unsubT = db.collection('teams').onSnapshot(snap => setTeams(snap.docs.map(d => ({id: d.id, ...d.data()}))));
                 const unsubP = db.collection('players').onSnapshot(snap => setPlayers(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+                
+                // MONITORAMENTO DE NOTÍCIAS PARA A BOLINHA
                 const unsubN = db.collection('news').onSnapshot(snap => {
                     const list = snap.docs.map(d => ({id: d.id, ...d.data()}));
                     list.sort((a,b) => b.date - a.date); 
                     setNews(list);
                     setLoading(false);
+
+                    // Lógica da Bolinha: Se a notícia mais recente for nova, acende.
+                    if (list.length > 0) {
+                        const lastRead = localStorage.getItem('lastReadNewsTime');
+                        if (!lastRead || list[0].date > parseInt(lastRead)) {
+                            setHasNewNews(true);
+                        }
+                    }
                 });
                 return () => { unsubT(); unsubP(); unsubN(); }
             }, []);
@@ -149,6 +160,15 @@
                 reader.readAsDataURL(file);
             };
             const postNews = (text, type='normal') => db.collection('news').add({ text, type, date: Date.now() });
+
+            // FUNÇÃO PARA ABRIR NOTÍCIAS E APAGAR A BOLINHA
+            const openNewsScreen = () => {
+                setScreen('NEWS');
+                setHasNewNews(false);
+                if(news.length > 0) {
+                    localStorage.setItem('lastReadNewsTime', news[0].date.toString());
+                }
+            };
 
             const handleLogin = (team, inputPassword) => {
                 if (inputPassword === team.password) {
@@ -310,6 +330,7 @@
                     swapPName = myP.name;
                     desc = `Troca: ${fmt(value||0)} + ${myP.name}\n📄 Contrato: ${offerSeasons} T.`;
                 }
+                
                 await db.collection('offers').add({
                     playerId: targetPlayer.id, playerName: targetPlayer.name,
                     buyerId: userTeam.id, buyerName: userTeam.name,
@@ -318,12 +339,10 @@
                     offerContract: offerSeasons, description: desc
                 });
 
-                // --- PLANTÃO DE NOTÍCIAS (PROPOSTA ENVIADA) ---
                 const targetTeam = teams.find(t => t.id === targetPlayer.teamId);
                 const targetTeamName = targetTeam ? targetTeam.name : "Clube Rival";
                 const newsMsg = `🚨 **PLANTÃO URGENTE: PROPOSTA!**\n\nO **${userTeam.name}** acaba de enviar uma proposta oficial por **${targetPlayer.name}**!\n\n📋 **Detalhes:**\n${desc}\n\n⏳ A decisão agora é do **${targetTeamName}**. Aceitar ou recusar?`;
                 postNews(newsMsg, 'transfer');
-                // ---------------------------------------------
 
                 alert("Proposta enviada! O mercado ficou sabendo."); setOfferModal(null);
             };
@@ -331,7 +350,7 @@
             const acceptOffer = async (offer) => {
                 const buyer = teams.find(t => t.id === offer.buyerId);
                 const player = players.find(p => p.id === offer.playerId);
-                if(!player || !buyer) { deleteOffer(offer); return; } // Mudei para passar o objeto todo
+                if(!player || !buyer) { deleteOffer(offer); return; }
                 const batch = db.batch();
                 if(offer.type === 'COMPRA') {
                     if(buyer.balance < offer.value) return alert("Sem saldo!");
@@ -358,10 +377,7 @@
             const deleteOffer = async (offer) => { 
                 if(confirm("Recusar esta proposta?")) {
                     await db.collection('offers').doc(offer.id).delete();
-                    
-                    // --- PLANTÃO DE NOTÍCIAS (PROPOSTA RECUSADA) ---
                     postNews(`❌ **NEGÓCIO MELADO!**\n\nO **${userTeam.name}** RECUSOU a investida do **${offer.buyerName}** pelo jogador **${offer.playerName}**.`, 'minus');
-                    // -----------------------------------------------
                 }
             };
             const doLogout = () => { localStorage.removeItem('myTeamId'); window.location.reload(); };
@@ -445,7 +461,13 @@
                         <div className={`nav-item ${screen==='HOME'?'active':''}`} onClick={()=>setScreen('HOME')}><i className="fas fa-home"></i>{isAdmin ? 'ADMIN' : isVisitor ? 'INÍCIO' : 'MEU TIME'}</div>
                         <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>
                         <div className={`nav-item ${screen==='RANKING'?'active':''}`} onClick={()=>setScreen('RANKING')}><i className="fas fa-trophy"></i>RANKING</div>
-                        <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={()=>setScreen('NEWS')}><i className="fas fa-newspaper"></i>NOTÍCIAS</div>
+                        
+                        {/* AQUI ESTÁ A NOVA LÓGICA DA BOLINHA DE NOTÍCIAS */}
+                        <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={openNewsScreen}>
+                            <i className="fas fa-newspaper"></i>
+                            {hasNewNews && <span className="news-badge"></span>}
+                            NOTÍCIAS
+                        </div>
                     </div>
 
                     {showAdmin && !isAdmin && !isVisitor && <AdminModal currName={userTeam.name} currSerie={userTeam.serie} currLogo={userTeam.logo} stadiumLvl={userTeam.stadiumLevel || 1} onSaveData={updateClubData} onFinance={updateClubFinance} onUpgradeStadium={upgradeStadium} onClose={()=>setShowAdmin(false)} onLogout={doLogout} onUpload={handleImageUpload} />}

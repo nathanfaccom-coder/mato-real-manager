@@ -68,11 +68,20 @@
         .status-tag { font-size: 10px; padding: 2px 5px; border-radius: 3px; font-weight: bold; display: inline-block; margin-top: 5px;}
         .st-venda { background: #003300; color: #00E676; border: 1px solid #00E676; }
         .st-block { background: #333; color: #888; }
+        .st-lock { background: #330000; color: #ff5252; border: 1px solid #ff5252; }
         .st-exp { background: #330000; color: #ff5252; border: 1px solid #ff5252; animation: blink 1s infinite; }
         .contract-tag { color: #2196F3; font-weight: bold; font-size: 11px; margin-left: 5px; }
         .expired-tag { color: #FF5722; font-weight: bold; font-size: 11px; margin-left: 5px; animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.5; } }
         .dev-credits { text-align: center; font-size: 10px; color: #444; margin-top: 20px; padding: 10px; font-weight: bold; letter-spacing: 1px; }
+        
+        /* Toggle Switch */
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; vertical-align: middle; margin-left: 10px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #00E676; }
+        input:checked + .slider:before { transform: translateX(20px); }
     </style>
 </head>
 <body>
@@ -110,7 +119,7 @@
             const [showNotif, setShowNotif] = useState(false); 
             const [offerModal, setOfferModal] = useState(null);
             const [hasNewNews, setHasNewNews] = useState(false);
-            const [adminViewingTeam, setAdminViewingTeam] = useState(null); // NOVO: Admin vendo elenco alheio
+            const [adminViewingTeam, setAdminViewingTeam] = useState(null); 
 
             const fmt = (v) => "R$ " + parseFloat(v||0).toLocaleString();
 
@@ -175,14 +184,14 @@
             const handleAdminLogin = () => {
                 const pass = prompt("Digite a Senha MESTRE (ADM):");
                 if(pass === '2503') {
-                    setUserTeam({ name: "SUPER ADMIN", id: "admin_user" }); // ID fictício para não quebrar
+                    setUserTeam({ name: "SUPER ADMIN", id: "admin_user" });
                     setIsAdmin(true);
                     setIsVisitor(false);
                 } else { alert("Acesso Negado."); }
             };
 
             const handleVisitorLogin = () => {
-                setUserTeam({ name: "VISITANTE", id: "visitor_user" }); // ID fictício
+                setUserTeam({ name: "VISITANTE", id: "visitor_user" });
                 setIsAdmin(false);
                 setIsVisitor(true);
                 setScreen('RANKING'); 
@@ -191,10 +200,16 @@
             const handleCreateTeam = async (name, bal, serie, password, logo) => {
                 const exist = teams.find(t => t.name.toLowerCase() === name.toLowerCase());
                 if(exist) { alert(`Já existe!`); return; }
-                const ref = await db.collection('teams').add({ name, balance: parseFloat(bal), serie, password, stadiumLevel: 1, logo: logo || null });
+                const ref = await db.collection('teams').add({ name, balance: parseFloat(bal), serie, password, stadiumLevel: 1, logo: logo || null, allowOffers: true });
                 postNews(`🛡️ **NOVO CLUBE NA ÁREA!**\n\nO **${name}** acaba de ser fundado!\n💰 Investimento Inicial: ${fmt(bal)}\n🏆 Série: ${serie}`, 'infra');
                 localStorage.setItem('myTeamId', ref.id);
-                setUserTeam({ id: ref.id, name, balance: parseFloat(bal), serie, password, stadiumLevel: 1, logo: logo || null });
+                setUserTeam({ id: ref.id, name, balance: parseFloat(bal), serie, password, stadiumLevel: 1, logo: logo || null, allowOffers: true });
+            };
+
+            const toggleAllowOffers = () => {
+                const newState = !userTeam.allowOffers;
+                db.collection('teams').doc(userTeam.id).update({ allowOffers: newState });
+                setUserTeam({...userTeam, allowOffers: newState});
             };
 
             const adminUpdateBalance = (team) => {
@@ -320,7 +335,7 @@
                 setUserTeam({...userTeam, balance: userTeam.balance - player.clause});
             };
 
-            const sendComplexOffer = async (targetPlayer, type, value, swapPlayerId, seasons) => {
+            const sendComplexOffer = async (targetPlayer, type, value, swapPlayerId, seasons, oldOfferId) => {
                 let desc = "", swapPName = "";
                 let offerSeasons = parseInt(seasons);
                 if(type !== 'EMPRESTIMO' && (isNaN(offerSeasons) || offerSeasons < 1 || offerSeasons > 10)) return alert("Defina contrato!");
@@ -332,7 +347,15 @@
                     desc = `Troca: ${fmt(value||0)} + ${myP.name}\n📄 Contrato: ${offerSeasons} T.`;
                 }
                 
-                await db.collection('offers').add({
+                const batch = db.batch();
+                
+                // Se for contraproposta, deleta a antiga
+                if(oldOfferId) {
+                    batch.delete(db.collection('offers').doc(oldOfferId));
+                }
+
+                const newOfferRef = db.collection('offers').doc();
+                batch.set(newOfferRef, {
                     playerId: targetPlayer.id, playerName: targetPlayer.name,
                     buyerId: userTeam.id, buyerName: userTeam.name,
                     sellerId: targetPlayer.teamId, type,
@@ -340,12 +363,20 @@
                     offerContract: offerSeasons, description: desc
                 });
 
+                await batch.commit();
+
                 const targetTeam = teams.find(t => t.id === targetPlayer.teamId);
                 const targetTeamName = targetTeam ? targetTeam.name : "Clube Rival";
-                const newsMsg = `🚨 **PLANTÃO URGENTE: PROPOSTA!**\n\nO **${userTeam.name}** acaba de enviar uma proposta oficial por **${targetPlayer.name}**!\n\n📋 **Detalhes:**\n${desc}\n\n⏳ A decisão agora é do **${targetTeamName}**. Aceitar ou recusar?`;
+                
+                // MENSAGEM DIFERENTE SE FOR RÉPLICA
+                const title = oldOfferId ? "🔄 RÉPLICA (CONTRAPROPOSTA)" : "🚨 PLANTÃO URGENTE: PROPOSTA!";
+                const newsMsg = `${title}\n\nO **${userTeam.name}** enviou uma oferta oficial por **${targetPlayer.name}**!\n\n📋 **Detalhes:**\n${desc}\n\n⏳ A bola está com o **${targetTeamName}**!`;
+                
                 postNews(newsMsg, 'transfer');
 
-                alert("Proposta enviada! O mercado ficou sabendo."); setOfferModal(null);
+                alert(oldOfferId ? "Contraproposta enviada!" : "Proposta enviada!"); 
+                setOfferModal(null);
+                setShowNotif(false);
             };
 
             const acceptOffer = async (offer) => {
@@ -381,6 +412,19 @@
                     postNews(`❌ **NEGÓCIO MELADO!**\n\nO **${userTeam.name}** RECUSOU a investida do **${offer.buyerName}** pelo jogador **${offer.playerName}**.`, 'minus');
                 }
             };
+            
+            // PREPARAR CONTRAPROPOSTA
+            const handleCounterOffer = (offer) => {
+                // Inverte os papéis: Quem era comprador vira vendedor, etc.
+                // Mas aqui a gente só abre o modal com os dados do jogador
+                const p = players.find(pl => pl.id === offer.playerId);
+                if(!p) return alert("Jogador não encontrado!");
+                
+                // Abre o modal de oferta normal, mas passando o ID da oferta antiga pra deletar
+                setOfferModal({ ...p, isCounter: true, oldOfferId: offer.id, oldVal: offer.value });
+                setShowNotif(false);
+            };
+
             const doLogout = () => { localStorage.removeItem('myTeamId'); window.location.reload(); };
 
             if(loading) return <div style={{padding:20}}>Carregando Manager...</div>;
@@ -443,6 +487,17 @@
                                                 <div><small style={{color:'#9C27B0', fontWeight:'bold'}}>ESTÁDIO (Nvl {userTeam.stadiumLevel || 1})</small><div style={{fontSize:16, fontWeight:'bold'}}>{STADIUM_NAMES[(userTeam.stadiumLevel || 1) - 1]}</div></div>
                                                 <button className="btn btn-purple" style={{width:'auto', padding:'5px 10px', fontSize:10, marginTop:0}} onClick={()=>setShowAdmin(true)}>EVOLUIR <i className="fas fa-arrow-up"></i></button>
                                             </div>
+                                            
+                                            {/* TOGGLE DE PERMITIR PROPOSTAS */}
+                                            <div style={{marginTop:10, padding:10, background:'#252525', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+                                                <span style={{fontSize:12, color: userTeam.allowOffers !== false ? '#00E676' : '#FF5722'}}>
+                                                    {userTeam.allowOffers !== false ? '🟢 JANELA ABERTA (Recebendo Propostas)' : '🔴 JANELA FECHADA (Recusando Tudo)'}
+                                                </span>
+                                                <label className="switch">
+                                                    <input type="checkbox" checked={userTeam.allowOffers !== false} onChange={toggleAllowOffers} />
+                                                    <span className="slider"></span>
+                                                </label>
+                                            </div>
                                         </div>
                                         <MyTeam ps={players.filter(p => p.teamId === userTeam.id)} onAdd={addPlayer} onUpd={updatePlayer} onDel={deletePlayer} readOnly={false} isAdmin={false} allTeams={teams} />
                                     </div>
@@ -491,7 +546,11 @@
                                         <div style={{color:'#00E676'}}>{o.playerName}</div>
                                         <div style={{fontSize:12}}>De: <b>{o.buyerName}</b></div>
                                         <div style={{fontSize:14, margin:'5px 0'}}>{o.description}</div>
-                                        <div style={{display:'flex', gap:10}}><button className="btn btn-green" onClick={()=>acceptOffer(o)}>ACEITAR</button><button className="btn btn-red" onClick={()=>deleteOffer(o)}>RECUSAR</button></div>
+                                        <div style={{display:'flex', gap:10}}>
+                                            <button className="btn btn-green" style={{fontSize:10}} onClick={()=>acceptOffer(o)}>ACEITAR</button>
+                                            <button className="btn btn-blue" style={{fontSize:10}} onClick={()=>handleCounterOffer(o)}>🔄 CONTRAPROPOSTA</button>
+                                            <button className="btn btn-red" style={{fontSize:10}} onClick={()=>deleteOffer(o)}>RECUSAR</button>
+                                        </div>
                                     </div>
                                 ))}
                                 <button className="btn" onClick={()=>setShowNotif(false)}>FECHAR</button>
@@ -502,6 +561,8 @@
                 </div>
             );
         }
+
+        // --- SUB-COMPONENTES ATUALIZADOS ---
 
         function Ranking({ teams, players }) {
             const list = teams.map(t => {
@@ -630,7 +691,13 @@
                         <div className="modal-bg">
                             <div className="modal-card">
                                 <h3>Editar {editP.name}</h3>
-                                <label style={{fontSize:12, color:'#888'}}>Status:</label><select className="input-field" value={ep.s} onChange={e=>setEp({...ep, s:e.target.value})}><option value="NAO_A_VENDA">Bloqueado</option><option value="VENDA">À Venda</option><option value="EMPRESTIMO">Empréstimo</option></select>
+                                <label style={{fontSize:12, color:'#888'}}>Status:</label>
+                                <select className="input-field" value={ep.s} onChange={e=>setEp({...ep, s:e.target.value})}>
+                                    <option value="NAO_A_VENDA">Disponível (Não Listado)</option>
+                                    <option value="VENDA">À Venda (Listado)</option>
+                                    <option value="EMPRESTIMO">Para Empréstimo</option>
+                                    <option value="INTRANSFERIVEL">⛔ INTRANSFERÍVEL (Bloqueado)</option>
+                                </select>
                                 <label style={{fontSize:12, color:'#888'}}>Posição:</label><select className="input-field" value={ep.pos} onChange={e=>setEp({...ep, pos:e.target.value})}>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select>
                                 <label style={{fontSize:12, color:'#888'}}>Passe:</label><input className="input-field" type="number" value={ep.v} onChange={e=>setEp({...ep, v:e.target.value})} />
                                 <label style={{fontSize:12, color:'#888'}}>Salário:</label><input className="input-field" type="number" value={ep.sal} onChange={e=>setEp({...ep, sal:e.target.value})} />
@@ -657,60 +724,9 @@
                         <div key={p.id} className="card" onClick={()=>{setEditP(p); setEp({s:p.status, v:p.value, o:p.overall, sal:p.salary||0, clause:p.clause||0, contract:p.contract||0, pos:p.position||'GOL', forcedTeam:''});}}>
                             <div className="player-header"><span className="player-name"><span className="player-pos">{p.position || '??'}</span>{p.name} {p.loan && <span className="loan-tag">(EMP)</span>}</span><span className="player-ov">{p.overall}</span></div>
                             <div className="player-details"><div className="detail-item">💰 Sal: R$ {parseFloat(p.salary||0).toLocaleString()}</div><div className="detail-item">💵 Pas: R$ {parseFloat(p.value||0).toLocaleString()}</div><div className="detail-item">{p.status === 'EXPIRADO' || p.contract === 0 ? <span className="expired-tag">⚠ EXPIRADO</span> : <span>📄 Con: {p.contract} T.</span>}</div><div className="detail-item">🔒 Mul: {p.clause > 0 ? 'R$ '+parseFloat(p.clause).toLocaleString() : '--'}</div></div>
-                            <div style={{textAlign:'right', marginTop:5}}><small className={`status-tag ${p.status === 'VENDA' ? 'st-venda' : p.status==='EXPIRADO'?'st-exp':'st-block'}`}>{p.status === 'VENDA' ? 'À VENDA' : p.status === 'EMPRESTIMO' ? 'EMPRÉSTIMO' : p.status === 'EXPIRADO' ? 'RENOVAR' : 'BLOQUEADO'}</small></div>
+                            <div style={{textAlign:'right', marginTop:5}}><small className={`status-tag ${p.status === 'VENDA' ? 'st-venda' : p.status==='INTRANSFERIVEL'?'st-lock':p.status==='EXPIRADO'?'st-exp':'st-block'}`}>{p.status === 'VENDA' ? 'À VENDA' : p.status === 'EMPRESTIMO' ? 'EMPRÉSTIMO' : p.status === 'INTRANSFERIVEL' ? '⛔ BLOQUEADO' : p.status === 'EXPIRADO' ? 'RENOVAR' : 'NORMAL'}</small></div>
                         </div>
                     ))}
-                </div>
-            );
-        }
-
-        function Market({ me, teams, ps, onOpenOffer, onPayClause, onPreContract, isVisitor }) {
-            const [serie, setSerie] = useState(''); const [selTeam, setSelTeam] = useState(null);
-            
-            // CORREÇÃO AQUI: Se for Admin ou Visitante, não filtre por ID (pois eles não têm ID de time real)
-            const isUserAdminOrVisitor = me === 'admin_user' || me === 'visitor_user';
-
-            if(!serie) return (<div><h3>Escolha a Série</h3>{['A','B','C','D'].map(s => <div key={s} className="card" onClick={()=>setSerie(s)}><b>Série {s}</b></div>)}</div>);
-            
-            if(!selTeam) {
-                // CORREÇÃO: Filtra para não mostrar o próprio time (se for time) ou mostra todos (se for Admin/Visitante)
-                const list = teams.filter(t => t.serie === serie && (isUserAdminOrVisitor || t.id !== me));
-                return (
-                    <div>
-                        <button className="btn" style={{background:'#333', color:'white', marginBottom:10}} onClick={()=>setSerie('')}>Voltar</button>
-                        <h3>Clubes Série {serie}</h3>
-                        {list.map(t => (
-                            <div key={t.id} className="card" onClick={()=>setSelTeam(t)}>
-                                <div style={{display:'flex', alignItems:'center', gap:10}}>
-                                    {t.logo ? <img src={t.logo} className="rank-logo" /> : <div className="rank-logo" style={{background:'#555'}}></div>}
-                                    <div><b>{t.name}</b><br/><small>R$ {t.balance.toLocaleString()}</small></div>
-                                </div>
-                            </div>
-                        ))}
-                        {list.length === 0 && <p style={{textAlign:'center', color:'#666'}}>Sem rivais aqui.</p>}
-                    </div>
-                );
-            }
-            
-            const teamPlayers = ps.filter(p => p.teamId === selTeam.id);
-            return (
-                <div>
-                    <button className="btn" style={{background:'#333', color:'white', marginBottom:10}} onClick={()=>setSelTeam(null)}>Voltar</button>
-                    <h3>{selTeam.name}</h3>
-                    {teamPlayers.map(p => (
-                        <div key={p.id} className="card">
-                            <div className="player-header"><span className="player-name"><span className="player-pos">{p.position || '??'}</span>{p.name} {p.loan && <span className="loan-tag">(EMP)</span>}</span><span className="player-ov">{p.overall}</span></div>
-                            <div className="player-details"><div className="detail-item">💰 Sal: R$ {parseFloat(p.salary||0).toLocaleString()}</div><div className="detail-item">💵 Pas: R$ {parseFloat(p.value||0).toLocaleString()}</div><div className="detail-item">{p.status === 'EXPIRADO' || p.contract === 0 ? <span className="expired-tag">⚠ EXPIRADO</span> : <span>📄 Con: {p.contract} T.</span>}</div><div className="detail-item">🔒 Mul: {p.clause > 0 ? 'R$ '+parseFloat(p.clause).toLocaleString() : '--'}</div></div>
-                            {!isVisitor && (
-                                <div style={{marginTop:8}}>
-                                    {p.clause > 0 && <button className="btn btn-gold" style={{marginBottom:5}} onClick={()=>onPayClause(p)}><i className="fas fa-bolt"></i> PAGAR MULTA</button>}
-                                    {(p.contract <= 1 && !p.preContract) && <button className="btn btn-orange" style={{marginBottom:5}} onClick={()=>onPreContract(p)}>ASSINAR PRÉ-CONTRATO</button>}
-                                    <button className="btn btn-purple" onClick={()=>onOpenOffer(p)}>NEGOCIAR</button>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                    {teamPlayers.length === 0 && <p>Sem jogadores.</p>}
                 </div>
             );
         }
@@ -740,12 +756,13 @@
 
         function OfferForm({ target, myPlayers, onSend, onClose }) {
             const [type, setType] = useState('COMPRA'); 
-            const [val, setVal] = useState(''); const [swapId, setSwapId] = useState('');
+            const [val, setVal] = useState(target.oldVal || ''); // Preenche se for contraproposta
+            const [swapId, setSwapId] = useState('');
             const [seas, setSeas] = useState('1');
             return (
                 <div className="modal-bg">
                     <div className="modal-card">
-                        <h3>Negociar {target.name}</h3>
+                        <h3>{target.isCounter ? '🔄 Contraproposta' : 'Negociar'} {target.name}</h3>
                         <div style={{display:'flex', gap:5, marginBottom:15}}>
                             <button className="btn" style={{background: type==='COMPRA'?'#00E676':'#333', color: type==='COMPRA'?'black':'white', padding:8, fontSize:10}} onClick={()=>setType('COMPRA')}>COMPRA</button>
                             <button className="btn" style={{background: type==='EMPRESTIMO'?'#00E676':'#333', color: type==='EMPRESTIMO'?'black':'white', padding:8, fontSize:10}} onClick={()=>setType('EMPRESTIMO')}>EMPRÉSTIMO</button>
@@ -755,9 +772,68 @@
                         {type === 'EMPRESTIMO' && <p style={{color:'#aaa', fontSize:12}}>O jogador virá por empréstimo.</p>}
                         {type === 'TROCA' && <div><label>Volta em Dinheiro:</label><input className="input-field" type="number" value={val} onChange={e=>setVal(e.target.value)} /><label>Seu Jogador:</label><select className="input-field" value={swapId} onChange={e=>setSwapId(e.target.value)}><option value="">Selecione...</option>{myPlayers.map(p => <option key={p.id} value={p.id}>{p.name} (Ov: {p.overall})</option>)}</select></div>}
                         {type !== 'EMPRESTIMO' && (<div><label style={{color:'#2196F3'}}>Tempo de Contrato (1-10 Anos):</label><input className="input-field" type="number" value={seas} onChange={e=>setSeas(e.target.value)} /></div>)}
-                        <button className="btn btn-green" onClick={()=>onSend(target, type, val, swapId, seas)}>ENVIAR PROPOSTA</button>
+                        <button className="btn btn-green" onClick={()=>onSend(target, type, val, swapId, seas, target.oldOfferId)}>ENVIAR {target.isCounter ? 'CONTRAPROPOSTA' : 'PROPOSTA'}</button>
                         <button className="btn" style={{background:'#d32f2f', color:'white'}} onClick={onClose}>CANCELAR</button>
                     </div>
+                </div>
+            );
+        }
+
+        function Market({ me, teams, ps, onOpenOffer, onPayClause, onPreContract, isVisitor }) {
+            const [serie, setSerie] = useState(''); const [selTeam, setSelTeam] = useState(null);
+            
+            const isUserAdminOrVisitor = me === 'admin_user' || me === 'visitor_user';
+
+            if(!serie) return (<div><h3>Escolha a Série</h3>{['A','B','C','D'].map(s => <div key={s} className="card" onClick={()=>setSerie(s)}><b>Série {s}</b></div>)}</div>);
+            
+            if(!selTeam) {
+                const list = teams.filter(t => t.serie === serie && (isUserAdminOrVisitor || t.id !== me));
+                return (
+                    <div>
+                        <button className="btn" style={{background:'#333', color:'white', marginBottom:10}} onClick={()=>setSerie('')}>Voltar</button>
+                        <h3>Clubes Série {serie}</h3>
+                        {list.map(t => (
+                            <div key={t.id} className="card" onClick={()=>setSelTeam(t)}>
+                                <div style={{display:'flex', alignItems:'center', gap:10}}>
+                                    {t.logo ? <img src={t.logo} className="rank-logo" /> : <div className="rank-logo" style={{background:'#555'}}></div>}
+                                    <div><b>{t.name}</b><br/><small>R$ {t.balance.toLocaleString()}</small></div>
+                                </div>
+                            </div>
+                        ))}
+                        {list.length === 0 && <p style={{textAlign:'center', color:'#666'}}>Sem rivais aqui.</p>}
+                    </div>
+                );
+            }
+            
+            const teamPlayers = ps.filter(p => p.teamId === selTeam.id);
+            // Verifica se o time aceita propostas
+            const allowOffers = selTeam.allowOffers !== false;
+
+            return (
+                <div>
+                    <button className="btn" style={{background:'#333', color:'white', marginBottom:10}} onClick={()=>setSelTeam(null)}>Voltar</button>
+                    <h3>{selTeam.name} {allowOffers ? '' : '(🚫 JANELA FECHADA)'}</h3>
+                    {teamPlayers.map(p => (
+                        <div key={p.id} className="card">
+                            <div className="player-header"><span className="player-name"><span className="player-pos">{p.position || '??'}</span>{p.name} {p.loan && <span className="loan-tag">(EMP)</span>}</span><span className="player-ov">{p.overall}</span></div>
+                            <div className="player-details"><div className="detail-item">💰 Sal: R$ {parseFloat(p.salary||0).toLocaleString()}</div><div className="detail-item">💵 Pas: R$ {parseFloat(p.value||0).toLocaleString()}</div><div className="detail-item">{p.status === 'EXPIRADO' || p.contract === 0 ? <span className="expired-tag">⚠ EXPIRADO</span> : <span>📄 Con: {p.contract} T.</span>}</div><div className="detail-item">🔒 Mul: {p.clause > 0 ? 'R$ '+parseFloat(p.clause).toLocaleString() : '--'}</div></div>
+                            
+                            {/* LÓGICA DE BLOQUEIO DE PROPOSTA */}
+                            {!isVisitor && (
+                                <div style={{marginTop:8}}>
+                                    {p.clause > 0 && <button className="btn btn-gold" style={{marginBottom:5}} onClick={()=>onPayClause(p)}><i className="fas fa-bolt"></i> PAGAR MULTA</button>}
+                                    {(p.contract <= 1 && !p.preContract) && <button className="btn btn-orange" style={{marginBottom:5}} onClick={()=>onPreContract(p)}>ASSINAR PRÉ-CONTRATO</button>}
+                                    
+                                    {allowOffers && p.status !== 'INTRANSFERIVEL' ? (
+                                        <button className="btn btn-purple" onClick={()=>onOpenOffer(p)}>NEGOCIAR</button>
+                                    ) : (
+                                        <button className="btn btn-outline" style={{color:'#666', cursor:'not-allowed'}}>⛔ BLOQUEADO</button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                    {teamPlayers.length === 0 && <p>Sem jogadores.</p>}
                 </div>
             );
         }

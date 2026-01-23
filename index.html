@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mato Real Manager - Definitive Edition</title>
+    <title>Mato Real Manager - Definitive</title>
     
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -17,47 +17,14 @@
 
     <style>
         :root {
-            --bg-dark: #121212;
-            --bg-card: #1E1E1E;
-            --bg-input: #2C2C2C;
-            --primary: #00E676;
-            --secondary: #2979FF;
-            --danger: #FF1744;
-            --warning: #FFC400;
-            --purple: #D500F9;
-            --text-main: #FFFFFF;
-            --text-muted: #B0BEC5;
-            --border: #333333;
+            --bg-dark: #121212; --bg-card: #1E1E1E; --bg-input: #2C2C2C;
+            --primary: #00E676; --secondary: #2979FF; --danger: #FF1744; --warning: #FFC400; --purple: #D500F9;
+            --text-main: #FFFFFF; --border: #333333;
         }
-
-        body { 
-            background: var(--bg-dark); 
-            color: var(--text-main); 
-            font-family: 'Roboto', sans-serif; 
-            margin: 0; 
-            padding-bottom: 80px; 
-            -webkit-font-smoothing: antialiased;
-        }
-
-        /* --- Components --- */
+        body { background: var(--bg-dark); color: var(--text-main); font-family: 'Roboto', sans-serif; margin: 0; padding-bottom: 80px; -webkit-font-smoothing: antialiased; }
         .container { max-width: 800px; margin: 0 auto; padding: 15px; }
-        
-        .card { 
-            background: var(--bg-card); 
-            padding: 15px; 
-            border-radius: 12px; 
-            margin-bottom: 12px; 
-            border: 1px solid var(--border);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.4);
-            position: relative;
-        }
-        
-        .btn { 
-            width: 100%; padding: 12px; border-radius: 8px; border: none; 
-            font-weight: 800; cursor: pointer; text-transform: uppercase; 
-            font-size: 11px; letter-spacing: 0.5px; transition: 0.2s;
-            margin-bottom: 5px; color: white;
-        }
+        .card { background: var(--bg-card); padding: 15px; border-radius: 12px; margin-bottom: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.4); position: relative; }
+        .btn { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: 800; cursor: pointer; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; transition: 0.2s; margin-bottom: 5px; color: white; }
         .btn:active { transform: scale(0.98); }
         .btn-green { background: var(--primary); color: #000; }
         .btn-blue { background: var(--secondary); }
@@ -65,63 +32,24 @@
         .btn-gold { background: var(--warning); color: #000; }
         .btn-purple { background: var(--purple); }
         .btn-ghost { background: transparent; border: 1px solid #666; color: #ccc; }
-        
-        .input-field { 
-            width: 100%; padding: 12px; background: var(--bg-input); 
-            border: 1px solid var(--border); color: white; border-radius: 8px; 
-            margin-bottom: 10px; box-sizing: border-box; font-family: inherit; font-size: 14px;
-        }
+        .input-field { width: 100%; padding: 12px; background: var(--bg-input); border: 1px solid var(--border); color: white; border-radius: 8px; margin-bottom: 10px; box-sizing: border-box; font-family: inherit; font-size: 14px; }
         .input-field:focus { outline: 2px solid var(--primary); border-color: transparent; }
-
-        /* --- Specifics --- */
-        .header { 
-            background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(10px);
-            padding: 15px; position: sticky; top: 0; z-index: 50; 
-            border-bottom: 1px solid var(--border);
-            display: flex; justify-content: space-between; align-items: center;
-        }
-
-        .badge-pos { 
-            font-size: 10px; padding: 2px 6px; border-radius: 4px; 
-            font-weight: 900; margin-right: 8px; color: #fff;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.8); box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-        }
-        
-        .player-ov {
-            background: #003300; color: #00E676; border: 1px solid #00E676;
-            padding: 2px 6px; border-radius: 4px; font-weight: 900; font-size: 14px;
-        }
-
-        .news-card {
-            background: #262626; padding: 12px; border-radius: 8px; margin-bottom: 8px;
-            border-left: 4px solid #666; font-size: 13px; line-height: 1.4;
-        }
+        .header { background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(10px); padding: 15px; position: sticky; top: 0; z-index: 50; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .badge-pos { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 900; margin-right: 8px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+        .player-ov { background: #003300; color: #00E676; border: 1px solid #00E676; padding: 2px 6px; border-radius: 4px; font-weight: 900; font-size: 14px; }
+        .news-card { background: #262626; padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid #666; font-size: 13px; line-height: 1.4; }
         .news-transfer { border-color: var(--secondary); background: linear-gradient(90deg, #1a1a2e, #16213e); }
         .news-money { border-color: var(--primary); }
-        .news-bad { border-color: var(--danger); }
         .news-admin { border-color: var(--warning); background: #2a2000; }
-
-        .bottom-nav { 
-            position: fixed; bottom: 0; left: 0; right: 0; 
-            background: #1a1a1a; border-top: 1px solid var(--border); 
-            display: flex; padding-bottom: env(safe-area-inset-bottom); z-index: 100;
-        }
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #1a1a1a; border-top: 1px solid var(--border); display: flex; padding-bottom: env(safe-area-inset-bottom); z-index: 100; }
         .nav-item { flex: 1; padding: 12px; text-align: center; color: #666; font-size: 9px; cursor: pointer; }
         .nav-item.active { color: var(--primary); }
         .nav-item i { font-size: 20px; margin-bottom: 4px; display: block; }
-
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 999; display: grid; place-items: center; padding: 15px; backdrop-filter: blur(5px); }
         .modal-content { background: var(--bg-card); width: 100%; max-width: 450px; padding: 20px; border-radius: 12px; border: 1px solid var(--border); max-height: 90vh; overflow-y: auto; }
-
-        /* Login & Misc */
         .login-tabs { display: flex; border-bottom: 1px solid #333; margin-bottom: 20px; }
         .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; color: #666; font-weight: bold; }
         .tab.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
-        
-        .market-filter-bar { display: flex; gap: 8px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px; }
-        .filter-chip { background: #333; padding: 8px 16px; border-radius: 20px; font-size: 11px; white-space: nowrap; cursor: pointer; border: 1px solid #444; }
-        .filter-chip.active { background: var(--primary); color: black; border-color: var(--primary); font-weight: bold; }
-
         .pulse { animation: pulse 2s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
     </style>
@@ -130,898 +58,362 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // --- CONFIGURAÇÃO ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyBrtJFfWAqT0AZYHlm4it-noB5h9jIPJEI",
-            authDomain: "gerenciador-de-times-matoreal.firebaseapp.com",
-            projectId: "gerenciador-de-times-matoreal",
-            storageBucket: "gerenciador-de-times-matoreal.firebasestorage.app",
-            messagingSenderId: "29096266740",
-            appId: "1:29096266740:web:ec48e7225c18c20dbc07a1"
-        };
-        
-        // Inicialização Segura
+        // --- CONFIG ---
+        const firebaseConfig = { apiKey: "AIzaSyBrtJFfWAqT0AZYHlm4it-noB5h9jIPJEI", authDomain: "gerenciador-de-times-matoreal.firebaseapp.com", projectId: "gerenciador-de-times-matoreal", storageBucket: "gerenciador-de-times-matoreal.firebasestorage.app", messagingSenderId: "29096266740", appId: "1:29096266740:web:ec48e7225c18c20dbc07a1" };
         try { if (!firebase.apps.length) firebase.initializeApp(firebaseConfig); } catch (e) { console.error(e); }
         const db = firebase.firestore();
         const { useState, useEffect } = React;
 
-        // --- DADOS ESTÁTICOS ---
-        const STADIUM_NAMES = ["Várzea", "Estádio Municipal", "Arena Moderna", "Arena Mundial", "Templo do Futebol"];
-        const STADIUM_COSTS = [0, 5000000, 20000000, 50000000, 100000000];
-        const POSITIONS = ['GOL', 'ZAG', 'LD', 'LE', 'VOL', 'MC', 'MEI', 'ATA'];
-        const SERIES = ['A', 'B', 'C', 'D']; // Série D Restaurada
+        const STADIUMS = ["Várzea", "Estádio Municipal", "Arena Moderna", "Arena Mundial", "Templo do Futebol"];
+        const COSTS = [0, 5000000, 20000000, 50000000, 100000000];
+        const POS = ['GOL', 'ZAG', 'LD', 'LE', 'VOL', 'MC', 'MEI', 'ATA'];
+        const SERIES = ['A', 'B', 'C', 'D'];
 
-        // --- HELPERS ---
         const fmt = (v) => "₣ " + parseFloat(v||0).toLocaleString('pt-BR');
-        const getPosColor = (p) => {
-            if(!p) return '#555';
-            if(p==='GOL') return '#FFD700';
-            if(['ZAG','LD','LE'].some(x=>p.includes(x))) return '#2979FF';
-            if(['VOL','MC','MEI'].some(x=>p.includes(x))) return '#00E676';
-            return '#FF1744';
-        };
+        const getPosColor = (p) => { if(!p) return '#555'; if(p==='GOL') return '#FFD700'; if(['ZAG','LD','LE'].some(x=>p.includes(x))) return '#2979FF'; if(['VOL','MC','MEI'].some(x=>p.includes(x))) return '#00E676'; return '#FF1744'; };
 
-        // --- APP PRINCIPAL ---
+        // --- APP ---
         function App() {
-            // States
-            const [userTeam, setUserTeam] = useState(null);
-            const [isAdmin, setIsAdmin] = useState(false);
-            const [isVisitor, setIsVisitor] = useState(false);
+            const [user, setUser] = useState(null); // { type: 'ADMIN'|'USER'|'VISITOR', data: teamData }
             const [teams, setTeams] = useState([]);
             const [players, setPlayers] = useState([]);
             const [offers, setOffers] = useState([]);
             const [news, setNews] = useState([]);
-            const [financeReqs, setFinanceReqs] = useState([]);
-            const [config, setConfig] = useState({ marketOpen: true });
+            const [reqs, setReqs] = useState([]);
+            const [conf, setConf] = useState({ marketOpen: true });
             
-            // UI States
             const [screen, setScreen] = useState('HOME');
-            const [modal, setModal] = useState(null); // { type: 'EDIT_PLAYER', data: ... }
+            const [modal, setModal] = useState(null);
             const [loading, setLoading] = useState(true);
-            const [hasNewNews, setHasNewNews] = useState(false);
+            const [newNews, setNewNews] = useState(false);
 
-            // --- DATA LISTENERS ---
             useEffect(() => {
                 const unsubs = [
                     db.collection('teams').onSnapshot(s => setTeams(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('players').onSnapshot(s => setPlayers(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    db.collection('config').doc('system').onSnapshot(s => setConfig(s.exists ? s.data() : {marketOpen:true})),
-                    db.collection('financeRequests').onSnapshot(s => setFinanceReqs(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    db.collection('config').doc('system').onSnapshot(s => setConf(s.exists ? s.data() : {marketOpen:true})),
+                    db.collection('financeRequests').onSnapshot(s => setReqs(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => {
                         const list = s.docs.map(d => ({id:d.id, ...d.data()}));
                         setNews(list);
                         const lastRead = localStorage.getItem('lastRead');
-                        if (list.length && (!lastRead || list[0].date > parseInt(lastRead))) setHasNewNews(true);
+                        if (list.length && (!lastRead || list[0].date > parseInt(lastRead))) setNewNews(true);
                         setLoading(false);
                     })
                 ];
                 return () => unsubs.forEach(u => u());
             }, []);
 
-            // User Specific Listener
             useEffect(() => {
-                if (userTeam && !isAdmin && !isVisitor) {
-                    // Update user team data live
-                    const me = teams.find(t => t.id === userTeam.id);
-                    if (me) setUserTeam(me);
-                    
-                    // Offers listener
-                    const unsub = db.collection('offers').where('sellerId', '==', userTeam.id)
-                        .onSnapshot(s => setOffers(s.docs.map(d => ({id:d.id, ...d.data()}))));
-                    return () => unsub();
+                if (user?.type === 'USER') {
+                    const me = teams.find(t => t.id === user.data.id);
+                    if (me) setUser(prev => ({...prev, data: me}));
+                    return db.collection('offers').where('sellerId', '==', user.data.id).onSnapshot(s => setOffers(s.docs.map(d => ({id:d.id, ...d.data()}))));
                 }
-            }, [teams, userTeam?.id]);
+            }, [teams, user?.data?.id]);
 
-            // --- ACTIONS ---
+            // --- FUNCTIONS ---
+            const postNews = (text, type='normal') => db.collection('news').add({ text, type, date: Date.now() });
 
-            const handleLogin = (teamId, pwd) => {
-                const t = teams.find(x => x.id === teamId);
-                if (t && t.password === pwd) {
-                    setUserTeam(t); setIsAdmin(false); setIsVisitor(false); setScreen('HOME');
-                } else alert("Senha incorreta!");
+            const login = (id, pwd) => {
+                const t = teams.find(x => x.id === id);
+                if (t && t.password === pwd) { setUser({type:'USER', data:t}); setScreen('HOME'); } else alert("Senha incorreta!");
             };
 
-            const handleCreateTeam = async (name, balance, serie, password, logo) => {
-                const exists = teams.find(t => t.name.toLowerCase() === name.toLowerCase());
-                if (exists) return alert("Nome já usado!");
-                
-                const ref = await db.collection('teams').add({
-                    name, balance: parseFloat(balance), serie, password, 
-                    stadiumLevel: 1, logo: logo || null, createdAt: Date.now()
-                });
-                
-                db.collection('news').add({
-                    text: `🛡️ **NOVO CLUBE NA ÁREA!**\nO **${name}** foi fundado na Série ${serie}.`,
-                    type: 'infra', date: Date.now()
-                });
-                
-                setUserTeam({ id: ref.id, name, balance, serie, password, stadiumLevel: 1, logo });
+            const createTeam = async (name, bal, serie, pass, logo) => {
+                if(teams.find(t=>t.name.toLowerCase()===name.toLowerCase())) return alert("Nome em uso!");
+                const ref = await db.collection('teams').add({ name, balance: parseFloat(bal), serie, password: pass, stadiumLevel: 1, logo: logo||null });
+                postNews(`🛡️ **NOVO CLUBE!**\n${name} fundado na Série ${serie}.`, 'infra');
+                setUser({type:'USER', data: {id:ref.id, name, balance:parseFloat(bal), serie, password:pass, stadiumLevel:1, logo:logo||null}});
                 setScreen('HOME');
             };
 
-            // Player Management (Create/Update/Delete)
-            const handleSavePlayer = async (data) => {
-                // data = { id (optional), name, position, overall, value, salary, clause, contract, mood, status, teamId }
-                
+            const savePlayer = async (d) => {
                 const payload = {
-                    name: data.name,
-                    position: data.position,
-                    overall: parseInt(data.overall),
-                    value: parseFloat(data.value),
-                    salary: parseFloat(data.salary),
-                    clause: parseFloat(data.clause),
-                    contract: parseInt(data.contract),
-                    mood: data.mood,
-                    status: data.status,
-                    teamId: data.teamId || userTeam.id,
-                    loan: false
+                    name: d.name, position: d.position, overall: parseInt(d.overall), value: parseFloat(d.value),
+                    salary: parseFloat(d.salary), clause: parseFloat(d.clause), contract: parseInt(d.contract),
+                    mood: d.mood, status: d.status, teamId: d.teamId || user.data.id, loan: false
                 };
-
-                if (data.id) {
-                    // Edit Existing
-                    const oldP = players.find(p => p.id === data.id);
-                    
-                    // Admin Forced Transfer Check
-                    if (isAdmin && data.forcedTeamId && data.forcedTeamId !== oldP.teamId) {
-                        payload.teamId = data.forcedTeamId;
-                        payload.loan = false;
-                        payload.futureTransfer = firebase.firestore.FieldValue.delete();
-                        const newTeamName = teams.find(t => t.id === data.forcedTeamId)?.name;
-                        postNews(`👮‍♂️ **INTERVENÇÃO DA FEDERAÇÃO**\nTransferência compulsória de **${data.name}** para o **${newTeamName}**!`, 'admin');
+                if(d.id) {
+                    const old = players.find(p=>p.id===d.id);
+                    if(user.type==='ADMIN' && d.forcedTeamId && d.forcedTeamId !== old.teamId) {
+                        payload.teamId = d.forcedTeamId; payload.futureTransfer = firebase.firestore.FieldValue.delete();
+                        postNews(`👮‍♂️ **INTERVENÇÃO**\nTransferência forçada de **${d.name}**!`, 'admin');
                     }
-
-                    await db.collection('players').doc(data.id).update(payload);
-                    if(isAdmin) alert("Jogador atualizado!");
+                    await db.collection('players').doc(d.id).update(payload);
                 } else {
-                    // Create New
                     await db.collection('players').add(payload);
-                    postNews(`🆕 **REFORÇO!**\n${teams.find(t=>t.id===payload.teamId)?.name} apresenta **${payload.name}** (${payload.position}).`, 'transfer');
+                    postNews(`🆕 **REFORÇO**\n${user.data.name} contrata **${d.name}**.`, 'transfer');
                 }
                 setModal(null);
             };
 
-            const handleDeletePlayer = async (pid) => {
-                if(!confirm("Tem certeza?")) return;
-                await db.collection('players').doc(pid).delete();
-                setModal(null);
-            };
-
-            // Market Actions
-            const sendOffer = async (targetP, type, value, swapId, contract, oldOffer) => {
-                const val = parseFloat(value || 0);
-                let desc = "";
-                let swapName = "";
-
-                if (type === 'COMPRA') desc = `Compra: ${fmt(val)} | ${contract} Anos`;
-                if (type === 'EMPRESTIMO') desc = `Empréstimo (Taxa: ${fmt(val)}) | ${contract} Temp.`;
-                if (type === 'TROCA') {
-                    const swapP = players.find(p => p.id === swapId);
-                    swapName = swapP?.name;
-                    desc = `Troca: ${fmt(val)} + ${swapName}`;
-                }
-
-                const payload = {
-                    playerId: targetP.id, playerName: targetP.name,
-                    buyerId: userTeam.id, buyerName: userTeam.name,
-                    sellerId: oldOffer ? oldOffer.buyerId : targetP.teamId, // Inverte se for contraproposta
-                    type, value: val, swapPlayerId: swapId || null, swapPlayerName: swapName || null,
-                    offerContract: contract, description: desc, date: Date.now()
-                };
-
-                const batch = db.batch();
-                if (oldOffer) batch.delete(db.collection('offers').doc(oldOffer.id));
-                batch.set(db.collection('offers').doc(), payload);
-                await batch.commit();
-
-                postNews(`🚨 **PROPOSTA ENVIADA**\n${userTeam.name} enviou uma oferta por **${targetP.name}**:\n${desc}`, 'transfer');
-                alert("Proposta enviada!");
-                setModal(null);
-            };
-
-            const acceptOffer = async (offer) => {
-                const buyer = teams.find(t => t.id === offer.buyerId);
-                const seller = teams.find(t => t.id === userTeam.id);
-                const player = players.find(p => p.id === offer.playerId);
-
-                if (buyer.balance < offer.value) return alert("Comprador sem saldo!");
-
-                const batch = db.batch();
+            const sendOffer = async (target, type, val, swapId, con, old) => {
+                const v = parseFloat(val||0);
+                let desc = type==='COMPRA' ? `Compra: ${fmt(v)} | ${con} Anos` : type==='EMPRESTIMO' ? `Emp (Taxa: ${fmt(v)}) | ${con} Temp` : `Troca: ${fmt(v)} + Player`;
+                if(type==='TROCA') { const sp = players.find(p=>p.id===swapId); desc = `Troca: ${fmt(v)} + ${sp.name}`; }
                 
-                // Money Transfer (Happens NOW regardless of window)
-                if (offer.value > 0) {
-                    batch.update(db.collection('teams').doc(buyer.id), { balance: buyer.balance - offer.value });
-                    batch.update(db.collection('teams').doc(seller.id), { balance: seller.balance + offer.value });
+                const pl = {
+                    playerId: target.id, playerName: target.name, buyerId: user.data.id, buyerName: user.data.name,
+                    sellerId: old ? old.buyerId : target.teamId, type, value: v, swapPlayerId: swapId||null,
+                    offerContract: con, description: desc, date: Date.now()
+                };
+                const b = db.batch();
+                if(old) b.delete(db.collection('offers').doc(old.id));
+                b.set(db.collection('offers').doc(), pl);
+                await b.commit();
+                postNews(`🚨 **PROPOSTA**\n${user.data.name} enviou oferta por **${target.name}**.\n${desc}`, 'transfer');
+                setModal(null); alert("Enviada!");
+            };
+
+            const acceptOffer = async (o) => {
+                const buy = teams.find(t=>t.id===o.buyerId); const sel = teams.find(t=>t.id===user.data.id);
+                const p = players.find(x=>x.id===o.playerId);
+                if(buy.balance < o.value) return alert("Sem saldo!");
+                
+                const b = db.batch();
+                if(o.value>0) {
+                    b.update(db.collection('teams').doc(buy.id), {balance: buy.balance - o.value});
+                    b.update(db.collection('teams').doc(sel.id), {balance: sel.balance + o.value});
                 }
 
-                // Player Transfer Logic
-                const executeNow = config.marketOpen || offer.type === 'EMPRESTIMO'; // Loans always go immediately? Or change this logic.
-
-                if (offer.type === 'COMPRA') {
-                    if (executeNow) {
-                        batch.update(db.collection('players').doc(player.id), {
-                            teamId: buyer.id, status: 'NAO_A_VENDA', loan: false, contract: parseInt(offer.offerContract)
-                        });
-                        postNews(`🤝 **NEGÓCIO FECHADO!**\n${buyer.name} comprou **${player.name}** por ${fmt(offer.value)}.`, 'transfer');
+                if(o.type==='COMPRA') {
+                    if(conf.marketOpen) {
+                        b.update(db.collection('players').doc(p.id), {teamId: buy.id, status:'NAO_A_VENDA', loan:false, contract: parseInt(o.offerContract)});
+                        postNews(`🤝 **NEGÓCIO FECHADO**\n${buy.name} comprou **${p.name}**!`, 'transfer');
                     } else {
-                        // Window Closed: Pre-agreement
-                        batch.update(db.collection('players').doc(player.id), {
-                            status: 'VENDIDO',
-                            futureTransfer: { teamId: buyer.id, contract: parseInt(offer.offerContract) }
-                        });
-                        postNews(`🤝 **PRÉ-ACORDO FIRMADO**\nCom a janela fechada, **${player.name}** irá para o **${buyer.name}** na próxima temporada!`, 'transfer');
+                        b.update(db.collection('players').doc(p.id), {status:'VENDIDO', futureTransfer:{teamId: buy.id, contract: parseInt(o.offerContract)}});
+                        postNews(`🤝 **PRÉ-ACORDO**\n${p.name} irá para o ${buy.name} na próxima temporada.`, 'transfer');
                     }
-                } else if (offer.type === 'EMPRESTIMO') {
-                    batch.update(db.collection('players').doc(player.id), {
-                        teamId: buyer.id, status: 'NAO_A_VENDA', loan: true, loanFrom: seller.id
-                    });
-                    postNews(`🔄 **EMPRÉSTIMO**\n${buyer.name} reforça o elenco com **${player.name}**.`, 'transfer');
-                } else if (offer.type === 'TROCA') {
-                    if(!config.marketOpen) return alert("Trocas apenas com Janela Aberta!");
-                    const swapP = players.find(p => p.id === offer.swapPlayerId);
-                    batch.update(db.collection('players').doc(player.id), { teamId: buyer.id, contract: parseInt(offer.offerContract), status: 'NAO_A_VENDA' });
-                    batch.update(db.collection('players').doc(swapP.id), { teamId: seller.id, status: 'NAO_A_VENDA' });
-                    postNews(`🔀 **TROCA BOMBÁSTICA**\n${buyer.name} e ${seller.name} trocam jogadores:\n${player.name} ↔ ${swapP.name}`, 'transfer');
+                } else if(o.type==='EMPRESTIMO') {
+                    b.update(db.collection('players').doc(p.id), {teamId: buy.id, status:'NAO_A_VENDA', loan:true, loanFrom: sel.id});
+                    postNews(`🔄 **EMPRÉSTIMO**\n${buy.name} pegou **${p.name}**.`, 'transfer');
+                } else if(o.type==='TROCA') {
+                    if(!conf.marketOpen) return alert("Troca só com janela aberta!");
+                    const sp = players.find(x=>x.id===o.swapPlayerId);
+                    b.update(db.collection('players').doc(p.id), {teamId: buy.id, status:'NAO_A_VENDA', contract: parseInt(o.offerContract)});
+                    b.update(db.collection('players').doc(sp.id), {teamId: sel.id, status:'NAO_A_VENDA'});
+                    postNews(`🔀 **TROCA**\n${p.name} (↔) ${sp.name}`, 'transfer');
                 }
-
-                batch.delete(db.collection('offers').doc(offer.id));
-                await batch.commit();
-                alert("Negócio Fechado!");
+                b.delete(db.collection('offers').doc(o.id));
+                await b.commit();
             };
 
-            // Admin Functions
-            const processSeason = async () => {
-                if (!confirm("⚠️ VIRAR TEMPORADA? Isso processará vendas futuras e contratos.")) return;
-                setLoading(true);
-                const batch = db.batch();
-                let moves = 0;
-
-                players.forEach(p => {
-                    const ref = db.collection('players').doc(p.id);
-                    let updates = {};
-
-                    // 1. Process Future Transfers (Sold during closed window)
-                    if (p.futureTransfer) {
-                        updates.teamId = p.futureTransfer.teamId;
-                        updates.contract = p.futureTransfer.contract;
-                        updates.status = 'NAO_A_VENDA';
-                        updates.futureTransfer = firebase.firestore.FieldValue.delete();
-                        updates.loan = false;
-                        moves++;
-                    } 
-                    // 2. Process Pre-Contracts (End of contract)
-                    else if ((p.contract <= 1 || p.contract === 0) && p.preContract) {
-                        updates.teamId = p.preContract.teamId;
-                        updates.contract = 1;
-                        updates.status = 'NAO_A_VENDA';
-                        updates.preContract = firebase.firestore.FieldValue.delete();
-                        updates.loan = false;
-                        moves++;
-                    } 
-                    // 3. Reduce Contracts
-                    else {
-                        let nc = (p.contract || 0) - 1;
-                        if (nc < 0) nc = 0;
-                        updates.contract = nc;
-                        if (nc === 0) updates.status = 'EXPIRADO';
-                    }
-                    batch.update(ref, updates);
-                });
-
-                await batch.commit();
-                postNews(`🌞 **NOVA TEMPORADA!**\nCalendário virou. ${moves} jogadores mudaram de casa. Contratos atualizados.`, 'season');
-                setLoading(false);
-                alert("Temporada Virada!");
-            };
-
-            const upgradeStadium = () => {
-                const lvl = userTeam.stadiumLevel || 1;
-                if (lvl >= 5) return alert("Nível Máximo!");
-                const cost = STADIUM_COSTS[lvl];
-                if (userTeam.balance < cost) return alert("Sem saldo!");
-                if (!confirm(`Melhorar estádio por ${fmt(cost)}?`)) return;
-
-                db.collection('teams').doc(userTeam.id).update({
-                    balance: userTeam.balance - cost,
-                    stadiumLevel: lvl + 1
-                });
-                // Local optimistic update
-                setUserTeam({ ...userTeam, balance: userTeam.balance - cost, stadiumLevel: lvl + 1 });
-                postNews(`🏗 **OBRAS!**\nO **${userTeam.name}** inaugurou seu estádio Nível ${lvl+1}.`, 'infra');
-                setModal(null);
-            };
-
-            const postNewsManual = (title, body, type) => {
-                db.collection('news').add({ text: `📢 **${title}**\n${body}`, type, date: Date.now() });
-                alert("Publicado!");
-            };
-
-            const payClause = (p) => {
-                if(userTeam.balance < p.clause) return alert("Sem saldo!");
-                const batch = db.batch();
-                batch.update(db.collection('teams').doc(userTeam.id), {balance: userTeam.balance - p.clause});
-                batch.update(db.collection('teams').doc(p.teamId), {balance: (teams.find(t=>t.id===p.teamId)?.balance||0) + p.clause});
-                batch.update(db.collection('players').doc(p.id), {teamId: userTeam.id, contract: 3, status: 'NAO_A_VENDA', loan: false});
-                batch.commit();
-                postNews(`💣 **MULTA PAGA!**\n${userTeam.name} pagou a multa de ${p.name} e levou o jogador!`, 'transfer');
-            };
-
-            const signPreContract = (p) => {
-                if(!confirm("Assinar pré-contrato?")) return;
-                db.collection('players').doc(p.id).update({ preContract: { teamId: userTeam.id } });
-                postNews(`📜 **PRÉ-CONTRATO**\n${userTeam.name} assinou com ${p.name} para a próxima temporada.`, 'transfer');
+            const adminAction = async (act, data) => {
+                if(act==='MARKET') { db.collection('config').doc('system').update({marketOpen: data}); postNews(data?"📢 JANELA ABERTA":"🔒 JANELA FECHADA", 'infra'); }
+                if(act==='SEASON') {
+                    if(!confirm("Virar temporada?")) return;
+                    setLoading(true); const b = db.batch(); let m=0;
+                    players.forEach(p => {
+                        let up = {};
+                        if(p.futureTransfer) { up.teamId=p.futureTransfer.teamId; up.contract=p.futureTransfer.contract; up.status='NAO_A_VENDA'; up.futureTransfer=firebase.firestore.FieldValue.delete(); up.loan=false; m++; }
+                        else if((p.contract<=1||p.contract===0) && p.preContract) { up.teamId=p.preContract.teamId; up.contract=1; up.status='NAO_A_VENDA'; up.preContract=firebase.firestore.FieldValue.delete(); up.loan=false; m++; }
+                        else { let nc=(p.contract||0)-1; if(nc<0)nc=0; up.contract=nc; if(nc===0)up.status='EXPIRADO'; }
+                        b.update(db.collection('players').doc(p.id), up);
+                    });
+                    await b.commit(); setLoading(false); postNews(`🌞 **NOVA TEMPORADA**\n${m} transferências realizadas.`, 'season'); alert("Virada!");
+                }
             };
 
             // --- RENDER ---
-            if (loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando Manager...</div>;
-
-            if (!userTeam) return (
-                <LoginScreen 
-                    teams={teams} 
-                    onLogin={handleLogin} 
-                    onCreate={handleCreateTeam} 
-                    onAdmin={()=> { if(prompt("Senha Master:")==='2503'){ setUserTeam({id:'admin', name:'FEDERAÇÃO'}); setIsAdmin(true); } }}
-                    onVisitor={()=> { setUserTeam({id:'visitor', name:'Visitante'}); setIsVisitor(true); setScreen('RANKING'); }}
-                />
-            );
+            if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
+            if(!user) return <LoginScreen teams={teams} onLogin={login} onCreate={createTeam} onAdmin={()=>setUser({type:'ADMIN'})} onVisitor={()=>setUser({type:'VISITOR'})} />;
 
             return (
                 <div>
-                    {/* Header */}
                     <div className="header">
                         <div style={{display:'flex', alignItems:'center', gap:10}}>
-                            {!isAdmin && userTeam.logo && <img src={userTeam.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)'}} />}
+                            {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
-                                <div style={{fontWeight:'900', fontSize:16}}>{userTeam.name}</div>
-                                {isAdmin && <span style={{color:'gold', fontSize:10}}>MODO MASTER</span>}
-                                {isVisitor && <span style={{color:'#888', fontSize:10}}>VISITANTE</span>}
+                                <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.type}</div>
+                                {user.type==='ADMIN' && <span style={{color:'gold', fontSize:10}}>MASTER</span>}
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
-                            {!isAdmin && !isVisitor && (
+                            {user.type==='USER' && (
                                 <div style={{position:'relative'}} onClick={()=>setScreen('OFFERS')}>
                                     <i className="fas fa-bell" style={{color: offers.length ? 'var(--warning)' : '#555'}}></i>
                                     {offers.length > 0 && <span style={{position:'absolute', top:-5, right:-5, background:'red', borderRadius:'50%', width:8, height:8}} className="pulse"></span>}
                                 </div>
                             )}
-                            {!isVisitor && <div style={{color:'var(--primary)', fontWeight:'bold'}}>{isAdmin ? '∞' : fmt(userTeam.balance)}</div>}
-                            {!isVisitor && <i className="fas fa-cog" onClick={()=>setModal({type:'SETTINGS'})}></i>}
-                            {isVisitor && <i className="fas fa-sign-out-alt" onClick={()=>window.location.reload()}></i>}
+                            {user.type==='USER' && <div style={{color:'var(--primary)', fontWeight:'bold'}}>{fmt(user.data.balance)}</div>}
+                            {user.type==='USER' && <i className="fas fa-cog" onClick={()=>setModal({type:'SETTINGS'})}></i>}
+                            <i className="fas fa-sign-out-alt" onClick={()=>window.location.reload()}></i>
                         </div>
                     </div>
 
-                    {/* Main Content */}
                     <div className="container">
-                        
                         {screen === 'HOME' && (
-                            isAdmin ? <AdminPanel 
-                                teams={teams} 
-                                players={players} 
-                                config={config} 
-                                reqs={financeReqs}
-                                onToggleMarket={(v) => { db.collection('config').doc('system').update({marketOpen: v}); postNews(v?"📢 JANELA ABERTA!":"🔒 JANELA FECHADA!", 'infra'); }}
-                                onTurnWeek={() => { /* Implementar virada de semana simples */ alert("Semana virada!"); }}
-                                onTurnSeason={processSeason}
-                                onPostNews={postNewsManual}
-                                onApproveReq={async (r) => {
-                                    const b = db.batch();
-                                    if(r.type === 'INJECTION') b.update(db.collection('teams').doc(r.teamId), {balance: (teams.find(t=>t.id===r.teamId).balance||0)+r.amount});
-                                    else b.update(db.collection('teams').doc(r.teamId), {sponsorship: {name: r.details, value: r.amount}});
-                                    b.delete(db.collection('financeRequests').doc(r.id));
-                                    await b.commit();
-                                }}
-                                onRejectReq={(rid) => db.collection('financeRequests').doc(rid).delete()}
-                                onEditTeam={(t) => { setUserTeam(t); setScreen('HOME'); /* Hack to use same views */ }} // Para admin ver elenco
-                                onSetEditPlayer={(p) => setModal({type:'PLAYER_EDIT', data:p})}
-                            /> :
-                            <TeamDashboard 
-                                team={userTeam} 
-                                players={players.filter(p => p.teamId === userTeam.id)} 
-                                stadiumName={STADIUM_NAMES[(userTeam.stadiumLevel||1)-1]}
-                                isVisitor={isVisitor}
-                                onAddPlayer={() => setModal({type:'PLAYER_ADD'})}
-                                onEditPlayer={(p) => setModal({type:'PLAYER_EDIT', data:p})}
-                                onOpenSettings={() => setModal({type:'SETTINGS'})}
-                            />
+                            user.type === 'ADMIN' ? 
+                            <AdminPanel teams={teams} reqs={reqs} config={conf} onAct={adminAction} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{const b=db.batch(); if(r.type==='INJECTION')b.update(db.collection('teams').doc(r.teamId),{balance:(teams.find(t=>t.id===r.teamId).balance||0)+r.amount}); else b.update(db.collection('teams').doc(r.teamId),{sponsorship:{name:r.details,value:r.amount}}); b.delete(db.collection('financeRequests').doc(r.id)); await b.commit();}} onReject={(rid)=>db.collection('financeRequests').doc(rid).delete()} onEditT={(t)=>{setUser({type:'ADMIN', data:t}); /*Hack to use User View as Admin*/}} /> 
+                            : <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} isVisitor={user.type==='VISITOR'} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />
                         )}
 
-                        {screen === 'MARKET' && <Market 
-                            teams={teams} 
-                            players={players} 
-                            me={userTeam.id} 
-                            marketOpen={config.marketOpen}
-                            isAdmin={isAdmin}
-                            isVisitor={isVisitor}
-                            onNegotiate={(p) => setModal({type:'OFFER', data:p})}
-                            onPayClause={payClause}
-                            onPreContract={signPreContract}
-                        />}
+                        {screen === 'MARKET' && <Market me={user.data?.id} teams={teams} players={players} open={conf.marketOpen} isVis={user.type==='VISITOR'} onNeg={(p)=>setModal({type:'OFFER', data:p})} onPayClause={(p)=>{ if(user.data.balance<p.clause)return alert("Sem saldo"); const b=db.batch(); b.update(db.collection('teams').doc(user.data.id),{balance:user.data.balance-p.clause}); b.update(db.collection('teams').doc(p.teamId),{balance:(teams.find(t=>t.id===p.teamId).balance||0)+p.clause}); b.update(db.collection('players').doc(p.id),{teamId:user.data.id, contract:3, status:'NAO_A_VENDA', loan:false}); b.commit(); postNews(`💣 **MULTA PAGA**\n${user.data.name} roubou ${p.name}!`, 'transfer'); }} onPre={(p)=>{ if(confirm("Pré-contrato?")) { db.collection('players').doc(p.id).update({preContract:{teamId:user.data.id}}); postNews(`📜 **ASSINOU**\n${p.name} vai pro ${user.data.name}.`,'transfer'); } }} />}
 
                         {screen === 'RANKING' && <Ranking teams={teams} players={players} />}
-
-                        {screen === 'NEWS' && <NewsFeed news={news} />}
-
-                        {screen === 'OFFERS' && <OffersScreen 
-                            offers={offers} 
-                            onAccept={acceptOffer} 
-                            onReject={(oid) => db.collection('offers').doc(oid).delete()}
-                            onCounter={(o) => setModal({type:'OFFER', data: { ...players.find(p=>p.id===o.playerId), oldOffer: o } })}
-                        />}
-
+                        {screen === 'NEWS' && <div><h3>Notícias</h3>{news.map(n=><div key={n.id} className={`news-card news-${n.type}`}>{n.text}<br/><small style={{color:'#666'}}>{new Date(n.date).toLocaleString()}</small></div>)}</div>}
+                        {screen === 'OFFERS' && <OffersScreen offers={offers} onAccept={acceptOffer} onReject={(oid)=>db.collection('offers').doc(oid).delete()} onCounter={(o)=>setModal({type:'OFFER', data:{...players.find(p=>p.id===o.playerId), oldOffer:o}})} />}
                     </div>
 
-                    {/* Bottom Nav */}
                     <div className="bottom-nav">
-                        <NavBtn icon="home" label="CLUBE" active={screen==='HOME'} onClick={()=>setScreen('HOME')} />
-                        <NavBtn icon="globe" label="MERCADO" active={screen==='MARKET'} onClick={()=>setScreen('MARKET')} />
-                        <NavBtn icon="trophy" label="RANKING" active={screen==='RANKING'} onClick={()=>setScreen('RANKING')} />
-                        <NavBtn icon="newspaper" label="NOTÍCIAS" active={screen==='NEWS'} onClick={()=>{setScreen('NEWS'); setHasNewNews(false); localStorage.setItem('lastRead', Date.now());}} dot={hasNewNews} />
+                        <div className={`nav-item ${screen==='HOME'?'active':''}`} onClick={()=>setScreen('HOME')}><i className="fas fa-home"></i>{user.type==='ADMIN'?'ADM':'CLUBE'}</div>
+                        <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>
+                        <div className={`nav-item ${screen==='RANKING'?'active':''}`} onClick={()=>setScreen('RANKING')}><i className="fas fa-trophy"></i>RANK</div>
+                        <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={()=>{setScreen('NEWS'); setNewNews(false); localStorage.setItem('lastRead', Date.now());}}><i className="fas fa-newspaper"></i>{newNews && <span style={{color:'red'}}>●</span>} NEWS</div>
                     </div>
 
-                    {/* MODALS */}
-                    {modal && (
-                        <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget && setModal(null)}>
-                            <div className="modal-content">
-                                <div style={{display:'flex', justifyContent:'space-between', marginBottom:15}}>
-                                    <h3>{modal.type === 'PLAYER_EDIT' ? 'Editar Jogador' : modal.type === 'OFFER' ? 'Negociação' : 'Configurações'}</h3>
-                                    <i className="fas fa-times" onClick={()=>setModal(null)}></i>
-                                </div>
-                                
-                                {modal.type === 'PLAYER_ADD' && <PlayerForm onSave={handleSavePlayer} />}
-                                
-                                {modal.type === 'PLAYER_EDIT' && <PlayerForm 
-                                    initial={modal.data} 
-                                    onSave={handleSavePlayer} 
-                                    onDelete={handleDeletePlayer} 
-                                    isAdmin={isAdmin} 
-                                    teams={teams} // Para lista de times no forced transfer
-                                />}
-
-                                {modal.type === 'OFFER' && <OfferForm 
-                                    target={modal.data} 
-                                    myPlayers={players.filter(p=>p.teamId===userTeam.id)} 
-                                    onSend={sendOffer} 
-                                />}
-
-                                {modal.type === 'SETTINGS' && <SettingsForm 
-                                    team={userTeam} 
-                                    isAdmin={isAdmin}
-                                    onUpgrade={upgradeStadium}
-                                    onUpdate={(d) => { db.collection('teams').doc(userTeam.id).update(d); setUserTeam({...userTeam, ...d}); setModal(null); }}
-                                    onRequest={(t,a,d) => { db.collection('financeRequests').add({teamId:userTeam.id, teamName:userTeam.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!"); }}
-                                />}
-                            </div>
+                    {modal && <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget && setModal(null)}>
+                        <div className="modal-content">
+                            {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={(id)=>{if(confirm("Excluir?"))db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} />}
+                            {modal.type==='OFFER' && <OfferForm target={modal.data} myPlayers={players.filter(p=>p.teamId===user.data.id)} onSend={sendOffer} />}
+                            {modal.type==='SETTINGS' && <SettingsForm team={user.data} isAdmin={user.type==='ADMIN'} onUp={(d)=>{db.collection('teams').doc(user.data.id).update(d); setUser(p=>({...p, data:{...p.data, ...d}})); setModal(null);}} onUpgrade={()=>{ const c=COSTS[user.data.stadiumLevel]; if(user.data.balance<c)return alert("Sem grana"); if(confirm("Pagar?")) { db.collection('teams').doc(user.data.id).update({balance:user.data.balance-c, stadiumLevel:user.data.stadiumLevel+1}); postNews(`🏗 **OBRAS**\n${user.data.name} evoluiu estádio.`,'infra'); setModal(null); } }} onReq={(t,a,d)=>{db.collection('financeRequests').add({teamId:user.data.id, teamName:user.data.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!");}} />}
                         </div>
-                    )}
+                    </div>}
                 </div>
             );
         }
 
-        // --- SUB-COMPONENTES (UI) ---
-
-        const NavBtn = ({ icon, label, active, onClick, dot }) => (
-            <div className={`nav-item ${active?'active':''}`} onClick={onClick}>
-                <div style={{position:'relative', display:'inline-block'}}>
-                    <i className={`fas fa-${icon}`}></i>
-                    {dot && <span style={{position:'absolute', top:0, right:-2, width:8, height:8, background:'var(--danger)', borderRadius:'50%'}}></span>}
-                </div>
-                <div>{label}</div>
-            </div>
-        );
-
+        // --- COMPONENTS ---
         const LoginScreen = ({ teams, onLogin, onCreate, onAdmin, onVisitor }) => {
-            const [tab, setTab] = useState('LOGIN');
-            const [form, setForm] = useState({ name: '', bal: '10000000', serie: 'A', pass: '' });
-            const [selTeam, setSelTeam] = useState(null);
-            
+            const [tab, setTab] = useState('LOGIN'); const [f, setF] = useState({n:'', b:'10000000', s:'A', p:''}); const [sel, setSel] = useState(null); const [lp, setLp] = useState('');
+            const handleUpload = (e) => { const file=e.target.files[0]; const reader=new FileReader(); reader.onloadend=()=>setF({...f, l:reader.result}); if(file) reader.readAsDataURL(file); };
             return (
-                <div style={{padding:20, display:'grid', placeItems:'center', minHeight:'100vh'}}>
-                    <div style={{width:'100%', maxWidth:400}}>
-                        <h1 style={{textAlign:'center', color:'var(--primary)'}}>MANAGER <span style={{color:'white'}}>ULTIMATE</span></h1>
-                        
-                        <div className="login-tabs">
-                            <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
-                            <div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR TIME</div>
-                        </div>
-
-                        {tab === 'LOGIN' ? (
-                            <div>
-                                {teams.map(t => (
-                                    <div key={t.id} className="card" onClick={()=>setSelTeam(t)} style={{display:'flex', alignItems:'center', cursor:'pointer', gap:10}}>
-                                        {t.logo ? <img src={t.logo} className="team-logo"/> : <div className="team-logo"></div>}
-                                        <div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div>
-                                    </div>
-                                ))}
-                                <div style={{display:'flex', gap:10, marginTop:20}}>
-                                    <button className="btn btn-blue" onClick={onVisitor}>VISITANTE</button>
-                                    <button className="btn btn-ghost" onClick={onAdmin}>ADMIN</button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="card">
-                                <input className="input-field" placeholder="Nome do Clube" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
-                                <input className="input-field" type="number" placeholder="Saldo Inicial" value={form.bal} onChange={e=>setForm({...form, bal:e.target.value})} />
-                                <select className="input-field" value={form.serie} onChange={e=>setForm({...form, serie:e.target.value})}>
-                                    {SERIES.map(s=><option key={s} value={s}>Série {s}</option>)}
-                                </select>
-                                <input className="input-field" type="number" placeholder="Senha (PIN)" value={form.pass} onChange={e=>setForm({...form, pass:e.target.value})} />
-                                <button className="btn btn-green" onClick={()=>onCreate(form.name, form.bal, form.serie, form.pass)}>FUNDAR CLUBE</button>
-                            </div>
-                        )}
-
-                        {selTeam && (
-                            <div className="modal-overlay">
-                                <div className="modal-content">
-                                    <h3>Acessar {selTeam.name}</h3>
-                                    <input className="input-field" type="password" placeholder="Senha" id="login-pass" />
-                                    <button className="btn btn-green" onClick={()=>onLogin(selTeam.id, document.getElementById('login-pass').value)}>ENTRAR</button>
-                                    <button className="btn" onClick={()=>setSelTeam(null)}>CANCELAR</button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
+                    <h1 style={{color:'var(--primary)'}}>MANAGER <span style={{color:'white'}}>DEFINITIVE</span></h1>
+                    <div className="login-tabs"><div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div><div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR</div></div>
+                    {tab==='LOGIN' ? <div>{teams.map(t=><div key={t.id} className="card" onClick={()=>setSel(t)} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}<div style={{marginTop:20}}><button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button><button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button></div></div> 
+                    : <div><input type="file" className="file-input" onChange={handleUpload} /><input className="input-field" placeholder="Nome" value={f.n} onChange={e=>setF({...f, n:e.target.value})} /><input className="input-field" type="number" placeholder="Saldo" value={f.b} onChange={e=>setF({...f, b:e.target.value})} /><select className="input-field" value={f.s} onChange={e=>setF({...f, s:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>Série {s}</option>)}</select><input className="input-field" type="number" placeholder="Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} /><button className="btn btn-green" onClick={()=>onCreate(f.n, f.b, f.s, f.p, f.l)}>CRIAR</button></div>}
+                    {sel && <div className="modal-overlay"><div className="modal-content"><h3>{sel.name}</h3><input className="input-field" type="password" placeholder="Senha" value={lp} onChange={e=>setLp(e.target.value)} /><button className="btn btn-green" onClick={()=>onLogin(sel.id, lp)}>ENTRAR</button><button className="btn" onClick={()=>setSel(null)}>CANCELAR</button></div></div>}
                 </div>
             );
         };
 
-        const TeamDashboard = ({ team, players, stadiumName, isVisitor, onAddPlayer, onEditPlayer, onOpenSettings }) => (
+        const TeamDashboard = ({ team, players, isVisitor, onEdit, onAdd }) => (
             <div>
-                {!isVisitor && (
-                    <div className="card" style={{borderLeft:'4px solid var(--purple)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                        <div>
-                            <small style={{color:'var(--purple)', fontWeight:'bold', textTransform:'uppercase'}}>Estádio (Nvl {team.stadiumLevel})</small>
-                            <div style={{fontWeight:'900', fontSize:16}}>{stadiumName}</div>
-                        </div>
-                        <button className="btn btn-purple" style={{width:'auto'}} onClick={onOpenSettings}>OBRAS / CONFIG</button>
-                    </div>
-                )}
-
-                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10}}>
-                    <h3>Elenco ({players.length})</h3>
-                    {!isVisitor && <button className="btn btn-green" style={{width:'auto', padding:'5px 15px'}} onClick={onAddPlayer}>+ JOGADOR</button>}
-                </div>
-
-                {players.sort((a,b)=> b.overall - a.overall).map(p => (
-                    <div key={p.id} className="card" onClick={() => !isVisitor && onEditPlayer(p)} style={{cursor: isVisitor?'default':'pointer'}}>
-                        <div className="player-header">
-                            <div className="player-name">
-                                <span className="pos-badge" style={{background: getPosColor(p.position)}}>{p.position}</span>
-                                {p.name}
-                                {p.loan && <span style={{fontSize:9, color:'var(--secondary)', marginLeft:5}}>(EMP)</span>}
-                            </div>
-                            <span className="player-ov">{p.overall}</span>
-                        </div>
-                        <div className="player-details">
-                            <div>Sal: {fmt(p.salary)}</div>
-                            <div>Val: {fmt(p.value)}</div>
-                            <div>Con: {p.contract} Anos</div>
-                            <div>Mul: {fmt(p.clause)}</div>
-                        </div>
-                        <div style={{marginTop:5, display:'flex', justifyContent:'space-between'}}>
-                            <span style={{fontSize:10, color: p.status==='VENDA'?'var(--primary)':p.status==='INTRANSFERIVEL'?'var(--danger)':'#666'}}>{p.status}</span>
-                            <span>{p.mood}</span>
-                        </div>
+                <div style={{display:'flex', justifyContent:'space-between', marginBottom:10}}><h3>Elenco ({players.length})</h3>{!isVisitor && <button className="btn btn-green" style={{width:'auto'}} onClick={onAdd}>+ JOGADOR</button>}</div>
+                {players.sort((a,b)=>b.overall-a.overall).map(p => (
+                    <div key={p.id} className="card" onClick={()=>!isVisitor && onEdit(p)} style={{cursor: isVisitor?'default':'pointer'}}>
+                        <div style={{display:'flex', justifyContent:'space-between'}}><div><span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span><b>{p.name}</b> {p.loan && <small style={{color:'var(--secondary)'}}>(EMP)</small>}</div><span className="player-ov">{p.overall}</span></div>
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', fontSize:11, color:'#aaa', marginTop:5}}><div>Sal: {fmt(p.salary)}</div><div>Val: {fmt(p.value)}</div><div>Con: {p.contract}</div><div>Mul: {fmt(p.clause)}</div></div>
+                        <div style={{marginTop:5, display:'flex', justifyContent:'space-between', fontSize:10}}><span style={{color: p.status==='VENDA'?'var(--primary)':p.status==='INTRANSFERIVEL'?'var(--danger)':'#666'}}>{p.status}</span><span>{p.mood}</span></div>
                     </div>
                 ))}
             </div>
         );
 
-        const Market = ({ teams, players, me, marketOpen, isAdmin, isVisitor, onNegotiate, onPayClause, onPreContract }) => {
-            const [view, setView] = useState('MENU'); // MENU, GLOBAL, TEAM_LIST, TEAM_VIEW
-            const [filter, setFilter] = useState('VENDA'); // VENDA, EMPRESTIMO, ALL
-            const [selSerie, setSelSerie] = useState('A');
-            const [selTeam, setSelTeam] = useState(null);
-
-            if (view === 'MENU') return (
-                <div>
-                    <h3 style={{textAlign:'center'}}>MERCADO {marketOpen ? 'ABERTO 🟢' : 'FECHADO 🔒'}</h3>
-                    <div style={{display:'flex', gap:10, marginBottom:20}}>
-                        <div className="card" onClick={()=>{setFilter('VENDA'); setView('GLOBAL');}} style={{flex:1, textAlign:'center', cursor:'pointer', border:'1px solid var(--primary)'}}>
-                            <i className="fas fa-shopping-cart" style={{fontSize:24, color:'var(--primary)', marginBottom:5}}></i><br/>À VENDA (TODOS)
-                        </div>
-                        <div className="card" onClick={()=>{setFilter('EMPRESTIMO'); setView('GLOBAL');}} style={{flex:1, textAlign:'center', cursor:'pointer', border:'1px solid var(--secondary)'}}>
-                            <i className="fas fa-exchange-alt" style={{fontSize:24, color:'var(--secondary)', marginBottom:5}}></i><br/>EMPRÉSTIMOS
-                        </div>
-                    </div>
-                    <h4>Por Série</h4>
-                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                        {SERIES.map(s => (
-                            <div key={s} className="card" onClick={()=>{setSelSerie(s); setView('TEAM_LIST');}} style={{textAlign:'center', cursor:'pointer'}}>
-                                <b>Série {s}</b>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
-
-            // Logic to list players
-            let displayPlayers = [];
-            if (view === 'GLOBAL') {
-                displayPlayers = players.filter(p => p.status === filter && p.teamId !== me);
-            } else if (view === 'TEAM_VIEW') {
-                displayPlayers = players.filter(p => p.teamId === selTeam.id);
-            }
-
-            if (view === 'TEAM_LIST') return (
-                <div>
-                    <button className="btn btn-ghost" onClick={()=>setView('MENU')}>VOLTAR</button>
-                    <h3>Clubes Série {selSerie}</h3>
-                    {teams.filter(t => t.serie === selSerie && (t.id !== me || isVisitor)).map(t => (
-                        <div key={t.id} className="card" onClick={()=>{setSelTeam(t); setView('TEAM_VIEW');}} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>
-                            {t.logo ? <img src={t.logo} className="team-logo"/> : <div className="team-logo"></div>}
-                            <div><b>{t.name}</b><br/><small>{fmt(t.balance)}</small></div>
-                        </div>
-                    ))}
-                </div>
-            );
-
+        const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams }) => {
+            const [f, setF] = useState(initial || {name:'', position:'ATA', overall:'', value:'', salary:'', clause:'', contract:'', mood:'😐', status:'NAO_A_VENDA'});
             return (
                 <div>
-                    <button className="btn btn-ghost" onClick={()=>setView('MENU')}>VOLTAR</button>
-                    <h3>{view === 'GLOBAL' ? `Jogadores: ${filter}` : selTeam.name}</h3>
-                    
-                    {displayPlayers.sort((a,b)=>b.overall-a.overall).map(p => {
-                        const owner = teams.find(t=>t.id===p.teamId);
-                        const isSold = p.status === 'VENDIDO';
-                        return (
-                            <div key={p.id} className="card">
-                                <div className="player-header">
-                                    <div className="player-name">
-                                        <span className="pos-badge" style={{background: getPosColor(p.position)}}>{p.position}</span>
-                                        {p.name}
-                                    </div>
-                                    <span className="player-ov">{p.overall}</span>
-                                </div>
-                                <div className="player-details">
-                                    {view==='GLOBAL' && <div style={{gridColumn:'span 2', color:'#fff', paddingBottom:5}}>Time: {owner?.name}</div>}
-                                    <div>Val: {fmt(p.value)}</div>
-                                    <div>Con: {p.contract}</div>
-                                    <div>Mul: {fmt(p.clause)}</div>
-                                </div>
-                                {!isVisitor && !isAdmin && (
-                                    <div style={{marginTop:10, display:'flex', gap:5, flexWrap:'wrap'}}>
-                                        {isSold ? <span className="btn btn-gold" style={{textAlign:'center'}}>VENDIDO</span> : (
-                                            <>
-                                                {(marketOpen || p.status === 'EMPRESTIMO') && p.status !== 'INTRANSFERIVEL' ? 
-                                                    <button className="btn btn-purple" style={{width:'auto', flex:1}} onClick={()=>onNegotiate(p)}>NEGOCIAR</button> : 
-                                                    <button className="btn btn-ghost" disabled style={{width:'auto', flex:1}}>BLOQUEADO</button>
-                                                }
-                                                {p.clause > 0 && <button className="btn btn-gold" style={{width:'auto'}} onClick={()=>onPayClause(p)}>MULTA</button>}
-                                                {p.contract <= 1 && !p.preContract && <button className="btn btn-blue" style={{width:'auto'}} onClick={()=>onPreContract(p)}>PRÉ</button>}
-                                            </>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                    {displayPlayers.length === 0 && <p style={{textAlign:'center', color:'#666'}}>Nenhum jogador encontrado.</p>}
+                    <label>Nome</label><input className="input-field" value={f.name} onChange={e=>setF({...f, name:e.target.value})} />
+                    <div style={{display:'flex', gap:5}}>
+                        <div style={{flex:1}}><label>Posição</label><select className="input-field" value={f.position} onChange={e=>setF({...f, position:e.target.value})}>{POS.map(p=><option key={p} value={p}>{p}</option>)}</select></div>
+                        {isAdmin && <div style={{flex:1}}><label>Overall (Adm)</label><input className="input-field" type="number" value={f.overall} onChange={e=>setF({...f, overall:e.target.value})} /></div>}
+                    </div>
+                    {/* Owner can edit these now per request */}
+                    <div style={{display:'flex', gap:5}}>
+                        <div style={{flex:1}}><label>Valor</label><input className="input-field" type="number" value={f.value} onChange={e=>setF({...f, value:e.target.value})} /></div>
+                        <div style={{flex:1}}><label>Salário</label><input className="input-field" type="number" value={f.salary} onChange={e=>setF({...f, salary:e.target.value})} /></div>
+                    </div>
+                    <div style={{display:'flex', gap:5}}>
+                        <div style={{flex:1}}><label>Multa</label><input className="input-field" type="number" value={f.clause} onChange={e=>setF({...f, clause:e.target.value})} /></div>
+                        <div style={{flex:1}}><label>Contrato</label><input className="input-field" type="number" value={f.contract} onChange={e=>setF({...f, contract:e.target.value})} /></div>
+                    </div>
+                    <label>Status</label><select className="input-field" value={f.status} onChange={e=>setF({...f, status:e.target.value})}><option value="NAO_A_VENDA">Não Listado</option><option value="VENDA">À Venda</option><option value="EMPRESTIMO">Empréstimo</option><option value="INTRANSFERIVEL">Bloqueado</option></select>
+                    <label>Humor</label><select className="input-field" value={f.mood} onChange={e=>setF({...f, mood:e.target.value})}><option>🤩</option><option>😐</option><option>😡</option></select>
+                    {isAdmin && <div style={{border:'1px solid gold', padding:5, marginTop:5}}><label style={{color:'gold'}}>Mover Time (Adm)</label><select className="input-field" onChange={e=>setF({...f, forcedTeamId:e.target.value})}><option value="">-- Manter --</option>{teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></div>}
+                    <div style={{display:'flex', gap:10, marginTop:15}}><button className="btn btn-green" onClick={()=>onSave(f)}>SALVAR</button>{initial && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>X</button>}</div>
                 </div>
             );
         };
 
-        const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams }) => {
-            const [form, setForm] = useState(initial || {
-                name:'', position:'ATA', overall:'', value:'', salary:'', clause:'', contract:'', mood:'😐', status:'NAO_A_VENDA', forcedTeamId: ''
-            });
+        const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) => {
+            const [view, setView] = useState('MENU'); const [serie, setSerie] = useState('A'); const [selT, setSelT] = useState(null); const [filt, setFilt] = useState('VENDA');
+            if(view==='MENU') return (
+                <div>
+                    <h3>Mercado {open?'🟢':'🔴'}</h3>
+                    <div style={{display:'flex', gap:10}}><div className="card" style={{flex:1, textAlign:'center', cursor:'pointer', border:'1px solid var(--primary)'}} onClick={()=>{setFilt('VENDA'); setView('GLOBAL');}}>🛒 VENDA</div><div className="card" style={{flex:1, textAlign:'center', cursor:'pointer', border:'1px solid var(--secondary)'}} onClick={()=>{setFilt('EMPRESTIMO'); setView('GLOBAL');}}>🔄 EMP</div></div>
+                    <h4>Séries</h4><div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>{SERIES.map(s=><div key={s} className="card" style={{textAlign:'center', cursor:'pointer'}} onClick={()=>{setSerie(s); setView('LIST');}}><b>Série {s}</b></div>)}</div>
+                </div>
+            );
+            
+            let list = [];
+            if(view==='GLOBAL') list = players.filter(p=>p.status===filt && p.teamId!==me).sort((a,b)=>b.overall-a.overall);
+            else if(view==='TEAM') list = players.filter(p=>p.teamId===selT.id).sort((a,b)=>b.overall-a.overall);
+
+            if(view==='LIST') return <div><button className="btn" onClick={()=>setView('MENU')}>Voltar</button><h3>Clubes Série {serie}</h3>{teams.filter(t=>t.serie===serie).map(t=><div key={t.id} className="card" onClick={()=>{setSelT(t); setView('TEAM');}} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo?<img src={t.logo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/>:<div style={{width:30}}></div>}<b>{t.name}</b></div>)}</div>;
 
             return (
                 <div>
-                    <label>Nome</label><input className="input-field" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
-                    
-                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                        <div><label>Posição</label><select className="input-field" value={form.position} onChange={e=>setForm({...form, position:e.target.value})}>{POSITIONS.map(p=><option key={p} value={p}>{p}</option>)}</select></div>
-                        <div><label>Overall</label><input className="input-field" type="number" value={form.overall} onChange={e=>setForm({...form, overall:e.target.value})} /></div>
-                    </div>
-
-                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                        <div><label>Contrato</label><input className="input-field" type="number" value={form.contract} onChange={e=>setForm({...form, contract:e.target.value})} /></div>
-                        <div><label>Humor</label><select className="input-field" value={form.mood} onChange={e=>setForm({...form, mood:e.target.value})}><option>🤩</option><option>🙂</option><option>😐</option><option>😡</option></select></div>
-                    </div>
-
-                    <label>Valor de Passe</label><input className="input-field" type="number" value={form.value} onChange={e=>setForm({...form, value:e.target.value})} />
-                    <label>Salário</label><input className="input-field" type="number" value={form.salary} onChange={e=>setForm({...form, salary:e.target.value})} />
-                    <label>Multa Rescisória</label><input className="input-field" type="number" value={form.clause} onChange={e=>setForm({...form, clause:e.target.value})} />
-                    
-                    <label>Status de Mercado</label>
-                    <select className="input-field" value={form.status} onChange={e=>setForm({...form, status:e.target.value})}>
-                        <option value="NAO_A_VENDA">Não Listado</option>
-                        <option value="VENDA">À Venda</option>
-                        <option value="EMPRESTIMO">Listar p/ Empréstimo</option>
-                        <option value="INTRANSFERIVEL">⛔ Intransferível</option>
-                    </select>
-
-                    {isAdmin && (
-                        <div style={{border:'1px solid var(--warning)', padding:10, borderRadius:8, marginBottom:10}}>
-                            <label style={{color:'var(--warning)'}}>⚠ Transferência Forçada (Admin)</label>
-                            <select className="input-field" value={form.forcedTeamId} onChange={e=>setForm({...form, forcedTeamId:e.target.value})}>
-                                <option value="">-- Manter no Time Atual --</option>
-                                {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                            </select>
-                        </div>
-                    )}
-
-                    <div style={{display:'flex', gap:10}}>
-                        <button className="btn btn-green" onClick={()=>onSave(form)}>SALVAR</button>
-                        {initial && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>EXCLUIR</button>}
-                    </div>
+                    <button className="btn" onClick={()=>setView('MENU')}>Voltar</button><h3>{view==='GLOBAL'?filt:selT.name}</h3>
+                    {list.map(p => {
+                        const owner = teams.find(t=>t.id===p.teamId);
+                        return (
+                            <div key={p.id} className="card">
+                                <div style={{display:'flex', justifyContent:'space-between'}}><div><span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span>{p.name}</div><span className="player-ov">{p.overall}</span></div>
+                                <div style={{fontSize:11, color:'#aaa', marginTop:5}}>{view==='GLOBAL' && <div>Time: {owner?.name}</div>}<div>Val: {fmt(p.value)} | Con: {p.contract}</div><div>Mul: {fmt(p.clause)}</div></div>
+                                {!isVis && <div style={{marginTop:5, display:'flex', gap:5}}>
+                                    {(open || p.status==='EMPRESTIMO') && p.status!=='INTRANSFERIVEL' ? <button className="btn btn-purple" style={{width:'auto', flex:1}} onClick={()=>onNeg(p)}>NEGOCIAR</button> : <button className="btn btn-ghost" style={{width:'auto', flex:1}} disabled>BLOQUEADO</button>}
+                                    {p.clause>0 && <button className="btn btn-gold" style={{width:'auto'}} onClick={()=>onPayClause(p)}>MULTA</button>}
+                                    {p.contract<=1 && !p.preContract && <button className="btn btn-blue" style={{width:'auto'}} onClick={()=>onPre(p)}>PRÉ</button>}
+                                </div>}
+                            </div>
+                        );
+                    })}
                 </div>
             );
         };
 
         const OfferForm = ({ target, myPlayers, onSend }) => {
-            const [type, setType] = useState('COMPRA');
-            const [val, setVal] = useState(target.oldVal || '');
-            const [swapId, setSwapId] = useState('');
-            const [con, setCon] = useState('1');
-
+            const [t, setT] = useState('COMPRA'); const [v, setV] = useState(target.oldVal||''); const [s, setS] = useState('1'); const [sw, setSw] = useState('');
             return (
                 <div>
-                    <div style={{display:'flex', gap:5, marginBottom:15}}>
-                        {['COMPRA', 'EMPRESTIMO', 'TROCA'].map(t => (
-                            <button key={t} className={`btn ${type===t?'btn-green':'btn-ghost'}`} onClick={()=>setType(t)}>{t}</button>
-                        ))}
-                    </div>
-
-                    <label>{type === 'EMPRESTIMO' ? 'Taxa de Empréstimo (Opcional)' : type === 'TROCA' ? 'Volta em Dinheiro' : 'Valor da Compra'}</label>
-                    <input className="input-field" type="number" value={val} onChange={e=>setVal(e.target.value)} />
-
-                    {type === 'TROCA' && (
-                        <div>
-                            <label>Seu Jogador para Troca</label>
-                            <select className="input-field" value={swapId} onChange={e=>setSwapId(e.target.value)}>
-                                <option value="">Selecione...</option>
-                                {myPlayers.map(p => <option key={p.id} value={p.id}>{p.name} ({p.overall})</option>)}
-                            </select>
-                        </div>
-                    )}
-
-                    <label>{type === 'EMPRESTIMO' ? 'Duração (Temporadas)' : 'Contrato Oferecido'}</label>
-                    {type === 'EMPRESTIMO' ? (
-                        <select className="input-field" value={con} onChange={e=>setCon(e.target.value)}>
-                            <option value="0.5">Meia Temporada</option>
-                            <option value="1">1 Temporada</option>
-                            <option value="2">2 Temporadas</option>
-                        </select>
-                    ) : (
-                        <input className="input-field" type="number" value={con} onChange={e=>setCon(e.target.value)} />
-                    )}
-
-                    <button className="btn btn-green" onClick={()=>onSend(target, type, val, swapId, con, target.oldOffer)}>ENVIAR {target.oldOffer ? 'CONTRAPROPOSTA' : 'PROPOSTA'}</button>
+                    <div style={{display:'flex', gap:5, marginBottom:10}}>{['COMPRA','EMPRESTIMO','TROCA'].map(x=><button key={x} className={`btn ${t===x?'btn-green':'btn-ghost'}`} onClick={()=>setT(x)}>{x}</button>)}</div>
+                    <input className="input-field" type="number" placeholder={t==='TROCA'?'Volta em Dinheiro':'Valor'} value={v} onChange={e=>setV(e.target.value)} />
+                    {t==='TROCA' && <select className="input-field" onChange={e=>setSw(e.target.value)}><option value="">Seu Jogador...</option>{myPlayers.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>}
+                    <label>{t==='EMPRESTIMO'?'Duração':'Contrato'}</label>
+                    {t==='EMPRESTIMO' ? <select className="input-field" onChange={e=>setS(e.target.value)}><option value="0.5">Meia Temp</option><option value="1">1 Temp</option></select> : <input className="input-field" type="number" value={s} onChange={e=>setS(e.target.value)} />}
+                    <button className="btn btn-green" onClick={()=>onSend(target, t, v, sw, s, target.oldOffer)}>ENVIAR</button>
                 </div>
             );
         };
 
-        const OffersScreen = ({ offers, onAccept, onReject, onCounter }) => (
-            <div>
-                <h3>Propostas Recebidas ({offers.length})</h3>
-                {offers.length === 0 && <p>Nenhuma proposta no momento.</p>}
-                {offers.map(o => (
-                    <div key={o.id} className="card" style={{borderLeft:'4px solid var(--warning)'}}>
-                        <div style={{color:'var(--primary)', fontWeight:'bold'}}>{o.playerName}</div>
-                        <div style={{fontSize:12, marginBottom:10}}>Interessado: {o.buyerName}</div>
-                        <div style={{background:'#333', padding:10, borderRadius:6, fontSize:13, marginBottom:10}}>{o.description}</div>
-                        <div style={{display:'flex', gap:5}}>
-                            <button className="btn btn-green" onClick={()=>onAccept(o)}>ACEITAR</button>
-                            <button className="btn btn-blue" onClick={()=>onCounter(o)}>CONTRAPROPOSTA</button>
-                            <button className="btn btn-red" onClick={()=>onReject(o.id)}>RECUSAR</button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        );
-
-        const AdminPanel = ({ teams, config, reqs, onToggleMarket, onTurnWeek, onTurnSeason, onPostNews, onApproveReq, onRejectReq, onEditTeam }) => (
+        const AdminPanel = ({ teams, reqs, config, onAct, onPost, onApprove, onReject, onEditT }) => (
             <div>
                 <h3>Painel Master</h3>
-                
                 <div className="card">
-                    <h4>Controle de Tempo</h4>
-                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                        <button className="btn btn-purple" onClick={onTurnWeek}>VIRAR SEMANA</button>
-                        <button className="btn btn-red" onClick={onTurnSeason}>VIRAR TEMPORADA</button>
-                    </div>
+                    <button className={`btn ${config.marketOpen?'btn-red':'btn-green'}`} onClick={()=>onAct('MARKET', !config.marketOpen)}>{config.marketOpen?'FECHAR MERCADO':'ABRIR MERCADO'}</button>
+                    <button className="btn btn-red" onClick={()=>onAct('SEASON')}>VIRAR TEMPORADA</button>
+                    <button className="btn btn-gold" onClick={()=>{ const t=prompt("Título"); const b=prompt("Texto"); if(t)onPost(t,b,'admin'); }}>COMUNICADO</button>
                 </div>
-
-                <div className="card">
-                    <h4>Mercado & Comunicação</h4>
-                    <button className={`btn ${config.marketOpen ? 'btn-red' : 'btn-green'}`} onClick={()=>onToggleMarket(!config.marketOpen)}>
-                        {config.marketOpen ? 'FECHAR MERCADO' : 'ABRIR MERCADO'}
-                    </button>
-                    <button className="btn btn-gold" onClick={() => {
-                        const t = prompt("Título:"); const b = prompt("Texto:"); const tp = prompt("Tipo (admin, transfer, infra):", "admin");
-                        if(t && b) onPostNews(t, b, tp);
-                    }}>PUBLICAR COMUNICADO</button>
-                </div>
-
-                <h4>Solicitações ({reqs.length})</h4>
-                {reqs.map(r => (
-                    <div key={r.id} className="card">
-                        <div><b>{r.teamName}</b> pede {fmt(r.amount)} ({r.type})</div>
-                        <small>{r.details}</small>
-                        <div style={{display:'flex', gap:10, marginTop:5}}>
-                            <button className="btn btn-green" onClick={()=>onApproveReq(r)}>APROVAR</button>
-                            <button className="btn btn-red" onClick={()=>onRejectReq(r.id)}>NEGAR</button>
-                        </div>
-                    </div>
-                ))}
-
-                <h4>Gerenciar Clubes</h4>
-                {teams.map(t => (
-                    <div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between'}}>
-                        <span>{t.name}</span>
-                        <button className="btn btn-purple" style={{width:'auto'}} onClick={()=>onEditTeam(t)}>VER ELENCO</button>
-                    </div>
-                ))}
+                <h4>Solicitações</h4>
+                {reqs.filter(r=>r.status==='PENDING').map(r=><div key={r.id} className="card"><b>{r.teamName}</b>: {fmt(r.amount)} ({r.type})<br/>{r.details}<br/><button className="btn-green" style={{width:'auto', marginRight:5}} onClick={()=>onApprove(r)}>V</button><button className="btn-red" style={{width:'auto'}} onClick={()=>onReject(r.id)}>X</button></div>)}
+                <h4>Clubes</h4>
+                {teams.map(t=><div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>{t.name}</span><button className="btn btn-purple" style={{width:'auto'}} onClick={()=>onEditT(t)}>ELENCO</button></div>)}
             </div>
         );
 
-        const SettingsForm = ({ team, isAdmin, onUpgrade, onUpdate, onRequest }) => (
+        const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq }) => (
             <div>
-                <label>Alterar Nome</label><input className="input-field" defaultValue={team.name} id="edit-name" />
-                <label>Alterar Logo (URL)</label><input className="input-field" defaultValue={team.logo} id="edit-logo" />
-                {isAdmin && <label>Alterar Saldo (Admin)</label>}
-                {isAdmin && <input className="input-field" type="number" defaultValue={team.balance} id="edit-bal" />}
-                
-                <button className="btn btn-blue" onClick={() => {
-                    const updates = { name: document.getElementById('edit-name').value, logo: document.getElementById('edit-logo').value };
-                    if(isAdmin) updates.balance = parseFloat(document.getElementById('edit-bal').value);
-                    onUpdate(updates);
-                }}>SALVAR DADOS</button>
-
-                <hr style={{borderColor:'#444', margin:'15px 0'}} />
-                
-                <h4>Estádio</h4>
-                <p>Nível Atual: {team.stadiumLevel || 1}</p>
-                <button className="btn btn-purple" onClick={onUpgrade}>EVOLUIR ESTÁDIO (₣ {fmt(STADIUM_COSTS[team.stadiumLevel||1]).replace('₣ ','')})</button>
-
-                <hr style={{borderColor:'#444', margin:'15px 0'}} />
-                
-                <h4>Financeiro</h4>
-                <button className="btn btn-green" onClick={() => {
-                    const v = prompt("Valor:"); const m = prompt("Motivo:");
-                    if(v && m) onRequest('INJECTION', v, m);
-                }}>PEDIR INJEÇÃO</button>
-                <button className="btn btn-gold" onClick={() => {
-                    const v = prompt("Valor:"); const m = prompt("Empresa:");
-                    if(v && m) onRequest('SPONSORSHIP', v, m);
-                }}>PEDIR PATROCÍNIO</button>
+                <label>Nome</label><input className="input-field" defaultValue={team.name} id="edit-n" />
+                <label>Logo (URL)</label><input className="input-field" defaultValue={team.logo} id="edit-l" />
+                {isAdmin && <label>Saldo (ADM)</label>} {isAdmin && <input className="input-field" type="number" defaultValue={team.balance} id="edit-b" />}
+                <button className="btn btn-blue" onClick={()=>{ const u={name:document.getElementById('edit-n').value, logo:document.getElementById('edit-l').value}; if(isAdmin)u.balance=parseFloat(document.getElementById('edit-b').value); onUp(u); }}>SALVAR</button>
+                <hr style={{borderColor:'#444'}}/>
+                <p>Estádio Nível {team.stadiumLevel||1}</p><button className="btn btn-purple" onClick={onUpgrade}>EVOLUIR (₣ {fmt(COSTS[team.stadiumLevel]||0).replace('₣ ','')})</button>
+                <hr style={{borderColor:'#444'}}/>
+                <button className="btn btn-green" onClick={()=>{const v=prompt("Valor");const m=prompt("Motivo"); if(v)onReq('INJECTION',v,m)}}>PEDIR INJEÇÃO</button>
+                <button className="btn btn-gold" onClick={()=>{const v=prompt("Valor");const m=prompt("Empresa"); if(v)onReq('SPONSORSHIP',v,m)}}>PEDIR PATROCÍNIO</button>
             </div>
         );
 
-        const Ranking = ({ teams, players }) => {
-            const list = teams.map(t => {
-                const squadVal = players.filter(p => p.teamId === t.id).reduce((a,b) => a + (b.value||0), 0);
-                return { ...t, wealth: (t.balance||0) + squadVal, squadVal };
-            }).sort((a,b) => b.wealth - a.wealth);
+        const OffersScreen = ({ offers, onAccept, onReject, onCounter }) => (
+            <div><h3>Propostas</h3>{offers.map(o=><div key={o.id} className="card" style={{borderLeft:'4px solid gold'}}><b style={{color:'var(--primary)'}}>{o.playerName}</b><br/><small>De: {o.buyerName}</small><p style={{background:'#333', padding:5, borderRadius:5}}>{o.description}</p><div style={{display:'flex', gap:5}}><button className="btn btn-green" onClick={()=>onAccept(o)}>ACEITAR</button><button className="btn btn-blue" onClick={()=>onCounter(o)}>CONTRA</button><button className="btn btn-red" onClick={()=>onReject(o.id)}>RECUSAR</button></div></div>)}</div>
+        );
 
-            return (
-                <div>
-                    <h3>Ranking de Bilionários</h3>
-                    {list.map((t, i) => (
-                        <div key={t.id} className="card" style={{display:'flex', alignItems:'center', gap:15}}>
-                            <div style={{fontSize:20, fontWeight:'bold', color:'#555', width:30}}>{i+1}º</div>
-                            {t.logo ? <img src={t.logo} style={{width:30, height:30, borderRadius:'50%'}} /> : <div style={{width:30}}></div>}
-                            <div style={{flex:1}}>
-                                <b style={{fontSize:16}}>{t.name}</b><br/>
-                                <small style={{color:'var(--primary)'}}>Patrimônio: {fmt(t.wealth)}</small><br/>
-                                <small style={{color:'#666', fontSize:10}}>Caixa: {fmt(t.balance)} | Elenco: {fmt(t.squadVal)}</small>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            );
-        };
-
-        const NewsFeed = ({ news }) => (
-            <div>
-                <h3>Plantão de Notícias</h3>
-                {news.map(n => (
-                    <div key={n.id} className={`news-card news-${n.type || 'normal'}`}>
-                        <div style={{fontSize:10, color:'#888', marginBottom:4, textTransform:'uppercase'}}>{new Date(n.date).toLocaleString()}</div>
-                        {n.text}
-                    </div>
-                ))}
-            </div>
+        const Ranking = ({ teams, players }) => (
+            <div><h3>Ranking</h3>{teams.map(t=>{ const sv=players.filter(p=>p.teamId===t.id).reduce((a,b)=>a+(b.value||0),0); return {...t, w: t.balance+sv, sv}}).sort((a,b)=>b.w-a.w).map((t,i)=><div key={t.id} className="card" style={{display:'flex', alignItems:'center', gap:10}}><b style={{fontSize:20, color:'#555', width:30}}>{i+1}</b>{t.logo?<img src={t.logo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/>:<div style={{width:30}}></div>}<div style={{flex:1}}><b>{t.name}</b><br/><small style={{color:'var(--primary)'}}>Patrimônio: {fmt(t.w)}</small><br/><small style={{fontSize:9, color:'#888'}}>Caixa: {fmt(t.balance)} | Elenco: {fmt(t.sv)}</small></div></div>)}</div>
         );
 
         const root = ReactDOM.createRoot(document.getElementById('root'));

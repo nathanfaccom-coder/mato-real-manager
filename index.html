@@ -74,7 +74,7 @@
 
         // --- APP ---
         function App() {
-            const [user, setUser] = useState(null); // { type: 'ADMIN'|'USER'|'VISITOR', data: teamData }
+            const [user, setUser] = useState(null); 
             const [teams, setTeams] = useState([]);
             const [players, setPlayers] = useState([]);
             const [offers, setOffers] = useState([]);
@@ -86,7 +86,7 @@
             const [modal, setModal] = useState(null);
             const [loading, setLoading] = useState(true);
             const [newNews, setNewNews] = useState(false);
-            const [adminTeam, setAdminTeam] = useState(null); // Time sendo editado pelo admin
+            const [adminTeam, setAdminTeam] = useState(null); 
 
             useEffect(() => {
                 const unsubs = [
@@ -118,15 +118,41 @@
 
             const login = (id, pwd) => {
                 const t = teams.find(x => x.id === id);
-                if (t && t.password === pwd) { setUser({type:'USER', data:t}); setScreen('HOME'); } else alert("Senha incorreta!");
+                if (t) {
+                    if (t.password === pwd) {
+                        if (t.status === 'PENDING') {
+                            alert("⏳ Aguarde! Seu time ainda está sendo analisado pela Federação.");
+                        } else {
+                            setUser({type:'USER', data:t}); 
+                            setScreen('HOME');
+                        }
+                    } else alert("Senha incorreta!");
+                } else alert("Time não encontrado.");
             };
 
             const createTeam = async (name, bal, serie, pass, logo) => {
                 if(teams.find(t=>t.name.toLowerCase()===name.toLowerCase())) return alert("Nome em uso!");
-                const ref = await db.collection('teams').add({ name, balance: parseFloat(bal), serie, password: pass, stadiumLevel: 1, logo: logo||null });
-                postNews(`🛡️ **NOVO CLUBE!**\n${name} fundado na Série ${serie}.`, 'infra');
-                setUser({type:'USER', data: {id:ref.id, name, balance:parseFloat(bal), serie, password:pass, stadiumLevel:1, logo:logo||null}});
-                setScreen('HOME');
+                const ref = await db.collection('teams').add({ 
+                    name, balance: parseFloat(bal), serie, password: pass, 
+                    stadiumLevel: 1, logo: logo||null, status: 'PENDING' 
+                });
+                alert("Time criado com sucesso! Aguarde a aprovação da Federação para entrar.");
+                // Não loga automaticamente, volta pra tela de login
+            };
+
+            const approveTeam = async (teamId, finalBalance) => {
+                await db.collection('teams').doc(teamId).update({
+                    status: 'ACTIVE',
+                    balance: parseFloat(finalBalance)
+                });
+                const t = teams.find(x=>x.id===teamId);
+                postNews(`🛡️ **NOVO CLUBE!**\nO **${t.name}** foi aprovado na Série ${t.serie}.`, 'infra');
+                alert("Time aprovado!");
+            };
+
+            const updateBalance = async (teamId, newBal) => {
+                await db.collection('teams').doc(teamId).update({ balance: parseFloat(newBal) });
+                alert("Saldo atualizado!");
             };
 
             const savePlayer = async (d) => {
@@ -257,9 +283,9 @@
                     <div className="container">
                         {screen === 'HOME' && (
                             user.type === 'ADMIN' ? 
-                            <AdminPanel teams={teams} reqs={reqs} config={conf} onAct={adminAction} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{const b=db.batch(); if(r.type==='INJECTION')b.update(db.collection('teams').doc(r.teamId),{balance:(teams.find(t=>t.id===r.teamId).balance||0)+r.amount}); else b.update(db.collection('teams').doc(r.teamId),{sponsorship:{name:r.details,value:r.amount}}); b.delete(db.collection('financeRequests').doc(r.id)); await b.commit();}} onReject={(rid)=>db.collection('financeRequests').doc(rid).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} /> 
+                            <AdminPanel teams={teams} reqs={reqs} config={conf} onAct={adminAction} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{const b=db.batch(); if(r.type==='INJECTION')b.update(db.collection('teams').doc(r.teamId),{balance:(teams.find(t=>t.id===r.teamId).balance||0)+r.amount}); else b.update(db.collection('teams').doc(r.teamId),{sponsorship:{name:r.details,value:r.amount}}); b.delete(db.collection('financeRequests').doc(r.id)); await b.commit();}} onReject={(rid)=>db.collection('financeRequests').doc(rid).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} /> 
                             : user.type === 'VISITOR' ? <div style={{textAlign:'center', marginTop:50, color:'#888'}}><h3>Bem-vindo, Visitante!</h3>Use o menu abaixo para navegar.</div>
-                            : <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />
+                            : <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} isVisitor={user.type==='VISITOR'} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />
                         )}
 
                         {screen === 'ADMIN_TEAM' && adminTeam && (
@@ -303,7 +329,7 @@
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
                     <div className="login-tabs"><div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div><div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR</div></div>
-                    {tab==='LOGIN' ? <div>{teams.map(t=><div key={t.id} className="card" onClick={()=>setSel(t)} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}<div style={{marginTop:20}}><button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button><button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button></div></div> 
+                    {tab==='LOGIN' ? <div>{teams.filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>setSel(t)} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}<div style={{marginTop:20}}><button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button><button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button></div></div> 
                     : <div><input type="file" className="file-input" onChange={handleUpload} /><input className="input-field" placeholder="Nome" value={f.n} onChange={e=>setF({...f, n:e.target.value})} /><input className="input-field" type="number" placeholder="Saldo" value={f.b} onChange={e=>setF({...f, b:e.target.value})} /><select className="input-field" value={f.s} onChange={e=>setF({...f, s:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>Série {s}</option>)}</select><input className="input-field" type="number" placeholder="Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} /><button className="btn btn-green" onClick={()=>onCreate(f.n, f.b, f.s, f.p, f.l)}>CRIAR</button></div>}
                     {sel && <div className="modal-overlay"><div className="modal-content"><h3>{sel.name}</h3><input className="input-field" type="password" placeholder="Senha" value={lp} onChange={e=>setLp(e.target.value)} /><button className="btn btn-green" onClick={()=>onLogin(sel.id, lp)}>ENTRAR</button><button className="btn" onClick={()=>setSel(null)}>CANCELAR</button></div></div>}
                 </div>
@@ -363,7 +389,7 @@
             if(view==='GLOBAL') list = players.filter(p=>p.status===filt && p.teamId!==me).sort((a,b)=>b.overall-a.overall);
             else if(view==='TEAM') list = players.filter(p=>p.teamId===selT.id).sort((a,b)=>b.overall-a.overall);
 
-            if(view==='LIST') return <div><button className="btn" onClick={()=>setView('MENU')}>Voltar</button><h3>Clubes Série {serie}</h3>{teams.filter(t=>t.serie===serie).map(t=><div key={t.id} className="card" onClick={()=>{setSelT(t); setView('TEAM');}} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo?<img src={t.logo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/>:<div style={{width:30}}></div>}<b>{t.name}</b></div>)}</div>;
+            if(view==='LIST') return <div><button className="btn" onClick={()=>setView('MENU')}>Voltar</button><h3>Clubes Série {serie}</h3>{teams.filter(t=>t.serie===serie && t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>{setSelT(t); setView('TEAM');}} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo?<img src={t.logo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/>:<div style={{width:30}}></div>}<b>{t.name}</b></div>)}</div>;
 
             return (
                 <div>
@@ -400,7 +426,7 @@
             );
         };
 
-        const AdminPanel = ({ teams, reqs, config, onAct, onPost, onApprove, onReject, onEditT }) => (
+        const AdminPanel = ({ teams, reqs, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal }) => (
             <div>
                 <h3>Painel Master</h3>
                 <div className="card">
@@ -409,10 +435,32 @@
                     <button className="btn btn-red" onClick={()=>onAct('SEASON')}>VIRAR TEMPORADA</button>
                     <button className="btn btn-gold" onClick={()=>{ const t=prompt("Título"); const b=prompt("Texto"); if(t)onPost(t,b,'admin'); }}>COMUNICADO</button>
                 </div>
-                <h4>Solicitações</h4>
+                
+                {/* Pending Teams Section */}
+                <h4>Aprovações Pendentes ({teams.filter(t=>t.status==='PENDING').length})</h4>
+                {teams.filter(t=>t.status==='PENDING').map(t=>(
+                    <div key={t.id} className="card" style={{borderLeft:'4px solid var(--warning)'}}>
+                        <b>{t.name}</b><br/>Série {t.serie}<br/>
+                        <div style={{display:'flex', gap:5, marginTop:5}}>
+                            <input className="input-field" style={{marginBottom:0, width:100}} defaultValue={t.balance} id={`bal-${t.id}`} />
+                            <button className="btn btn-green" style={{marginBottom:0}} onClick={()=>onApproveTeam(t.id, document.getElementById(`bal-${t.id}`).value)}>APROVAR</button>
+                        </div>
+                    </div>
+                ))}
+
+                <h4>Solicitações Financeiras</h4>
                 {reqs.filter(r=>r.status==='PENDING').map(r=><div key={r.id} className="card"><b>{r.teamName}</b>: {fmt(r.amount)} ({r.type})<br/>{r.details}<br/><button className="btn-green" style={{width:'auto', marginRight:5}} onClick={()=>onApprove(r)}>V</button><button className="btn-red" style={{width:'auto'}} onClick={()=>onReject(r.id)}>X</button></div>)}
-                <h4>Clubes</h4>
-                {teams.map(t=><div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>{t.name}</span><button className="btn btn-purple" style={{width:'auto'}} onClick={()=>onEditT(t)}>ELENCO</button></div>)}
+                
+                <h4>Clubes Ativos</h4>
+                {teams.filter(t=>t.status!=='PENDING').map(t=>(
+                    <div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between'}}>
+                        <span>{t.name}</span>
+                        <div>
+                            <button className="btn btn-green" style={{width:'auto', marginRight:5}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button>
+                            <button className="btn btn-purple" style={{width:'auto'}} onClick={()=>onEditT(t)}>ELENCO</button>
+                        </div>
+                    </div>
+                ))}
             </div>
         );
 
@@ -435,7 +483,7 @@
         );
 
         const Ranking = ({ teams, players }) => (
-            <div><h3>Ranking</h3>{teams.map(t=>{ const sv=players.filter(p=>p.teamId===t.id).reduce((a,b)=>a+(b.value||0),0); return {...t, w: t.balance+sv, sv}}).sort((a,b)=>b.w-a.w).map((t,i)=><div key={t.id} className="card" style={{display:'flex', alignItems:'center', gap:10}}><b style={{fontSize:20, color:'#555', width:30}}>{i+1}</b>{t.logo?<img src={t.logo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/>:<div style={{width:30}}></div>}<div style={{flex:1}}><b>{t.name}</b><br/><small style={{color:'var(--primary)'}}>Patrimônio: {fmt(t.w)}</small><br/><small style={{fontSize:9, color:'#888'}}>Caixa: {fmt(t.balance)} | Elenco: {fmt(t.sv)}</small></div></div>)}</div>
+            <div><h3>Ranking</h3>{teams.filter(t=>t.status!=='PENDING').map(t=>{ const sv=players.filter(p=>p.teamId===t.id).reduce((a,b)=>a+(b.value||0),0); return {...t, w: t.balance+sv, sv}}).sort((a,b)=>b.w-a.w).map((t,i)=><div key={t.id} className="card" style={{display:'flex', alignItems:'center', gap:10}}><b style={{fontSize:20, color:'#555', width:30}}>{i+1}</b>{t.logo?<img src={t.logo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/>:<div style={{width:30}}></div>}<div style={{flex:1}}><b>{t.name}</b><br/><small style={{color:'var(--primary)'}}>Patrimônio: {fmt(t.w)}</small><br/><small style={{fontSize:9, color:'#888'}}>Caixa: {fmt(t.balance)} | Elenco: {fmt(t.sv)}</small></div></div>)}</div>
         );
 
         const root = ReactDOM.createRoot(document.getElementById('root'));

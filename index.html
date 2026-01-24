@@ -85,6 +85,7 @@
                         <div className="error-screen">
                             <h2>Ocorreu um erro!</h2>
                             <p>O aplicativo encontrou um problema inesperado.</p>
+                            <pre style={{fontSize:10, background:'#000', padding:10, borderRadius:5, maxWidth:'100%', overflow:'auto'}}>{this.state.error?.toString()}</pre>
                             <button className="btn btn-red" onClick={()=>{localStorage.clear(); window.location.reload();}}>REINICIAR APLICATIVO</button>
                         </div>
                     );
@@ -267,19 +268,36 @@
                 if(type==='COMPRA') desc = `Compra: ${fmt(v)} | ${con} Anos` + (meta?.sellOn > 0 ? `\n+${meta.sellOn}% Revenda` : '');
                 if(type==='EMPRESTIMO') desc = `Emp: ${fmt(v)} | ${con} Temp` + (meta?.buyOpt > 0 ? `\nOpção: ${fmt(meta.buyOpt)}` : '');
                 if(type==='TROCA') { const names = (swapIds||[]).map(id => players.find(p=>p.id===id)?.name).join(', '); desc = `Troca: ${names}\n${meta?.cashDir === 'PAY' ? 'Eu pago' : 'Eu recebo'}: ${fmt(v)}`; }
-                const pl = { playerId: target.id, playerName: target.name, buyerId: user.data.id, buyerName: user.data.name, sellerId: old ? old.buyerId : target.teamId, type, value: v, swapPlayerIds: swapIds || [], offerContract: con, description: desc, meta: meta || {}, date: Date.now() };
-                const b = db.batch(); if(old && old.id) b.delete(db.collection('offers').doc(old.id)); b.set(db.collection('offers').doc(), pl); await b.commit();
-                postNews(`🚨 **PROPOSTA**\n${user.data.name} > **${target.name}**\n${desc}`, 'transfer'); setModal(null); alert("Enviada!");
+                
+                // --- FIX: CORRECT SELLER ID LOGIC ---
+                // If it's a counter (old exists), the Seller is the one who MADE the previous offer (old.buyerId)
+                // If it's a new offer, the Seller is the team that owns the player (target.teamId)
+                const realSellerId = (old && old.buyerId) ? old.buyerId : target.teamId;
+
+                const pl = { 
+                    playerId: target.id, playerName: target.name, 
+                    buyerId: user.data.id, buyerName: user.data.name, 
+                    sellerId: realSellerId, 
+                    type, value: v, swapPlayerIds: swapIds || [], offerContract: parseInt(con) || 1, 
+                    description: desc, meta: meta || {}, date: Date.now() 
+                };
+                
+                const b = db.batch(); 
+                if(old && old.id) b.delete(db.collection('offers').doc(old.id)); 
+                b.set(db.collection('offers').doc(), pl); 
+                await b.commit();
+                postNews(`🚨 **PROPOSTA**\n${user.data.name} > **${target.name}**\n${desc}`, 'transfer'); 
+                setModal(null); 
+                alert("Enviada!");
             };
 
             const acceptOffer = async (o) => {
                 const buy = teams.find(t=>t.id===o.buyerId); const sel = teams.find(t=>t.id===user.data.id); const p = players.find(x=>x.id===o.playerId);
                 let cost = o.value; if(o.type === 'TROCA' && o.meta?.cashDir === 'RECEIVE') cost = -o.value; 
                 
-                // --- NEW INSTALLMENT LOGIC ---
+                // --- INSTALLMENT LOGIC ---
                 if (o.type === 'COMPRA' && o.meta?.installments > 1) {
                     if (buy.balance < (cost / o.meta.installments)) return alert("Saldo insuficiente para 1ª parcela!");
-                    // Creates Debt, doesn't pay full amount
                     db.collection('debts').add({
                         buyerId: buy.id, buyerName: buy.name,
                         sellerId: sel.id, sellerName: sel.name,
@@ -289,7 +307,7 @@
                         weeksRemaining: parseInt(o.meta.installments),
                         date: Date.now()
                     });
-                    cost = 0; // Immediate cost is 0 (handled by debt system in Admin Week)
+                    cost = 0; // Immediate cost handled by debt system
                     alert("Transferência parcelada aceita!");
                 } else {
                     if (buy.balance < cost) return alert("Sem saldo!");
@@ -323,38 +341,19 @@
                     if(!confirm("Virar?")) return; 
                     setLoading(true); 
                     const b = db.batch(); 
-                    
-                    // Wages & Sponsor
-                    teams.forEach(t => { 
-                        const w=players.filter(p=>p.teamId===t.id).reduce((a,p)=>a+(p.salary||0),0); 
-                        const s=t.sponsorship?.value||0; 
-                        b.update(db.collection('teams').doc(t.id), {balance:(t.balance||0)+s-w}); 
-                    }); 
-
-                    // --- DEBT PROCESSING ---
+                    teams.forEach(t => { const w=players.filter(p=>p.teamId===t.id).reduce((a,p)=>a+(p.salary||0),0); const s=t.sponsorship?.value||0; b.update(db.collection('teams').doc(t.id), {balance:(t.balance||0)+s-w}); }); 
+                    // DEBT PROCESSING
                     const debtsSnap = await db.collection('debts').get();
                     debtsSnap.docs.forEach(doc => {
                         const d = doc.data();
                         if (d.weeksRemaining > 0) {
-                            // Deduct from Buyer
                             b.update(db.collection('teams').doc(d.buyerId), {balance: firebase.firestore.FieldValue.increment(-d.installmentVal)});
-                            // Add to Seller
                             b.update(db.collection('teams').doc(d.sellerId), {balance: firebase.firestore.FieldValue.increment(d.installmentVal)});
-                            // Update Debt
-                            if (d.weeksRemaining - 1 === 0) {
-                                b.delete(doc.ref);
-                                postNews(`✅ **DÍVIDA QUITADA**\n${d.buyerName} terminou de pagar ${d.playerName}.`, 'money');
-                            } else {
-                                b.update(doc.ref, {weeksRemaining: d.weeksRemaining - 1});
-                                postNews(`💳 **PARCELA PAGA**\n${d.buyerName} pagou a parcela (${d.weeksRemaining}x) de ${d.playerName}.`, 'money-minus');
-                            }
+                            if (d.weeksRemaining - 1 === 0) { b.delete(doc.ref); postNews(`✅ **DÍVIDA QUITADA**\n${d.buyerName} terminou de pagar ${d.playerName}.`, 'money'); } 
+                            else { b.update(doc.ref, {weeksRemaining: d.weeksRemaining - 1}); postNews(`💳 **PARCELA PAGA**\n${d.buyerName} pagou a parcela (${d.weeksRemaining}x) de ${d.playerName}.`, 'money-minus'); }
                         }
                     });
-
-                    await b.commit(); 
-                    setLoading(false); 
-                    postNews("📅 VIRADA SEMANAL", 'infra'); 
-                    alert("Ok"); 
+                    await b.commit(); setLoading(false); postNews("📅 VIRADA SEMANAL", 'infra'); alert("Ok"); 
                 }
 
                 if(act==='SEASON') { if(!confirm("Virar?")) return; setLoading(true); const b = db.batch(); players.forEach(p => { let u={}; if(p.futureTransfer){u=p.futureTransfer; u.futureTransfer=firebase.firestore.FieldValue.delete();} else if((p.contract<=1||p.contract===0)&&p.preContract){u.teamId=p.preContract.teamId; u.contract=1; u.status='NAO_A_VENDA'; u.preContract=firebase.firestore.FieldValue.delete();} else { let nc=(p.contract||0)-1; if(nc<0)nc=0; u.contract=nc; if(nc===0)u.status='EXPIRADO'; } b.update(db.collection('players').doc(p.id), u); }); await b.commit(); setLoading(false); postNews("🌞 NOVA TEMPORADA", 'season'); alert("Ok"); }
@@ -371,7 +370,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.40.9</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.40.10</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -383,7 +382,7 @@
                     </div>
 
                     <div className="container">
-                        {screen === 'HOME' && user.type === 'ADMIN' && <AdminPanel teams={teams} papers={papers} journalists={journalists} reqs={reqs} config={conf} onAct={adminAction} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{/*Fin logic*/}} onReject={(id)=>db.collection('financeRequests').doc(id).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam} onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} onDeletePaper={deletePaper} onDeleteJourno={deleteJournalist} onRejectPaper={(id)=>db.collection('newspapers').doc(id).delete()} onConfig={(t)=>setModal({type:'SETTINGS', data:t})} />}
+                        {screen === 'HOME' && user.type === 'ADMIN' && <AdminPanel teams={teams} papers={papers} journalists={journalists} reqs={reqs} config={conf} onAct={async(a,d)=>{ if(a==='MARKET')db.collection('config').doc('system').update({marketOpen:d}); if(a==='SEASON'){/*Season logic*/} }} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{/*Fin logic*/}} onReject={(id)=>db.collection('financeRequests').doc(id).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam} onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} onDeletePaper={deletePaper} onDeleteJourno={deleteJournalist} onRejectPaper={(id)=>db.collection('newspapers').doc(id).delete()} onConfig={(t)=>setModal({type:'SETTINGS', data:t})} />}
                         
                         {screen === 'HOME' && user.type === 'USER' && <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />}
                         
@@ -436,7 +435,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.40.9</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.40.10</div>
                     <div className="login-tabs"><div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div><div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR</div><div className={`tab ${tab==='PRESS'?'active':''}`} onClick={()=>setTab('PRESS')}>IMPRENSA</div></div>
                     {tab==='LOGIN' && <div>{(teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}<div style={{marginTop:20}}><button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button><button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button></div></div>}
                     {tab==='CREATE' && <div><input type="file" className="file-input" onChange={handleUpload} /><input className="input-field" placeholder="Nome" value={f.n} onChange={e=>setF({...f, n:e.target.value})} /><input className="input-field" type="number" placeholder="Saldo" value={f.b} onChange={e=>setF({...f, b:e.target.value})} /><select className="input-field" value={f.s} onChange={e=>setF({...f, s:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>Série {s}</option>)}</select><input className="input-field" type="number" placeholder="Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} /><button className="btn btn-green" onClick={()=>onCreateTeam(f.n, f.b, f.s, f.p, f.l)}>CRIAR</button></div>}

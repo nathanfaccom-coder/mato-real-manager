@@ -556,12 +556,21 @@
         };
 
         const AdminPanel = ({ teams, papers, journalists, companies, reqs, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onConfig, onApprovePaper, onDeletePaper, onDeleteJourno, onRejectPaper, onApproveComp, onDeleteComp }) => (
-            <div><h3>Painel Master</h3><div className="card"><button className={`btn ${config.marketOpen?'btn-red':'btn-green'}`} onClick={()=>onAct('MARKET', !config.marketOpen)}>{config.marketOpen?'FECHAR MERCADO':'ABRIR MERCADO'}</button><button className="btn btn-purple" onClick={()=>onAct('WEEK')}>VIRAR SEMANA</button><button className="btn btn-red" onClick={()=>onAct('SEASON')}>VIRAR TEMPORADA</button><button className="btn btn-gold" onClick={()=>{ const t=prompt("Título"); const b=prompt("Texto"); if(t)onPost(t,b,'admin'); }}>COMUNICADO</button></div>
-                {/* ETAPA 1: Lista de Empresas Pendentes para o Admin Aprovar */}
+            <div>
+                <h3>Painel Master</h3>
+                <div className="card">
+                    <button className={`btn ${config.marketOpen?'btn-red':'btn-green'}`} onClick={()=>onAct('MARKET', !config.marketOpen)}>{config.marketOpen?'FECHAR MERCADO':'ABRIR MERCADO'}</button>
+                    <button className="btn btn-purple" onClick={()=>onAct('WEEK')}>VIRAR SEMANA (Cobr. Impostos)</button>
+                    <button className="btn btn-red" onClick={()=>onAct('SEASON')}>VIRAR TEMPORADA</button>
+                    <button className="btn btn-gold" onClick={()=>{ const t=prompt("Título"); const b=prompt("Texto"); if(t)onPost(t,b,'admin'); }}>COMUNICADO</button>
+                </div>
+
+                {/* CORREÇÃO AQUI: Adicionado ?.label e || 'Desconhecido' para não travar se o tipo não existir */}
                 {(companies||[]).some(c=>c.status==='PENDING') && <h4>Empresas Pendentes</h4>}
                 {(companies||[]).filter(c=>c.status==='PENDING').map(c => (
                     <div key={c.id} className="card" style={{borderLeft:'4px solid var(--purple)'}}>
-                        <b>{c.name}</b> ({COMPANY_TYPES[c.companyType].label})<br/>Dono: {c.owner}
+                        <b>{c.name}</b> ({(COMPANY_TYPES[c.companyType] || {}).label || 'Tipo Desconhecido'})<br/>
+                        Dono: {c.owner}
                         <div style={{display:'flex', gap:5, marginTop:5}}>
                             <button className="btn btn-green" onClick={()=>onApproveComp(c.id)}>APROVAR</button>
                             <button className="btn btn-red" onClick={()=>onDeleteComp(c.id)}>X</button>
@@ -569,13 +578,30 @@
                     </div>
                 ))}
 
-                {(teams||[]).some(t=>t.status==='PENDING') && <h4>Pendentes (Times)</h4>}
+                <h4>Gestão de Empresas</h4>
+                {(companies||[]).filter(c=>c.status!=='PENDING').map(c => (
+                    <div key={c.id} className="card">
+                        <b>{c.name}</b> {c.status==='BLOCKED' && <span style={{color:'red'}}>(BLOQUEADA)</span>}<br/>
+                        Saldo: {fmt(c.balance)}
+                        <button className="btn btn-red" style={{marginTop:5}} onClick={()=>onDeleteComp(c.id)}>EXCLUIR</button>
+                    </div>
+                ))}
+
+                {(teams||[]).some(t=>t.status==='PENDING') && <h4>Times Pendentes</h4>}
                 {(teams||[]).filter(t=>t.status==='PENDING').map(t=><div key={t.id} className="card" style={{borderLeft:'4px solid var(--warning)'}}><b>{t.name}</b><div style={{display:'flex', gap:5}}><input className="input-field" style={{marginBottom:0, width:100}} defaultValue={t.balance} id={`bal-${t.id}`} /><button className="btn btn-green" onClick={()=>onApproveTeam(t.id, document.getElementById(`bal-${t.id}`).value)}>V</button><button className="btn btn-red" onClick={()=>onDeleteTeam(t.id)}>X</button></div></div>)}
-                {(papers||[]).some(p=>p.status==='PENDING') && <h4>Pendentes (Jornais)</h4>}
+                
+                {(papers||[]).some(p=>p.status==='PENDING') && <h4>Jornais Pendentes</h4>}
                 {(papers||[]).filter(p=>p.status==='PENDING').map(p=><div key={p.id} className="card"><b>📰 {p.name}</b><br/><small>Dono: {p.ownerName}</small><button className="btn btn-green" onClick={()=>onApprovePaper(p.id)}>APROVAR</button><button className="btn btn-red" style={{marginLeft:5}} onClick={()=>onRejectPaper(p.id)}>X</button></div>)}
-                <h4>Gestão de Imprensa</h4>{(papers||[]).filter(p=>p.status==='ACTIVE').map(p=><div key={p.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>📰 {p.name}</span><button className="btn btn-red" style={{width:'auto'}} onClick={()=>onDeletePaper(p.id)}>X</button></div>)}{(journalists||[]).map(j=><div key={j.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>✒️ {j.name}</span><button className="btn btn-red" style={{width:'auto'}} onClick={()=>onDeleteJourno(j.id)}>X</button></div>)}
-                <h4>Solicitações</h4>{(reqs||[]).filter(r=>r.status==='PENDING').map(r=><div key={r.id} className="card"><b>{r.teamName}</b>: {fmt(r.amount)} ({r.type})<br/>{r.details}<br/><button className="btn-green" style={{width:'auto', marginRight:5}} onClick={()=>onApprove(r)}>V</button><button className="btn-red" style={{width:'auto'}} onClick={()=>onReject(r.id)}>X</button></div>)}
-                <h4>Clubes</h4>{(teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>{t.name}</span><div><button className="btn btn-ghost" style={{width:'auto', marginRight:5}} onClick={()=>onConfig(t)}><i className="fas fa-cog"></i></button><button className="btn btn-green" style={{width:'auto', marginRight:5}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button><button className="btn btn-purple" style={{width:'auto'}} onClick={()=>onEditT(t)}>ELENCO</button><button className="btn btn-red" style={{width:'auto', marginLeft:5}} onClick={()=>onDeleteTeam(t.id)}><i className="fas fa-trash"></i></button></div></div>)}
+                
+                <h4>Gestão de Imprensa</h4>
+                {(papers||[]).filter(p=>p.status==='ACTIVE').map(p=><div key={p.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>📰 {p.name}</span><button className="btn btn-red" style={{width:'auto'}} onClick={()=>onDeletePaper(p.id)}>X</button></div>)}
+                {(journalists||[]).map(j=><div key={j.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>✒️ {j.name}</span><button className="btn btn-red" style={{width:'auto'}} onClick={()=>onDeleteJourno(j.id)}>X</button></div>)}
+                
+                <h4>Solicitações Financeiras</h4>
+                {(reqs||[]).filter(r=>r.status==='PENDING').map(r=><div key={r.id} className="card"><b>{r.teamName}</b>: {fmt(r.amount)} ({r.type})<br/>{r.details}<br/><button className="btn-green" style={{width:'auto', marginRight:5}} onClick={()=>onApprove(r)}>V</button><button className="btn-red" style={{width:'auto'}} onClick={()=>onReject(r.id)}>X</button></div>)}
+                
+                <h4>Clubes</h4>
+                {(teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>{t.name}</span><div><button className="btn btn-ghost" style={{width:'auto', marginRight:5}} onClick={()=>onConfig(t)}><i className="fas fa-cog"></i></button><button className="btn btn-green" style={{width:'auto', marginRight:5}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button><button className="btn btn-purple" style={{width:'auto'}} onClick={()=>onEditT(t)}>ELENCO</button><button className="btn btn-red" style={{width:'auto', marginLeft:5}} onClick={()=>onDeleteTeam(t.id)}><i className="fas fa-trash"></i></button></div></div>)}
             </div>
         );
 

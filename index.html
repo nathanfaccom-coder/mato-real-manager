@@ -89,6 +89,7 @@
             const [conf, setConf] = useState({ marketOpen: true });
             const [papers, setPapers] = useState([]);
             const [journalists, setJournalists] = useState([]);
+            
             const [screen, setScreen] = useState('HOME');
             const [modal, setModal] = useState(null);
             const [loading, setLoading] = useState(true);
@@ -122,7 +123,6 @@
                 }
             }, [teams, user?.data?.id]);
 
-            // --- FUNCTIONS ---
             const postNews = (text, type='normal') => db.collection('news').add({ text, type, date: Date.now() });
 
             const login = (id, pwd, type) => {
@@ -145,6 +145,13 @@
                         else { setUser({type:'PRESS_WORKER', data:j}); setScreen('PRESS_DASH'); }
                     } else alert("Erro!");
                 }
+            };
+
+            // Admin Login Safety Wrapper
+            const loginAdmin = () => {
+                // Previne tela preta definindo dados padrão seguros
+                setUser({ type: 'ADMIN', data: { id: 'admin', name: 'FEDERAÇÃO (ADM)', balance: 0, logo: null } });
+                setScreen('HOME');
             };
 
             const createTeam = async (name, bal, serie, pass, logo) => {
@@ -230,9 +237,15 @@
                 await b.commit();
             };
 
+            const adminAction = async (act, data) => {
+                if(act==='MARKET') { db.collection('config').doc('system').update({marketOpen: data}); postNews(data?"📢 JANELA ABERTA":"🔒 JANELA FECHADA", 'infra'); }
+                if(act==='WEEK') { if(!confirm("Virar?")) return; setLoading(true); const b = db.batch(); teams.forEach(t => { const w=players.filter(p=>p.teamId===t.id).reduce((a,p)=>a+(p.salary||0),0); const s=t.sponsorship?.value||0; b.update(db.collection('teams').doc(t.id), {balance:(t.balance||0)+s-w}); }); await b.commit(); setLoading(false); postNews("📅 VIRADA SEMANAL", 'infra'); alert("Ok"); }
+                if(act==='SEASON') { if(!confirm("Virar?")) return; setLoading(true); const b = db.batch(); players.forEach(p => { let u={}; if(p.futureTransfer){u=p.futureTransfer; u.futureTransfer=firebase.firestore.FieldValue.delete();} else if((p.contract<=1||p.contract===0)&&p.preContract){u.teamId=p.preContract.teamId; u.contract=1; u.status='NAO_A_VENDA'; u.preContract=firebase.firestore.FieldValue.delete();} else { let nc=(p.contract||0)-1; if(nc<0)nc=0; u.contract=nc; if(nc===0)u.status='EXPIRADO'; } b.update(db.collection('players').doc(p.id), u); }); await b.commit(); setLoading(false); postNews("🌞 NOVA TEMPORADA", 'season'); alert("Ok"); }
+            };
+
             // --- RENDER ---
             if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
-            if(!user) return <LoginScreen teams={teams} papers={papers} onLogin={login} onCreateTeam={createTeam} onCreatePaper={createNewspaper} onCreateJourno={createJournalist} onAdmin={()=>setUser({type:'ADMIN', data:{name:'FEDERAÇÃO (ADM)'}})} onVisitor={()=>{setUser({type:'VISITOR'}); setScreen('RANKING');}} />;
+            if(!user) return <LoginScreen teams={teams} papers={papers} onLogin={login} onCreateTeam={createTeam} onCreatePaper={createNewspaper} onCreateJourno={createJournalist} onAdmin={loginAdmin} onVisitor={()=>{setUser({type:'VISITOR'}); setScreen('RANKING');}} />;
 
             return (
                 <div>
@@ -253,7 +266,7 @@
                     </div>
 
                     <div className="container">
-                        {screen === 'HOME' && user.type === 'ADMIN' && <AdminPanel teams={teams} papers={papers} reqs={reqs} config={conf} onAct={async(a,d)=>{ if(a==='MARKET')db.collection('config').doc('system').update({marketOpen:d}); if(a==='SEASON'){/*Season logic*/} }} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{/*Fin logic*/}} onReject={(id)=>db.collection('financeRequests').doc(id).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={async(id)=>{db.collection('teams').doc(id).delete();}} onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} onConfig={(t)=>setModal({type:'SETTINGS', data:t})} />}
+                        {screen === 'HOME' && user.type === 'ADMIN' && <AdminPanel teams={teams} papers={papers} reqs={reqs} config={conf} onAct={adminAction} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{const b=db.batch(); if(r.type==='INJECTION')b.update(db.collection('teams').doc(r.teamId),{balance:(teams.find(t=>t.id===r.teamId).balance||0)+r.amount}); else b.update(db.collection('teams').doc(r.teamId),{sponsorship:{name:r.details,value:r.amount}}); b.delete(db.collection('financeRequests').doc(r.id)); await b.commit();}} onReject={(id)=>db.collection('financeRequests').doc(id).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={async(id)=>{db.collection('teams').doc(id).delete();}} onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} onConfig={(t)=>setModal({type:'SETTINGS', data:t})} />}
                         
                         {screen === 'HOME' && user.type === 'USER' && <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />}
                         
@@ -380,12 +393,12 @@
 
         const AdminPanel = ({ teams, papers, reqs, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onConfig, onApprovePaper }) => (
             <div><h3>Painel Master</h3><div className="card"><button className={`btn ${config.marketOpen?'btn-red':'btn-green'}`} onClick={()=>onAct('MARKET', !config.marketOpen)}>{config.marketOpen?'FECHAR MERCADO':'ABRIR MERCADO'}</button><button className="btn btn-purple" onClick={()=>onAct('WEEK')}>VIRAR SEMANA</button><button className="btn btn-red" onClick={()=>onAct('SEASON')}>VIRAR TEMPORADA</button><button className="btn btn-gold" onClick={()=>{ const t=prompt("Título"); const b=prompt("Texto"); if(t)onPost(t,b,'admin'); }}>COMUNICADO</button></div>
-                {teams.some(t=>t.status==='PENDING') && <h4>Pendentes (Times)</h4>}
-                {teams.filter(t=>t.status==='PENDING').map(t=><div key={t.id} className="card" style={{borderLeft:'4px solid var(--warning)'}}><b>{t.name}</b><div style={{display:'flex', gap:5}}><input className="input-field" style={{marginBottom:0, width:100}} defaultValue={t.balance} id={`bal-${t.id}`} /><button className="btn btn-green" onClick={()=>onApproveTeam(t.id, document.getElementById(`bal-${t.id}`).value)}>V</button><button className="btn btn-red" onClick={()=>onDeleteTeam(t.id)}>X</button></div></div>)}
-                {papers.some(p=>p.status==='PENDING') && <h4>Pendentes (Jornais)</h4>}
-                {papers.filter(p=>p.status==='PENDING').map(p=><div key={p.id} className="card"><b>📰 {p.name}</b><br/><small>Dono: {p.ownerName}</small><button className="btn btn-green" onClick={()=>onApprovePaper(p.id)}>APROVAR</button></div>)}
-                <h4>Solicitações</h4>{reqs.filter(r=>r.status==='PENDING').map(r=><div key={r.id} className="card"><b>{r.teamName}</b>: {fmt(r.amount)} ({r.type})<br/>{r.details}<br/><button className="btn-green" style={{width:'auto', marginRight:5}} onClick={()=>onApprove(r)}>V</button><button className="btn-red" style={{width:'auto'}} onClick={()=>onReject(r.id)}>X</button></div>)}
-                <h4>Clubes</h4>{teams.filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>{t.name}</span><div><button className="btn btn-ghost" style={{width:'auto', marginRight:5}} onClick={()=>onConfig(t)}><i className="fas fa-cog"></i></button><button className="btn btn-green" style={{width:'auto', marginRight:5}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button><button className="btn btn-purple" style={{width:'auto'}} onClick={()=>onEditT(t)}>ELENCO</button><button className="btn btn-red" style={{width:'auto', marginLeft:5}} onClick={()=>onDeleteTeam(t.id)}><i className="fas fa-trash"></i></button></div></div>)}
+                {(teams||[]).some(t=>t.status==='PENDING') && <h4>Pendentes (Times)</h4>}
+                {(teams||[]).filter(t=>t.status==='PENDING').map(t=><div key={t.id} className="card" style={{borderLeft:'4px solid var(--warning)'}}><b>{t.name}</b><div style={{display:'flex', gap:5}}><input className="input-field" style={{marginBottom:0, width:100}} defaultValue={t.balance} id={`bal-${t.id}`} /><button className="btn btn-green" onClick={()=>onApproveTeam(t.id, document.getElementById(`bal-${t.id}`).value)}>V</button><button className="btn btn-red" onClick={()=>onDeleteTeam(t.id)}>X</button></div></div>)}
+                {(papers||[]).some(p=>p.status==='PENDING') && <h4>Pendentes (Jornais)</h4>}
+                {(papers||[]).filter(p=>p.status==='PENDING').map(p=><div key={p.id} className="card"><b>📰 {p.name}</b><br/><small>Dono: {p.ownerName}</small><button className="btn btn-green" onClick={()=>onApprovePaper(p.id)}>APROVAR</button></div>)}
+                <h4>Solicitações</h4>{(reqs||[]).filter(r=>r.status==='PENDING').map(r=><div key={r.id} className="card"><b>{r.teamName}</b>: {fmt(r.amount)} ({r.type})<br/>{r.details}<br/><button className="btn-green" style={{width:'auto', marginRight:5}} onClick={()=>onApprove(r)}>V</button><button className="btn-red" style={{width:'auto'}} onClick={()=>onReject(r.id)}>X</button></div>)}
+                <h4>Clubes</h4>{(teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>{t.name}</span><div><button className="btn btn-ghost" style={{width:'auto', marginRight:5}} onClick={()=>onConfig(t)}><i className="fas fa-cog"></i></button><button className="btn btn-green" style={{width:'auto', marginRight:5}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button><button className="btn btn-purple" style={{width:'auto'}} onClick={()=>onEditT(t)}>ELENCO</button><button className="btn btn-red" style={{width:'auto', marginLeft:5}} onClick={()=>onDeleteTeam(t.id)}><i className="fas fa-trash"></i></button></div></div>)}
             </div>
         );
 

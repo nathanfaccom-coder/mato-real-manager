@@ -40,7 +40,7 @@
         .news-card { background: #262626; padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid #666; font-size: 13px; line-height: 1.4; }
         .news-transfer { border-color: var(--secondary); background: linear-gradient(90deg, #1a1a2e, #16213e); }
         .news-money { border-color: var(--primary); }
-        .news-money-minus { border-color: var(--danger); } /* Nova classe para saida */
+        .news-money-minus { border-color: var(--danger); }
         .news-admin { border-color: var(--warning); background: #2a2000; }
         .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #1a1a1a; border-top: 1px solid var(--border); display: flex; padding-bottom: env(safe-area-inset-bottom); z-index: 100; }
         .nav-item { flex: 1; padding: 12px; text-align: center; color: #666; font-size: 9px; cursor: pointer; }
@@ -156,18 +156,19 @@
                 alert("Saldo atualizado!");
             };
 
-            // NOVA FUNÇÃO: RETIRAR DINHEIRO
+            // CORREÇÃO MATEMÁTICA AQUI: USANDO INCREMENTO NEGATIVO
             const withdrawMoney = async (amount, reason) => {
-                const val = parseFloat(amount);
+                // Aceita virgula substituindo por ponto
+                const valStr = amount.replace(',', '.');
+                const val = parseFloat(valStr);
+                
                 if(isNaN(val) || val <= 0) return alert("Valor inválido!");
                 if(user.data.balance < val) return alert("Saldo insuficiente!");
                 
+                // Transação Segura: Subtrai direto no servidor
                 await db.collection('teams').doc(user.data.id).update({
-                    balance: user.data.balance - val
+                    balance: firebase.firestore.FieldValue.increment(-val)
                 });
-                
-                // Optimistic UI Update (opcional, o listener já cuida, mas garante fluidez)
-                setUser(prev => ({...prev, data: {...prev.data, balance: prev.data.balance - val}}));
                 
                 postNews(`💸 **SAÍDA DE CAIXA**\nO **${user.data.name}** registrou retirada de ${fmt(val)}.\n📝 Motivo: ${reason}`, 'money-minus');
                 setModal(null);
@@ -381,7 +382,7 @@
                                 onUp={(d)=>{ const tid = (modal.data && modal.data.id) || user.data.id; db.collection('teams').doc(tid).update(d); if(tid===user.data.id) setUser(p=>({...p, data:{...p.data, ...d}})); setModal(null); }} 
                                 onUpgrade={()=>{ const tid = (modal.data && modal.data.id) || user.data.id; const t = teams.find(x=>x.id===tid); const c=COSTS[t.stadiumLevel]; if(t.balance<c)return alert("Sem grana"); if(confirm("Pagar?")) { db.collection('teams').doc(tid).update({balance:t.balance-c, stadiumLevel:t.stadiumLevel+1}); postNews(`🏗 **OBRAS**\n${t.name} evoluiu estádio.`,'infra'); setModal(null); } }} 
                                 onReq={(t,a,d)=>{db.collection('financeRequests').add({teamId:user.data.id, teamName:user.data.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!");}} 
-                                onWithdraw={withdrawMoney} // PASSANDO A FUNÇÃO DE RETIRADA
+                                onWithdraw={withdrawMoney}
                             />}
                         </div>
                     </div>}

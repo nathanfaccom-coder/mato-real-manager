@@ -228,8 +228,7 @@
                 const v = parseFloat(value||0);
                 const detailText = formatOfferDetails(type, v, con, meta, swapIds, players);
                 
-                // Identify Actors
-                const actingTeamName = user.data.name; // Who is clicking the button
+                const actingTeamName = user.data.name; 
                 const targetPlayerName = target.name;
                 const ownerTeam = teams.find(t=>t.id===target.teamId);
                 const ownerTeamName = ownerTeam ? ownerTeam.name : 'Desconhecido';
@@ -238,12 +237,11 @@
                 let sellerId = "";
 
                 if (old) {
-                    // COUNTER-OFFER: I am responding to an offer made by 'old.buyerId'
+                    // COUNTER: Respond to 'old.buyerId' (who sent the previous offer)
                     headline = `🔄 **CONTRAPROPOSTA**\nO **${actingTeamName}** não concordou com os termos e fez uma contraoferta pelo **${targetPlayerName}**!`;
-                    // If I am the original owner countering, sending back to original buyer
                     sellerId = old.buyerId; 
                 } else {
-                    // FRESH PROPOSAL: I am buying from 'target.teamId'
+                    // NEW OFFER: Send to current owner
                     headline = `🚨 **MERCADO AGITADO**\nO **${actingTeamName}** enviou uma proposta oficial ao **${ownerTeamName}** pelo jogador **${targetPlayerName}**!`;
                     sellerId = target.teamId;
                 }
@@ -261,7 +259,6 @@
             };
 
             const rejectOffer = async (o) => {
-                // Determine who was rejected
                 const rejectedTeam = teams.find(t=>t.id===o.buyerId)?.name || 'Outro Time';
                 const rejectorTeam = user.data.name;
                 const text = `❌ **NEGOCIAÇÃO ENCERRADA**\nO **${rejectorTeam}** recusou a investida do **${rejectedTeam}** pelo jogador **${o.playerName}** e encerrou as conversas.`;
@@ -287,14 +284,8 @@
                     if (p.sellOnDetails) { const prev = teams.find(t=>t.id === p.sellOnDetails.beneficiary); if (prev) { const cut = o.value * (p.sellOnDetails.percentage / 100); b.update(db.collection('teams').doc(sel.id), {balance: (sel.balance + cost) - cut}); b.update(db.collection('teams').doc(prev.id), {balance: prev.balance + cut}); postNews(`💰 **CLÁUSULA**\n${prev.name} recebeu ${fmt(cut)} pela venda de ${p.name}.`, 'money'); } }
                     const up = { teamId: buy.id, status:'NAO_A_VENDA', loan:false, contract: parseInt(o.offerContract), sellOnDetails: null };
                     if (o.meta?.sellOn > 0) up.sellOnDetails = { percentage: o.meta.sellOn, beneficiary: sel.id };
-                    
-                    if(conf.marketOpen) { 
-                        b.update(db.collection('players').doc(p.id), up); 
-                        newsText = `🤝 **NEGÓCIO FECHADO**\nO **${buy.name}** aceitou as exigências e contratou **${p.name}** do **${sel.name}**!`;
-                    } else { 
-                        b.update(db.collection('players').doc(p.id), {status:'VENDIDO', futureTransfer: up}); 
-                        newsText = `🤝 **PRÉ-ACORDO**\nO **${buy.name}** garantiu a contratação de **${p.name}** para a próxima temporada.`;
-                    }
+                    if(conf.marketOpen) { b.update(db.collection('players').doc(p.id), up); newsText = `🤝 **NEGÓCIO FECHADO**\nO **${buy.name}** aceitou as exigências e contratou **${p.name}** do **${sel.name}**!`; } 
+                    else { b.update(db.collection('players').doc(p.id), {status:'VENDIDO', futureTransfer: up}); newsText = `🤝 **PRÉ-ACORDO**\nO **${buy.name}** garantiu a contratação de **${p.name}** para a próxima temporada.`; }
                 } 
                 else if(o.type==='EMPRESTIMO') {
                     b.update(db.collection('players').doc(p.id), { teamId: buy.id, status:'NAO_A_VENDA', loan:true, loanFrom: sel.id, loanDetails: { wageSplit: o.meta?.wageSplit || 50, buyOption: o.meta?.buyOpt } });
@@ -345,7 +336,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.41.0</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.41.1</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -410,7 +401,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.41.0</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.41.1</div>
                     <div className="login-tabs"><div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div><div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR</div><div className={`tab ${tab==='PRESS'?'active':''}`} onClick={()=>setTab('PRESS')}>IMPRENSA</div></div>
                     {tab==='LOGIN' && <div>{(teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}<div style={{marginTop:20}}><button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button><button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button></div></div>}
                     {tab==='CREATE' && <div><input type="file" className="file-input" onChange={handleUpload} /><input className="input-field" placeholder="Nome" value={f.n} onChange={e=>setF({...f, n:e.target.value})} /><input className="input-field" type="number" placeholder="Saldo" value={f.b} onChange={e=>setF({...f, b:e.target.value})} /><select className="input-field" value={f.s} onChange={e=>setF({...f, s:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>Série {s}</option>)}</select><input className="input-field" type="number" placeholder="Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} /><button className="btn btn-green" onClick={()=>onCreateTeam(f.n, f.b, f.s, f.p, f.l)}>CRIAR</button></div>}

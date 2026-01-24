@@ -58,7 +58,6 @@
         .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; font-size: 10px; margin-top: 8px; background: #222; padding: 5px; border-radius: 5px; }
         .stat-item { text-align: center; } .stat-lbl { color: #888; display: block; } .stat-val { color: #fff; font-weight: bold; }
         .dev-credits { font-size: 10px; color: #666; margin-top: -5px; margin-bottom: 15px; text-align: center; display: block; width: 100%; }
-        /* Error Boundary */
         .error-screen { height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #220000; color: #ff5555; padding: 20px; text-align: center; }
     </style>
 </head>
@@ -169,12 +168,8 @@
                 }
             };
 
-            // SAFE ADMIN LOGIN - Previne tela preta preenchendo todos os campos
             const loginAdmin = () => {
-                setUser({ 
-                    type: 'ADMIN', 
-                    data: { id: 'admin', name: 'FEDERAÇÃO (ADM)', balance: 0, logo: null, stadiumLevel: 1, serie: 'ADM' } 
-                });
+                setUser({ type: 'ADMIN', data: { id: 'admin', name: 'FEDERAÇÃO (ADM)', balance: 0, logo: null, stadiumLevel: 1, serie: 'ADM' } });
                 setScreen('HOME');
             };
 
@@ -185,6 +180,25 @@
             };
             const createNewspaper = async (name, pass, owner) => { await db.collection('newspapers').add({ name, password: pass, ownerName: owner, status: 'PENDING' }); alert("Jornal criado! Aguarde Federação."); };
             const createJournalist = async (name, pass, paperId) => { await db.collection('journalists').add({ name, password: pass, newspaperId: paperId, status: 'PENDING' }); alert("Conta criada! Aguarde seu Chefe."); };
+
+            // --- RESTAURAÇÃO DAS FUNÇÕES PERDIDAS ---
+            const approveTeam = async (teamId, finalBalance) => {
+                await db.collection('teams').doc(teamId).update({ status: 'ACTIVE', balance: parseFloat(finalBalance) });
+                const t = teams.find(x=>x.id===teamId);
+                postNews(`🛡️ **NOVO CLUBE!**\nO **${t.name}** foi aprovado na Série ${t.serie}.`, 'infra');
+                alert("Aprovado!");
+            };
+
+            const deleteTeam = async (teamId) => {
+                if(!confirm("⚠️ PERIGO: Excluir time e jogadores?")) return;
+                const batch = db.batch();
+                batch.delete(db.collection('teams').doc(teamId));
+                const snap = await db.collection('players').where('teamId', '==', teamId).get();
+                snap.docs.forEach(doc => batch.delete(doc.ref));
+                await batch.commit();
+                postNews("🚫 **CLUBE EXTINTO**\nUm time encerrou atividades.", 'infra');
+            };
+            // ----------------------------------------
 
             const updateBalance = async (teamId, newBal) => { await db.collection('teams').doc(teamId).update({ balance: parseFloat(newBal) }); alert("Atualizado!"); };
             
@@ -279,7 +293,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.40.1</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.40.2 (HF)</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -291,7 +305,7 @@
                     </div>
 
                     <div className="container">
-                        {screen === 'HOME' && user.type === 'ADMIN' && <AdminPanel teams={teams} papers={papers} reqs={reqs} config={conf} onAct={async(a,d)=>{ if(a==='MARKET')db.collection('config').doc('system').update({marketOpen:d}); if(a==='SEASON'){/*Season logic*/} }} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{/*Fin logic*/}} onReject={(id)=>db.collection('financeRequests').doc(id).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={async(id)=>{db.collection('teams').doc(id).delete();}} onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} onConfig={(t)=>setModal({type:'SETTINGS', data:t})} />}
+                        {screen === 'HOME' && user.type === 'ADMIN' && <AdminPanel teams={teams} papers={papers} reqs={reqs} config={conf} onAct={async(a,d)=>{ if(a==='MARKET')db.collection('config').doc('system').update({marketOpen:d}); if(a==='SEASON'){/*Season logic*/} }} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{/*Fin logic*/}} onReject={(id)=>db.collection('financeRequests').doc(id).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam} onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} onConfig={(t)=>setModal({type:'SETTINGS', data:t})} />}
                         
                         {screen === 'HOME' && user.type === 'USER' && <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />}
                         
@@ -344,7 +358,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.40.1</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.40.2 (HF)</div>
                     <div className="login-tabs"><div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div><div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR</div><div className={`tab ${tab==='PRESS'?'active':''}`} onClick={()=>setTab('PRESS')}>IMPRENSA</div></div>
                     {tab==='LOGIN' && <div>{(teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}<div style={{marginTop:20}}><button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button><button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button></div></div>}
                     {tab==='CREATE' && <div><input type="file" className="file-input" onChange={handleUpload} /><input className="input-field" placeholder="Nome" value={f.n} onChange={e=>setF({...f, n:e.target.value})} /><input className="input-field" type="number" placeholder="Saldo" value={f.b} onChange={e=>setF({...f, b:e.target.value})} /><select className="input-field" value={f.s} onChange={e=>setF({...f, s:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>Série {s}</option>)}</select><input className="input-field" type="number" placeholder="Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} /><button className="btn btn-green" onClick={()=>onCreateTeam(f.n, f.b, f.s, f.p, f.l)}>CRIAR</button></div>}

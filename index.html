@@ -56,10 +56,10 @@
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
         .rating-badge { color: var(--warning); font-weight: bold; font-size: 11px; margin-left: 5px; display: flex; align-items: center; gap: 2px; text-shadow: 0 1px 2px black; }
         
-        /* NEW STATS GRID STYLE */
+        /* UPDATED STATS GRID STYLE */
         .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 10px; margin-top: 10px; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px; }
         .stat-item { display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .stat-lbl { font-size: 14px; margin-bottom: 2px; } /* Emojis larger */
+        .stat-lbl { font-size: 14px; margin-bottom: 2px; }
         .stat-val { color: #fff; font-weight: 900; font-size: 11px; }
         
         .dev-credits { font-size: 10px; color: #666; margin-top: -5px; margin-bottom: 15px; text-align: center; display: block; width: 100%; }
@@ -316,7 +316,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.40.5</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.40.6</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -381,7 +381,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.40.5</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.40.6</div>
                     <div className="login-tabs"><div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div><div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR</div><div className={`tab ${tab==='PRESS'?'active':''}`} onClick={()=>setTab('PRESS')}>IMPRENSA</div></div>
                     {tab==='LOGIN' && <div>{(teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}<div style={{marginTop:20}}><button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button><button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button></div></div>}
                     {tab==='CREATE' && <div><input type="file" className="file-input" onChange={handleUpload} /><input className="input-field" placeholder="Nome" value={f.n} onChange={e=>setF({...f, n:e.target.value})} /><input className="input-field" type="number" placeholder="Saldo" value={f.b} onChange={e=>setF({...f, b:e.target.value})} /><select className="input-field" value={f.s} onChange={e=>setF({...f, s:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>Série {s}</option>)}</select><input className="input-field" type="number" placeholder="Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} /><button className="btn btn-green" onClick={()=>onCreateTeam(f.n, f.b, f.s, f.p, f.l)}>CRIAR</button></div>}
@@ -437,15 +437,19 @@
                     <label>Status</label><select className="input-field" value={f.status} onChange={e=>setF({...f, status:e.target.value})}><option value="NAO_A_VENDA">Não Listado</option><option value="VENDA">À Venda</option><option value="EMPRESTIMO">Empréstimo</option><option value="INTRANSFERIVEL">Bloqueado</option></select>
                     <label>Humor</label><select className="input-field" value={f.mood} onChange={e=>setF({...f, mood:e.target.value})}><option>🤩</option><option>😐</option><option>😡</option></select>
                     {isAdmin && <div style={{border:'1px solid var(--purple)', padding:5, borderRadius:5, margin:'5px 0'}}><label style={{color:'var(--purple)'}}>Nota (0.0 - 10.0)</label><input className="input-field" type="number" step="0.1" min="0" max="10" value={f.rating} onChange={e=>setF({...f, rating:e.target.value})} /></div>}
-                    {isAdmin && <div style={{border:'1px solid var(--primary)', padding:5, borderRadius:5, margin:'5px 0'}}>
-                        <label style={{color:'var(--primary)'}}>Estatísticas (Admin)</label>
-                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:5}}>
-                            <input className="input-field" placeholder="Gols" type="number" value={f.stats?.goals||0} onChange={e=>setF({...f, stats:{...f.stats, goals:e.target.value}})} />
-                            <input className="input-field" placeholder="Assist" type="number" value={f.stats?.assists||0} onChange={e=>setF({...f, stats:{...f.stats, assists:e.target.value}})} />
-                            <input className="input-field" placeholder="Amarelos" type="number" value={f.stats?.yellows||0} onChange={e=>setF({...f, stats:{...f.stats, yellows:e.target.value}})} />
-                            <input className="input-field" placeholder="Vermelhos" type="number" value={f.stats?.reds||0} onChange={e=>setF({...f, stats:{...f.stats, reds:e.target.value}})} />
+                    
+                    {isAdmin && <div style={{border:'1px solid var(--primary)', padding:8, borderRadius:8, marginTop:10}}>
+                        <label style={{color:'var(--primary)', display:'block', marginBottom:5}}>Estatísticas (Admin)</label>
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:5}}>
+                            <div><span style={{fontSize:10, color:'#aaa'}}>⚽ Gols</span><input className="input-field" type="number" value={f.stats?.goals||0} onChange={e=>setF({...f, stats:{...f.stats, goals:e.target.value}})} /></div>
+                            <div><span style={{fontSize:10, color:'#aaa'}}>👟 Assis</span><input className="input-field" type="number" value={f.stats?.assists||0} onChange={e=>setF({...f, stats:{...f.stats, assists:e.target.value}})} /></div>
+                            <div><span style={{fontSize:10, color:'#aaa'}}>🛡️ Desar</span><input className="input-field" type="number" value={f.stats?.tackles||0} onChange={e=>setF({...f, stats:{...f.stats, tackles:e.target.value}})} /></div>
+                            <div><span style={{fontSize:10, color:'#aaa'}}>🧤 Defes</span><input className="input-field" type="number" value={f.stats?.saves||0} onChange={e=>setF({...f, stats:{...f.stats, saves:e.target.value}})} /></div>
+                            <div><span style={{fontSize:10, color:'#aaa'}}>🟨 Amar</span><input className="input-field" type="number" value={f.stats?.yellows||0} onChange={e=>setF({...f, stats:{...f.stats, yellows:e.target.value}})} /></div>
+                            <div><span style={{fontSize:10, color:'#aaa'}}>🟥 Verm</span><input className="input-field" type="number" value={f.stats?.reds||0} onChange={e=>setF({...f, stats:{...f.stats, reds:e.target.value}})} /></div>
                         </div>
                     </div>}
+
                     {isAdmin && <div style={{border:'1px solid gold', padding:5, marginTop:5}}><label style={{color:'gold'}}>Mover Time (Adm)</label><select className="input-field" onChange={e=>setF({...f, forcedTeamId:e.target.value})}><option value="">-- Manter --</option>{teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></div>}
                     <div style={{display:'flex', gap:10, marginTop:15}}><button className="btn btn-green" onClick={()=>onSave(f)}>SALVAR</button>{initial && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>X</button>}</div>
                 </div>

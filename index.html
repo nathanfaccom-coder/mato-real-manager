@@ -188,13 +188,13 @@
                 
                 const pl = {
                     playerId: target.id, playerName: target.name, buyerId: user.data.id, buyerName: user.data.name,
-                    sellerId: (old && old.buyerId) ? old.buyerId : target.teamId, // Correção: Garante que SellerId seja válido
+                    sellerId: (old && old.buyerId) ? old.buyerId : target.teamId,
                     type, value: v, swapPlayerIds: swapIds || [],
                     offerContract: con, description: desc, meta: meta || {}, date: Date.now()
                 };
                 
                 const b = db.batch();
-                if(old && old.id) b.delete(db.collection('offers').doc(old.id)); // Correção: Verifica ID antes de deletar
+                if(old && old.id) b.delete(db.collection('offers').doc(old.id));
                 b.set(db.collection('offers').doc(), pl);
                 await b.commit();
                 postNews(`🚨 **PROPOSTA**\n${user.data.name} > **${target.name}**\n${desc}`, 'transfer');
@@ -310,7 +310,7 @@
                                 </div>
                             )}
                             {user.type==='USER' && <div style={{color:'var(--primary)', fontWeight:'bold'}}>{fmt(user.data.balance)}</div>}
-                            {user.type==='USER' && <i className="fas fa-cog" onClick={()=>setModal({type:'SETTINGS'})}></i>}
+                            {user.type==='USER' && <i className="fas fa-cog" onClick={()=>setModal({type:'SETTINGS', data:user.data})}></i>}
                             <i className="fas fa-sign-out-alt" onClick={()=>window.location.reload()}></i>
                         </div>
                     </div>
@@ -318,7 +318,7 @@
                     <div className="container">
                         {screen === 'HOME' && (
                             user.type === 'ADMIN' ? 
-                            <AdminPanel teams={teams} reqs={reqs} config={conf} onAct={adminAction} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{const b=db.batch(); if(r.type==='INJECTION')b.update(db.collection('teams').doc(r.teamId),{balance:(teams.find(t=>t.id===r.teamId).balance||0)+r.amount}); else b.update(db.collection('teams').doc(r.teamId),{sponsorship:{name:r.details,value:r.amount}}); b.delete(db.collection('financeRequests').doc(r.id)); await b.commit();}} onReject={(rid)=>db.collection('financeRequests').doc(rid).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam} /> 
+                            <AdminPanel teams={teams} reqs={reqs} config={conf} onAct={adminAction} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{const b=db.batch(); if(r.type==='INJECTION')b.update(db.collection('teams').doc(r.teamId),{balance:(teams.find(t=>t.id===r.teamId).balance||0)+r.amount}); else b.update(db.collection('teams').doc(r.teamId),{sponsorship:{name:r.details,value:r.amount}}); b.delete(db.collection('financeRequests').doc(r.id)); await b.commit();}} onReject={(rid)=>db.collection('financeRequests').doc(rid).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam} onConfig={(t)=>setModal({type:'SETTINGS', data:t})} /> 
                             : user.type === 'VISITOR' ? <div style={{textAlign:'center', marginTop:50, color:'#888'}}><h3>Bem-vindo, Visitante!</h3>Use o menu abaixo para navegar.</div>
                             : <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} isVisitor={user.type==='VISITOR'} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />
                         )}
@@ -349,7 +349,7 @@
                         <div className="modal-content">
                             {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={(id)=>{if(confirm("Excluir?"))db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} />}
                             {modal.type==='OFFER' && <OfferForm target={modal.data} myPlayers={players.filter(p=>p.teamId===user.data.id)} onSend={sendOffer} />}
-                            {modal.type==='SETTINGS' && <SettingsForm team={user.data} isAdmin={user.type==='ADMIN'} onUp={(d)=>{db.collection('teams').doc(user.data.id).update(d); setUser(p=>({...p, data:{...p.data, ...d}})); setModal(null);}} onUpgrade={()=>{ const c=COSTS[user.data.stadiumLevel]; if(user.data.balance<c)return alert("Sem grana"); if(confirm("Pagar?")) { db.collection('teams').doc(user.data.id).update({balance:user.data.balance-c, stadiumLevel:user.data.stadiumLevel+1}); postNews(`🏗 **OBRAS**\n${user.data.name} evoluiu estádio.`,'infra'); setModal(null); } }} onReq={(t,a,d)=>{db.collection('financeRequests').add({teamId:user.data.id, teamName:user.data.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!");}} />}
+                            {modal.type==='SETTINGS' && <SettingsForm team={modal.data || user.data} isAdmin={user.type==='ADMIN'} onUp={(d)=>{ const tid = (modal.data && modal.data.id) || user.data.id; db.collection('teams').doc(tid).update(d); if(tid===user.data.id) setUser(p=>({...p, data:{...p.data, ...d}})); setModal(null); }} onUpgrade={()=>{ const tid = (modal.data && modal.data.id) || user.data.id; const t = teams.find(x=>x.id===tid); const c=COSTS[t.stadiumLevel]; if(t.balance<c)return alert("Sem grana"); if(confirm("Pagar?")) { db.collection('teams').doc(tid).update({balance:t.balance-c, stadiumLevel:t.stadiumLevel+1}); postNews(`🏗 **OBRAS**\n${t.name} evoluiu estádio.`,'infra'); setModal(null); } }} onReq={(t,a,d)=>{db.collection('financeRequests').add({teamId:user.data.id, teamName:user.data.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!");}} />}
                         </div>
                     </div>}
                 </div>
@@ -487,7 +487,7 @@
             );
         };
 
-        const AdminPanel = ({ teams, reqs, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam }) => (
+        const AdminPanel = ({ teams, reqs, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onConfig }) => (
             <div>
                 <h3>Painel Master</h3>
                 <div className="card">
@@ -501,7 +501,7 @@
                 <h4>Solicitações</h4>
                 {reqs.filter(r=>r.status==='PENDING').map(r=><div key={r.id} className="card"><b>{r.teamName}</b>: {fmt(r.amount)} ({r.type})<br/>{r.details}<br/><button className="btn-green" style={{width:'auto', marginRight:5}} onClick={()=>onApprove(r)}>V</button><button className="btn-red" style={{width:'auto'}} onClick={()=>onReject(r.id)}>X</button></div>)}
                 <h4>Clubes</h4>
-                {teams.filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>{t.name}</span><div><button className="btn btn-green" style={{width:'auto', marginRight:5}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button><button className="btn btn-purple" style={{width:'auto'}} onClick={()=>onEditT(t)}>ELENCO</button><button className="btn btn-red" style={{width:'auto', marginLeft:5}} onClick={()=>onDeleteTeam(t.id)}><i className="fas fa-trash"></i></button></div></div>)}
+                {teams.filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>{t.name}</span><div><button className="btn btn-ghost" style={{width:'auto', marginRight:5}} onClick={()=>onConfig(t)}><i className="fas fa-cog"></i></button><button className="btn btn-green" style={{width:'auto', marginRight:5}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button><button className="btn btn-purple" style={{width:'auto'}} onClick={()=>onEditT(t)}>ELENCO</button><button className="btn btn-red" style={{width:'auto', marginLeft:5}} onClick={()=>onDeleteTeam(t.id)}><i className="fas fa-trash"></i></button></div></div>)}
             </div>
         );
 
@@ -514,7 +514,13 @@
                     <label>Nome</label><input className="input-field" value={form.name} onChange={e=>setF({...form, name:e.target.value})} />
                     <label>Logo (URL)</label><input className="input-field" value={form.logo} onChange={e=>setF({...form, logo:e.target.value})} />
                     {isAdmin && <label>Saldo (ADM)</label>} {isAdmin && <input className="input-field" type="number" value={form.balance} onChange={e=>setF({...form, balance:parseFloat(e.target.value)})} />}
-                    <label>Série</label><select className="input-field" value={form.serie} onChange={e=>setF({...form, serie:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>{s}</option>)}</select>
+                    
+                    {/* SÉRIE RESTAURADA PARA ADMINS */}
+                    {isAdmin && <label>Série (ADM)</label>}
+                    {isAdmin && <select className="input-field" value={form.serie} onChange={e=>setF({...form, serie:e.target.value})}>
+                        {SERIES.map(s=><option key={s} value={s}>{s}</option>)}
+                    </select>}
+
                     <button className="btn btn-blue" onClick={()=>onUp(form)}>SALVAR</button>
                     <hr style={{borderColor:'#444'}}/>
                     <p>Estádio Nível {team.stadiumLevel||1}</p><button className="btn btn-purple" onClick={onUpgrade}>EVOLUIR (₣ {fmt(COSTS[team.stadiumLevel]||0).replace('₣ ','')})</button>

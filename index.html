@@ -61,15 +61,11 @@
         .stat-val { color: #fff; font-weight: 900; font-size: 11px; }
         .dev-credits { font-size: 10px; color: #666; margin-top: -5px; margin-bottom: 15px; text-align: center; display: block; width: 100%; }
         .error-screen { height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #220000; color: #ff5555; padding: 20px; text-align: center; }
-        
-        /* SCROLLABLE RANKING TABS */
         .rank-tabs { display: flex; gap: 8px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 10px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
         .rank-tabs::-webkit-scrollbar { display: none; }
         .rank-tab { background: #333; border: 1px solid #444; color: #888; padding: 8px 16px; border-radius: 20px; font-size: 12px; white-space: nowrap; cursor: pointer; transition: 0.2s; font-weight: bold; display: flex; align-items: center; gap: 5px; }
         .rank-tab.active { background: var(--primary); color: #000; border-color: var(--primary); box-shadow: 0 0 10px rgba(0,230,118,0.3); }
         .rank-tab i { font-size: 14px; }
-
-        /* HIGHLIGHT CARD */
         .highlight-card { background: linear-gradient(135deg, #1a237e 0%, #0d47a1 100%); border: 1px solid var(--secondary); padding: 20px; text-align: center; margin-bottom: 15px; border-radius: 12px; position: relative; overflow: hidden; }
         .highlight-card::after { content: '★'; position: absolute; top: -10px; right: -10px; font-size: 100px; color: rgba(255,255,255,0.05); }
     </style>
@@ -89,7 +85,6 @@
                         <div className="error-screen">
                             <h2>Ocorreu um erro!</h2>
                             <p>O aplicativo encontrou um problema inesperado.</p>
-                            <pre style={{fontSize:10, background:'#000', padding:10, borderRadius:5, maxWidth:'100%', overflow:'auto'}}>{this.state.error?.toString()}</pre>
                             <button className="btn btn-red" onClick={()=>{localStorage.clear(); window.location.reload();}}>REINICIAR APLICATIVO</button>
                         </div>
                     );
@@ -280,7 +275,26 @@
             const acceptOffer = async (o) => {
                 const buy = teams.find(t=>t.id===o.buyerId); const sel = teams.find(t=>t.id===user.data.id); const p = players.find(x=>x.id===o.playerId);
                 let cost = o.value; if(o.type === 'TROCA' && o.meta?.cashDir === 'RECEIVE') cost = -o.value; 
-                if(buy.balance < cost) return alert("Sem saldo!");
+                
+                // --- NEW INSTALLMENT LOGIC ---
+                if (o.type === 'COMPRA' && o.meta?.installments > 1) {
+                    if (buy.balance < (cost / o.meta.installments)) return alert("Saldo insuficiente para 1ª parcela!");
+                    // Creates Debt, doesn't pay full amount
+                    db.collection('debts').add({
+                        buyerId: buy.id, buyerName: buy.name,
+                        sellerId: sel.id, sellerName: sel.name,
+                        playerId: p.id, playerName: p.name,
+                        totalVal: cost,
+                        installmentVal: cost / o.meta.installments,
+                        weeksRemaining: parseInt(o.meta.installments),
+                        date: Date.now()
+                    });
+                    cost = 0; // Immediate cost is 0 (handled by debt system in Admin Week)
+                    alert("Transferência parcelada aceita!");
+                } else {
+                    if (buy.balance < cost) return alert("Sem saldo!");
+                }
+                
                 const b = db.batch();
                 if(cost !== 0) { b.update(db.collection('teams').doc(buy.id), {balance: buy.balance - cost}); b.update(db.collection('teams').doc(sel.id), {balance: sel.balance + cost}); }
                 if(o.type==='COMPRA') {
@@ -304,7 +318,45 @@
 
             const adminAction = async (act, data) => {
                 if(act==='MARKET') { db.collection('config').doc('system').update({marketOpen: data}); postNews(data?"📢 JANELA ABERTA":"🔒 JANELA FECHADA", 'infra'); }
-                if(act==='WEEK') { if(!confirm("Virar?")) return; setLoading(true); const b = db.batch(); teams.forEach(t => { const w=players.filter(p=>p.teamId===t.id).reduce((a,p)=>a+(p.salary||0),0); const s=t.sponsorship?.value||0; b.update(db.collection('teams').doc(t.id), {balance:(t.balance||0)+s-w}); }); await b.commit(); setLoading(false); postNews("📅 VIRADA SEMANAL", 'infra'); alert("Ok"); }
+                
+                if(act==='WEEK') { 
+                    if(!confirm("Virar?")) return; 
+                    setLoading(true); 
+                    const b = db.batch(); 
+                    
+                    // Wages & Sponsor
+                    teams.forEach(t => { 
+                        const w=players.filter(p=>p.teamId===t.id).reduce((a,p)=>a+(p.salary||0),0); 
+                        const s=t.sponsorship?.value||0; 
+                        b.update(db.collection('teams').doc(t.id), {balance:(t.balance||0)+s-w}); 
+                    }); 
+
+                    // --- DEBT PROCESSING ---
+                    const debtsSnap = await db.collection('debts').get();
+                    debtsSnap.docs.forEach(doc => {
+                        const d = doc.data();
+                        if (d.weeksRemaining > 0) {
+                            // Deduct from Buyer
+                            b.update(db.collection('teams').doc(d.buyerId), {balance: firebase.firestore.FieldValue.increment(-d.installmentVal)});
+                            // Add to Seller
+                            b.update(db.collection('teams').doc(d.sellerId), {balance: firebase.firestore.FieldValue.increment(d.installmentVal)});
+                            // Update Debt
+                            if (d.weeksRemaining - 1 === 0) {
+                                b.delete(doc.ref);
+                                postNews(`✅ **DÍVIDA QUITADA**\n${d.buyerName} terminou de pagar ${d.playerName}.`, 'money');
+                            } else {
+                                b.update(doc.ref, {weeksRemaining: d.weeksRemaining - 1});
+                                postNews(`💳 **PARCELA PAGA**\n${d.buyerName} pagou a parcela (${d.weeksRemaining}x) de ${d.playerName}.`, 'money-minus');
+                            }
+                        }
+                    });
+
+                    await b.commit(); 
+                    setLoading(false); 
+                    postNews("📅 VIRADA SEMANAL", 'infra'); 
+                    alert("Ok"); 
+                }
+
                 if(act==='SEASON') { if(!confirm("Virar?")) return; setLoading(true); const b = db.batch(); players.forEach(p => { let u={}; if(p.futureTransfer){u=p.futureTransfer; u.futureTransfer=firebase.firestore.FieldValue.delete();} else if((p.contract<=1||p.contract===0)&&p.preContract){u.teamId=p.preContract.teamId; u.contract=1; u.status='NAO_A_VENDA'; u.preContract=firebase.firestore.FieldValue.delete();} else { let nc=(p.contract||0)-1; if(nc<0)nc=0; u.contract=nc; if(nc===0)u.status='EXPIRADO'; } b.update(db.collection('players').doc(p.id), u); }); await b.commit(); setLoading(false); postNews("🌞 NOVA TEMPORADA", 'season'); alert("Ok"); }
             };
 
@@ -319,7 +371,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.40.8</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.40.9</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -331,11 +383,10 @@
                     </div>
 
                     <div className="container">
-                        {screen === 'HOME' && user.type === 'ADMIN' && <AdminPanel teams={teams} papers={papers} journalists={journalists} reqs={reqs} config={conf} onAct={async(a,d)=>{ if(a==='MARKET')db.collection('config').doc('system').update({marketOpen:d}); if(a==='SEASON'){/*Season logic*/} }} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{/*Fin logic*/}} onReject={(id)=>db.collection('financeRequests').doc(id).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam} onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} onDeletePaper={deletePaper} onDeleteJourno={deleteJournalist} onRejectPaper={(id)=>db.collection('newspapers').doc(id).delete()} onConfig={(t)=>setModal({type:'SETTINGS', data:t})} />}
+                        {screen === 'HOME' && user.type === 'ADMIN' && <AdminPanel teams={teams} papers={papers} journalists={journalists} reqs={reqs} config={conf} onAct={adminAction} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{/*Fin logic*/}} onReject={(id)=>db.collection('financeRequests').doc(id).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam} onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} onDeletePaper={deletePaper} onDeleteJourno={deleteJournalist} onRejectPaper={(id)=>db.collection('newspapers').doc(id).delete()} onConfig={(t)=>setModal({type:'SETTINGS', data:t})} />}
                         
                         {screen === 'HOME' && user.type === 'USER' && <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />}
                         
-                        {/* VISITOR HOME */}
                         {screen === 'HOME' && user.type === 'VISITOR' && <VisitorDashboard players={players} teams={teams} />}
 
                         {screen === 'PRESS_DASH' && (user.type==='PRESS' || user.type==='PRESS_WORKER') && (
@@ -353,9 +404,7 @@
 
                         {screen === 'MARKET' && <Market me={user.data?.id} teams={teams} players={players} open={conf.marketOpen} isVis={user.type==='VISITOR'} onNeg={(p)=>setModal({type:'OFFER', data:p})} onPayClause={async(p)=>{/*Clause logic*/}} onPre={async(p)=>{/*Pre logic*/}} />}
 
-                        {/* NEW: COMPLETE RANKING SYSTEM */}
                         {screen === 'RANKING' && <Ranking teams={teams} players={players} />}
-
                         {screen === 'NEWS' && <div><h3>Notícias</h3>{news.map(n=><div key={n.id} className={`news-card news-${n.type}`}>{n.text}<br/><small style={{color:'#666'}}>{new Date(n.date).toLocaleString()}</small></div>)}</div>}
                         {screen === 'OFFERS' && <OffersScreen offers={offers} onAccept={acceptOffer} onReject={(oid)=>db.collection('offers').doc(oid).delete()} onCounter={(o)=>setModal({type:'OFFER', data:{...players.find(p=>p.id===o.playerId), oldOffer:o}})} />}
                     </div>
@@ -387,7 +436,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.40.8</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.40.9</div>
                     <div className="login-tabs"><div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div><div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR</div><div className={`tab ${tab==='PRESS'?'active':''}`} onClick={()=>setTab('PRESS')}>IMPRENSA</div></div>
                     {tab==='LOGIN' && <div>{(teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}<div style={{marginTop:20}}><button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button><button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button></div></div>}
                     {tab==='CREATE' && <div><input type="file" className="file-input" onChange={handleUpload} /><input className="input-field" placeholder="Nome" value={f.n} onChange={e=>setF({...f, n:e.target.value})} /><input className="input-field" type="number" placeholder="Saldo" value={f.b} onChange={e=>setF({...f, b:e.target.value})} /><select className="input-field" value={f.s} onChange={e=>setF({...f, s:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>Série {s}</option>)}</select><input className="input-field" type="number" placeholder="Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} /><button className="btn btn-green" onClick={()=>onCreateTeam(f.n, f.b, f.s, f.p, f.l)}>CRIAR</button></div>}
@@ -516,9 +565,27 @@
         };
 
         const OfferForm = ({ target, myPlayers, onSend }) => {
-            const old = target.oldOffer || {}; const [t, setT] = useState(old.type || 'COMPRA'); const [v, setV] = useState(old.value || target.oldVal || ''); const [con, setCon] = useState(old.offerContract || '1'); const [meta, setMeta] = useState(old.meta || { sellOn: 0, wageSplit: 50, buyOpt: '', cashDir: 'PAY' }); const [swaps, setSwaps] = useState(old.swapPlayerIds || []);
+            const old = target.oldOffer || {}; const [t, setT] = useState(old.type || 'COMPRA'); const [v, setV] = useState(old.value || target.oldVal || ''); const [con, setCon] = useState(old.offerContract || '1'); const [meta, setMeta] = useState(old.meta || { sellOn: 0, wageSplit: 50, buyOpt: '', cashDir: 'PAY', installments: 1 }); const [swaps, setSwaps] = useState(old.swapPlayerIds || []);
             const toggleSwap = (pid) => { if(swaps.includes(pid)) setSwaps(swaps.filter(id=>id!==pid)); else if(swaps.length < 3) setSwaps([...swaps, pid]); };
-            return <div className="modal-bg"><div className="modal-card"><h3>Negociar {target.name}</h3><div style={{display:'flex', gap:5, marginBottom:10}}>{['COMPRA','EMPRESTIMO','TROCA'].map(x=><button key={x} className={`btn ${t===x?'btn-green':'btn-ghost'}`} onClick={()=>setT(x)}>{x}</button>)}</div><label>Valor {t==='TROCA' ? `(${meta.cashDir==='PAY'?'Eu pago':'Eu recebo'})` : ''}</label><input className="input-field" type="number" value={v} onChange={e=>setV(e.target.value)} />{t==='COMPRA' && <div><label>Revenda: {meta.sellOn}%</label><input type="range" style={{width:'100%'}} min="0" max="50" value={meta.sellOn} onChange={e=>setMeta({...meta, sellOn:e.target.value})} /></div>}{t==='EMPRESTIMO' && <div style={{background:'#333', padding:10, borderRadius:8, marginBottom:10}}><label>Divisão Salarial (Eu pago {meta.wageSplit}%)</label><input type="range" style={{width:'100%'}} min="0" max="100" value={meta.wageSplit} onChange={e=>setMeta({...meta, wageSplit:e.target.value})} /><label>Opção de Compra</label><input className="input-field" type="number" value={meta.buyOpt} onChange={e=>setMeta({...meta, buyOpt:e.target.value})} /></div>}{t==='TROCA' && <div><div style={{display:'flex', gap:5}}><button className={`btn ${meta.cashDir==='PAY'?'btn-blue':'btn-ghost'}`} onClick={()=>setMeta({...meta, cashDir:'PAY'})}>PAGAR</button><button className={`btn ${meta.cashDir==='RECEIVE'?'btn-blue':'btn-ghost'}`} onClick={()=>setMeta({...meta, cashDir:'RECEIVE'})}>RECEBER</button></div><label>Jogadores (Máx 3)</label><div style={{maxHeight:100, overflowY:'auto', background:'#222', padding:5}}>{myPlayers.map(p=><div key={p.id} onClick={()=>toggleSwap(p.id)} style={{padding:5, borderBottom:'1px solid #444', color:swaps.includes(p.id)?'var(--primary)':'#fff', cursor:'pointer'}}>{swaps.includes(p.id)?'✔ ':''}{p.name}</div>)}</div></div>}<label>{t==='EMPRESTIMO'?'Duração':'Contrato'}</label><input className="input-field" type="number" value={con} onChange={e=>setCon(e.target.value)} /><button className="btn btn-green" onClick={()=>onSend(target, t, v, swaps, con, meta, old)}>ENVIAR</button></div></div>;
+            return (
+                <div className="modal-bg"><div className="modal-card"><h3>Negociar {target.name}</h3>
+                <div style={{display:'flex', gap:5, marginBottom:10}}>{['COMPRA','EMPRESTIMO','TROCA'].map(x=><button key={x} className={`btn ${t===x?'btn-green':'btn-ghost'}`} onClick={()=>setT(x)}>{x}</button>)}</div>
+                <label>Valor {t==='TROCA' ? `(${meta.cashDir==='PAY'?'Eu pago':'Eu recebo'})` : ''}</label><input className="input-field" type="number" value={v} onChange={e=>setV(e.target.value)} />
+                
+                {/* INSTALLMENTS SLIDER */}
+                {t==='COMPRA' && (
+                    <div style={{background:'#222', padding:10, borderRadius:8, marginBottom:10}}>
+                        <label>Parcelas (Semanas): {meta.installments || 1}</label>
+                        <input type="range" min="1" max="10" value={meta.installments || 1} onChange={e=>setMeta({...meta, installments:e.target.value})} style={{width:'100%'}} />
+                        {meta.installments > 1 && <div style={{fontSize:11, color:'var(--warning)', marginTop:5}}> {meta.installments}x de {fmt(v/meta.installments)}</div>}
+                    </div>
+                )}
+
+                {t==='COMPRA' && <div><label>Revenda: {meta.sellOn}%</label><input type="range" style={{width:'100%'}} min="0" max="50" value={meta.sellOn} onChange={e=>setMeta({...meta, sellOn:e.target.value})} /></div>}
+                {t==='EMPRESTIMO' && <div style={{background:'#333', padding:10, borderRadius:8, marginBottom:10}}><label>Divisão Salarial (Eu pago {meta.wageSplit}%)</label><input type="range" style={{width:'100%'}} min="0" max="100" value={meta.wageSplit} onChange={e=>setMeta({...meta, wageSplit:e.target.value})} /><label>Opção de Compra</label><input className="input-field" type="number" value={meta.buyOpt} onChange={e=>setMeta({...meta, buyOpt:e.target.value})} /></div>}
+                {t==='TROCA' && <div><div style={{display:'flex', gap:5}}><button className={`btn ${meta.cashDir==='PAY'?'btn-blue':'btn-ghost'}`} onClick={()=>setMeta({...meta, cashDir:'PAY'})}>PAGAR</button><button className={`btn ${meta.cashDir==='RECEIVE'?'btn-blue':'btn-ghost'}`} onClick={()=>setMeta({...meta, cashDir:'RECEIVE'})}>RECEBER</button></div><label>Jogadores (Máx 3)</label><div style={{maxHeight:100, overflowY:'auto', background:'#222', padding:5}}>{myPlayers.map(p=><div key={p.id} onClick={()=>toggleSwap(p.id)} style={{padding:5, borderBottom:'1px solid #444', color:swaps.includes(p.id)?'var(--primary)':'#fff', cursor:'pointer'}}>{swaps.includes(p.id)?'✔ ':''}{p.name}</div>)}</div></div>}
+                <label>{t==='EMPRESTIMO'?'Duração':'Contrato'}</label><input className="input-field" type="number" value={con} onChange={e=>setCon(e.target.value)} /><button className="btn btn-green" onClick={()=>onSend(target, t, v, swaps, con, meta, old)}>ENVIAR</button></div></div>
+            );
         };
 
         const AdminPanel = ({ teams, papers, journalists, reqs, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onConfig, onApprovePaper, onDeletePaper, onDeleteJourno, onRejectPaper }) => (

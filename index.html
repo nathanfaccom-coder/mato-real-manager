@@ -40,6 +40,7 @@
         .news-card { background: #262626; padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid #666; font-size: 13px; line-height: 1.4; }
         .news-transfer { border-color: var(--secondary); background: linear-gradient(90deg, #1a1a2e, #16213e); }
         .news-money { border-color: var(--primary); }
+        .news-money-minus { border-color: var(--danger); } /* Nova classe para saida */
         .news-admin { border-color: var(--warning); background: #2a2000; }
         .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #1a1a1a; border-top: 1px solid var(--border); display: flex; padding-bottom: env(safe-area-inset-bottom); z-index: 100; }
         .nav-item { flex: 1; padding: 12px; text-align: center; color: #666; font-size: 9px; cursor: pointer; }
@@ -52,7 +53,6 @@
         .tab.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
         .pulse { animation: pulse 2s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
-        
         .rating-badge { color: var(--warning); font-weight: bold; font-size: 11px; margin-left: 5px; display: flex; align-items: center; gap: 2px; text-shadow: 0 1px 2px black; }
     </style>
 </head>
@@ -156,23 +156,39 @@
                 alert("Saldo atualizado!");
             };
 
+            // NOVA FUNÇÃO: RETIRAR DINHEIRO
+            const withdrawMoney = async (amount, reason) => {
+                const val = parseFloat(amount);
+                if(isNaN(val) || val <= 0) return alert("Valor inválido!");
+                if(user.data.balance < val) return alert("Saldo insuficiente!");
+                
+                await db.collection('teams').doc(user.data.id).update({
+                    balance: user.data.balance - val
+                });
+                
+                // Optimistic UI Update (opcional, o listener já cuida, mas garante fluidez)
+                setUser(prev => ({...prev, data: {...prev.data, balance: prev.data.balance - val}}));
+                
+                postNews(`💸 **SAÍDA DE CAIXA**\nO **${user.data.name}** registrou retirada de ${fmt(val)}.\n📝 Motivo: ${reason}`, 'money-minus');
+                setModal(null);
+                alert("Retirada realizada!");
+            };
+
             const savePlayer = async (d) => {
                 const targetTeamId = (user.type==='ADMIN' && adminTeam) ? adminTeam.id : user.data.id;
                 const payload = {
                     name: d.name, position: d.position, overall: parseInt(d.overall), value: parseFloat(d.value),
                     salary: parseFloat(d.salary), clause: parseFloat(d.clause), contract: parseInt(d.contract),
                     mood: d.mood, status: d.status, teamId: d.teamId || targetTeamId, loan: false,
-                    rating: d.rating ? parseFloat(d.rating) : 0 // Save Rating
+                    rating: d.rating ? parseFloat(d.rating) : 0 
                 };
                 if(d.id) {
                     const old = players.find(p=>p.id===d.id);
                     if(user.type==='ADMIN') {
-                        // Admin Interventions
                         if(d.forcedTeamId && d.forcedTeamId !== old.teamId) {
                             payload.teamId = d.forcedTeamId; payload.futureTransfer = firebase.firestore.FieldValue.delete();
                             postNews(`👮‍♂️ **INTERVENÇÃO**\nTransferência forçada de **${d.name}**!`, 'admin');
                         }
-                        // Rating News Trigger
                         if(payload.rating > 0 && payload.rating !== old.rating) {
                             postNews(`⭐ **NOVA AVALIAÇÃO**\nA Federação atualizou a nota de **${d.name}** para **${payload.rating}**!`, 'admin');
                         }
@@ -359,7 +375,14 @@
                         <div className="modal-content">
                             {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={(id)=>{if(confirm("Excluir?"))db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} />}
                             {modal.type==='OFFER' && <OfferForm target={modal.data} myPlayers={players.filter(p=>p.teamId===user.data.id)} onSend={sendOffer} />}
-                            {modal.type==='SETTINGS' && <SettingsForm team={modal.data || user.data} isAdmin={user.type==='ADMIN'} onUp={(d)=>{ const tid = (modal.data && modal.data.id) || user.data.id; db.collection('teams').doc(tid).update(d); if(tid===user.data.id) setUser(p=>({...p, data:{...p.data, ...d}})); setModal(null); }} onUpgrade={()=>{ const tid = (modal.data && modal.data.id) || user.data.id; const t = teams.find(x=>x.id===tid); const c=COSTS[t.stadiumLevel]; if(t.balance<c)return alert("Sem grana"); if(confirm("Pagar?")) { db.collection('teams').doc(tid).update({balance:t.balance-c, stadiumLevel:t.stadiumLevel+1}); postNews(`🏗 **OBRAS**\n${t.name} evoluiu estádio.`,'infra'); setModal(null); } }} onReq={(t,a,d)=>{db.collection('financeRequests').add({teamId:user.data.id, teamName:user.data.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!");}} />}
+                            {modal.type==='SETTINGS' && <SettingsForm 
+                                team={modal.data || user.data} 
+                                isAdmin={user.type==='ADMIN'} 
+                                onUp={(d)=>{ const tid = (modal.data && modal.data.id) || user.data.id; db.collection('teams').doc(tid).update(d); if(tid===user.data.id) setUser(p=>({...p, data:{...p.data, ...d}})); setModal(null); }} 
+                                onUpgrade={()=>{ const tid = (modal.data && modal.data.id) || user.data.id; const t = teams.find(x=>x.id===tid); const c=COSTS[t.stadiumLevel]; if(t.balance<c)return alert("Sem grana"); if(confirm("Pagar?")) { db.collection('teams').doc(tid).update({balance:t.balance-c, stadiumLevel:t.stadiumLevel+1}); postNews(`🏗 **OBRAS**\n${t.name} evoluiu estádio.`,'infra'); setModal(null); } }} 
+                                onReq={(t,a,d)=>{db.collection('financeRequests').add({teamId:user.data.id, teamName:user.data.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!");}} 
+                                onWithdraw={withdrawMoney} // PASSANDO A FUNÇÃO DE RETIRADA
+                            />}
                         </div>
                     </div>}
                 </div>
@@ -524,7 +547,7 @@
             </div>
         );
 
-        const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq }) => {
+        const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => {
             const [form, setF] = useState({name: team.name, logo: team.logo, balance: team.balance, serie: team.serie});
             useEffect(() => { setF({name: team.name, logo: team.logo, balance: team.balance, serie: team.serie}); }, [team]);
 
@@ -546,6 +569,9 @@
                     <hr style={{borderColor:'#444'}}/>
                     <button className="btn btn-green" onClick={()=>{const v=prompt("Valor");const m=prompt("Motivo"); if(v)onReq('INJECTION',v,m)}}>PEDIR INJEÇÃO</button>
                     <button className="btn btn-gold" onClick={()=>{const v=prompt("Valor");const m=prompt("Empresa"); if(v)onReq('SPONSORSHIP',v,m)}}>PEDIR PATROCÍNIO</button>
+                    
+                    {/* BOTÃO RETIRAR DINHEIRO ADICIONADO */}
+                    <button className="btn btn-red" onClick={()=>{const v=prompt("Valor a retirar:"); if(v){ const m=prompt("Motivo:"); if(m) onWithdraw(v, m); }}}>RETIRAR DINHEIRO</button>
                 </div>
             );
         };

@@ -53,7 +53,7 @@
         .pulse { animation: pulse 2s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
         
-        .rating-badge { color: var(--warning); font-weight: bold; font-size: 11px; margin-left: 5px; display: flex; align-items: center; gap: 2px; }
+        .rating-badge { color: var(--warning); font-weight: bold; font-size: 11px; margin-left: 5px; display: flex; align-items: center; gap: 2px; text-shadow: 0 1px 2px black; }
     </style>
 </head>
 <body>
@@ -162,13 +162,20 @@
                     name: d.name, position: d.position, overall: parseInt(d.overall), value: parseFloat(d.value),
                     salary: parseFloat(d.salary), clause: parseFloat(d.clause), contract: parseInt(d.contract),
                     mood: d.mood, status: d.status, teamId: d.teamId || targetTeamId, loan: false,
-                    rating: parseFloat(d.rating || 0) // NOVA FUNCIONALIDADE: NOTA
+                    rating: d.rating ? parseFloat(d.rating) : 0 // Save Rating
                 };
                 if(d.id) {
                     const old = players.find(p=>p.id===d.id);
-                    if(user.type==='ADMIN' && d.forcedTeamId && d.forcedTeamId !== old.teamId) {
-                        payload.teamId = d.forcedTeamId; payload.futureTransfer = firebase.firestore.FieldValue.delete();
-                        postNews(`👮‍♂️ **INTERVENÇÃO**\nTransferência forçada de **${d.name}**!`, 'admin');
+                    if(user.type==='ADMIN') {
+                        // Admin Interventions
+                        if(d.forcedTeamId && d.forcedTeamId !== old.teamId) {
+                            payload.teamId = d.forcedTeamId; payload.futureTransfer = firebase.firestore.FieldValue.delete();
+                            postNews(`👮‍♂️ **INTERVENÇÃO**\nTransferência forçada de **${d.name}**!`, 'admin');
+                        }
+                        // Rating News Trigger
+                        if(payload.rating > 0 && payload.rating !== old.rating) {
+                            postNews(`⭐ **NOVA AVALIAÇÃO**\nA Federação atualizou a nota de **${d.name}** para **${payload.rating}**!`, 'admin');
+                        }
                     }
                     await db.collection('players').doc(d.id).update(payload);
                 } else {
@@ -191,7 +198,7 @@
                 
                 const pl = {
                     playerId: target.id, playerName: target.name, buyerId: user.data.id, buyerName: user.data.name,
-                    sellerId: (old && old.buyerId) ? old.buyerId : target.teamId,
+                    sellerId: old ? old.buyerId : target.teamId,
                     type, value: v, swapPlayerIds: swapIds || [],
                     offerContract: con, description: desc, meta: meta || {}, date: Date.now()
                 };
@@ -379,7 +386,7 @@
                 <div style={{display:'flex', justifyContent:'space-between', marginBottom:10}}><h3>Elenco ({players.length})</h3>{!isVisitor && <button className="btn btn-green" style={{width:'auto'}} onClick={onAdd}>+ JOGADOR</button>}</div>
                 {players.sort((a,b)=>b.overall-a.overall).map(p => (
                     <div key={p.id} className="card" onClick={()=>!isVisitor && onEdit(p)} style={{cursor: isVisitor?'default':'pointer'}}>
-                        <div style={{display:'flex', justifyContent:'space-between'}}><div><span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span><b>{p.name}</b> {p.rating > 0 && <span className="rating-badge">★ {p.rating}</span>} {p.loan && <small style={{color:'var(--secondary)'}}>(EMP)</small>}</div><span className="player-ov">{p.overall}</span></div>
+                        <div style={{display:'flex', justifyContent:'space-between'}}><div><span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span><b>{p.name}</b> {p.rating > 0 && <span className="rating-badge">★ {p.rating}</span>}</div><span className="player-ov">{p.overall}</span></div>
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', fontSize:11, color:'#aaa', marginTop:5}}><div>Sal: {fmt(p.salary)}</div><div>Val: {fmt(p.value)}</div><div>Con: {p.contract}</div><div>Mul: {fmt(p.clause)}</div></div>
                         <div style={{marginTop:5, display:'flex', justifyContent:'space-between', fontSize:10}}><span style={{color: p.status==='VENDA'?'var(--primary)':p.status==='INTRANSFERIVEL'?'var(--danger)':'#666'}}>{p.status}</span><span>{p.mood}</span></div>
                     </div>
@@ -396,15 +403,7 @@
                         <div style={{flex:1}}><label>Posição</label><select className="input-field" value={f.position} onChange={e=>setF({...f, position:e.target.value})}>{POS.map(p=><option key={p} value={p}>{p}</option>)}</select></div>
                         <div style={{flex:1}}><label>Overall</label><input className="input-field" type="number" value={f.overall} onChange={e=>setF({...f, overall:e.target.value})} disabled={!isAdmin && initial} /></div>
                     </div>
-                    
-                    {/* CAMPO DE NOTA (SÓ ADMIN VÊ E EDITA) */}
-                    {isAdmin && (
-                        <div style={{border:'1px solid var(--purple)', padding:5, borderRadius:5, margin:'5px 0'}}>
-                            <label style={{color:'var(--purple)'}}>Nota (0.0 - 10.0)</label>
-                            <input className="input-field" type="number" step="0.1" min="0" max="10" value={f.rating} onChange={e=>setF({...f, rating:e.target.value})} />
-                        </div>
-                    )}
-
+                    {/* Campos editáveis */}
                     <div style={{display:'flex', gap:5}}>
                         <div style={{flex:1}}><label>Valor</label><input className="input-field" type="number" value={f.value} onChange={e=>setF({...f, value:e.target.value})} /></div>
                         <div style={{flex:1}}><label>Salário</label><input className="input-field" type="number" value={f.salary} onChange={e=>setF({...f, salary:e.target.value})} /></div>
@@ -415,6 +414,15 @@
                     </div>
                     <label>Status</label><select className="input-field" value={f.status} onChange={e=>setF({...f, status:e.target.value})}><option value="NAO_A_VENDA">Não Listado</option><option value="VENDA">À Venda</option><option value="EMPRESTIMO">Empréstimo</option><option value="INTRANSFERIVEL">Bloqueado</option></select>
                     <label>Humor</label><select className="input-field" value={f.mood} onChange={e=>setF({...f, mood:e.target.value})}><option>🤩</option><option>😐</option><option>😡</option></select>
+                    
+                    {/* CAMPO DE NOTA (SÓ ADMIN) */}
+                    {isAdmin && (
+                        <div style={{border:'1px solid var(--purple)', padding:5, borderRadius:5, margin:'5px 0'}}>
+                            <label style={{color:'var(--purple)'}}>Nota (0.0 - 10.0)</label>
+                            <input className="input-field" type="number" step="0.1" min="0" max="10" value={f.rating} onChange={e=>setF({...f, rating:e.target.value})} />
+                        </div>
+                    )}
+
                     {isAdmin && <div style={{border:'1px solid gold', padding:5, marginTop:5}}><label style={{color:'gold'}}>Mover Time (Adm)</label><select className="input-field" onChange={e=>setF({...f, forcedTeamId:e.target.value})}><option value="">-- Manter --</option>{teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></div>}
                     <div style={{display:'flex', gap:10, marginTop:15}}><button className="btn btn-green" onClick={()=>onSave(f)}>SALVAR</button>{initial && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>X</button>}</div>
                 </div>

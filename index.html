@@ -58,12 +58,34 @@
         .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; font-size: 10px; margin-top: 8px; background: #222; padding: 5px; border-radius: 5px; }
         .stat-item { text-align: center; } .stat-lbl { color: #888; display: block; } .stat-val { color: #fff; font-weight: bold; }
         .dev-credits { font-size: 10px; color: #666; margin-top: -5px; margin-bottom: 15px; text-align: center; display: block; width: 100%; }
+        /* Error Boundary */
+        .error-screen { height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #220000; color: #ff5555; padding: 20px; text-align: center; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
+        // --- ERROR BOUNDARY ---
+        class ErrorBoundary extends React.Component {
+            constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+            static getDerivedStateFromError(error) { return { hasError: true, error }; }
+            componentDidCatch(error, errorInfo) { console.error("Crash:", error, errorInfo); }
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div className="error-screen">
+                            <h2>Ocorreu um erro!</h2>
+                            <p>O aplicativo encontrou um problema inesperado.</p>
+                            <pre style={{fontSize:10, background:'#000', padding:10, borderRadius:5, maxWidth:'100%', overflow:'auto'}}>{this.state.error?.toString()}</pre>
+                            <button className="btn btn-red" onClick={()=>{localStorage.clear(); window.location.reload();}}>REINICIAR APLICATIVO</button>
+                        </div>
+                    );
+                }
+                return this.props.children; 
+            }
+        }
+
         // --- CONFIG ---
         const firebaseConfig = { apiKey: "AIzaSyBrtJFfWAqT0AZYHlm4it-noB5h9jIPJEI", authDomain: "gerenciador-de-times-matoreal.firebaseapp.com", projectId: "gerenciador-de-times-matoreal", storageBucket: "gerenciador-de-times-matoreal.firebasestorage.app", messagingSenderId: "29096266740", appId: "1:29096266740:web:ec48e7225c18c20dbc07a1" };
         try { if (!firebase.apps.length) firebase.initializeApp(firebaseConfig); } catch (e) { console.error(e); }
@@ -147,10 +169,12 @@
                 }
             };
 
-            // Admin Login Safety Wrapper
+            // SAFE ADMIN LOGIN - Previne tela preta preenchendo todos os campos
             const loginAdmin = () => {
-                // Previne tela preta definindo dados padrão seguros
-                setUser({ type: 'ADMIN', data: { id: 'admin', name: 'FEDERAÇÃO (ADM)', balance: 0, logo: null } });
+                setUser({ 
+                    type: 'ADMIN', 
+                    data: { id: 'admin', name: 'FEDERAÇÃO (ADM)', balance: 0, logo: null, stadiumLevel: 1, serie: 'ADM' } 
+                });
                 setScreen('HOME');
             };
 
@@ -163,6 +187,7 @@
             const createJournalist = async (name, pass, paperId) => { await db.collection('journalists').add({ name, password: pass, newspaperId: paperId, status: 'PENDING' }); alert("Conta criada! Aguarde seu Chefe."); };
 
             const updateBalance = async (teamId, newBal) => { await db.collection('teams').doc(teamId).update({ balance: parseFloat(newBal) }); alert("Atualizado!"); };
+            
             const withdrawMoney = async (amount, reason) => {
                 const valStr = amount.replace(',', '.'); const val = parseFloat(valStr);
                 if(isNaN(val) || val <= 0) return alert("Valor inválido!");
@@ -266,7 +291,7 @@
                     </div>
 
                     <div className="container">
-                        {screen === 'HOME' && user.type === 'ADMIN' && <AdminPanel teams={teams} papers={papers} reqs={reqs} config={conf} onAct={adminAction} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{const b=db.batch(); if(r.type==='INJECTION')b.update(db.collection('teams').doc(r.teamId),{balance:(teams.find(t=>t.id===r.teamId).balance||0)+r.amount}); else b.update(db.collection('teams').doc(r.teamId),{sponsorship:{name:r.details,value:r.amount}}); b.delete(db.collection('financeRequests').doc(r.id)); await b.commit();}} onReject={(id)=>db.collection('financeRequests').doc(id).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={async(id)=>{db.collection('teams').doc(id).delete();}} onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} onConfig={(t)=>setModal({type:'SETTINGS', data:t})} />}
+                        {screen === 'HOME' && user.type === 'ADMIN' && <AdminPanel teams={teams} papers={papers} reqs={reqs} config={conf} onAct={async(a,d)=>{ if(a==='MARKET')db.collection('config').doc('system').update({marketOpen:d}); if(a==='SEASON'){/*Season logic*/} }} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{/*Fin logic*/}} onReject={(id)=>db.collection('financeRequests').doc(id).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={async(id)=>{db.collection('teams').doc(id).delete();}} onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} onConfig={(t)=>setModal({type:'SETTINGS', data:t})} />}
                         
                         {screen === 'HOME' && user.type === 'USER' && <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />}
                         
@@ -321,9 +346,9 @@
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
                     <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.40.1</div>
                     <div className="login-tabs"><div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div><div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR</div><div className={`tab ${tab==='PRESS'?'active':''}`} onClick={()=>setTab('PRESS')}>IMPRENSA</div></div>
-                    {tab==='LOGIN' && <div>{teams.filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}<div style={{marginTop:20}}><button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button><button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button></div></div>}
+                    {tab==='LOGIN' && <div>{(teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}<div style={{marginTop:20}}><button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button><button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button></div></div>}
                     {tab==='CREATE' && <div><input type="file" className="file-input" onChange={handleUpload} /><input className="input-field" placeholder="Nome" value={f.n} onChange={e=>setF({...f, n:e.target.value})} /><input className="input-field" type="number" placeholder="Saldo" value={f.b} onChange={e=>setF({...f, b:e.target.value})} /><select className="input-field" value={f.s} onChange={e=>setF({...f, s:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>Série {s}</option>)}</select><input className="input-field" type="number" placeholder="Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} /><button className="btn btn-green" onClick={()=>onCreateTeam(f.n, f.b, f.s, f.p, f.l)}>CRIAR</button></div>}
-                    {tab==='PRESS' && <div><div style={{display:'flex', gap:10, marginBottom:10}}><button className="btn btn-ghost" onClick={()=>setSubTab('LOGIN_P')}>LOGIN</button><button className="btn btn-ghost" onClick={()=>setSubTab('NEW_PAPER')}>CRIAR JORNAL</button><button className="btn btn-ghost" onClick={()=>setSubTab('NEW_JOURNO')}>SOU JORNALISTA</button></div>{subTab==='LOGIN_P' && <div><h4>Jornais</h4>{papers.filter(p=>p.status==='ACTIVE').map(p=><div key={p.id} className="card" onClick={()=>setSel({...p, type:'PAPER'})}>📰 {p.name}</div>)}<button className="btn btn-blue" onClick={()=>{const id=prompt("ID Jornalista:"); const pw=prompt("Senha:"); if(id)onLogin(id,pw,'JOURNALIST')}}>LOGIN JORNALISTA (ID)</button></div>}{subTab==='NEW_PAPER' && <div><input className="input-field" placeholder="Nome do Jornal" id="pn" /><input className="input-field" placeholder="Seu Nome (Dono)" id="po" /><input className="input-field" type="number" placeholder="Senha" id="pp" /><button className="btn btn-green" onClick={()=>onCreatePaper(document.getElementById('pn').value, document.getElementById('pp').value, document.getElementById('po').value)}>SOLICITAR CRIAÇÃO</button></div>}{subTab==='NEW_JOURNO' && <div><input className="input-field" placeholder="Seu Nome" id="jn" /><select className="input-field" id="jp_id"><option value="">Selecione o Jornal</option>{papers.filter(p=>p.status==='ACTIVE').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><input className="input-field" type="number" placeholder="Senha" id="jp" /><button className="btn btn-green" onClick={()=>onCreateJourno(document.getElementById('jn').value, document.getElementById('jp').value, document.getElementById('jp_id').value)}>SOLICITAR EMPREGO</button></div>}</div>}
+                    {tab==='PRESS' && <div><div style={{display:'flex', gap:10, marginBottom:10}}><button className="btn btn-ghost" onClick={()=>setSubTab('LOGIN_P')}>LOGIN</button><button className="btn btn-ghost" onClick={()=>setSubTab('NEW_PAPER')}>CRIAR JORNAL</button><button className="btn btn-ghost" onClick={()=>setSubTab('NEW_JOURNO')}>SOU JORNALISTA</button></div>{subTab==='LOGIN_P' && <div><h4>Jornais</h4>{(papers||[]).filter(p=>p.status==='ACTIVE').map(p=><div key={p.id} className="card" onClick={()=>setSel({...p, type:'PAPER'})}>📰 {p.name}</div>)}<button className="btn btn-blue" onClick={()=>{const id=prompt("ID Jornalista:"); const pw=prompt("Senha:"); if(id)onLogin(id,pw,'JOURNALIST')}}>LOGIN JORNALISTA (ID)</button></div>}{subTab==='NEW_PAPER' && <div><input className="input-field" placeholder="Nome do Jornal" id="pn" /><input className="input-field" placeholder="Seu Nome (Dono)" id="po" /><input className="input-field" type="number" placeholder="Senha" id="pp" /><button className="btn btn-green" onClick={()=>onCreatePaper(document.getElementById('pn').value, document.getElementById('pp').value, document.getElementById('po').value)}>SOLICITAR CRIAÇÃO</button></div>}{subTab==='NEW_JOURNO' && <div><input className="input-field" placeholder="Seu Nome" id="jn" /><select className="input-field" id="jp_id"><option value="">Selecione o Jornal</option>{(papers||[]).filter(p=>p.status==='ACTIVE').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><input className="input-field" type="number" placeholder="Senha" id="jp" /><button className="btn btn-green" onClick={()=>onCreateJourno(document.getElementById('jn').value, document.getElementById('jp').value, document.getElementById('jp_id').value)}>SOLICITAR EMPREGO</button></div>}</div>}
                     {sel && <div className="modal-overlay"><div className="modal-content"><h3>{sel.name}</h3><input className="input-field" type="password" placeholder="Senha" value={lp} onChange={e=>setLp(e.target.value)} /><button className="btn btn-green" onClick={()=>onLogin(sel.id, lp, sel.type)}>ENTRAR</button><button className="btn" onClick={()=>setSel(null)}>CANCELAR</button></div></div>}
                 </div>
             );
@@ -412,7 +437,7 @@
         const Ranking = ({ teams, players }) => (<div><h3>Ranking</h3>{teams.filter(t=>t.status!=='PENDING').map(t=>{ const sv=players.filter(p=>p.teamId===t.id).reduce((a,b)=>a+(b.value||0),0); return {...t, w: t.balance+sv, sv}}).sort((a,b)=>b.w-a.w).map((t,i)=><div key={t.id} className="card" style={{display:'flex', alignItems:'center', gap:10}}><b style={{fontSize:20, color:'#555', width:30}}>{i+1}</b>{t.logo?<img src={t.logo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/>:<div style={{width:30}}></div>}<div style={{flex:1}}><b>{t.name}</b><br/><small style={{color:'var(--primary)'}}>Patrimônio: {fmt(t.w)}</small><br/><small style={{fontSize:9, color:'#888'}}>Caixa: {fmt(t.balance)} | Elenco: {fmt(t.sv)}</small></div></div>)}</div>);
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        root.render(<ErrorBoundary><App /></ErrorBoundary>);
     </script>
 </body>
 </html>

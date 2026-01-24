@@ -223,58 +223,48 @@
 
             const updateStats = async (pid, newStats) => { await db.collection('players').doc(pid).update({ stats: newStats }); alert("Estatísticas Atualizadas!"); setModal(null); };
 
-            // --- FIXED: SEND OFFER LOGIC ---
             const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
                 const v = parseFloat(value||0);
                 const detailText = formatOfferDetails(type, v, con, meta, swapIds, players);
                 
-                // Identify Actors
                 const actingTeamName = user.data.name; 
                 const targetPlayerName = target.name;
                 const ownerTeam = teams.find(t=>t.id===target.teamId);
                 const ownerTeamName = ownerTeam ? ownerTeam.name : 'Desconhecido';
 
                 let headline = "";
-                let sellerId = null; // Initialize as null
+                let sellerId = null;
 
                 if (old && old.id) {
-                    // COUNTER-OFFER: The seller is the one who made the previous offer
                     headline = `🔄 **CONTRAPROPOSTA**\nO **${actingTeamName}** não concordou com os termos e fez uma contraoferta pelo **${targetPlayerName}**!`;
                     sellerId = old.buyerId; 
                 } else {
-                    // NEW OFFER: The seller is the current owner of the player
                     headline = `🚨 **MERCADO AGITADO**\nO **${actingTeamName}** enviou uma proposta oficial ao **${ownerTeamName}** pelo jogador **${targetPlayerName}**!`;
                     sellerId = target.teamId;
                 }
 
-                // SAFETY CHECK: If sellerId is still null/undefined, abort
-                if (!sellerId) {
-                    alert("ERRO: Não foi possível identificar o time vendedor. Tente novamente.");
-                    return;
-                }
+                if (!sellerId) { alert("ERRO: Não foi possível identificar o time vendedor."); return; }
 
-                const pl = { 
-                    playerId: target.id, playerName: target.name, 
-                    buyerId: user.data.id, buyerName: user.data.name, 
-                    sellerId: sellerId, // Now safely defined
-                    type, value: v, swapPlayerIds: swapIds || [], offerContract: parseInt(con) || 1, 
-                    description: detailText, meta: meta || {}, date: Date.now() 
-                };
+                const pl = { playerId: target.id, playerName: target.name, buyerId: user.data.id, buyerName: user.data.name, sellerId, type, value: v, swapPlayerIds: swapIds || [], offerContract: parseInt(con) || 1, description: detailText, meta: meta || {}, date: Date.now() };
                 
                 const b = db.batch(); 
                 if(old && old.id) b.delete(db.collection('offers').doc(old.id)); 
                 b.set(db.collection('offers').doc(), pl); 
                 await b.commit();
-                
                 postNews(`${headline}\n\n📄 **Detalhes da Oferta:**\n${detailText}`, 'transfer'); 
                 setModal(null); 
-                alert("Proposta Enviada com Sucesso!");
+                alert("Enviada!");
             };
 
             const rejectOffer = async (o) => {
+                if(!confirm("Tem certeza que deseja recusar esta proposta?")) return;
                 const rejectedTeam = teams.find(t=>t.id===o.buyerId)?.name || 'Outro Time';
                 const rejectorTeam = user.data.name;
                 const text = `❌ **NEGOCIAÇÃO ENCERRADA**\nO **${rejectorTeam}** recusou a investida do **${rejectedTeam}** pelo jogador **${o.playerName}** e encerrou as conversas.`;
+                
+                // Force Update UI immediately
+                setOffers(prev => prev.filter(off => off.id !== o.id));
+                
                 await db.collection('offers').doc(o.id).delete();
                 postNews(text, 'transfer');
             };
@@ -299,18 +289,18 @@
                     if (o.meta?.sellOn > 0) up.sellOnDetails = { percentage: o.meta.sellOn, beneficiary: sel.id };
                     if(conf.marketOpen) { b.update(db.collection('players').doc(p.id), up); newsText = `🤝 **NEGÓCIO FECHADO**\nO **${buy.name}** aceitou as exigências e contratou **${p.name}** do **${sel.name}**!`; } 
                     else { b.update(db.collection('players').doc(p.id), {status:'VENDIDO', futureTransfer: up}); newsText = `🤝 **PRÉ-ACORDO**\nO **${buy.name}** garantiu a contratação de **${p.name}** para a próxima temporada.`; }
-                } 
-                else if(o.type==='EMPRESTIMO') {
+                } else if(o.type==='EMPRESTIMO') {
                     b.update(db.collection('players').doc(p.id), { teamId: buy.id, status:'NAO_A_VENDA', loan:true, loanFrom: sel.id, loanDetails: { wageSplit: o.meta?.wageSplit || 50, buyOption: o.meta?.buyOpt } });
                     newsText = `🔄 **EMPRÉSTIMO**\nO **${buy.name}** acertou o empréstimo de **${p.name}** junto ao **${sel.name}**.`;
-                } 
-                else if(o.type==='TROCA') {
+                } else if(o.type==='TROCA') {
                     if(!conf.marketOpen) return alert("Troca só com janela aberta!");
                     b.update(db.collection('players').doc(p.id), {teamId: buy.id, status:'NAO_A_VENDA', contract: parseInt(o.offerContract)});
                     if (o.swapPlayerIds) o.swapPlayerIds.forEach(id => b.update(db.collection('players').doc(id), {teamId: sel.id, status:'NAO_A_VENDA'}));
                     newsText = `🔀 **TROCA BOMBÁSTICA**\n**${buy.name}** e **${sel.name}** chegaram a um acordo e trocaram jogadores!`;
                 }
                 
+                // Force remove offer from UI
+                setOffers(prev => prev.filter(off => off.id !== o.id));
                 b.delete(db.collection('offers').doc(o.id));
                 await b.commit();
                 postNews(`${newsText}\n\n📄 **Termos do Acordo:**\n${o.description}`, 'transfer');
@@ -320,7 +310,6 @@
                 const cost = (p.value || 1000000) * 0.10; // 10% do valor de mercado
                 if(user.data.balance < cost) return alert(`Sem saldo para luvas (Custo: ${fmt(cost)})`);
                 if(!confirm(`Renovar com ${p.name} por +1 ano?\nCusto: ${fmt(cost)}`)) return;
-                
                 const b = db.batch();
                 b.update(db.collection('teams').doc(user.data.id), {balance: user.data.balance - cost});
                 b.update(db.collection('players').doc(p.id), {contract: (p.contract||0) + 1});
@@ -337,7 +326,6 @@
                 }
                 if(act==='SEASON') { if(!confirm("Virar?")) return; setLoading(true); const b = db.batch(); players.forEach(p => { let u={}; if(p.futureTransfer){u=p.futureTransfer; u.futureTransfer=firebase.firestore.FieldValue.delete();} else if((p.contract<=1||p.contract===0)&&p.preContract){u.teamId=p.preContract.teamId; u.contract=1; u.status='NAO_A_VENDA'; u.preContract=firebase.firestore.FieldValue.delete();} else { let nc=(p.contract||0)-1; if(nc<0)nc=0; u.contract=nc; if(nc===0)u.status='EXPIRADO'; } b.update(db.collection('players').doc(p.id), u); }); await b.commit(); setLoading(false); postNews("🌞 NOVA TEMPORADA", 'season'); alert("Ok"); }
             };
-
             // --- RENDER ---
             if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
             if(!user) return <LoginScreen teams={teams} papers={papers} journalists={journalists} onLogin={login} onCreateTeam={createTeam} onCreatePaper={createNewspaper} onCreateJourno={createJournalist} onAdmin={loginAdmin} onVisitor={()=>{setUser({type:'VISITOR'}); setScreen('RANKING');}} />;
@@ -349,7 +337,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.41.2</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.41.3</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -414,7 +402,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.41.2</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.41.3</div>
                     <div className="login-tabs"><div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div><div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR</div><div className={`tab ${tab==='PRESS'?'active':''}`} onClick={()=>setTab('PRESS')}>IMPRENSA</div></div>
                     {tab==='LOGIN' && <div>{(teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}<div style={{marginTop:20}}><button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button><button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button></div></div>}
                     {tab==='CREATE' && <div><input type="file" className="file-input" onChange={handleUpload} /><input className="input-field" placeholder="Nome" value={f.n} onChange={e=>setF({...f, n:e.target.value})} /><input className="input-field" type="number" placeholder="Saldo" value={f.b} onChange={e=>setF({...f, b:e.target.value})} /><select className="input-field" value={f.s} onChange={e=>setF({...f, s:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>Série {s}</option>)}</select><input className="input-field" type="number" placeholder="Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} /><button className="btn btn-green" onClick={()=>onCreateTeam(f.n, f.b, f.s, f.p, f.l)}>CRIAR</button></div>}
@@ -528,8 +516,6 @@
                         <div key={p.id} className="card">
                             <div style={{display:'flex', justifyContent:'space-between'}}><div><span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span>{p.name} {p.rating>0 && <span className="rating-badge">★ {p.rating}</span>}</div><span className="player-ov">{p.overall}</span></div>
                             <div style={{fontSize:11, color:'#aaa', marginTop:5}}>{view==='GLOBAL' && <div>Time: {teams.find(t=>t.id===p.teamId)?.name}</div>}<div>Val: {fmt(p.value)} | Con: {p.contract}</div></div>
-                            
-                            {/* STATS NO MERCADO TBM */}
                             <div className="stats-grid">
                                 <div className="stat-item"><span className="stat-lbl">⚽</span><span className="stat-val">{p.stats?.goals||0}</span></div>
                                 <div className="stat-item"><span className="stat-lbl">👟</span><span className="stat-val">{p.stats?.assists||0}</span></div>
@@ -538,7 +524,6 @@
                                 <div className="stat-item"><span className="stat-lbl">🟨</span><span className="stat-val">{p.stats?.yellows||0}</span></div>
                                 <div className="stat-item"><span className="stat-lbl">🟥</span><span className="stat-val">{p.stats?.reds||0}</span></div>
                             </div>
-
                             {!isVis && <div style={{marginTop:5, display:'flex', gap:5}}>{(open || p.status==='EMPRESTIMO') && p.status!=='INTRANSFERIVEL' ? <button className="btn btn-purple" style={{width:'auto', flex:1}} onClick={()=>onNeg(p)}>NEGOCIAR</button> : <button className="btn btn-ghost" style={{width:'auto', flex:1}} disabled>BLOQUEADO</button>}{p.clause>0 && <button className="btn btn-gold" style={{width:'auto'}} onClick={()=>onPayClause(p)}>MULTA</button>}{p.contract<=1 && !p.preContract && <button className="btn btn-blue" style={{width:'auto'}} onClick={()=>onPre(p)}>PRÉ</button>}</div>}
                         </div>
                     ))}
@@ -553,8 +538,6 @@
                 <div className="modal-bg"><div className="modal-card"><h3>Negociar {target.name}</h3>
                 <div style={{display:'flex', gap:5, marginBottom:10}}>{['COMPRA','EMPRESTIMO','TROCA'].map(x=><button key={x} className={`btn ${t===x?'btn-green':'btn-ghost'}`} onClick={()=>setT(x)}>{x}</button>)}</div>
                 <label>Valor {t==='TROCA' ? `(${meta.cashDir==='PAY'?'Eu pago':'Eu recebo'})` : ''}</label><input className="input-field" type="number" value={v} onChange={e=>setV(e.target.value)} />
-                
-                {/* INSTALLMENTS SLIDER */}
                 {t==='COMPRA' && (
                     <div style={{background:'#222', padding:10, borderRadius:8, marginBottom:10}}>
                         <label>Parcelas (Semanas): {meta.installments || 1}</label>
@@ -562,7 +545,6 @@
                         {meta.installments > 1 && <div style={{fontSize:11, color:'var(--warning)', marginTop:5}}> {meta.installments}x de {fmt(v/meta.installments)}</div>}
                     </div>
                 )}
-
                 {t==='COMPRA' && <div><label>Revenda: {meta.sellOn}%</label><input type="range" style={{width:'100%'}} min="0" max="50" value={meta.sellOn} onChange={e=>setMeta({...meta, sellOn:e.target.value})} /></div>}
                 {t==='EMPRESTIMO' && <div style={{background:'#333', padding:10, borderRadius:8, marginBottom:10}}><label>Divisão Salarial (Eu pago {meta.wageSplit}%)</label><input type="range" style={{width:'100%'}} min="0" max="100" value={meta.wageSplit} onChange={e=>setMeta({...meta, wageSplit:e.target.value})} /><label>Opção de Compra</label><input className="input-field" type="number" value={meta.buyOpt} onChange={e=>setMeta({...meta, buyOpt:e.target.value})} /></div>}
                 {t==='TROCA' && <div><div style={{display:'flex', gap:5}}><button className={`btn ${meta.cashDir==='PAY'?'btn-blue':'btn-ghost'}`} onClick={()=>setMeta({...meta, cashDir:'PAY'})}>PAGAR</button><button className={`btn ${meta.cashDir==='RECEIVE'?'btn-blue':'btn-ghost'}`} onClick={()=>setMeta({...meta, cashDir:'RECEIVE'})}>RECEBER</button></div><label>Jogadores (Máx 3)</label><div style={{maxHeight:100, overflowY:'auto', background:'#222', padding:5}}>{myPlayers.map(p=><div key={p.id} onClick={()=>toggleSwap(p.id)} style={{padding:5, borderBottom:'1px solid #444', color:swaps.includes(p.id)?'var(--primary)':'#fff', cursor:'pointer'}}>{swaps.includes(p.id)?'✔ ':''}{p.name}</div>)}</div></div>}
@@ -588,7 +570,7 @@
             return <div><label>Nome</label><input className="input-field" value={form.name} onChange={e=>setF({...form, name:e.target.value})} /><label>Logo</label><input className="input-field" value={form.logo} onChange={e=>setF({...form, logo:e.target.value})} />{isAdmin && <label>Saldo (ADM)</label>} {isAdmin && <input className="input-field" type="number" value={form.balance} onChange={e=>setF({...form, balance:parseFloat(e.target.value)})} />}{isAdmin && <label>Série (ADM)</label>}{isAdmin && <select className="input-field" value={form.serie} onChange={e=>setF({...form, serie:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>{s}</option>)}</select>}<button className="btn btn-blue" onClick={()=>onUp(form)}>SALVAR</button><hr style={{borderColor:'#444'}}/><p>Estádio Nível {team.stadiumLevel||1}</p><button className="btn btn-purple" onClick={onUpgrade}>EVOLUIR (₣ {fmt(COSTS[team.stadiumLevel]||0).replace('₣ ','')})</button><hr style={{borderColor:'#444'}}/><button className="btn btn-green" onClick={()=>{const v=prompt("Valor");const m=prompt("Motivo"); if(v)onReq('INJECTION',v,m)}}>PEDIR INJEÇÃO</button><button className="btn btn-gold" onClick={()=>{const v=prompt("Valor");const m=prompt("Empresa"); if(v)onReq('SPONSORSHIP',v,m)}}>PEDIR PATROCÍNIO</button><button className="btn btn-red" onClick={()=>{const v=prompt("Valor a retirar:"); if(v){ const m=prompt("Motivo:"); if(m) onWithdraw(v, m); }}}>RETIRAR DINHEIRO</button></div>;
         };
 
-        const OffersScreen = ({ offers, onAccept, onReject, onCounter }) => (<div><h3>Propostas</h3>{offers.map(o=><div key={o.id} className="card" style={{borderLeft:'4px solid gold'}}><b style={{color:'var(--primary)'}}>{o.playerName}</b><br/><small>De: {o.buyerName}</small><p style={{background:'#333', padding:5, borderRadius:5, whiteSpace:'pre-wrap', fontSize:11}}>{o.description}</p><div style={{display:'flex', gap:5}}><button className="btn btn-green" onClick={()=>onAccept(o)}>ACEITAR</button><button className="btn btn-blue" onClick={()=>onCounter(o)}>CONTRA</button><button className="btn btn-red" onClick={()=>onReject(o.id)}>RECUSAR</button></div></div>)}</div>);
+        const OffersScreen = ({ offers, onAccept, onReject, onCounter }) => (<div><h3>Propostas</h3>{offers.map(o=><div key={o.id} className="card" style={{borderLeft:'4px solid gold'}}><b style={{color:'var(--primary)'}}>{o.playerName}</b><br/><small>De: {o.buyerName}</small><p style={{background:'#333', padding:5, borderRadius:5, whiteSpace:'pre-wrap', fontSize:11}}>{o.description}</p><div style={{display:'flex', gap:5}}><button className="btn btn-green" onClick={()=>onAccept(o)}>ACEITAR</button><button className="btn btn-blue" onClick={()=>onCounter(o)}>CONTRA</button><button className="btn btn-red" onClick={()=>onReject(o)}>RECUSAR</button></div></div>)}</div>);
         
         // --- NEW: COMPLETE RANKING SYSTEM ---
         const Ranking = ({ teams, players }) => {

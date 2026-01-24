@@ -65,6 +65,7 @@
         .rank-tabs::-webkit-scrollbar { display: none; }
         .rank-tab { background: #333; border: 1px solid #444; color: #888; padding: 8px 16px; border-radius: 20px; font-size: 12px; white-space: nowrap; cursor: pointer; transition: 0.2s; font-weight: bold; display: flex; align-items: center; gap: 5px; }
         .rank-tab.active { background: var(--primary); color: #000; border-color: var(--primary); box-shadow: 0 0 10px rgba(0,230,118,0.3); }
+        .rank-tab i { font-size: 14px; }
         .highlight-card { background: linear-gradient(135deg, #1a237e 0%, #0d47a1 100%); border: 1px solid var(--secondary); padding: 20px; text-align: center; margin-bottom: 15px; border-radius: 12px; position: relative; overflow: hidden; }
         .highlight-card::after { content: '★'; position: absolute; top: -10px; right: -10px; font-size: 100px; color: rgba(255,255,255,0.05); }
     </style>
@@ -73,20 +74,13 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // --- ERROR BOUNDARY ---
         class ErrorBoundary extends React.Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
             static getDerivedStateFromError(error) { return { hasError: true, error }; }
             componentDidCatch(error, errorInfo) { console.error("Crash:", error, errorInfo); }
-            render() {
-                if (this.state.hasError) {
-                    return <div className="error-screen"><h2>Ocorreu um erro!</h2><p>O aplicativo encontrou um problema inesperado.</p><button className="btn btn-red" onClick={()=>{localStorage.clear(); window.location.reload();}}>REINICIAR APLICATIVO</button></div>;
-                }
-                return this.props.children; 
-            }
+            render() { if (this.state.hasError) { return <div className="error-screen"><h2>Ocorreu um erro!</h2><p>O aplicativo encontrou um problema inesperado.</p><button className="btn btn-red" onClick={()=>{localStorage.clear(); window.location.reload();}}>REINICIAR APLICATIVO</button></div>; } return this.props.children; }
         }
 
-        // --- CONFIG ---
         const firebaseConfig = { apiKey: "AIzaSyBrtJFfWAqT0AZYHlm4it-noB5h9jIPJEI", authDomain: "gerenciador-de-times-matoreal.firebaseapp.com", projectId: "gerenciador-de-times-matoreal", storageBucket: "gerenciador-de-times-matoreal.firebasestorage.app", messagingSenderId: "29096266740", appId: "1:29096266740:web:ec48e7225c18c20dbc07a1" };
         try { if (!firebase.apps.length) firebase.initializeApp(firebaseConfig); } catch (e) { console.error(e); }
         const db = firebase.firestore();
@@ -95,32 +89,23 @@
         const POS = ['GOL', 'ZAG', 'LD', 'LE', 'VOL', 'MC', 'MEI', 'ATA'];
         const SERIES = ['A', 'B', 'C', 'D'];
         const COSTS = [0, 5000000, 20000000, 50000000, 100000000];
-
         const fmt = (v) => "₣ " + parseFloat(v||0).toLocaleString('pt-BR');
         const getPosColor = (p) => { if(!p) return '#555'; if(p==='GOL') return '#FFD700'; if(['ZAG','LD','LE'].some(x=>p.includes(x))) return '#2979FF'; if(['VOL','MC','MEI'].some(x=>p.includes(x))) return '#00E676'; return '#FF1744'; };
 
-        // --- HELPER: FORMAT OFFER DETAILS ---
         const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
             let details = [];
             if(v > 0) details.push(`💰 Valor: ${fmt(v)}`);
             if (meta.installments > 1) details.push(`📅 Parcelamento: ${meta.installments}x de ${fmt(v/meta.installments)}`);
             if (type !== 'TROCA') details.push(`📝 Contrato: ${con} Temporadas`);
             if (type === 'COMPRA' && meta.sellOn > 0) details.push(`📈 Revenda: ${meta.sellOn}% futura venda`);
-            if (type === 'EMPRESTIMO') {
-                details.push(`💸 Salários: Comprador paga ${meta.wageSplit}%`);
-                if (meta.buyOpt > 0) details.push(`🛒 Opção de Compra: ${fmt(meta.buyOpt)}`);
-            }
+            if (type === 'EMPRESTIMO') { details.push(`💸 Salários: Comprador paga ${meta.wageSplit}%`); if (meta.buyOpt > 0) details.push(`🛒 Opção de Compra: ${fmt(meta.buyOpt)}`); }
             if (type === 'TROCA') {
-                if (swapIds && swapIds.length > 0) {
-                    const swapNames = swapIds.map(id => players.find(p=>p.id===id)?.name).join(', ');
-                    details.push(`🔄 Troca por: ${swapNames}`);
-                }
+                if (swapIds && swapIds.length > 0) { const swapNames = swapIds.map(id => players.find(p=>p.id===id)?.name).join(', '); details.push(`🔄 Troca por: ${swapNames}`); }
                 if (v > 0) details.push(`💵 Volta: ${meta.cashDir === 'PAY' ? 'Eu pago' : 'Eu recebo'} ${fmt(v)}`);
             }
             return details.join('\n');
         };
 
-        // --- APP ---
         function App() {
             const [user, setUser] = useState(null); 
             const [teams, setTeams] = useState([]);
@@ -131,7 +116,6 @@
             const [conf, setConf] = useState({ marketOpen: true });
             const [papers, setPapers] = useState([]);
             const [journalists, setJournalists] = useState([]);
-            
             const [screen, setScreen] = useState('HOME');
             const [modal, setModal] = useState(null);
             const [loading, setLoading] = useState(true);
@@ -146,13 +130,7 @@
                     db.collection('financeRequests').onSnapshot(s => setReqs(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('newspapers').onSnapshot(s => setPapers(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('journalists').onSnapshot(s => setJournalists(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => {
-                        const list = s.docs.map(d => ({id:d.id, ...d.data()}));
-                        setNews(list);
-                        const lastRead = localStorage.getItem('lastRead');
-                        if (list.length && (!lastRead || list[0].date > parseInt(lastRead))) setNewNews(true);
-                        setLoading(false);
-                    })
+                    db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => { const list = s.docs.map(d => ({id:d.id, ...d.data()})); setNews(list); const lastRead = localStorage.getItem('lastRead'); if (list.length && (!lastRead || list[0].date > parseInt(lastRead))) setNewNews(true); setLoading(false); })
                 ];
                 return () => unsubs.forEach(u => u());
             }, []);
@@ -168,39 +146,20 @@
             const postNews = (text, type='normal') => db.collection('news').add({ text, type, date: Date.now() });
 
             const login = (id, pwd, type) => {
-                if (type === 'TEAM') {
-                    const t = teams.find(x => x.id === id);
-                    if (t && t.password === pwd) {
-                        if (t.status === 'PENDING') alert("⏳ Aguarde a Federação.");
-                        else { setUser({type:'USER', data:t}); setScreen('HOME'); }
-                    } else alert("Erro!");
-                } else if (type === 'PAPER') {
-                    const p = papers.find(x => x.id === id);
-                    if (p && p.password === pwd) {
-                        if (p.status === 'PENDING') alert("⏳ Aguarde a Federação.");
-                        else { setUser({type:'PRESS', data:p}); setScreen('PRESS_DASH'); }
-                    } else alert("Erro!");
-                } else if (type === 'JOURNALIST') {
-                    const j = journalists.find(x => x.id === id);
-                    if (j && j.password === pwd) {
-                        if (j.status === 'PENDING') alert("⏳ Aguarde o Dono do Jornal.");
-                        else { setUser({type:'PRESS_WORKER', data:j}); setScreen('PRESS_DASH'); }
-                    } else alert("Erro!");
-                }
+                if (type === 'TEAM') { const t = teams.find(x => x.id === id); if (t && t.password === pwd) { if (t.status === 'PENDING') alert("⏳ Aguarde a Federação."); else { setUser({type:'USER', data:t}); setScreen('HOME'); } } else alert("Erro!"); } 
+                else if (type === 'PAPER') { const p = papers.find(x => x.id === id); if (p && p.password === pwd) { if (p.status === 'PENDING') alert("⏳ Aguarde a Federação."); else { setUser({type:'PRESS', data:p}); setScreen('PRESS_DASH'); } } else alert("Erro!"); } 
+                else if (type === 'JOURNALIST') { const j = journalists.find(x => x.id === id); if (j && j.password === pwd) { if (j.status === 'PENDING') alert("⏳ Aguarde o Dono do Jornal."); else { setUser({type:'PRESS_WORKER', data:j}); setScreen('PRESS_DASH'); } } else alert("Erro!"); }
             };
 
             const loginAdmin = () => { setUser({ type: 'ADMIN', data: { id: 'admin', name: 'FEDERAÇÃO (ADM)', balance: 0, logo: null, stadiumLevel: 1, serie: 'ADM' } }); setScreen('HOME'); };
-
             const createTeam = async (name, bal, serie, pass, logo) => { if(teams.find(t=>t.name.toLowerCase()===name.toLowerCase())) return alert("Nome em uso!"); await db.collection('teams').add({ name, balance: parseFloat(bal), serie, password: pass, stadiumLevel: 1, logo: logo||null, status: 'PENDING' }); alert("Criado! Aguarde aprovação."); };
             const createNewspaper = async (name, pass, owner) => { await db.collection('newspapers').add({ name, password: pass, ownerName: owner, status: 'PENDING' }); alert("Jornal criado! Aguarde Federação."); };
             const createJournalist = async (name, pass, paperId) => { await db.collection('journalists').add({ name, password: pass, newspaperId: paperId, status: 'PENDING' }); alert("Conta criada! Aguarde seu Chefe."); };
-
             const approveTeam = async (teamId, finalBalance) => { await db.collection('teams').doc(teamId).update({ status: 'ACTIVE', balance: parseFloat(finalBalance) }); const t = teams.find(x=>x.id===teamId); postNews(`🛡️ **NOVO CLUBE!**\nO **${t.name}** foi aprovado na Série ${t.serie}.`, 'infra'); alert("Aprovado!"); };
             const deleteTeam = async (teamId) => { if(!confirm("⚠️ PERIGO: Excluir time e jogadores?")) return; const batch = db.batch(); batch.delete(db.collection('teams').doc(teamId)); const snap = await db.collection('players').where('teamId', '==', teamId).get(); snap.docs.forEach(doc => batch.delete(doc.ref)); await batch.commit(); postNews("🚫 **CLUBE EXTINTO**\nUm time encerrou atividades.", 'infra'); };
             const deletePaper = async (id) => { if(!confirm("Excluir Jornal e demitir jornalistas?")) return; const batch = db.batch(); batch.delete(db.collection('newspapers').doc(id)); const js = await db.collection('journalists').where('newspaperId', '==', id).get(); js.docs.forEach(d => batch.delete(d.ref)); await batch.commit(); alert("Jornal fechado!"); };
             const deleteJournalist = async (id) => { if(!confirm("Demitir Jornalista?")) return; await db.collection('journalists').doc(id).delete(); alert("Demitido!"); };
             const updateBalance = async (teamId, newBal) => { await db.collection('teams').doc(teamId).update({ balance: parseFloat(newBal) }); alert("Atualizado!"); };
-            
             const withdrawMoney = async (amount, reason) => { const val = parseFloat(amount.replace(',', '.')); if(isNaN(val) || val <= 0) return alert("Valor inválido!"); if(user.data.balance < val) return alert("Saldo insuficiente!"); await db.collection('teams').doc(user.data.id).update({ balance: firebase.firestore.FieldValue.increment(-val) }); postNews(`💸 **SAÍDA DE CAIXA**\nO **${user.data.name}** retirou ${fmt(val)}.\n📝 Motivo: ${reason}`, 'money-minus'); setModal(null); };
 
             const savePlayer = async (d) => {
@@ -209,60 +168,70 @@
                 if(d.id) {
                     const old = players.find(p=>p.id===d.id);
                     if(user.type==='USER') payload.stats = old.stats || payload.stats; 
-                    if(user.type==='ADMIN') {
-                        if(d.forcedTeamId && d.forcedTeamId !== old.teamId) { payload.teamId = d.forcedTeamId; payload.futureTransfer = firebase.firestore.FieldValue.delete(); postNews(`👮‍♂️ **INTERVENÇÃO**\nTransferência forçada de **${d.name}**!`, 'admin'); }
-                        if(payload.rating > 0 && payload.rating !== old.rating) { postNews(`⭐ **NOVA AVALIAÇÃO**\nA Federação atualizou a nota de **${d.name}** para **${payload.rating}**!`, 'admin'); }
-                    }
+                    if(user.type==='ADMIN') { if(d.forcedTeamId && d.forcedTeamId !== old.teamId) { payload.teamId = d.forcedTeamId; payload.futureTransfer = firebase.firestore.FieldValue.delete(); postNews(`👮‍♂️ **INTERVENÇÃO**\nTransferência forçada de **${d.name}**!`, 'admin'); } if(payload.rating > 0 && payload.rating !== old.rating) { postNews(`⭐ **NOVA AVALIAÇÃO**\nA Federação atualizou a nota de **${d.name}** para **${payload.rating}**!`, 'admin'); } }
                     await db.collection('players').doc(d.id).update(payload);
-                } else {
-                    await db.collection('players').add(payload);
-                    postNews(`🆕 **REFORÇO**\n${(teams.find(t=>t.id===payload.teamId)||{}).name} contrata **${d.name}**.`, 'transfer');
-                }
+                } else { await db.collection('players').add(payload); postNews(`🆕 **REFORÇO**\n${(teams.find(t=>t.id===payload.teamId)||{}).name} contrata **${d.name}**.`, 'transfer'); }
                 setModal(null);
             };
-
             const updateStats = async (pid, newStats) => { await db.collection('players').doc(pid).update({ stats: newStats }); alert("Estatísticas Atualizadas!"); setModal(null); };
-
+            // --- NEGOTIATION LOGIC REWORKED (FIXED TEXTS) ---
             const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
                 const v = parseFloat(value||0);
                 const detailText = formatOfferDetails(type, v, con, meta, swapIds, players);
                 
                 const actingTeamName = user.data.name; 
                 const targetPlayerName = target.name;
-                const ownerTeam = teams.find(t=>t.id===target.teamId);
-                const ownerTeamName = ownerTeam ? ownerTeam.name : 'Desconhecido';
+                const playerOwnerTeam = teams.find(t=>t.id===target.teamId)?.name || 'Desconhecido';
 
                 let headline = "";
                 let sellerId = null;
 
                 if (old && old.id) {
-                    headline = `🔄 **CONTRAPROPOSTA**\nO **${actingTeamName}** não concordou com os termos e fez uma contraoferta pelo **${targetPlayerName}**!`;
-                    sellerId = old.buyerId; 
+                    // COUNTER-OFFER: I am replying to someone who made an offer
+                    const originalProposer = teams.find(t=>t.id === old.buyerId)?.name;
+                    sellerId = old.buyerId; // The new "Seller" (recipient) is the one who proposed before
+                    
+                    if (user.data.id === target.teamId) {
+                        // I AM THE OWNER COUNTERING THE BUYER
+                        headline = `🔄 **CONTRAPROPOSTA**\nO **${actingTeamName}** (Dono) não gostou dos valores e pediu mais ao **${originalProposer}** pelo **${targetPlayerName}**!`;
+                    } else {
+                        // I AM THE BUYER COUNTERING THE OWNER (Tréplica)
+                        headline = `🔄 **NOVA OFERTA / TRÉPLICA**\nO **${actingTeamName}** insiste na negociação e enviou novos termos ao **${playerOwnerTeam}** por **${targetPlayerName}**!`;
+                    }
                 } else {
-                    headline = `🚨 **MERCADO AGITADO**\nO **${actingTeamName}** enviou uma proposta oficial ao **${ownerTeamName}** pelo jogador **${targetPlayerName}**!`;
+                    // FRESH PROPOSAL: I am buying from current owner
+                    headline = `🚨 **MERCADO AGITADO**\nO **${actingTeamName}** enviou uma proposta oficial ao **${playerOwnerTeam}** pelo jogador **${targetPlayerName}**!`;
                     sellerId = target.teamId;
                 }
 
-                if (!sellerId) { alert("ERRO: Não foi possível identificar o time vendedor."); return; }
+                if (!sellerId) { alert("ERRO: Vendedor não identificado."); return; }
 
                 const pl = { playerId: target.id, playerName: target.name, buyerId: user.data.id, buyerName: user.data.name, sellerId, type, value: v, swapPlayerIds: swapIds || [], offerContract: parseInt(con) || 1, description: detailText, meta: meta || {}, date: Date.now() };
-                
                 const b = db.batch(); 
                 if(old && old.id) b.delete(db.collection('offers').doc(old.id)); 
                 b.set(db.collection('offers').doc(), pl); 
                 await b.commit();
                 postNews(`${headline}\n\n📄 **Detalhes da Oferta:**\n${detailText}`, 'transfer'); 
-                setModal(null); 
-                alert("Enviada!");
+                setModal(null); alert("Enviada!");
             };
 
             const rejectOffer = async (o) => {
-                if(!confirm("Tem certeza que deseja recusar esta proposta?")) return;
-                const rejectedTeam = teams.find(t=>t.id===o.buyerId)?.name || 'Outro Time';
-                const rejectorTeam = user.data.name;
-                const text = `❌ **NEGOCIAÇÃO ENCERRADA**\nO **${rejectorTeam}** recusou a investida do **${rejectedTeam}** pelo jogador **${o.playerName}** e encerrou as conversas.`;
+                if(!confirm("Recusar esta proposta?")) return;
                 
-                // Force Update UI immediately
+                const actingTeamName = user.data.name;
+                const otherTeamName = teams.find(t=>t.id===o.buyerId)?.name || 'Outro Time';
+                const playerOwnerId = (players.find(p=>p.id===o.playerId)||{}).teamId;
+                
+                let text = "";
+                // If I am the owner rejecting a buy offer
+                if (user.data.id === playerOwnerId) {
+                    text = `❌ **NEGOCIAÇÃO FRACASSADA**\nO **${actingTeamName}** fez jogo duro e recusou a investida do **${otherTeamName}** pelo jogador **${o.playerName}**.`;
+                } else {
+                    // If I am the buyer rejecting a counter-offer from owner
+                    text = `❌ **RETIRADA**\nO **${actingTeamName}** não aceitou a contraproposta do **${otherTeamName}** e encerrou as negociações por **${o.playerName}**.`;
+                }
+
+                // UI UPDATE (Prevent Ghost)
                 setOffers(prev => prev.filter(off => off.id !== o.id));
                 
                 await db.collection('offers').doc(o.id).delete();
@@ -299,7 +268,6 @@
                     newsText = `🔀 **TROCA BOMBÁSTICA**\n**${buy.name}** e **${sel.name}** chegaram a um acordo e trocaram jogadores!`;
                 }
                 
-                // Force remove offer from UI
                 setOffers(prev => prev.filter(off => off.id !== o.id));
                 b.delete(db.collection('offers').doc(o.id));
                 await b.commit();
@@ -307,7 +275,7 @@
             };
 
             const renewContract = async (p) => {
-                const cost = (p.value || 1000000) * 0.10; // 10% do valor de mercado
+                const cost = (p.value || 1000000) * 0.10; 
                 if(user.data.balance < cost) return alert(`Sem saldo para luvas (Custo: ${fmt(cost)})`);
                 if(!confirm(`Renovar com ${p.name} por +1 ano?\nCusto: ${fmt(cost)}`)) return;
                 const b = db.batch();
@@ -326,6 +294,7 @@
                 }
                 if(act==='SEASON') { if(!confirm("Virar?")) return; setLoading(true); const b = db.batch(); players.forEach(p => { let u={}; if(p.futureTransfer){u=p.futureTransfer; u.futureTransfer=firebase.firestore.FieldValue.delete();} else if((p.contract<=1||p.contract===0)&&p.preContract){u.teamId=p.preContract.teamId; u.contract=1; u.status='NAO_A_VENDA'; u.preContract=firebase.firestore.FieldValue.delete();} else { let nc=(p.contract||0)-1; if(nc<0)nc=0; u.contract=nc; if(nc===0)u.status='EXPIRADO'; } b.update(db.collection('players').doc(p.id), u); }); await b.commit(); setLoading(false); postNews("🌞 NOVA TEMPORADA", 'season'); alert("Ok"); }
             };
+
             // --- RENDER ---
             if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
             if(!user) return <LoginScreen teams={teams} papers={papers} journalists={journalists} onLogin={login} onCreateTeam={createTeam} onCreatePaper={createNewspaper} onCreateJourno={createJournalist} onAdmin={loginAdmin} onVisitor={()=>{setUser({type:'VISITOR'}); setScreen('RANKING');}} />;
@@ -337,7 +306,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.41.3</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.41.4</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -350,26 +319,11 @@
 
                     <div className="container">
                         {screen === 'HOME' && user.type === 'ADMIN' && <AdminPanel teams={teams} papers={papers} journalists={journalists} reqs={reqs} config={conf} onAct={async(a,d)=>{ if(a==='MARKET')db.collection('config').doc('system').update({marketOpen:d}); if(a==='SEASON'){/*Season logic*/} }} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{/*Fin logic*/}} onReject={(id)=>db.collection('financeRequests').doc(id).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam} onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} onDeletePaper={deletePaper} onDeleteJourno={deleteJournalist} onRejectPaper={(id)=>db.collection('newspapers').doc(id).delete()} onConfig={(t)=>setModal({type:'SETTINGS', data:t})} />}
-                        
                         {screen === 'HOME' && user.type === 'USER' && <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />}
-                        
                         {screen === 'HOME' && user.type === 'VISITOR' && <VisitorDashboard players={players} teams={teams} />}
-
-                        {screen === 'PRESS_DASH' && (user.type==='PRESS' || user.type==='PRESS_WORKER') && (
-                            <div>
-                                <h3>Painel de Imprensa ({user.data.name})</h3>
-                                <div className="card">
-                                    <button className="btn btn-blue" onClick={()=>setModal({type:'POST_NEWS'})}>ESCREVER NOTÍCIA</button>
-                                    <button className="btn btn-purple" onClick={()=>setModal({type:'STATS_SEARCH'})}>SÚMULA / ESTATÍSTICAS</button>
-                                </div>
-                                {user.type==='PRESS' && journalists.filter(j=>j.newspaperId===user.data.id && j.status==='PENDING').map(j=><div key={j.id} className="card">{j.name}<button className="btn btn-green" onClick={()=>db.collection('journalists').doc(j.id).update({status:'ACTIVE'})}>APROVAR</button></div>)}
-                            </div>
-                        )}
-
+                        {screen === 'PRESS_DASH' && (user.type==='PRESS' || user.type==='PRESS_WORKER') && (<div><h3>Painel de Imprensa ({user.data.name})</h3><div className="card"><button className="btn btn-blue" onClick={()=>setModal({type:'POST_NEWS'})}>ESCREVER NOTÍCIA</button><button className="btn btn-purple" onClick={()=>setModal({type:'STATS_SEARCH'})}>SÚMULA / ESTATÍSTICAS</button></div>{user.type==='PRESS' && journalists.filter(j=>j.newspaperId===user.data.id && j.status==='PENDING').map(j=><div key={j.id} className="card">{j.name}<button className="btn btn-green" onClick={()=>db.collection('journalists').doc(j.id).update({status:'ACTIVE'})}>APROVAR</button></div>)}</div>)}
                         {screen === 'ADMIN_TEAM' && adminTeam && <div><button className="btn" style={{background:'#333', marginBottom:10}} onClick={()=>{setAdminTeam(null); setScreen('HOME');}}>⬅ VOLTAR</button><h3 style={{color:'var(--purple)'}}>Editando: {adminTeam.name}</h3><TeamDashboard team={adminTeam} players={players.filter(p=>p.teamId===adminTeam.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} /></div>}
-
                         {screen === 'MARKET' && <Market me={user.data?.id} teams={teams} players={players} open={conf.marketOpen} isVis={user.type==='VISITOR'} onNeg={(p)=>setModal({type:'OFFER', data:p})} onPayClause={async(p)=>{/*Clause logic*/}} onPre={async(p)=>{/*Pre logic*/}} />}
-
                         {screen === 'RANKING' && <Ranking teams={teams} players={players} />}
                         {screen === 'NEWS' && <div><h3>Notícias</h3>{news.map(n=><div key={n.id} className={`news-card news-${n.type}`}>{n.text}<br/><small style={{color:'#666'}}>{new Date(n.date).toLocaleString()}</small></div>)}</div>}
                         {screen === 'OFFERS' && <OffersScreen offers={offers} onAccept={acceptOffer} onReject={rejectOffer} onCounter={(o)=>setModal({type:'OFFER', data:{...players.find(p=>p.id===o.playerId), oldOffer:o}})} />}
@@ -402,7 +356,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.41.3</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.41.4</div>
                     <div className="login-tabs"><div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div><div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR</div><div className={`tab ${tab==='PRESS'?'active':''}`} onClick={()=>setTab('PRESS')}>IMPRENSA</div></div>
                     {tab==='LOGIN' && <div>{(teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}<div style={{marginTop:20}}><button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button><button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button></div></div>}
                     {tab==='CREATE' && <div><input type="file" className="file-input" onChange={handleUpload} /><input className="input-field" placeholder="Nome" value={f.n} onChange={e=>setF({...f, n:e.target.value})} /><input className="input-field" type="number" placeholder="Saldo" value={f.b} onChange={e=>setF({...f, b:e.target.value})} /><select className="input-field" value={f.s} onChange={e=>setF({...f, s:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>Série {s}</option>)}</select><input className="input-field" type="number" placeholder="Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} /><button className="btn btn-green" onClick={()=>onCreateTeam(f.n, f.b, f.s, f.p, f.l)}>CRIAR</button></div>}
@@ -421,20 +375,7 @@
             const topAssist = players.sort((a,b)=>(b.stats?.assists||0)-(a.stats?.assists||0))[0];
             return (
                 <div>
-                    <div className="highlight-card">
-                        <h2 style={{margin:0, color:'var(--primary)'}}>Jornal do Dia</h2>
-                        <small>Resumo da Temporada</small>
-                        <div style={{marginTop:15, textAlign:'left'}}>
-                            <div style={{marginBottom:10}}>
-                                <span style={{color:'#aaa', fontSize:10, textTransform:'uppercase'}}>Artilheiro</span>
-                                <div style={{fontWeight:'bold', fontSize:16}}>⚽ {topScorer?.name || 'Ninguém'} <span style={{color:'var(--primary)'}}>{topScorer?.stats?.goals||0} Gols</span></div>
-                            </div>
-                            <div>
-                                <span style={{color:'#aaa', fontSize:10, textTransform:'uppercase'}}>Rei das Assistências</span>
-                                <div style={{fontWeight:'bold', fontSize:16}}>👟 {topAssist?.name || 'Ninguém'} <span style={{color:'var(--secondary)'}}>{topAssist?.stats?.assists||0} Assis</span></div>
-                            </div>
-                        </div>
-                    </div>
+                    <div className="highlight-card"><h2 style={{margin:0, color:'var(--primary)'}}>Jornal do Dia</h2><small>Resumo da Temporada</small><div style={{marginTop:15, textAlign:'left'}}><div style={{marginBottom:10}}><span style={{color:'#aaa', fontSize:10, textTransform:'uppercase'}}>Artilheiro</span><div style={{fontWeight:'bold', fontSize:16}}>⚽ {topScorer?.name || 'Ninguém'} <span style={{color:'var(--primary)'}}>{topScorer?.stats?.goals||0} Gols</span></div></div><div><span style={{color:'#aaa', fontSize:10, textTransform:'uppercase'}}>Rei das Assistências</span><div style={{fontWeight:'bold', fontSize:16}}>👟 {topAssist?.name || 'Ninguém'} <span style={{color:'var(--secondary)'}}>{topAssist?.stats?.assists||0} Assis</span></div></div></div></div>
                     <div style={{textAlign:'center', color:'#666'}}>Use o menu abaixo para navegar.</div>
                 </div>
             );
@@ -447,14 +388,7 @@
                     <div key={p.id} className="card" onClick={()=>!isVisitor && onEdit(p)} style={{cursor: isVisitor?'default':'pointer'}}>
                         <div style={{display:'flex', justifyContent:'space-between'}}><div><span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span><b>{p.name}</b> {p.rating > 0 && <span className="rating-badge">★ {p.rating}</span>}</div><span className="player-ov">{p.overall}</span></div>
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', fontSize:11, color:'#aaa', marginTop:5}}><div>Sal: {fmt(p.salary)}</div><div>Val: {fmt(p.value)}</div><div>Con: {p.contract}</div><div>Mul: {fmt(p.clause)}</div></div>
-                        <div className="stats-grid">
-                            <div className="stat-item"><span className="stat-lbl">⚽</span><span className="stat-val">{p.stats?.goals||0}</span></div>
-                            <div className="stat-item"><span className="stat-lbl">👟</span><span className="stat-val">{p.stats?.assists||0}</span></div>
-                            <div className="stat-item"><span className="stat-lbl">🛡️</span><span className="stat-val">{p.stats?.tackles||0}</span></div>
-                            <div className="stat-item"><span className="stat-lbl">🧤</span><span className="stat-val">{p.stats?.saves||0}</span></div>
-                            <div className="stat-item"><span className="stat-lbl">🟨</span><span className="stat-val">{p.stats?.yellows||0}</span></div>
-                            <div className="stat-item"><span className="stat-lbl">🟥</span><span className="stat-val">{p.stats?.reds||0}</span></div>
-                        </div>
+                        <div className="stats-grid"><div className="stat-item"><span className="stat-lbl">⚽</span><span className="stat-val">{p.stats?.goals||0}</span></div><div className="stat-item"><span className="stat-lbl">👟</span><span className="stat-val">{p.stats?.assists||0}</span></div><div className="stat-item"><span className="stat-lbl">🛡️</span><span className="stat-val">{p.stats?.tackles||0}</span></div><div className="stat-item"><span className="stat-lbl">🧤</span><span className="stat-val">{p.stats?.saves||0}</span></div><div className="stat-item"><span className="stat-lbl">🟨</span><span className="stat-val">{p.stats?.yellows||0}</span></div><div className="stat-item"><span className="stat-lbl">🟥</span><span className="stat-val">{p.stats?.reds||0}</span></div></div>
                     </div>
                 ))}
             </div>
@@ -463,9 +397,7 @@
         const StatsEditor = ({ players, teams, onSave }) => {
             const [search, setSearch] = useState(''); const [selP, setSelP] = useState(null); const [s, setS] = useState({});
             const filtered = players.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
-            if (selP) return (
-                <div><h3>Editando: {selP.name}</h3><div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}><div><label>Gols</label><input className="input-field" type="number" value={s.goals} onChange={e=>setS({...s, goals:parseInt(e.target.value)})} /></div><div><label>Assistências</label><input className="input-field" type="number" value={s.assists} onChange={e=>setS({...s, assists:parseInt(e.target.value)})} /></div><div><label>Desarmes</label><input className="input-field" type="number" value={s.tackles} onChange={e=>setS({...s, tackles:parseInt(e.target.value)})} /></div><div><label>Defesas</label><input className="input-field" type="number" value={s.saves} onChange={e=>setS({...s, saves:parseInt(e.target.value)})} /></div><div><label>Amarelos</label><input className="input-field" type="number" value={s.yellows} onChange={e=>setS({...s, yellows:parseInt(e.target.value)})} /></div><div><label>Vermelhos</label><input className="input-field" type="number" value={s.reds} onChange={e=>setS({...s, reds:parseInt(e.target.value)})} /></div></div><button className="btn btn-green" onClick={()=>onSave(selP.id, s)}>SALVAR ESTATÍSTICAS</button><button className="btn" onClick={()=>setSelP(null)}>VOLTAR</button></div>
-            );
+            if (selP) return ( <div><h3>Editando: {selP.name}</h3><div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}><div><label>Gols</label><input className="input-field" type="number" value={s.goals} onChange={e=>setS({...s, goals:parseInt(e.target.value)})} /></div><div><label>Assistências</label><input className="input-field" type="number" value={s.assists} onChange={e=>setS({...s, assists:parseInt(e.target.value)})} /></div><div><label>Desarmes</label><input className="input-field" type="number" value={s.tackles} onChange={e=>setS({...s, tackles:parseInt(e.target.value)})} /></div><div><label>Defesas</label><input className="input-field" type="number" value={s.saves} onChange={e=>setS({...s, saves:parseInt(e.target.value)})} /></div><div><label>Amarelos</label><input className="input-field" type="number" value={s.yellows} onChange={e=>setS({...s, yellows:parseInt(e.target.value)})} /></div><div><label>Vermelhos</label><input className="input-field" type="number" value={s.reds} onChange={e=>setS({...s, reds:parseInt(e.target.value)})} /></div></div><button className="btn btn-green" onClick={()=>onSave(selP.id, s)}>SALVAR ESTATÍSTICAS</button><button className="btn" onClick={()=>setSelP(null)}>VOLTAR</button></div> );
             return (<div><input className="input-field" placeholder="Buscar jogador..." value={search} onChange={e=>setSearch(e.target.value)} /><div style={{maxHeight:300, overflowY:'auto'}}>{search.length > 0 && filtered.map(p => (<div key={p.id} className="card" onClick={()=>{setSelP(p); setS(p.stats || {goals:0,assists:0,tackles:0,saves:0,yellows:0,reds:0})}}><b>{p.name}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small></div>))}</div></div>);
         };
 
@@ -516,14 +448,7 @@
                         <div key={p.id} className="card">
                             <div style={{display:'flex', justifyContent:'space-between'}}><div><span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span>{p.name} {p.rating>0 && <span className="rating-badge">★ {p.rating}</span>}</div><span className="player-ov">{p.overall}</span></div>
                             <div style={{fontSize:11, color:'#aaa', marginTop:5}}>{view==='GLOBAL' && <div>Time: {teams.find(t=>t.id===p.teamId)?.name}</div>}<div>Val: {fmt(p.value)} | Con: {p.contract}</div></div>
-                            <div className="stats-grid">
-                                <div className="stat-item"><span className="stat-lbl">⚽</span><span className="stat-val">{p.stats?.goals||0}</span></div>
-                                <div className="stat-item"><span className="stat-lbl">👟</span><span className="stat-val">{p.stats?.assists||0}</span></div>
-                                <div className="stat-item"><span className="stat-lbl">🛡️</span><span className="stat-val">{p.stats?.tackles||0}</span></div>
-                                <div className="stat-item"><span className="stat-lbl">🧤</span><span className="stat-val">{p.stats?.saves||0}</span></div>
-                                <div className="stat-item"><span className="stat-lbl">🟨</span><span className="stat-val">{p.stats?.yellows||0}</span></div>
-                                <div className="stat-item"><span className="stat-lbl">🟥</span><span className="stat-val">{p.stats?.reds||0}</span></div>
-                            </div>
+                            <div className="stats-grid"><div className="stat-item"><span className="stat-lbl">⚽</span><span className="stat-val">{p.stats?.goals||0}</span></div><div className="stat-item"><span className="stat-lbl">👟</span><span className="stat-val">{p.stats?.assists||0}</span></div><div className="stat-item"><span className="stat-lbl">🛡️</span><span className="stat-val">{p.stats?.tackles||0}</span></div><div className="stat-item"><span className="stat-lbl">🧤</span><span className="stat-val">{p.stats?.saves||0}</span></div><div className="stat-item"><span className="stat-lbl">🟨</span><span className="stat-val">{p.stats?.yellows||0}</span></div><div className="stat-item"><span className="stat-lbl">🟥</span><span className="stat-val">{p.stats?.reds||0}</span></div></div>
                             {!isVis && <div style={{marginTop:5, display:'flex', gap:5}}>{(open || p.status==='EMPRESTIMO') && p.status!=='INTRANSFERIVEL' ? <button className="btn btn-purple" style={{width:'auto', flex:1}} onClick={()=>onNeg(p)}>NEGOCIAR</button> : <button className="btn btn-ghost" style={{width:'auto', flex:1}} disabled>BLOQUEADO</button>}{p.clause>0 && <button className="btn btn-gold" style={{width:'auto'}} onClick={()=>onPayClause(p)}>MULTA</button>}{p.contract<=1 && !p.preContract && <button className="btn btn-blue" style={{width:'auto'}} onClick={()=>onPre(p)}>PRÉ</button>}</div>}
                         </div>
                     ))}
@@ -538,13 +463,7 @@
                 <div className="modal-bg"><div className="modal-card"><h3>Negociar {target.name}</h3>
                 <div style={{display:'flex', gap:5, marginBottom:10}}>{['COMPRA','EMPRESTIMO','TROCA'].map(x=><button key={x} className={`btn ${t===x?'btn-green':'btn-ghost'}`} onClick={()=>setT(x)}>{x}</button>)}</div>
                 <label>Valor {t==='TROCA' ? `(${meta.cashDir==='PAY'?'Eu pago':'Eu recebo'})` : ''}</label><input className="input-field" type="number" value={v} onChange={e=>setV(e.target.value)} />
-                {t==='COMPRA' && (
-                    <div style={{background:'#222', padding:10, borderRadius:8, marginBottom:10}}>
-                        <label>Parcelas (Semanas): {meta.installments || 1}</label>
-                        <input type="range" min="1" max="10" value={meta.installments || 1} onChange={e=>setMeta({...meta, installments:e.target.value})} style={{width:'100%'}} />
-                        {meta.installments > 1 && <div style={{fontSize:11, color:'var(--warning)', marginTop:5}}> {meta.installments}x de {fmt(v/meta.installments)}</div>}
-                    </div>
-                )}
+                {t==='COMPRA' && ( <div style={{background:'#222', padding:10, borderRadius:8, marginBottom:10}}><label>Parcelas (Semanas): {meta.installments || 1}</label><input type="range" min="1" max="10" value={meta.installments || 1} onChange={e=>setMeta({...meta, installments:e.target.value})} style={{width:'100%'}} />{meta.installments > 1 && <div style={{fontSize:11, color:'var(--warning)', marginTop:5}}> {meta.installments}x de {fmt(v/meta.installments)}</div>}</div> )}
                 {t==='COMPRA' && <div><label>Revenda: {meta.sellOn}%</label><input type="range" style={{width:'100%'}} min="0" max="50" value={meta.sellOn} onChange={e=>setMeta({...meta, sellOn:e.target.value})} /></div>}
                 {t==='EMPRESTIMO' && <div style={{background:'#333', padding:10, borderRadius:8, marginBottom:10}}><label>Divisão Salarial (Eu pago {meta.wageSplit}%)</label><input type="range" style={{width:'100%'}} min="0" max="100" value={meta.wageSplit} onChange={e=>setMeta({...meta, wageSplit:e.target.value})} /><label>Opção de Compra</label><input className="input-field" type="number" value={meta.buyOpt} onChange={e=>setMeta({...meta, buyOpt:e.target.value})} /></div>}
                 {t==='TROCA' && <div><div style={{display:'flex', gap:5}}><button className={`btn ${meta.cashDir==='PAY'?'btn-blue':'btn-ghost'}`} onClick={()=>setMeta({...meta, cashDir:'PAY'})}>PAGAR</button><button className={`btn ${meta.cashDir==='RECEIVE'?'btn-blue':'btn-ghost'}`} onClick={()=>setMeta({...meta, cashDir:'RECEIVE'})}>RECEBER</button></div><label>Jogadores (Máx 3)</label><div style={{maxHeight:100, overflowY:'auto', background:'#222', padding:5}}>{myPlayers.map(p=><div key={p.id} onClick={()=>toggleSwap(p.id)} style={{padding:5, borderBottom:'1px solid #444', color:swaps.includes(p.id)?'var(--primary)':'#fff', cursor:'pointer'}}>{swaps.includes(p.id)?'✔ ':''}{p.name}</div>)}</div></div>}
@@ -572,54 +491,11 @@
 
         const OffersScreen = ({ offers, onAccept, onReject, onCounter }) => (<div><h3>Propostas</h3>{offers.map(o=><div key={o.id} className="card" style={{borderLeft:'4px solid gold'}}><b style={{color:'var(--primary)'}}>{o.playerName}</b><br/><small>De: {o.buyerName}</small><p style={{background:'#333', padding:5, borderRadius:5, whiteSpace:'pre-wrap', fontSize:11}}>{o.description}</p><div style={{display:'flex', gap:5}}><button className="btn btn-green" onClick={()=>onAccept(o)}>ACEITAR</button><button className="btn btn-blue" onClick={()=>onCounter(o)}>CONTRA</button><button className="btn btn-red" onClick={()=>onReject(o)}>RECUSAR</button></div></div>)}</div>);
         
-        // --- NEW: COMPLETE RANKING SYSTEM ---
         const Ranking = ({ teams, players }) => {
-            const [view, setView] = useState('TEAMS'); // TEAMS, GOALS, ASSIST, SAVES, OVERALL, SALARY, YEL, RED
-            
+            const [view, setView] = useState('TEAMS');
             const renderTeams = () => teams.filter(t=>t.status!=='PENDING').map(t=>{ const sv=players.filter(p=>p.teamId===t.id).reduce((a,b)=>a+(b.value||0),0); return {...t, w: t.balance+sv, sv}}).sort((a,b)=>b.w-a.w).map((t,i)=><div key={t.id} className="card" style={{display:'flex', alignItems:'center', gap:10}}><b style={{fontSize:20, color:'#555', width:30}}>{i+1}</b>{t.logo?<img src={t.logo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/>:<div style={{width:30}}></div>}<div style={{flex:1}}><b>{t.name}</b><br/><small style={{color:'var(--primary)'}}>Patrimônio: {fmt(t.w)}</small><br/><small style={{fontSize:9, color:'#888'}}>Caixa: {fmt(t.balance)} | Elenco: {fmt(t.sv)}</small></div></div>);
-            
-            const renderPlayers = (sortKey, label, color, isStat=true) => {
-                // Sorter
-                let sorted = [];
-                if(isStat) sorted = players.filter(p=>p.stats && p.stats[sortKey] > 0).sort((a,b)=>b.stats[sortKey]-a.stats[sortKey]);
-                else sorted = players.sort((a,b)=>b[sortKey]-a[sortKey]);
-
-                return sorted.map((p,i)=>(
-                    <div key={p.id} className="card" style={{display:'flex', alignItems:'center', gap:10}}>
-                        <b style={{fontSize:20, color:'#555', width:30}}>{i+1}</b>
-                        <div style={{flex:1}}><b>{p.name}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small></div>
-                        <div style={{fontWeight:'bold', fontSize:14, color:color}}>
-                            {label} {isStat ? p.stats[sortKey] : (sortKey==='salary' ? fmt(p[sortKey]) : p[sortKey])}
-                        </div>
-                    </div>
-                ));
-            };
-
-            return (
-                <div>
-                    <h3>Ranking e Estatísticas</h3>
-                    <div className="rank-tabs">
-                        <div className={`rank-tab ${view==='TEAMS'?'active':''}`} onClick={()=>setView('TEAMS')}>💰 Clubes</div>
-                        <div className={`rank-tab ${view==='OVERALL'?'active':''}`} onClick={()=>setView('OVERALL')}>⭐ Craques</div>
-                        <div className={`rank-tab ${view==='SALARY'?'active':''}`} onClick={()=>setView('SALARY')}>💸 Salários</div>
-                        <div className={`rank-tab ${view==='GOALS'?'active':''}`} onClick={()=>setView('GOALS')}>⚽ Artilheiros</div>
-                        <div className={`rank-tab ${view==='ASSIST'?'active':''}`} onClick={()=>setView('ASSIST')}>👟 Garçons</div>
-                        <div className={`rank-tab ${view==='TACKLES'?'active':''}`} onClick={()=>setView('TACKLES')}>🛡️ Desarmes</div>
-                        <div className={`rank-tab ${view==='SAVES'?'active':''}`} onClick={()=>setView('SAVES')}>🧤 Paredões</div>
-                        <div className={`rank-tab ${view==='YEL'?'active':''}`} onClick={()=>setView('YEL')}>🟨 Amarelos</div>
-                        <div className={`rank-tab ${view==='RED'?'active':''}`} onClick={()=>setView('RED')}>🟥 Vermelhos</div>
-                    </div>
-                    {view==='TEAMS' && renderTeams()}
-                    {view==='OVERALL' && renderPlayers('overall', 'Ov:', 'var(--warning)', false)}
-                    {view==='SALARY' && renderPlayers('salary', '', 'var(--primary)', false)}
-                    {view==='GOALS' && renderPlayers('goals', '⚽', '#fff')}
-                    {view==='ASSIST' && renderPlayers('assists', '👟', '#fff')}
-                    {view==='TACKLES' && renderPlayers('tackles', '🛡️', '#fff')}
-                    {view==='SAVES' && renderPlayers('saves', '🧤', '#fff')}
-                    {view==='YEL' && renderPlayers('yellows', '🟨', 'yellow')}
-                    {view==='RED' && renderPlayers('reds', '🟥', 'red')}
-                </div>
-            );
+            const renderPlayers = (sortKey, label, color, isStat=true) => { let sorted = []; if(isStat) sorted = players.filter(p=>p.stats && p.stats[sortKey] > 0).sort((a,b)=>b.stats[sortKey]-a.stats[sortKey]); else sorted = players.sort((a,b)=>b[sortKey]-a[sortKey]); return sorted.map((p,i)=>(<div key={p.id} className="card" style={{display:'flex', alignItems:'center', gap:10}}><b style={{fontSize:20, color:'#555', width:30}}>{i+1}</b><div style={{flex:1}}><b>{p.name}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small></div><div style={{fontWeight:'bold', fontSize:14, color:color}}>{label} {isStat ? p.stats[sortKey] : (sortKey==='salary' ? fmt(p[sortKey]) : p[sortKey])}</div></div>)); };
+            return (<div><h3>Ranking e Estatísticas</h3><div className="rank-tabs"><div className={`rank-tab ${view==='TEAMS'?'active':''}`} onClick={()=>setView('TEAMS')}>💰 Clubes</div><div className={`rank-tab ${view==='OVERALL'?'active':''}`} onClick={()=>setView('OVERALL')}>⭐ Craques</div><div className={`rank-tab ${view==='SALARY'?'active':''}`} onClick={()=>setView('SALARY')}>💸 Salários</div><div className={`rank-tab ${view==='GOALS'?'active':''}`} onClick={()=>setView('GOALS')}>⚽ Artilheiros</div><div className={`rank-tab ${view==='ASSIST'?'active':''}`} onClick={()=>setView('ASSIST')}>👟 Garçons</div><div className={`rank-tab ${view==='TACKLES'?'active':''}`} onClick={()=>setView('TACKLES')}>🛡️ Desarmes</div><div className={`rank-tab ${view==='SAVES'?'active':''}`} onClick={()=>setView('SAVES')}>🧤 Paredões</div><div className={`rank-tab ${view==='YEL'?'active':''}`} onClick={()=>setView('YEL')}>🟨 Amarelos</div><div className={`rank-tab ${view==='RED'?'active':''}`} onClick={()=>setView('RED')}>🟥 Vermelhos</div></div>{view==='TEAMS' && renderTeams()}{view==='OVERALL' && renderPlayers('overall', 'Ov:', 'var(--warning)', false)}{view==='SALARY' && renderPlayers('salary', '', 'var(--primary)', false)}{view==='GOALS' && renderPlayers('goals', '⚽', '#fff')}{view==='ASSIST' && renderPlayers('assists', '👟', '#fff')}{view==='TACKLES' && renderPlayers('tackles', '🛡️', '#fff')}{view==='SAVES' && renderPlayers('saves', '🧤', '#fff')}{view==='YEL' && renderPlayers('yellows', '🟨', 'yellow')}{view==='RED' && renderPlayers('reds', '🟥', 'red')}</div>);
         };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));

@@ -264,15 +264,50 @@
             const updateStats = async (pid, newStats) => { await db.collection('players').doc(pid).update({ stats: newStats }); alert("Estatísticas Atualizadas!"); setModal(null); };
 
             const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
-                const v = parseFloat(value||0); let desc = "";
-                if(type==='COMPRA') desc = `Compra: ${fmt(v)} | ${con} Anos` + (meta?.sellOn > 0 ? `\n+${meta.sellOn}% Revenda` : '');
-                if(type==='EMPRESTIMO') desc = `Emp: ${fmt(v)} | ${con} Temp` + (meta?.buyOpt > 0 ? `\nOpção: ${fmt(meta.buyOpt)}` : '');
-                if(type==='TROCA') { const names = (swapIds||[]).map(id => players.find(p=>p.id===id)?.name).join(', '); desc = `Troca: ${names}\n${meta?.cashDir === 'PAY' ? 'Eu pago' : 'Eu recebo'}: ${fmt(v)}`; }
+                const v = parseFloat(value||0);
                 
-                // --- FIX: CORRECT SELLER ID LOGIC ---
-                // If it's a counter (old exists), the Seller is the one who MADE the previous offer (old.buyerId)
-                // If it's a new offer, the Seller is the team that owns the player (target.teamId)
+                // --- RICH DETAIL GENERATION ---
+                let details = [];
+                // Basics
+                details.push(`💰 Valor: ${fmt(v)}`);
+                if (meta.installments > 1) details.push(`📅 Parcelamento: ${meta.installments}x de ${fmt(v/meta.installments)}`);
+                if (type !== 'TROCA') details.push(`📝 Contrato: ${con} Temporadas`);
+                
+                // Clauses
+                if (type === 'COMPRA' && meta.sellOn > 0) details.push(`📈 Cláusula de Revenda: ${meta.sellOn}%`);
+                
+                // Loan specifics
+                if (type === 'EMPRESTIMO') {
+                    details.push(`💸 Salário: Você paga ${meta.wageSplit}%`);
+                    if (meta.buyOpt > 0) details.push(`🛒 Opção de Compra: ${fmt(meta.buyOpt)}`);
+                }
+                
+                // Swap specifics
+                if (type === 'TROCA') {
+                    if (swapIds.length > 0) {
+                        const swapNames = swapIds.map(id => players.find(p=>p.id===id)?.name).join(', ');
+                        details.push(`🔄 Jogadores na Troca: ${swapNames}`);
+                    }
+                    if (v > 0) details.push(`💵 Volta em Dinheiro: ${meta.cashDir === 'PAY' ? 'Eu pago' : 'Eu recebo'} ${fmt(v)}`);
+                }
+
+                // Final description text
+                const desc = details.join('\n');
+
+                // Determine Logic Sellers/Buyers
+                // If OLD exists (Counter), the 'SellerId' is the one who MADE the previous offer (old.buyerId)
                 const realSellerId = (old && old.buyerId) ? old.buyerId : target.teamId;
+                const realBuyerName = user.data.name; 
+                
+                // News Headline Construction
+                let headline = "";
+                if (old) {
+                    headline = `🔄 **RÉPLICA / CONTRAPROPOSTA**\n${realBuyerName} não aceitou os termos anteriores e enviou uma nova proposta por **${target.name}**!`;
+                } else {
+                    if (type === 'COMPRA') headline = `🚨 **MERCADO AGITADO**\n${realBuyerName} enviou uma oferta oficial por **${target.name}**!`;
+                    else if (type === 'EMPRESTIMO') headline = `⏳ **PEDIDO DE EMPRÉSTIMO**\n${realBuyerName} tem interesse em contar com **${target.name}** por empréstimo.`;
+                    else headline = `🔀 **PROPOSTA DE TROCA**\n${realBuyerName} propôs uma troca envolvendo **${target.name}**.`;
+                }
 
                 const pl = { 
                     playerId: target.id, playerName: target.name, 
@@ -286,9 +321,10 @@
                 if(old && old.id) b.delete(db.collection('offers').doc(old.id)); 
                 b.set(db.collection('offers').doc(), pl); 
                 await b.commit();
-                postNews(`🚨 **PROPOSTA**\n${user.data.name} > **${target.name}**\n${desc}`, 'transfer'); 
+                
+                postNews(`${headline}\n\n${desc}`, 'transfer'); 
                 setModal(null); 
-                alert("Enviada!");
+                alert("Proposta Enviada com Sucesso!");
             };
 
             const acceptOffer = async (o) => {
@@ -370,7 +406,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.40.10</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.40.11</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -435,7 +471,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.40.10</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.40.11</div>
                     <div className="login-tabs"><div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div><div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR</div><div className={`tab ${tab==='PRESS'?'active':''}`} onClick={()=>setTab('PRESS')}>IMPRENSA</div></div>
                     {tab==='LOGIN' && <div>{(teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}<div style={{marginTop:20}}><button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button><button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button></div></div>}
                     {tab==='CREATE' && <div><input type="file" className="file-input" onChange={handleUpload} /><input className="input-field" placeholder="Nome" value={f.n} onChange={e=>setF({...f, n:e.target.value})} /><input className="input-field" type="number" placeholder="Saldo" value={f.b} onChange={e=>setF({...f, b:e.target.value})} /><select className="input-field" value={f.s} onChange={e=>setF({...f, s:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>Série {s}</option>)}</select><input className="input-field" type="number" placeholder="Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} /><button className="btn btn-green" onClick={()=>onCreateTeam(f.n, f.b, f.s, f.p, f.l)}>CRIAR</button></div>}
@@ -605,7 +641,7 @@
             return <div><label>Nome</label><input className="input-field" value={form.name} onChange={e=>setF({...form, name:e.target.value})} /><label>Logo</label><input className="input-field" value={form.logo} onChange={e=>setF({...form, logo:e.target.value})} />{isAdmin && <label>Saldo (ADM)</label>} {isAdmin && <input className="input-field" type="number" value={form.balance} onChange={e=>setF({...form, balance:parseFloat(e.target.value)})} />}{isAdmin && <label>Série (ADM)</label>}{isAdmin && <select className="input-field" value={form.serie} onChange={e=>setF({...form, serie:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>{s}</option>)}</select>}<button className="btn btn-blue" onClick={()=>onUp(form)}>SALVAR</button><hr style={{borderColor:'#444'}}/><p>Estádio Nível {team.stadiumLevel||1}</p><button className="btn btn-purple" onClick={onUpgrade}>EVOLUIR (₣ {fmt(COSTS[team.stadiumLevel]||0).replace('₣ ','')})</button><hr style={{borderColor:'#444'}}/><button className="btn btn-green" onClick={()=>{const v=prompt("Valor");const m=prompt("Motivo"); if(v)onReq('INJECTION',v,m)}}>PEDIR INJEÇÃO</button><button className="btn btn-gold" onClick={()=>{const v=prompt("Valor");const m=prompt("Empresa"); if(v)onReq('SPONSORSHIP',v,m)}}>PEDIR PATROCÍNIO</button><button className="btn btn-red" onClick={()=>{const v=prompt("Valor a retirar:"); if(v){ const m=prompt("Motivo:"); if(m) onWithdraw(v, m); }}}>RETIRAR DINHEIRO</button></div>;
         };
 
-        const OffersScreen = ({ offers, onAccept, onReject, onCounter }) => (<div><h3>Propostas</h3>{offers.map(o=><div key={o.id} className="card" style={{borderLeft:'4px solid gold'}}><b style={{color:'var(--primary)'}}>{o.playerName}</b><br/><small>De: {o.buyerName}</small><p style={{background:'#333', padding:5, borderRadius:5}}>{o.description}</p><div style={{display:'flex', gap:5}}><button className="btn btn-green" onClick={()=>onAccept(o)}>ACEITAR</button><button className="btn btn-blue" onClick={()=>onCounter(o)}>CONTRA</button><button className="btn btn-red" onClick={()=>onReject(o.id)}>RECUSAR</button></div></div>)}</div>);
+        const OffersScreen = ({ offers, onAccept, onReject, onCounter }) => (<div><h3>Propostas</h3>{offers.map(o=><div key={o.id} className="card" style={{borderLeft:'4px solid gold'}}><b style={{color:'var(--primary)'}}>{o.playerName}</b><br/><small>De: {o.buyerName}</small><p style={{background:'#333', padding:5, borderRadius:5, whiteSpace:'pre-wrap', fontSize:11}}>{o.description}</p><div style={{display:'flex', gap:5}}><button className="btn btn-green" onClick={()=>onAccept(o)}>ACEITAR</button><button className="btn btn-blue" onClick={()=>onCounter(o)}>CONTRA</button><button className="btn btn-red" onClick={()=>onReject(o.id)}>RECUSAR</button></div></div>)}</div>);
         
         // --- NEW: COMPLETE RANKING SYSTEM ---
         const Ranking = ({ teams, players }) => {

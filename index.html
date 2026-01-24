@@ -363,11 +363,13 @@
                         {screen === 'OFFERS' && <OffersScreen offers={offers} onAccept={acceptOffer} onReject={rejectOffer} onCounter={(o)=>setModal({type:'OFFER', data:{...players.find(p=>p.id===o.playerId), oldOffer:o}})} />}
                         
                         {/* ETAPA 1: Painel Provisório da Empresa */}
+                        {/* ETAPA 1: Painel Provisório da Empresa (CORRIGIDO) */}
                         {screen === 'COMPANY_HOME' && user.type === 'COMPANY' && (
                             <div style={{textAlign:'center'}}>
                                 <div className="highlight-card">
                                     <h2>🏢 {user.data.name}</h2>
-                                    <p>{COMPANY_TYPES[user.data.companyType].label}</p>
+                                    {/* AQUI ESTAVA O ERRO: Adicionei proteção caso o tipo seja inválido */}
+                                    <p>{(COMPANY_TYPES[user.data.companyType] || {}).label || 'Tipo Desconhecido'}</p>
                                     <h3>Saldo: {fmt(user.data.balance)}</h3>
                                     <small style={{color:'#aaa'}}>Painel em Construção (Etapa 1)</small>
                                 </div>

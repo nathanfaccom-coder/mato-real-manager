@@ -52,6 +52,8 @@
         .tab.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
         .pulse { animation: pulse 2s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+        
+        .rating-badge { color: var(--warning); font-weight: bold; font-size: 11px; margin-left: 5px; display: flex; align-items: center; gap: 2px; }
     </style>
 </head>
 <body>
@@ -159,7 +161,8 @@
                 const payload = {
                     name: d.name, position: d.position, overall: parseInt(d.overall), value: parseFloat(d.value),
                     salary: parseFloat(d.salary), clause: parseFloat(d.clause), contract: parseInt(d.contract),
-                    mood: d.mood, status: d.status, teamId: d.teamId || targetTeamId, loan: false
+                    mood: d.mood, status: d.status, teamId: d.teamId || targetTeamId, loan: false,
+                    rating: parseFloat(d.rating || 0) // NOVA FUNCIONALIDADE: NOTA
                 };
                 if(d.id) {
                     const old = players.find(p=>p.id===d.id);
@@ -376,7 +379,7 @@
                 <div style={{display:'flex', justifyContent:'space-between', marginBottom:10}}><h3>Elenco ({players.length})</h3>{!isVisitor && <button className="btn btn-green" style={{width:'auto'}} onClick={onAdd}>+ JOGADOR</button>}</div>
                 {players.sort((a,b)=>b.overall-a.overall).map(p => (
                     <div key={p.id} className="card" onClick={()=>!isVisitor && onEdit(p)} style={{cursor: isVisitor?'default':'pointer'}}>
-                        <div style={{display:'flex', justifyContent:'space-between'}}><div><span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span><b>{p.name}</b> {p.loan && <small style={{color:'var(--secondary)'}}>(EMP)</small>}</div><span className="player-ov">{p.overall}</span></div>
+                        <div style={{display:'flex', justifyContent:'space-between'}}><div><span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span><b>{p.name}</b> {p.rating > 0 && <span className="rating-badge">★ {p.rating}</span>} {p.loan && <small style={{color:'var(--secondary)'}}>(EMP)</small>}</div><span className="player-ov">{p.overall}</span></div>
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', fontSize:11, color:'#aaa', marginTop:5}}><div>Sal: {fmt(p.salary)}</div><div>Val: {fmt(p.value)}</div><div>Con: {p.contract}</div><div>Mul: {fmt(p.clause)}</div></div>
                         <div style={{marginTop:5, display:'flex', justifyContent:'space-between', fontSize:10}}><span style={{color: p.status==='VENDA'?'var(--primary)':p.status==='INTRANSFERIVEL'?'var(--danger)':'#666'}}>{p.status}</span><span>{p.mood}</span></div>
                     </div>
@@ -385,7 +388,7 @@
         );
 
         const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams }) => {
-            const [f, setF] = useState(initial || {name:'', position:'ATA', overall:'', value:'', salary:'', clause:'', contract:'', mood:'😐', status:'NAO_A_VENDA'});
+            const [f, setF] = useState(initial || {name:'', position:'ATA', overall:'', value:'', salary:'', clause:'', contract:'', mood:'😐', status:'NAO_A_VENDA', rating: ''});
             return (
                 <div>
                     <label>Nome</label><input className="input-field" value={f.name} onChange={e=>setF({...f, name:e.target.value})} />
@@ -393,7 +396,15 @@
                         <div style={{flex:1}}><label>Posição</label><select className="input-field" value={f.position} onChange={e=>setF({...f, position:e.target.value})}>{POS.map(p=><option key={p} value={p}>{p}</option>)}</select></div>
                         <div style={{flex:1}}><label>Overall</label><input className="input-field" type="number" value={f.overall} onChange={e=>setF({...f, overall:e.target.value})} disabled={!isAdmin && initial} /></div>
                     </div>
-                    {/* Campos editáveis */}
+                    
+                    {/* CAMPO DE NOTA (SÓ ADMIN VÊ E EDITA) */}
+                    {isAdmin && (
+                        <div style={{border:'1px solid var(--purple)', padding:5, borderRadius:5, margin:'5px 0'}}>
+                            <label style={{color:'var(--purple)'}}>Nota (0.0 - 10.0)</label>
+                            <input className="input-field" type="number" step="0.1" min="0" max="10" value={f.rating} onChange={e=>setF({...f, rating:e.target.value})} />
+                        </div>
+                    )}
+
                     <div style={{display:'flex', gap:5}}>
                         <div style={{flex:1}}><label>Valor</label><input className="input-field" type="number" value={f.value} onChange={e=>setF({...f, value:e.target.value})} /></div>
                         <div style={{flex:1}}><label>Salário</label><input className="input-field" type="number" value={f.salary} onChange={e=>setF({...f, salary:e.target.value})} /></div>
@@ -432,7 +443,7 @@
                         const owner = teams.find(t=>t.id===p.teamId);
                         return (
                             <div key={p.id} className="card">
-                                <div style={{display:'flex', justifyContent:'space-between'}}><div><span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span>{p.name}</div><span className="player-ov">{p.overall}</span></div>
+                                <div style={{display:'flex', justifyContent:'space-between'}}><div><span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span>{p.name} {p.rating > 0 && <span className="rating-badge">★ {p.rating}</span>}</div><span className="player-ov">{p.overall}</span></div>
                                 <div style={{fontSize:11, color:'#aaa', marginTop:5}}>{view==='GLOBAL' && <div>Time: {owner?.name}</div>}<div>Val: {fmt(p.value)} | Con: {p.contract}</div><div>Mul: {fmt(p.clause)}</div></div>
                                 {!isVis && <div style={{marginTop:5, display:'flex', gap:5}}>
                                     {(open || p.status==='EMPRESTIMO') && p.status!=='INTRANSFERIVEL' ? <button className="btn btn-purple" style={{width:'auto', flex:1}} onClick={()=>onNeg(p)}>NEGOCIAR</button> : <button className="btn btn-ghost" style={{width:'auto', flex:1}} disabled>BLOQUEADO</button>}

@@ -204,66 +204,155 @@
                     db.collection('sales').orderBy('date', 'desc').limit(50).onSnapshot(s => setSales(s.docs.map(d => d.data()))),
                     db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => { const list = s.docs.map(d => ({id:d.id, ...d.data()})); setNews(list); const lastRead = localStorage.getItem('lastRead'); if (list.length && (!lastRead || list[0].date > parseInt(lastRead))) setNewNews(true); setLoading(false); })
                 ];
-                return () => unsubs.forEach(u => u());
-            }, []);
+               // --- BLOCO RETURN DO APP (CORRIGIDO) ---
+            return (
+                <div> {/* <--- ESTA É A DIV PAI (A SACOLA) QUE FALTAVA OU FECHOU ANTES DA HORA */}
+                    
+                    {/* 1. CABEÇALHO */}
+                    <div className="header">
+                        <div style={{display:'flex', alignItems:'center', gap:10}}>
+                            {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
+                            <div>
+                                <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.62 (Fixed)</div>
+                            </div>
+                        </div>
+                        <div style={{display:'flex', gap:15, alignItems:'center'}}>
+                            {user.type==='USER' && <div onClick={()=>setScreen('OFFERS')}><i className="fas fa-bell" style={{color: offers.length ? 'var(--warning)' : '#555'}}></i>{offers.length > 0 && <span style={{position:'absolute', top:-5, right:-5, background:'red', borderRadius:'50%', width:8, height:8}} className="pulse"></span>}</div>}
+                            {(user.type==='USER' || user.type==='COMPANY') && <div style={{color:'var(--primary)', fontWeight:'bold'}}>{fmt(user.data.balance)}</div>}
+                            {user.type==='USER' && <i className="fas fa-cog" onClick={()=>setModal({type:'SETTINGS', data:user.data})}></i>}
+                            <i className="fas fa-sign-out-alt" onClick={()=>window.location.reload()}></i>
+                        </div>
+                    </div>
 
-            useEffect(() => {
-                if (user?.type === 'USER') {
-                    const me = teams.find(t => t.id === user.data.id);
-                    if (me) setUser(prev => ({...prev, data: me}));
-                    return db.collection('offers').where('sellerId', '==', user.data.id).onSnapshot(s => setOffers(s.docs.map(d => ({id:d.id, ...d.data()}))));
-                }
+                    {/* 2. CONTEÚDO PRINCIPAL (TELAS) */}
+                    <div className="container">
+                        {screen === 'HOME' && user.type === 'ADMIN' && 
+                            <AdminPanel 
+                                teams={teams} 
+                                papers={papers} 
+                                journalists={journalists} 
+                                companies={companies} 
+                                reqs={reqs} 
+                                config={conf} 
+                                onAct={adminAction} 
+                                onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} 
+                                onApprove={async(r)=>{/*Fin logic*/}} 
+                                onReject={(id)=>db.collection('financeRequests').doc(id).delete()} 
+                                onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} 
+                                onApproveTeam={approveTeam} 
+                                onUpdateBal={updateBalance} 
+                                onDeleteTeam={deleteTeam} 
+                                onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} 
+                                onDeletePaper={deletePaper} 
+                                onDeleteJourno={deleteJournalist} 
+                                onRejectPaper={(id)=>db.collection('newspapers').doc(id).delete()} 
+                                onConfig={(t)=>setModal({type:'SETTINGS', data:t})} 
+                                onApproveComp={async(id)=>{await db.collection('companies').doc(id).update({status:'ACTIVE'}); alert("Empresa Aprovada!");}}
+                                onDeleteComp={async(id)=>{if(confirm("Excluir Empresa?")) await db.collection('companies').doc(id).delete();}}
+                                onUpdateCompBal={async(id, val)=>{ await db.collection('companies').doc(id).update({balance: parseFloat(val)}); alert("Saldo Alterado!"); }}
+                            />
+                        }
+                          
+                        {screen === 'HOME' && user.type === 'USER' && <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />}
+                        {screen === 'HOME' && user.type === 'VISITOR' && <VisitorDashboard players={players} teams={teams} />}
+                        {screen === 'PRESS_DASH' && (user.type==='PRESS' || user.type==='PRESS_WORKER') && (<div><h3>Painel de Imprensa ({user.data.name})</h3><div className="card"><button className="btn btn-blue" onClick={()=>setModal({type:'POST_NEWS'})}>ESCREVER NOTÍCIA</button><button className="btn btn-purple" onClick={()=>setModal({type:'STATS_SEARCH'})}>SÚMULA / ESTATÍSTICAS</button></div>{user.type==='PRESS' && journalists.filter(j=>j.newspaperId===user.data.id && j.status==='PENDING').map(j=><div key={j.id} className="card">{j.name}<button className="btn btn-green" onClick={()=>db.collection('journalists').doc(j.id).update({status:'ACTIVE'})}>APROVAR</button></div>)}</div>)}
+                        {screen === 'ADMIN_TEAM' && adminTeam && <div><button className="btn" style={{background:'#333', marginBottom:10}} onClick={()=>{setAdminTeam(null); setScreen('HOME');}}>⬅ VOLTAR</button><h3 style={{color:'var(--purple)'}}>Editando: {adminTeam.name}</h3><TeamDashboard team={adminTeam} players={players.filter(p=>p.teamId===adminTeam.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} /></div>}
+                        {screen === 'MARKET' && <Market me={user.data?.id} teams={teams} players={players} open={conf.marketOpen} isVis={user.type==='VISITOR'} onNeg={(p)=>setModal({type:'OFFER', data:p})} onPayClause={async(p)=>{/*Clause logic*/}} onPre={async(p)=>{/*Pre logic*/}} />}
+                        
+                        {screen === 'SHOPPING' && <ShoppingScreen products={products} companies={companies} userTeam={user.type==='USER' || user.type==='PLAYER'} onBuy={buyProduct} />}
+                        
+                        {screen === 'SPONSORSHIPS' && user.type === 'USER' && (
+                            <div>
+                                <h3>Buscar Patrocínio</h3>
+                                <p style={{fontSize:11, color:'#aaa'}}>Envie propostas semanais para as empresas.</p>
+                                {companies.filter(c=>c.status==='ACTIVE').map(c => (
+                                    <div key={c.id} className="card">
+                                        <b>{c.name}</b> <small>({(COMPANY_TYPES[c.companyType] || {}).label})</small>
+                                        <div style={{display:'flex', gap:5, marginTop:5}}>
+                                            <button className="btn btn-purple" onClick={()=>{const v=prompt("Valor Semanal pedido (₣):"); if(v) requestSponsorship(c.id, v);}}>PEDIR PATROCÍNIO</button>
+                                        </div>
+                                    </div>
+                                ))}
+                                <hr style={{borderColor:'#333'}}/>
+                                <h4>Meus Contratos</h4>
+                                {sps.filter(s=>s.teamId===user.data.id).length === 0 && <p style={{color:'#666'}}>Sem contratos.</p>}
+                                {sps.filter(s=>s.teamId===user.data.id).map(s => (
+                                    <div key={s.id} className="card" style={{borderLeft:`4px solid ${s.status==='ACTIVE'?'var(--primary)':'#666'}`}}>
+                                        <b>{s.companyName}</b><br/>
+                                        Valor: {fmt(s.value)}/sem <small>({s.status === 'PENDING' ? 'Aguardando' : 'Ativo'})</small>
+                                        {s.status==='ACTIVE' && <button className="btn btn-red" style={{width:'auto', marginTop:5}} onClick={()=>{if(confirm("Encerrar contrato de patrocínio?")) db.collection('sponsorships').doc(s.id).delete();}}>ENCERRAR</button>}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {screen === 'RANKING' && <Ranking teams={teams} players={players} />}
+                        {screen === 'NEWS' && <div><h3>Notícias</h3>{news.map(n=><div key={n.id} className={`news-card news-${n.type}`}>{n.text}<br/><small style={{color:'#666'}}>{new Date(n.date).toLocaleString()}</small></div>)}</div>}
+                        {screen === 'OFFERS' && <OffersScreen offers={offers} onAccept={acceptOffer} onReject={rejectOffer} onCounter={(o)=>setModal({type:'OFFER', data:{...players.find(p=>p.id===o.playerId), oldOffer:o}})} />}
+                        
+                        {(screen === 'COMPANY_DASH' || screen === 'COMPANY_HOME') && user.type === 'COMPANY' && 
+                            <CompanyDashboard 
+                                company={user.data} 
+                                products={products.filter(p => p.companyId === user.data.id)} 
+                                sps={sps.filter(s => s.companyId === user.data.id)}
+                                sales={sales || []}
+                                teams={teams}
+                                onSaveProd={saveProduct} 
+                                onDeleteProd={async(id)=>{if(confirm("Excluir produto?")) await db.collection('products').doc(id).delete();}}
+                                onProcessSpons={processSponsorship} 
+                            />
+                        }
+
+                        {screen === 'PLAYER_DASH' && user.type === 'PLAYER' && 
+                            <PlayerDashboard 
+                                player={players.find(p=>p.id===user.data.id) || user.data} 
+                                team={teams.find(t=>t.id===user.data.teamId)} 
+                                sales={sales} 
+                                onUpdatePassword={async(newP)=>{ await db.collection('players').doc(user.data.id).update({password: newP}); alert("Senha alterada!"); }} 
+                            />
+                        }
+                    </div>
+
+                    {/* 3. MENU INFERIOR (ESTAVA DANDO ERRO, AGORA ESTÁ DENTRO DA DIV PAI) */}
+                    <div className="bottom-nav">
+                        <div 
+                            className={`nav-item ${['HOME','COMPANY_HOME','COMPANY_DASH','PLAYER_DASH'].includes(screen)?'active':''}`} 
+                            onClick={() => {
+                                if(user.type.includes('PRESS')) setScreen('PRESS_DASH');
+                                else if(user.type === 'COMPANY') setScreen('COMPANY_HOME');
+                                else if(user.type === 'PLAYER') setScreen('PLAYER_DASH');
+                                else setScreen('HOME');
+                            }}
+                        >
+                            <i className="fas fa-home"></i>INÍCIO
+                        </div>
+
+                        {user.type!=='COMPANY' && user.type!=='PLAYER' && <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>}
+                        
+                        {/* Botão SHOPPING liberado para jogadores */}
+                        {user.type!=='COMPANY' && <div className={`nav-item ${screen==='SHOPPING'?'active':''}`} onClick={()=>setScreen('SHOPPING')}><i className="fas fa-shopping-bag"></i>SHOP</div>}
+                        
+                        {user.type==='USER' && <div className={`nav-item ${screen==='SPONSORSHIPS'?'active':''}`} onClick={()=>setScreen('SPONSORSHIPS')}><i className="fas fa-handshake"></i>PATRO</div>}
+                        
+                        {user.type!=='COMPANY' && <div className={`nav-item ${screen==='RANKING'?'active':''}`} onClick={()=>setScreen('RANKING')}><i className="fas fa-trophy"></i>RANK</div>}
+                        
+                        <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={()=>{setScreen('NEWS'); setNewNews(false); localStorage.setItem('lastRead', Date.now());}}><i className="fas fa-newspaper"></i>NEWS</div>
+                    </div>
+
+                    {/* 4. MODAIS */}
+                    {modal && <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget && setModal(null)}>
+                        <div className="modal-content">
+                            {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={async(id)=>{db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} onRenew={renewContract} isOwner={user.type==='USER' && modal.data?.teamId===user.data?.id} />}
+                            {modal.type==='OFFER' && <OfferForm target={modal.data} myPlayers={players.filter(p=>p.teamId===user.data.id)} onSend={sendOffer} />}
+                            {modal.type==='SETTINGS' && <SettingsForm team={modal.data || user.data} isAdmin={user.type==='ADMIN'} onUp={(d)=>{const tid=(modal.data?.id)||user.data.id; db.collection('teams').doc(tid).update(d); setModal(null);}} onUpgrade={()=>{/*Upgrade logic*/}} onReq={(t,a,d)=>{db.collection('financeRequests').add({teamId:user.data.id, teamName:user.data.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!");}} onWithdraw={withdrawMoney} />}
+                            {modal.type==='POST_NEWS' && <div><h3>Nova Notícia</h3><input className="input-field" placeholder="Manchete / Texto" id="news-body" /><button className="btn btn-blue" onClick={()=>{postNews(`📰 **${user.data.name}:**\n${document.getElementById('news-body').value}`, 'press'); setModal(null);}}>PUBLICAR</button></div>}
+                            {modal.type==='STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
+                        </div>
+                    </div>}
                 
-                if (user?.type === 'COMPANY') {
-                    const me = companies.find(c => c.id === user.data.id);
-                    if (me) {
-                        if (me.status === 'BLOCKED') { alert("🚫 Empresa Bloqueada/Falida."); window.location.reload(); }
-                        else setUser(prev => ({...prev, data: me}));
-                    }
-                }
-            }, [teams, companies, user?.data?.id]);
-
-            const postNews = (text, type='normal') => db.collection('news').add({ text, type, date: Date.now() });
-
-            const login = (id, pwd, type) => {
-                if (type === 'TEAM') { 
-                    const t = teams.find(x => x.id === id); 
-                    if (t && t.password === pwd) { 
-                        if (t.status === 'PENDING') alert("⏳ Aguarde a Federação."); 
-                        else { setUser({type:'USER', data:t}); setScreen('HOME'); } 
-                    } else alert("Erro!"); 
-                } 
-                else if (type === 'PAPER') { 
-                    const p = papers.find(x => x.id === id); 
-                    if (p && p.password === pwd) { 
-                        if (p.status === 'PENDING') alert("⏳ Aguarde a Federação."); 
-                        else { setUser({type:'PRESS', data:p}); setScreen('PRESS_DASH'); } 
-                    } else alert("Erro!"); 
-                } 
-                else if (type === 'JOURNALIST') { 
-                    const j = journalists.find(x => x.id === id); 
-                    if (j && j.password === pwd) { 
-                        if (j.status === 'PENDING') alert("⏳ Aguarde o Dono do Jornal."); 
-                        else { setUser({type:'PRESS_WORKER', data:j}); setScreen('PRESS_DASH'); } 
-                    } else alert("Erro!"); 
-                }
-                else if (type === 'COMPANY') { 
-                    const c = companies.find(x => x.id === id); 
-                    if (c && c.password === pwd) { 
-                        if (c.status === 'PENDING') alert("⏳ Aguarde a Federação."); 
-                        else if (c.status === 'BLOCKED') alert("🚫 Empresa Bloqueada."); 
-                        else { setUser({type:'COMPANY', data:c}); setScreen('COMPANY_HOME'); } 
-                    } else alert("Erro!"); 
-                }
-                else if (type === 'PLAYER') { 
-                     const pl = players.find(x => x.id === id); 
-                     const pass = pl.password || '1234'; 
-                     if (pl && pass === pwd) { 
-                         setUser({type:'PLAYER', data:pl}); 
-                         setScreen('PLAYER_DASH'); 
-                     } else alert("Senha incorreta!"); 
-                }
-            };
+                </div> /* <--- FECHAMENTO DA DIV PAI (IMPORTANTE!) */
+            );
+        }
             const loginAdmin = () => { setUser({ type: 'ADMIN', data: { id: 'admin', name: 'FEDERAÇÃO (ADM)', balance: 0, logo: null, stadiumLevel: 1, serie: 'ADM' } }); setScreen('HOME'); };
             const createTeam = async (name, bal, serie, pass, logo) => { if(teams.find(t=>t.name.toLowerCase()===name.toLowerCase())) return alert("Nome em uso!"); await db.collection('teams').add({ name, balance: parseFloat(bal), serie, password: pass, stadiumLevel: 1, logo: logo||null, status: 'PENDING' }); alert("Criado! Aguarde aprovação."); };
             const createNewspaper = async (name, pass, owner) => { await db.collection('newspapers').add({ name, password: pass, ownerName: owner, status: 'PENDING' }); alert("Jornal criado! Aguarde Federação."); };

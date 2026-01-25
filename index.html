@@ -560,7 +560,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.57</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.58</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -655,16 +655,15 @@
                                 onProcessSpons={processSponsorship} 
                             />
                         }
+                        {/* ADICIONEI "sales={sales}" AQUI */}
                         {screen === 'PLAYER_DASH' && user.type === 'PLAYER' && 
-    <PlayerDashboard 
-        player={players.find(p=>p.id===user.data.id) || user.data} 
-        team={teams.find(t=>t.id===user.data.teamId)} 
-        onUpdatePassword={async(newP)=>{
-            await db.collection('players').doc(user.data.id).update({password: newP});
-            alert("Senha alterada com sucesso! Não esqueça dela.");
-        }} 
-    />
-}
+                            <PlayerDashboard 
+                                player={players.find(p=>p.id===user.data.id) || user.data} 
+                                team={teams.find(t=>t.id===user.data.teamId)} 
+                                sales={sales} 
+                                onUpdatePassword={async(newP)=>{ await db.collection('players').doc(user.data.id).update({password: newP}); alert("Senha alterada!"); }} 
+                            />
+                        }
                     </div>
 
                     <div className="bottom-nav">
@@ -725,7 +724,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.57 (Player Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.58 (Player Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1131,11 +1130,16 @@
         };
 
         // NOVO: Painel Exclusivo do Jogador
-        const PlayerDashboard = ({ player, team, onUpdatePassword }) => {
+        const PlayerDashboard = ({ player, team, sales, onUpdatePassword }) => {
             const [newPass, setNewPass] = useState('');
-            
+            const [tab, setTab] = useState('PERFIL'); // Estado para trocar abas
+
+            // Filtra as compras feitas por este jogador (pelo nome)
+            const myItems = (sales||[]).filter(s => s.buyerName === player.name);
+
             return (
                 <div>
+                    {/* Cabeçalho do Jogador */}
                     <div className="highlight-card" style={{textAlign:'center'}}>
                         <h2 style={{margin:0}}>Bem-vindo, {player.name}!</h2>
                         <span className="badge-pos" style={{fontSize:14, background:getPosColor(player.position)}}>{player.position}</span>
@@ -1143,44 +1147,60 @@
                         <small>Atleta do: <b>{team?.name || 'Sem Clube'}</b></small>
                     </div>
 
-                    {/* NOVO: Conta Bancária */}
-                    <div className="card" style={{borderLeft:'4px solid var(--primary)', background:'linear-gradient(90deg, #1b2e1b, #1E1E1E)'}}>
-                        <h3 style={{marginTop:0, color:'var(--primary)'}}>🏦 Conta Bancária</h3>
-                        <div style={{fontSize:24, fontWeight:'bold'}}>{fmt(player.balance)}</div>
-                        <small style={{color:'#aaa'}}>Salário Semanal: {fmt(player.salary)}</small>
+                    {/* Menu de Abas */}
+                    <div style={{display:'flex', gap:10, marginBottom:15}}>
+                        <button className={`btn ${tab==='PERFIL'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('PERFIL')}>PERFIL</button>
+                        <button className={`btn ${tab==='INV'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('INV')}>MOCHILA ({myItems.length})</button>
                     </div>
 
-                    <div className="card">
-                        <h3>📊 Minhas Estatísticas</h3>
-                        <div className="stats-grid" style={{gridTemplateColumns:'1fr 1fr 1fr'}}>
-                             <div className="stat-item"><span className="stat-lbl">⚽ Gols</span><span className="stat-val">{player.stats?.goals||0}</span></div>
-                             <div className="stat-item"><span className="stat-lbl">👟 Assis</span><span className="stat-val">{player.stats?.assists||0}</span></div>
-                             <div className="stat-item"><span className="stat-lbl">🛡️ Desar</span><span className="stat-val">{player.stats?.tackles||0}</span></div>
-                             <div className="stat-item"><span className="stat-lbl">🧤 Defes</span><span className="stat-val">{player.stats?.saves||0}</span></div>
-                             <div className="stat-item"><span className="stat-lbl">🟨 Amar</span><span className="stat-val">{player.stats?.yellows||0}</span></div>
-                             <div className="stat-item"><span className="stat-lbl">🟥 Verm</span><span className="stat-val">{player.stats?.reds||0}</span></div>
+                    {/* ABA PERFIL (O que já existia) */}
+                    {tab==='PERFIL' && <div>
+                        <div className="card" style={{borderLeft:'4px solid var(--primary)', background:'linear-gradient(90deg, #1b2e1b, #1E1E1E)'}}>
+                            <h3 style={{marginTop:0, color:'var(--primary)'}}>🏦 Conta Bancária</h3>
+                            <div style={{fontSize:24, fontWeight:'bold'}}>{fmt(player.balance)}</div>
+                            <small style={{color:'#aaa'}}>Salário Semanal: {fmt(player.salary)}</small>
                         </div>
-                    </div>
 
-                    <div className="card">
-                        <h3>📃 Meu Contrato</h3>
-                        <p>Valor de Mercado: {fmt(player.value)}</p>
-                        <p>Contrato: {player.contract} Temporadas</p>
-                        <p>Multa: {fmt(player.clause)}</p>
-                    </div>
-
-                    <div className="card" style={{borderLeft:'4px solid var(--purple)'}}>
-                        <h3>🔐 Segurança</h3>
-                        <p style={{fontSize:12, color:'#ccc'}}>Troque sua senha para que o manager não tenha mais acesso à sua conta.</p>
-                        <div style={{display:'flex', gap:5}}>
-                            <input className="input-field" type="password" placeholder="Nova Senha" value={newPass} onChange={e=>setNewPass(e.target.value)} style={{marginBottom:0}} />
-                            <button className="btn btn-purple" style={{width:'auto'}} onClick={()=>{
-                                if(!newPass) return alert("Digite uma senha!");
-                                onUpdatePassword(newPass);
-                                setNewPass('');
-                            }}>ALTERAR SENHA</button>
+                        <div className="card">
+                            <h3>📊 Estatísticas</h3>
+                            <div className="stats-grid" style={{gridTemplateColumns:'1fr 1fr 1fr'}}>
+                                <div className="stat-item"><span className="stat-lbl">⚽ Gols</span><span className="stat-val">{player.stats?.goals||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">👟 Assis</span><span className="stat-val">{player.stats?.assists||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🛡️ Desar</span><span className="stat-val">{player.stats?.tackles||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🧤 Defes</span><span className="stat-val">{player.stats?.saves||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🟨 Amar</span><span className="stat-val">{player.stats?.yellows||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🟥 Verm</span><span className="stat-val">{player.stats?.reds||0}</span></div>
+                            </div>
                         </div>
-                    </div>
+
+                        <div className="card" style={{borderLeft:'4px solid var(--purple)'}}>
+                            <h3>🔐 Segurança</h3>
+                            <div style={{display:'flex', gap:5}}>
+                                <input className="input-field" type="password" placeholder="Nova Senha" value={newPass} onChange={e=>setNewPass(e.target.value)} style={{marginBottom:0}} />
+                                <button className="btn btn-purple" style={{width:'auto'}} onClick={()=>{ if(!newPass) return alert("Digite uma senha!"); onUpdatePassword(newPass); setNewPass(''); }}>ALTERAR</button>
+                            </div>
+                        </div>
+                    </div>}
+
+                    {/* ABA INVENTÁRIO (NOVA) */}
+                    {tab==='INV' && <div>
+                        <h3>Meus Itens</h3>
+                        {myItems.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Você ainda não comprou nada no Shopping.</p>}
+                        
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                            {myItems.map((item, index) => (
+                                <div key={index} className="card" style={{border:'1px solid #444', textAlign:'center'}}>
+                                    <div style={{fontSize:30}}>🛍️</div>
+                                    <b>{item.productName}</b>
+                                    <br/>
+                                    <small style={{color:'#888'}}>Comprado por: {fmt(item.price)}</small>
+                                    <div style={{marginTop:5}}>
+                                        <button className="btn btn-green" style={{fontSize:10, padding:5}}>USAR / EQUIPAR</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>}
                 </div>
             );
         };

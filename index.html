@@ -398,12 +398,75 @@
             };
 
             const adminAction = async (act, data) => {
-                if(act==='MARKET') { db.collection('config').doc('system').update({marketOpen: data}); postNews(data?"📢 JANELA ABERTA":"🔒 JANELA FECHADA", 'infra'); }
-                if(act==='WEEK') { if(!confirm("Virar?")) return; setLoading(true); const b = db.batch(); teams.forEach(t => { const w=players.filter(p=>p.teamId===t.id).reduce((a,p)=>a+(p.salary||0),0); const s=t.sponsorship?.value||0; b.update(db.collection('teams').doc(t.id), {balance:(t.balance||0)+s-w}); }); 
-                    const debtsSnap = await db.collection('debts').get(); debtsSnap.docs.forEach(doc => { const d = doc.data(); if (d.weeksRemaining > 0) { b.update(db.collection('teams').doc(d.buyerId), {balance: firebase.firestore.FieldValue.increment(-d.installmentVal)}); b.update(db.collection('teams').doc(d.sellerId), {balance: firebase.firestore.FieldValue.increment(d.installmentVal)}); if (d.weeksRemaining - 1 === 0) { b.delete(doc.ref); postNews(`✅ **DÍVIDA QUITADA**\n${d.buyerName} terminou de pagar ${d.playerName}.`, 'money'); } else { b.update(doc.ref, {weeksRemaining: d.weeksRemaining - 1}); postNews(`💳 **PARCELA PAGA**\n${d.buyerName} pagou a parcela (${d.weeksRemaining}x) de ${d.playerName}.`, 'money-minus'); } } });
-                    await b.commit(); setLoading(false); postNews("📅 VIRADA SEMANAL", 'infra'); alert("Ok"); 
+                if(act==='MARKET') { 
+                    db.collection('config').doc('system').update({marketOpen: data}); 
+                    postNews(data?"📢 JANELA ABERTA":"🔒 JANELA FECHADA", 'infra'); 
                 }
-                if(act==='SEASON') { if(!confirm("Virar?")) return; setLoading(true); const b = db.batch(); players.forEach(p => { let u={}; if(p.futureTransfer){u=p.futureTransfer; u.futureTransfer=firebase.firestore.FieldValue.delete();} else if((p.contract<=1||p.contract===0)&&p.preContract){u.teamId=p.preContract.teamId; u.contract=1; u.status='NAO_A_VENDA'; u.preContract=firebase.firestore.FieldValue.delete();} else { let nc=(p.contract||0)-1; if(nc<0)nc=0; u.contract=nc; if(nc===0)u.status='EXPIRADO'; } b.update(db.collection('players').doc(p.id), u); }); await b.commit(); setLoading(false); postNews("🌞 NOVA TEMPORADA", 'season'); alert("Ok"); }
+                
+                if(act==='WEEK') { 
+                    if(!confirm("⚠️ VIRAR SEMANA?\n\nIsso irá:\n1. Cobrar Salários dos Times\n2. Pagar Patrocínios aos Times\n3. Cobrar Impostos das Empresas\n4. Processar Parcelas de Dívidas")) return;
+                    
+                    setLoading(true); 
+                    const b = db.batch(); 
+                    
+                    // 1. Atualizar Times (Salários e Patrocínios)
+                    teams.forEach(t => { 
+                        // Soma salários dos jogadores
+                        const wages = players.filter(p=>p.teamId===t.id).reduce((a,p)=>a+(p.salary||0),0);
+                        // Soma patrocínios ATIVOS
+                        const income = sps.filter(s => s.teamId === t.id && s.status === 'ACTIVE').reduce((a,s) => a + parseFloat(s.value), 0);
+                        
+                        // Cálculo Final: Saldo Atual + Renda - Despesas
+                        b.update(db.collection('teams').doc(t.id), {balance:(t.balance||0) + income - wages}); 
+                    }); 
+                    
+                    // 2. Atualizar Empresas (Cobrar Impostos)
+                    companies.forEach(c => {
+                        if(c.status === 'ACTIVE') {
+                            const tax = (COMPANY_TYPES[c.companyType] || {}).tax || 0;
+                            b.update(db.collection('companies').doc(c.id), { balance: (c.balance||0) - tax });
+                        }
+                    });
+
+                    // 3. Processar Dívidas de Transferência (Parcelas)
+                    const debtsSnap = await db.collection('debts').get(); 
+                    debtsSnap.docs.forEach(doc => { 
+                        const d = doc.data(); 
+                        if (d.weeksRemaining > 0) { 
+                            b.update(db.collection('teams').doc(d.buyerId), {balance: firebase.firestore.FieldValue.increment(-d.installmentVal)}); 
+                            b.update(db.collection('teams').doc(d.sellerId), {balance: firebase.firestore.FieldValue.increment(d.installmentVal)}); 
+                            if (d.weeksRemaining - 1 === 0) { 
+                                b.delete(doc.ref); 
+                                postNews(`✅ **DÍVIDA QUITADA**\n${d.buyerName} terminou de pagar ${d.playerName}.`, 'money'); 
+                            } else { 
+                                b.update(doc.ref, {weeksRemaining: d.weeksRemaining - 1}); 
+                                postNews(`💳 **PARCELA PAGA**\n${d.buyerName} pagou a parcela (${d.weeksRemaining}x) de ${d.playerName}.`, 'money-minus'); 
+                            } 
+                        } 
+                    }); 
+                    
+                    await b.commit(); 
+                    setLoading(false); 
+                    postNews("📅 **VIRADA DE SEMANA**\nSalários pagos, patrocínios recebidos e impostos cobrados!", 'infra'); 
+                    alert("Semana processada com sucesso!"); 
+                }
+                
+                if(act==='SEASON') { 
+                    if(!confirm("⚠️ VIRAR TEMPORADA?\nIsso envelhece contratos e reseta status.")) return; 
+                    setLoading(true); 
+                    const b = db.batch(); 
+                    players.forEach(p => { 
+                        let u={}; 
+                        if(p.futureTransfer){u=p.futureTransfer; u.futureTransfer=firebase.firestore.FieldValue.delete();} 
+                        else if((p.contract<=1||p.contract===0)&&p.preContract){u.teamId=p.preContract.teamId; u.contract=1; u.status='NAO_A_VENDA'; u.preContract=firebase.firestore.FieldValue.delete();} 
+                        else { let nc=(p.contract||0)-1; if(nc<0)nc=0; u.contract=nc; if(nc===0)u.status='EXPIRADO'; } 
+                        b.update(db.collection('players').doc(p.id), u); 
+                    }); 
+                    await b.commit(); 
+                    setLoading(false); 
+                    postNews("🌞 **NOVA TEMPORADA**\nOs contratos foram reduzidos em 1 ano.", 'season'); 
+                    alert("Temporada virada!"); 
+                }
             };
 
             // --- RENDER ---
@@ -417,7 +480,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.41.8</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.41.9</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -530,7 +593,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.41.8</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.41.9</div>
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
                         <div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR TIME</div>

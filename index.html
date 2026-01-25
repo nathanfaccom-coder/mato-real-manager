@@ -184,6 +184,25 @@
                 await db.collection('companies').add({ name: f.n, owner: f.owner, password: f.p, companyType: f.type, balance: COMPANY_TYPES[f.type].start, status: 'PENDING' });
                 alert("Solicitação enviada! Aguarde a Federação.");
             };
+            // --- ETAPA 2: Lógica de Produtos ---
+            const saveProduct = async (p) => {
+                const price = parseFloat(p.price);
+                if (p.id) {
+                    const old = products.find(x=>x.id===p.id);
+                    if (old && price < old.price) {
+                        postNews(`🚨 **PROMOÇÃO!**\nA **${user.data.name}** baixou o preço de **${p.name}**!\nDe: ${fmt(old.price)} ➝ Por: ${fmt(price)}`, 'biz');
+                    }
+                    await db.collection('products').doc(p.id).update({ name: p.name, price, img: p.img, desc: p.desc });
+                } else {
+                    await db.collection('products').add({ companyId: user.data.id, name: p.name, price, img: p.img, desc: p.desc });
+                    postNews(`🛍️ **NOVIDADE**\nA **${user.data.name}** lançou o produto: **${p.name}** por ${fmt(price)}.`, 'biz');
+                }
+            };
+            const deleteProduct = async (id) => {
+                if(confirm("Tem certeza que deseja excluir este produto?")) {
+                    await db.collection('products').doc(id).delete();
+                }
+            };
 
             const approveTeam = async (teamId, finalBalance) => { await db.collection('teams').doc(teamId).update({ status: 'ACTIVE', balance: parseFloat(finalBalance) }); const t = teams.find(x=>x.id===teamId); postNews(`🛡️ **NOVO CLUBE!**\nO **${t.name}** foi aprovado na Série ${t.serie}.`, 'infra'); alert("Aprovado!"); };
             const deleteTeam = async (teamId) => { if(!confirm("⚠️ PERIGO: Excluir time e jogadores?")) return; const batch = db.batch(); batch.delete(db.collection('teams').doc(teamId)); const snap = await db.collection('players').where('teamId', '==', teamId).get(); snap.docs.forEach(doc => batch.delete(doc.ref)); await batch.commit(); postNews("🚫 **CLUBE EXTINTO**\nUm time encerrou atividades.", 'infra'); };
@@ -363,18 +382,14 @@
                         {screen === 'OFFERS' && <OffersScreen offers={offers} onAccept={acceptOffer} onReject={rejectOffer} onCounter={(o)=>setModal({type:'OFFER', data:{...players.find(p=>p.id===o.playerId), oldOffer:o}})} />}
                         
                         {/* ETAPA 1: Painel Provisório da Empresa */}
-                        {/* ETAPA 1: Painel Provisório da Empresa (CORRIGIDO) */}
-                        {screen === 'COMPANY_HOME' && user.type === 'COMPANY' && (
-                            <div style={{textAlign:'center'}}>
-                                <div className="highlight-card">
-                                    <h2>🏢 {user.data.name}</h2>
-                                    {/* AQUI ESTAVA O ERRO: Adicionei proteção caso o tipo seja inválido */}
-                                    <p>{(COMPANY_TYPES[user.data.companyType] || {}).label || 'Tipo Desconhecido'}</p>
-                                    <h3>Saldo: {fmt(user.data.balance)}</h3>
-                                    <small style={{color:'#aaa'}}>Painel em Construção (Etapa 1)</small>
-                                </div>
-                            </div>
-                        )}
+                        {screen === 'COMPANY_HOME' && user.type === 'COMPANY' && 
+    <CompanyDashboard 
+        company={user.data} 
+        products={products.filter(p => p.companyId === user.data.id)} 
+        onSaveProd={saveProduct} 
+        onDeleteProd={deleteProduct} 
+    />
+}
                     </div>
 
                     <div className="bottom-nav">
@@ -463,6 +478,63 @@
                 <div>
                     <div className="highlight-card"><h2 style={{margin:0, color:'var(--primary)'}}>Jornal do Dia</h2><small>Resumo da Temporada</small><div style={{marginTop:15, textAlign:'left'}}><div style={{marginBottom:10}}><span style={{color:'#aaa', fontSize:10, textTransform:'uppercase'}}>Artilheiro</span><div style={{fontWeight:'bold', fontSize:16}}>⚽ {topScorer?.name || 'Ninguém'} <span style={{color:'var(--primary)'}}>{topScorer?.stats?.goals||0} Gols</span></div></div><div><span style={{color:'#aaa', fontSize:10, textTransform:'uppercase'}}>Rei das Assistências</span><div style={{fontWeight:'bold', fontSize:16}}>👟 {topAssist?.name || 'Ninguém'} <span style={{color:'var(--secondary)'}}>{topAssist?.stats?.assists||0} Assis</span></div></div></div></div>
                     <div style={{textAlign:'center', color:'#666'}}>Use o menu abaixo para navegar.</div>
+                </div>
+            );
+        };
+        // --- NOVO COMPONENTE: PAINEL DA EMPRESA ---
+        const CompanyDashboard = ({ company, products, onSaveProd, onDeleteProd }) => {
+            const [tab, setTab] = useState('PRODS'); 
+            const [editP, setEditP] = useState(null); 
+            
+            return (
+                <div>
+                    <div style={{display:'flex', gap:10, marginBottom:15}}>
+                        <button className={`btn ${tab==='PRODS'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('PRODS')}>PRODUTOS</button>
+                        <button className={`btn ${tab==='FIN'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('FIN')}>FINANÇAS</button>
+                    </div>
+                    
+                    {tab==='PRODS' && <div>
+                        <button className="btn btn-green" onClick={()=>setEditP({name:'', price:'', img:'', desc:''})}>+ NOVO PRODUTO</button>
+                        {products.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Nenhum produto cadastrado.</p>}
+                        {products.map(p => (
+                            <div key={p.id} className="card" style={{display:'flex', gap:10, textAlign:'left'}}>
+                                <img src={p.img || 'https://via.placeholder.com/100'} style={{width:80, height:80, objectFit:'cover', borderRadius:6}} />
+                                <div style={{flex:1}}>
+                                    <b>{p.name}</b><br/>
+                                    <span style={{color:'var(--primary)', fontWeight:'bold'}}>{fmt(p.price)}</span>
+                                    <p style={{fontSize:11, color:'#aaa', margin:'5px 0'}}>{p.desc}</p>
+                                </div>
+                                <div style={{display:'flex', flexDirection:'column', gap:5}}>
+                                    <button className="btn btn-blue" style={{width:'auto', padding:'5px 10px'}} onClick={()=>setEditP(p)}>✏️</button>
+                                    <button className="btn btn-red" style={{width:'auto', padding:'5px 10px'}} onClick={()=>onDeleteProd(p.id)}>X</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>}
+
+                    {tab==='FIN' && <div>
+                        <div className="highlight-card">
+                            <h3>Saldo: {fmt(company.balance)}</h3>
+                            <small>Imposto Semanal: {fmt((COMPANY_TYPES[company.companyType] || {}).tax || 0)}</small>
+                        </div>
+                        <p style={{textAlign:'center', color:'#666'}}>Histórico financeiro em breve...</p>
+                    </div>}
+
+                    {editP && <div className="modal-overlay"><div className="modal-content">
+                        <h3>{editP.id ? 'Editar' : 'Novo'} Produto</h3>
+                        <label>Nome do Produto</label>
+                        <input className="input-field" value={editP.name} onChange={e=>setEditP({...editP, name:e.target.value})} />
+                        <label>Preço (₣)</label>
+                        <input className="input-field" type="number" value={editP.price} onChange={e=>setEditP({...editP, price:e.target.value})} />
+                        <label>URL da Imagem (Opcional)</label>
+                        <input className="input-field" value={editP.img} placeholder="http://..." onChange={e=>setEditP({...editP, img:e.target.value})} />
+                        <label>Descrição</label>
+                        <textarea className="input-field" value={editP.desc} onChange={e=>setEditP({...editP, desc:e.target.value})} />
+                        <div style={{display:'flex', gap:10}}>
+                            <button className="btn btn-green" onClick={()=>{onSaveProd(editP); setEditP(null);}}>SALVAR</button>
+                            <button className="btn" onClick={()=>setEditP(null)}>CANCELAR</button>
+                        </div>
+                    </div></div>}
                 </div>
             );
         };

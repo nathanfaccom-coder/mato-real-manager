@@ -573,7 +573,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.62</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.63</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -729,15 +729,18 @@
             const [fc, setFC] = useState({n:'', owner:'', p:'', type:'COMERCIO'});
             const [sel, setSel] = useState(null); 
             const [selPaper, setSelPaper] = useState(null); 
-            const [selTeamForPlayer, setSelTeamForPlayer] = useState(null); // Estado que guarda o time selecionado
+            const [selTeamForPlayer, setSelTeamForPlayer] = useState(null); 
             const [lp, setLp] = useState('');
 
             const handleUpload = (e) => { const file=e.target.files[0]; const reader=new FileReader(); reader.onloadend=()=>setF({...f, l:reader.result}); if(file) reader.readAsDataURL(file); };
             
+            // Variável auxiliar para pegar os dados do tipo selecionado
+            const selectedTypeInfo = COMPANY_TYPES[fc.type] || {};
+
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.62 (Player Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.60 (Company Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -753,47 +756,64 @@
                             <button className={`btn ${subTab==='COMPANY'?'btn-purple':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>setSubTab('COMPANY')}>EMPRESAS</button>
                         </div>
 
-                        {/* LOGIN DE TIMES */}
                         {subTab==='TEAM' && (teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}
                         
-                        {/* --- CORREÇÃO AQUI: LOGIN DE JOGADORES --- */}
                         {subTab==='PLAYER' && !selTeamForPlayer && <div>
                             <p style={{color:'#aaa'}}>Selecione o clube onde você joga:</p>
-                            {(teams||[]).filter(t=>t.status!=='PENDING').map(t=>(
-                                <div key={t.id} className="card" onClick={()=>setSelTeamForPlayer(t)} style={{cursor:'pointer'}}>
-                                    <b>{t.name}</b>
-                                </div>
-                            ))}
+                            {(teams||[]).filter(t=>t.status!=='PENDING').map(t=>(<div key={t.id} className="card" onClick={()=>setSelTeamForPlayer(t)} style={{cursor:'pointer'}}><b>{t.name}</b></div>))}
                         </div>}
 
                         {subTab==='PLAYER' && selTeamForPlayer && <div>
                             <button className="btn" style={{marginBottom:10, background:'#333'}} onClick={()=>setSelTeamForPlayer(null)}>⬅ VOLTAR PARA TIMES</button>
                             <h4 style={{color:'var(--secondary)'}}>Elenco do {selTeamForPlayer.name}:</h4>
-                            
-                            {/* Lista os jogadores do time selecionado */}
                             {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).length === 0 && <p style={{color:'#666'}}>Nenhum jogador encontrado neste time.</p>}
-                            
-                            {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).map(p => (
-                                <div key={p.id} className="card" onClick={()=>setSel({...p, type:'PLAYER'})} style={{cursor:'pointer', borderLeft:'4px solid var(--secondary)'}}>
-                                    👟 <b>{p.name}</b>
-                                </div>
-                            ))}
+                            {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).map(p => (<div key={p.id} className="card" onClick={()=>setSel({...p, type:'PLAYER'})} style={{cursor:'pointer', borderLeft:'4px solid var(--secondary)'}}>👟 <b>{p.name}</b></div>))}
                         </div>}
-                        {/* ----------------------------------------- */}
 
                         {subTab==='COMPANY' && (companies||[]).filter(c=>c.status!=='PENDING').map(c=><div key={c.id} className="card" onClick={()=>setSel({...c, type:'COMPANY'})} style={{cursor:'pointer', borderLeft:'4px solid var(--purple)'}}>🏢 <b>{c.name}</b><br/><small>{(c.companyType)}</small></div>)}
                         
                         <div style={{marginTop:20}}><button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button><button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button></div>
                     </div>}
 
-                    {/* (O RESTO DO CÓDIGO PERMANECE IGUAL, NÃO PRECISA MUDAR NADA ABAIXO DAQUI DENTRO DO COMPONENTE) */}
                     {tab==='CREATE' && <div><input type="file" className="file-input" onChange={handleUpload} /><input className="input-field" placeholder="Nome" value={f.n} onChange={e=>setF({...f, n:e.target.value})} /><input className="input-field" type="number" placeholder="Saldo" value={f.b} onChange={e=>setF({...f, b:e.target.value})} /><select className="input-field" value={f.s} onChange={e=>setF({...f, s:e.target.value})}>{['A','B','C','D'].map(s=><option key={s} value={s}>Série {s}</option>)}</select><input className="input-field" type="number" placeholder="Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} /><button className="btn btn-green" onClick={()=>onCreateTeam(f.n, f.b, f.s, f.p, f.l)}>CRIAR</button></div>}
+                    
                     {tab==='PRESS' && <div><div style={{display:'flex', gap:10, marginBottom:10}}><button className="btn btn-ghost" onClick={()=>setSubTab('LOGIN_P')}>LOGIN</button><button className="btn btn-ghost" onClick={()=>setSubTab('NEW_PAPER')}>CRIAR JORNAL</button><button className="btn btn-ghost" onClick={()=>setSubTab('NEW_JOURNO')}>SOU JORNALISTA</button></div>
                         {subTab==='LOGIN_P' && !selPaper && <div><h4>Selecione o Jornal</h4>{(papers||[]).filter(p=>p.status==='ACTIVE').map(p=><div key={p.id} className="card" onClick={()=>setSelPaper(p)}>📰 {p.name}</div>)}</div>}
                         {subTab==='LOGIN_P' && selPaper && <div><button className="btn" style={{marginBottom:10}} onClick={()=>setSelPaper(null)}>⬅ VOLTAR</button><h4>{selPaper.name} - Jornalistas</h4><div className="card" onClick={()=>setSel({...selPaper, type:'PAPER'})} style={{border:'1px solid var(--primary)'}}>👑 {selPaper.ownerName} (Dono)</div>{(journalists||[]).filter(j=>j.newspaperId===selPaper.id && j.status==='ACTIVE').map(j=><div key={j.id} className="card" onClick={()=>setSel({...j, type:'JOURNALIST'})}>✒️ {j.name}</div>)}</div>}
                         {subTab==='NEW_PAPER' && <div><input className="input-field" placeholder="Nome do Jornal" id="pn" /><input className="input-field" placeholder="Seu Nome (Dono)" id="po" /><input className="input-field" type="number" placeholder="Senha" id="pp" /><button className="btn btn-green" onClick={()=>onCreatePaper(document.getElementById('pn').value, document.getElementById('pp').value, document.getElementById('po').value)}>SOLICITAR CRIAÇÃO</button></div>}
                         {subTab==='NEW_JOURNO' && <div><input className="input-field" placeholder="Seu Nome" id="jn" /><select className="input-field" id="jp_id"><option value="">Selecione o Jornal</option>{(papers||[]).filter(p=>p.status==='ACTIVE').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><input className="input-field" type="number" placeholder="Senha" id="jp" /><button className="btn btn-green" onClick={()=>onCreateJourno(document.getElementById('jn').value, document.getElementById('jp').value, document.getElementById('jp_id').value)}>SOLICITAR EMPREGO</button></div>}</div>}
-                    {tab==='COMPANY' && <div><h3 style={{color:'var(--purple)'}}>Abrir Empresa</h3><input className="input-field" placeholder="Nome da Empresa" value={fc.n} onChange={e=>setFC({...fc, n:e.target.value})} /><input className="input-field" placeholder="Nome do Dono" value={fc.owner} onChange={e=>setFC({...fc, owner:e.target.value})} /><label style={{textAlign:'left', display:'block', color:'#aaa', fontSize:12}}>Porte da Empresa</label><select className="input-field" value={fc.type} onChange={e=>setFC({...fc, type:e.target.value})}><option value="COMERCIO">Comércio Local</option><option value="MEDIA">Média Empresa</option><option value="GRANDE">Grande Empresa</option></select><input className="input-field" type="number" placeholder="Senha de Acesso" value={fc.p} onChange={e=>setFC({...fc, p:e.target.value})} /><button className="btn btn-purple" onClick={()=>onCreateCompany(fc)}>SOLICITAR ABERTURA</button></div>}
+                    
+                    {tab==='COMPANY' && <div>
+                        <h3 style={{color:'var(--purple)'}}>Abrir Empresa</h3>
+                        <input className="input-field" placeholder="Nome da Empresa" value={fc.n} onChange={e=>setFC({...fc, n:e.target.value})} />
+                        <input className="input-field" placeholder="Nome do Dono" value={fc.owner} onChange={e=>setFC({...fc, owner:e.target.value})} />
+                        
+                        <label style={{textAlign:'left', display:'block', color:'#aaa', fontSize:12}}>Porte da Empresa</label>
+                        <select className="input-field" value={fc.type} onChange={e=>setFC({...fc, type:e.target.value})}>
+                            <option value="COMERCIO">Comércio Local</option>
+                            <option value="MEDIA">Média Empresa</option>
+                            <option value="GRANDE">Grande Empresa</option>
+                        </select>
+
+                        {/* NOVO: BLOCO DE INFORMAÇÕES FINANCEIRAS */}
+                        <div style={{background: 'rgba(255, 255, 255, 0.05)', padding: 10, borderRadius: 5, marginBottom: 10, textAlign: 'left', border: '1px solid #444'}}>
+                            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 5}}>
+                                <span>💰 Capital Inicial:</span>
+                                <span style={{color: 'var(--primary)', fontWeight: 'bold'}}>{fmt(selectedTypeInfo.start)}</span>
+                            </div>
+                            <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                                <span>💸 Imposto Semanal:</span>
+                                <span style={{color: 'var(--danger)', fontWeight: 'bold'}}>{fmt(selectedTypeInfo.tax)}</span>
+                            </div>
+                            <p style={{fontSize: 11, color: '#888', marginTop: 8, fontStyle: 'italic', borderTop:'1px solid #333', paddingTop:5}}>
+                                "{selectedTypeInfo.desc}"
+                            </p>
+                        </div>
+                        {/* -------------------------------------- */}
+
+                        <input className="input-field" type="number" placeholder="Senha de Acesso" value={fc.p} onChange={e=>setFC({...fc, p:e.target.value})} />
+                        <button className="btn btn-purple" onClick={()=>onCreateCompany(fc)}>SOLICITAR ABERTURA</button>
+                    </div>}
                     
                     {sel && <div className="modal-overlay"><div className="modal-content"><h3>{sel.name}</h3><input className="input-field" type="password" placeholder="Senha" value={lp} onChange={e=>setLp(e.target.value)} /><button className="btn btn-green" onClick={()=>onLogin(sel.id, lp, sel.type)}>ENTRAR</button><button className="btn" onClick={()=>setSel(null)}>CANCELAR</button></div></div>}
                 </div>

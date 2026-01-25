@@ -123,6 +123,9 @@
             const [conf, setConf] = useState({ marketOpen: true });
             const [papers, setPapers] = useState([]);
             const [journalists, setJournalists] = useState([]);
+            const [companies, setCompanies] = useState([]);
+            const [products, setProducts] = useState([]);
+            const [sps, setSps] = useState([]);
             // ETAPA 1: Novo estado para empresas
             const [companies, setCompanies] = useState([]);
 
@@ -142,6 +145,8 @@
                     db.collection('journalists').onSnapshot(s => setJournalists(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     // ETAPA 1: Escutar coleção de empresas
                     db.collection('companies').onSnapshot(s => setCompanies(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    db.collection('products').onSnapshot(s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    db.collection('sponsorships').onSnapshot(s => setSps(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => { const list = s.docs.map(d => ({id:d.id, ...d.data()})); setNews(list); const lastRead = localStorage.getItem('lastRead'); if (list.length && (!lastRead || list[0].date > parseInt(lastRead))) setNewNews(true); setLoading(false); })
                 ];
                 return () => unsubs.forEach(u => u());

@@ -221,7 +221,102 @@
                     }
                 }
             }, [teams, companies, user?.data?.id]);
+const postNews = (text, type='normal') => db.collection('news').add({ text, type, date: Date.now() });
 
+            const login = (id, pwd, type) => {
+                if (type === 'TEAM') { const t = teams.find(x => x.id === id); if (t && t.password === pwd) { if (t.status === 'PENDING') alert("Aguarde"); else { setUser({type:'USER', data:t}); setScreen('HOME'); } } else alert("Erro!"); } 
+                else if (type === 'PAPER') { const p = papers.find(x => x.id === id); if (p && p.password === pwd) { if (p.status === 'PENDING') alert("Aguarde"); else { setUser({type:'PRESS', data:p}); setScreen('PRESS_DASH'); } } else alert("Erro!"); } 
+                else if (type === 'JOURNALIST') { const j = journalists.find(x => x.id === id); if (j && j.password === pwd) { if (j.status === 'PENDING') alert("Aguarde"); else { setUser({type:'PRESS_WORKER', data:j}); setScreen('PRESS_DASH'); } } else alert("Erro!"); }
+                else if (type === 'COMPANY') { const c = companies.find(x => x.id === id); if (c && c.password === pwd) { if (c.status === 'PENDING') alert("Aguarde"); else if (c.status === 'BLOCKED') alert("Bloqueada"); else { setUser({type:'COMPANY', data:c}); setScreen('COMPANY_HOME'); } } else alert("Erro!"); }
+                else if (type === 'PLAYER') { const pl = players.find(x => x.id === id); const pass = pl.password || '1234'; if (pl && pass === pwd) { setUser({type:'PLAYER', data:pl}); setScreen('PLAYER_DASH'); } else alert("Senha incorreta!"); }
+            };
+
+            const loginAdmin = () => { setUser({ type: 'ADMIN', data: { id: 'admin', name: 'FEDERAÇÃO (ADM)', balance: 0, logo: null, stadiumLevel: 1, serie: 'ADM' } }); setScreen('HOME'); };
+            const createTeam = async (name, bal, serie, pass, logo) => { if(teams.find(t=>t.name.toLowerCase()===name.toLowerCase())) return alert("Nome em uso!"); await db.collection('teams').add({ name, balance: parseFloat(bal), serie, password: pass, stadiumLevel: 1, logo: logo||null, status: 'PENDING' }); alert("Criado! Aguarde aprovação."); };
+            const createNewspaper = async (name, pass, owner) => { await db.collection('newspapers').add({ name, password: pass, ownerName: owner, status: 'PENDING' }); alert("Jornal criado! Aguarde Federação."); };
+            const createJournalist = async (name, pass, paperId) => { await db.collection('journalists').add({ name, password: pass, newspaperId: paperId, status: 'PENDING' }); alert("Conta criada! Aguarde seu Chefe."); };
+            const createCompany = async (f) => { if(!f.n || !f.p) return alert("Preencha tudo!"); await db.collection('companies').add({ name: f.n, owner: f.owner, password: f.p, companyType: f.type, balance: COMPANY_TYPES[f.type].start, status: 'PENDING' }); alert("Solicitação enviada! Aguarde a Federação."); };
+            
+            const saveProduct = async (p) => {
+                const price = parseFloat(p.price);
+                const payload = { name: p.name, price, img: p.img, desc: p.desc, cat: p.cat || 'CHUTEIRA', companyId: user.data.id };
+                if (p.id) {
+                    const old = products.find(x=>x.id===p.id);
+                    if (old && price < old.price) { postNews(`🚨 **PROMOÇÃO!**\nA **${user.data.name}** baixou o preço de **${p.name}**!\nDe: ${fmt(old.price)} ➝ Por: ${fmt(price)}`, 'biz'); }
+                    delete payload.companyId; await db.collection('products').doc(p.id).update(payload);
+                } else { await db.collection('products').add(payload); postNews(`🛍️ **NOVIDADE**\nA **${user.data.name}** lançou: **${p.name}**.`, 'biz'); }
+            };
+
+            const requestSponsorship = async (companyId, val) => { if (sps.find(s => s.companyId === companyId && s.teamId === user.data.id)) return alert("Já existe!"); const comp = companies.find(c => c.id === companyId); await db.collection('sponsorships').add({ companyId, companyName: comp.name, teamId: user.data.id, teamName: user.data.name, value: parseFloat(val), status: 'PENDING' }); alert("Enviado!"); };
+            const processSponsorship = async (s, status) => { if (status === 'REJECTED' || status === 'CANCELLED') { if(confirm("Confirmar?")) await db.collection('sponsorships').doc(s.id).delete(); } else if (status === 'ACTIVE') { await db.collection('sponsorships').doc(s.id).update({ status: 'ACTIVE' }); postNews(`🤝 **PATROCÍNIO**\n**${s.companyName}** patrocina **${s.teamName}**!`, 'biz'); } };
+            const buyProduct = async (prod, seller) => {
+                const currentBalance = (user.type==='PLAYER' ? user.data.balance : user.data.balance) || 0;
+                if (currentBalance < prod.price) return alert("Saldo insuficiente!");
+                if (!confirm(`Comprar ${prod.name}?`)) return;
+                const b = db.batch();
+                if (user.type === 'PLAYER') b.update(db.collection('players').doc(user.data.id), { balance: currentBalance - prod.price });
+                else b.update(db.collection('teams').doc(user.data.id), { balance: currentBalance - prod.price });
+                b.update(db.collection('companies').doc(seller.id), { balance: seller.balance + prod.price });
+                b.set(db.collection('sales').doc(), { companyId: seller.id, productName: prod.name, buyerName: user.data.name, price: prod.price, cat: prod.cat, date: Date.now() });
+                await b.commit(); alert("Compra realizada!");
+            };
+
+            const approveTeam = async (teamId, finalBalance) => { await db.collection('teams').doc(teamId).update({ status: 'ACTIVE', balance: parseFloat(finalBalance) }); alert("Aprovado!"); };
+            const deleteTeam = async (teamId) => { if(!confirm("Excluir?")) return; const b = db.batch(); b.delete(db.collection('teams').doc(teamId)); const s = await db.collection('players').where('teamId', '==', teamId).get(); s.docs.forEach(d => b.delete(d.ref)); await b.commit(); };
+            const deletePaper = async (id) => { if(!confirm("Excluir?")) return; db.collection('newspapers').doc(id).delete(); };
+            const deleteJournalist = async (id) => { if(!confirm("Excluir?")) return; db.collection('journalists').doc(id).delete(); };
+            const updateBalance = async (teamId, newBal) => { await db.collection('teams').doc(teamId).update({ balance: parseFloat(newBal) }); };
+            const withdrawMoney = async (amount, reason) => { const val = parseFloat(amount.replace(',', '.')); if(isNaN(val) || val <= 0) return alert("Inválido"); if(user.data.balance < val) return alert("Sem saldo"); await db.collection('teams').doc(user.data.id).update({ balance: firebase.firestore.FieldValue.increment(-val) }); postNews(`💸 **SAÍDA**\n**${user.data.name}** retirou ${fmt(val)}.\n📝 ${reason}`, 'money-minus'); setModal(null); };
+
+            const savePlayer = async (d) => {
+                let targetTeamId = d.teamId; 
+                if (user.type === 'USER') targetTeamId = user.data.id;
+                if (user.type === 'ADMIN' && adminTeam) targetTeamId = adminTeam.id;
+                if (!targetTeamId) return alert("Erro: Time não identificado.");
+                let newLevel = parseInt(d.overall) || 45; if (newLevel < 45) newLevel = 45; if (newLevel > 100) newLevel = 100;
+                let payload = { name: d.name, position: d.position, overall: newLevel, value: parseFloat(d.value)||0, salary: parseFloat(d.salary)||0, clause: parseFloat(d.clause)||0, contract: parseInt(d.contract)||0, mood: d.mood, status: d.status, teamId: targetTeamId, loan: false, rating: d.rating ? parseFloat(d.rating) : 0, password: d.password || '1234', xp: d.xp || 0, energy: d.energy !== undefined ? d.energy : 100, stats: { goals: parseInt(d.stats?.goals||0), assists: parseInt(d.stats?.assists||0), tackles: parseInt(d.stats?.tackles||0), saves: parseInt(d.stats?.saves||0), yellows: parseInt(d.stats?.yellows||0), reds: parseInt(d.stats?.reds||0) } };
+                if (user.type === 'ADMIN') payload.balance = parseFloat(d.balance) || 0;
+                if(d.id) {
+                    const old = players.find(p=>p.id===d.id);
+                    if(user.type==='USER') payload.stats = old.stats || payload.stats;
+                    if(!d.password) payload.password = old.password || '1234';
+                    if (payload.overall !== old.overall) { payload.xp = 0; } else { payload.xp = old.xp || 0; payload.energy = old.energy !== undefined ? old.energy : 100; }
+                    if(user.type==='ADMIN' && d.forcedTeamId && d.forcedTeamId !== old.teamId) { payload.teamId = d.forcedTeamId; payload.futureTransfer = firebase.firestore.FieldValue.delete(); }
+                    await db.collection('players').doc(d.id).update(payload);
+                } else { await db.collection('players').add(payload); postNews(`🆕 **REFORÇO**\n${(teams.find(t=>t.id===payload.teamId)||{}).name} contrata **${d.name}**.`, 'transfer'); }
+                setModal(null);
+            };
+            const updateStats = async (pid, newStats) => { await db.collection('players').doc(pid).update({ stats: newStats }); alert("Atualizado!"); setModal(null); };
+            const updateTeamStats = async (tid, stats) => { await db.collection('teams').doc(tid).update({ stats }); alert("Tabela atualizada!"); };
+            const saveMatchStats = async (player, match, xpGained) => {
+                const b = db.batch(); const pRef = db.collection('players').doc(player.id);
+                const newStats = { goals: (player.stats?.goals||0) + match.goals, assists: (player.stats?.assists||0) + match.assists, tackles: (player.stats?.tackles||0) + match.tackles, saves: (player.stats?.saves||0) + match.saves, yellows: (player.stats?.yellows||0) + match.yellows, reds: (player.stats?.reds||0) + match.reds };
+                b.update(pRef, { stats: newStats, pendingXP: (player.pendingXP || 0) + xpGained });
+                await b.commit(); alert(`Desempenho lançado! +${xpGained} XP.`); setModal(null);
+            };
+
+            const sendOffer = async (target, type, value, swapIds, con, meta, old) => { const v=parseFloat(value||0); const sellerId = old?.buyerId || target.teamId; if(!sellerId) return alert("Erro"); const pl={playerId:target.id, playerName:target.name, buyerId:user.data.id, buyerName:user.data.name, sellerId, type, value:v, swapPlayerIds:swapIds||[], offerContract:parseInt(con)||1, description:formatOfferDetails(type,v,con,meta,swapIds,players), meta:meta||{}, date:Date.now()}; const b=db.batch(); if(old?.id) b.delete(db.collection('offers').doc(old.id)); b.set(db.collection('offers').doc(), pl); await b.commit(); postNews(`🚨 **OFERTA**\n${user.data.name} enviou proposta por ${target.name}.`, 'transfer'); setModal(null); alert("Enviada!"); };
+            const rejectOffer = async (o) => { if(confirm("Recusar?")) { await db.collection('offers').doc(o.id).delete(); setOffers(prev=>prev.filter(x=>x.id!==o.id)); } };
+            const acceptOffer = async (o) => { const buy=teams.find(t=>t.id===o.buyerId); const sel=teams.find(t=>t.id===user.data.id); const p=players.find(x=>x.id===o.playerId); let cost=o.value; if(o.type==='TROCA'&&o.meta?.cashDir==='RECEIVE') cost=-o.value; if(o.type==='COMPRA'&&o.meta?.installments>1){ if(buy.balance<(cost/o.meta.installments))return alert("Sem saldo!"); db.collection('debts').add({buyerId:buy.id, buyerName:buy.name, sellerId:sel.id, sellerName:sel.name, playerId:p.id, playerName:p.name, totalVal:cost, installmentVal:cost/o.meta.installments, weeksRemaining:parseInt(o.meta.installments), date:Date.now()}); cost=0; } else { if(buy.balance<cost) return alert("Sem saldo!"); } const b=db.batch(); if(cost!==0){ b.update(db.collection('teams').doc(buy.id), {balance:buy.balance-cost}); b.update(db.collection('teams').doc(sel.id), {balance:sel.balance+cost}); } if(o.type==='COMPRA'){ const up={teamId:buy.id, status:'NAO_A_VENDA', loan:false, contract:parseInt(o.offerContract), sellOnDetails:null}; if(conf.marketOpen) b.update(db.collection('players').doc(p.id), up); else b.update(db.collection('players').doc(p.id), {status:'VENDIDO', futureTransfer:up}); } else if(o.type==='EMPRESTIMO'){ b.update(db.collection('players').doc(p.id), {teamId:buy.id, status:'NAO_A_VENDA', loan:true, loanFrom:sel.id, loanDetails:{wageSplit:o.meta?.wageSplit, buyOption:o.meta?.buyOpt}}); } else if(o.type==='TROCA'){ b.update(db.collection('players').doc(p.id), {teamId:buy.id, status:'NAO_A_VENDA', contract:parseInt(o.offerContract)}); if(o.swapPlayerIds) o.swapPlayerIds.forEach(id=>b.update(db.collection('players').doc(id), {teamId:sel.id, status:'NAO_A_VENDA'})); } setOffers(prev=>prev.filter(x=>x.id!==o.id)); b.delete(db.collection('offers').doc(o.id)); await b.commit(); postNews("Negócio Fechado", 'transfer'); };
+            const renewContract = async (p) => { if(confirm("Renovar?")) { await db.collection('players').doc(p.id).update({contract: (p.contract||0)+1}); setModal(null); } };
+
+            const adminAction = async (act, data) => {
+                if(act==='MARKET') { db.collection('config').doc('system').update({marketOpen: data}); postNews(data?"📢 ABERTO":"🔒 FECHADO", 'infra'); }
+                if(act==='WEEK') { 
+                    if(!confirm("⚠️ VIRAR SEMANA? (Salários, Energia, XP)")) return; 
+                    setLoading(true); const b = db.batch(); 
+                    players.forEach(p => { if(p.teamId) { 
+                        let finalXP = p.xp || 0; let finalLvl = p.overall || 45;
+                        if (p.pendingXP) { const res = calcNewLevel(finalLvl, finalXP, p.pendingXP); finalLvl = res.lvl; finalXP = res.xp; }
+                        b.update(db.collection('players').doc(p.id), { balance: (p.balance||0) + (p.salary||0), energy: 100, overall: finalLvl, xp: finalXP, pendingXP: 0 }); 
+                    }});
+                    teams.forEach(t => { const wages=players.filter(p=>p.teamId===t.id).reduce((a,p)=>a+(p.salary||0),0); const inc=sps.filter(s=>s.teamId===t.id&&s.status==='ACTIVE').reduce((a,s)=>a+parseFloat(s.value),0); b.update(db.collection('teams').doc(t.id), {balance:(t.balance||0)+inc-wages}); });
+                    companies.forEach(c => { if(c.status === 'ACTIVE') { const tax = (COMPANY_TYPES[c.companyType] || {}).tax || 0; b.update(db.collection('companies').doc(c.id), { balance: (c.balance||0) - tax }); } });
+                    const ds = await db.collection('debts').get(); ds.docs.forEach(doc => { const d = doc.data(); if (d.weeksRemaining > 0) { b.update(db.collection('teams').doc(d.buyerId), {balance: firebase.firestore.FieldValue.increment(-d.installmentVal)}); b.update(db.collection('teams').doc(d.sellerId), {balance: firebase.firestore.FieldValue.increment(d.installmentVal)}); if (d.weeksRemaining - 1 === 0) { b.delete(doc.ref); postNews(`✅ **DÍVIDA QUITADA**\n${d.buyerName} terminou de pagar ${d.playerName}.`, 'money'); } else { b.update(doc.ref, {weeksRemaining: d.weeksRemaining - 1}); postNews(`💳 **PARCELA PAGA**\n${d.buyerName} pagou a parcela (${d.weeksRemaining}x) de ${d.playerName}.`, 'money-minus'); } } });
+                    await b.commit(); setLoading(false); alert("Semana processada e XP aplicado!"); 
+                }
+                if(act==='SEASON') { if(confirm("Virar Temporada?")) { setLoading(true); const b=db.batch(); players.forEach(p=>{ let u={contract:(p.contract||1)-1}; if(u.contract<0)u.contract=0; b.update(db.collection('players').doc(p.id), u); }); await b.commit(); setLoading(false); alert("Temporada virada!"); } }
+            };
             const postNews = (text, type='normal') => db.collection('news').add({ text, type, date: Date.now() });
 
             const login = (id, pwd, type) => {

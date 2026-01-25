@@ -126,7 +126,6 @@
             const [companies, setCompanies] = useState([]);
             const [products, setProducts] = useState([]);
             const [sps, setSps] = useState([]);
-            const [sales, setSales] = useState([]);
             // ETAPA 1: Novo estado para empresas
         
 
@@ -135,6 +134,7 @@
             const [loading, setLoading] = useState(true);
             const [newNews, setNewNews] = useState(false);
             const [adminTeam, setAdminTeam] = useState(null); 
+            const [sales, setSales] = useState([]);
 
             useEffect(() => {
                 const unsubs = [

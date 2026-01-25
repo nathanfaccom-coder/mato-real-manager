@@ -526,86 +526,88 @@
                     postNews(data?"📢 JANELA ABERTA":"🔒 JANELA FECHADA", 'infra'); 
                 }
                 
+                // --- VIRADA DE SEMANA: Dinheiro, Energia e Acumular XP (Sem subir nível) ---
                 if(act==='WEEK') { 
-                    if(!confirm("⚠️ VIRAR SEMANA?\n\nIsso irá:\n1. Pagar Salários aos Jogadores (+)\n2. Cobrar Times (-)\n3. Processar Patrocínios e Impostos")) return;
+                    if(!confirm("⚠️ VIRAR SEMANA?\n\n1. Pagar Salários (+)\n2. Recuperar Energia (100%)\n3. Acumular XP Pendente")) return;
                     
                     setLoading(true); 
                     const b = db.batch(); 
                     
-                    // 1. Pagar Salários aos Jogadores (NOVO)
-                    players.forEach(p => {
-                        if(p.teamId && p.salary > 0) {
-                            // Se o jogador não tiver saldo (undefined), assume 0
-                            const currentBal = p.balance || 0;
-                            b.update(db.collection('players').doc(p.id), { balance: currentBal + p.salary });
-                        }
-                    });
-                    // 1. Pagar Salários e RECUPERAR ENERGIA
-                    players.forEach(p => {
-                        if(p.teamId) { // Removi p.salary > 0 pra recuperar energia de todos
+                    players.forEach(p => { 
+                        if(p.teamId) { 
                             const currentBal = p.balance || 0;
                             const salary = p.salary || 0;
-                            // Atualiza saldo e RESETA energia para 100
+                            
+                            // AQUI ESTÁ O SEGREDO:
+                            // Pegamos o XP pendente e somamos ao XP total, mas NÃO recalculamos o Overall ainda.
+                            // O jogador vai ver a barra enchendo, mas o nível só muda na Temporada.
+                            const xpTotal = (p.xp || 0) + (p.pendingXP || 0);
+
                             b.update(db.collection('players').doc(p.id), { 
                                 balance: currentBal + salary,
-                                energy: 100 
-                            });
+                                energy: 100,      // Recupera toda a energia
+                                xp: xpTotal,      // Acumula o XP
+                                pendingXP: 0      // Limpa o pendente
+                            }); 
                         }
                     });
 
-                    // 2. Atualizar Times (Cobrar Salários e Pagar Patrocínios)
+                    // Atualiza Times e Empresas (Mantido igual)
                     teams.forEach(t => { 
-                        const wages = players.filter(p=>p.teamId===t.id).reduce((a,p)=>a+(p.salary||0),0);
-                        const income = sps.filter(s => s.teamId === t.id && s.status === 'ACTIVE').reduce((a,s) => a + parseFloat(s.value), 0);
-                        b.update(db.collection('teams').doc(t.id), {balance:(t.balance||0) + income - wages}); 
-                    }); 
-                    
-                    // 3. Empresas (Impostos)
-                    companies.forEach(c => {
-                        if(c.status === 'ACTIVE') {
-                            const tax = (COMPANY_TYPES[c.companyType] || {}).tax || 0;
-                            b.update(db.collection('companies').doc(c.id), { balance: (c.balance||0) - tax });
-                        }
+                        const wages=players.filter(p=>p.teamId===t.id).reduce((a,p)=>a+(p.salary||0),0); 
+                        const inc=sps.filter(s=>s.teamId===t.id&&s.status==='ACTIVE').reduce((a,s)=>a+parseFloat(s.value),0); 
+                        b.update(db.collection('teams').doc(t.id), {balance:(t.balance||0)+inc-wages}); 
                     });
-
-                    // 4. Dívidas
+                    companies.forEach(c => { if(c.status === 'ACTIVE') { const tax = (COMPANY_TYPES[c.companyType] || {}).tax || 0; b.update(db.collection('companies').doc(c.id), { balance: (c.balance||0) - tax }); } });
+                    
                     const ds = await db.collection('debts').get(); 
                     ds.docs.forEach(doc => { 
                         const d = doc.data(); 
                         if (d.weeksRemaining > 0) { 
                             b.update(db.collection('teams').doc(d.buyerId), {balance: firebase.firestore.FieldValue.increment(-d.installmentVal)}); 
                             b.update(db.collection('teams').doc(d.sellerId), {balance: firebase.firestore.FieldValue.increment(d.installmentVal)}); 
-                            if (d.weeksRemaining - 1 === 0) { 
-                                b.delete(doc.ref); 
-                                postNews(`✅ **DÍVIDA QUITADA**\n${d.buyerName} terminou de pagar ${d.playerName}.`, 'money'); 
-                            } else { 
-                                b.update(doc.ref, {weeksRemaining: d.weeksRemaining - 1}); 
-                                postNews(`💳 **PARCELA PAGA**\n${d.buyerName} pagou a parcela (${d.weeksRemaining}x) de ${d.playerName}.`, 'money-minus'); 
-                            } 
+                            if (d.weeksRemaining - 1 === 0) { b.delete(doc.ref); postNews(`✅ **DÍVIDA QUITADA**\n${d.buyerName} terminou de pagar ${d.playerName}.`, 'money'); } 
+                            else { b.update(doc.ref, {weeksRemaining: d.weeksRemaining - 1}); postNews(`💳 **PARCELA PAGA**\n${d.buyerName} pagou a parcela (${d.weeksRemaining}x) de ${d.playerName}.`, 'money-minus'); } 
                         } 
+                    });
+                    
+                    await b.commit(); 
+                    setLoading(false); 
+                    alert("Semana processada! Jogadores receberam e energia recuperada."); 
+                }
+                
+                // --- VIRADA DE TEMPORADA: A Evolução Acontece Aqui ---
+                if(act==='SEASON') { 
+                    if(!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Jogadores sobem de nível (Evolução)\n2. Contratos diminuem")) return; 
+                    
+                    setLoading(true); 
+                    const b = db.batch(); 
+                    
+                    players.forEach(p => { 
+                        let u={}; 
+                        
+                        // EVOLUÇÃO: Agora sim calculamos o novo nível
+                        const currentLvl = p.overall || 45;
+                        const currentXP = p.xp || 0;
+                        const res = calcNewLevel(currentLvl, currentXP, 0); // Calcula a subida
+                        
+                        if (res.lvl !== currentLvl) {
+                            u.overall = res.lvl; // Atualiza o nível
+                            u.xp = res.xp;       // Atualiza o XP (sobra)
+                        }
+
+                        // Contratos
+                        if(p.futureTransfer){u.futureTransfer=firebase.firestore.FieldValue.delete();} 
+                        else if((p.contract<=1||p.contract===0)&&p.preContract){u.teamId=p.preContract.teamId; u.contract=1; u.status='NAO_A_VENDA'; u.preContract=firebase.firestore.FieldValue.delete();} 
+                        else { let nc=(p.contract||0)-1; if(nc<0)nc=0; u.contract=nc; if(nc===0)u.status='EXPIRADO'; } 
+                        
+                        b.update(db.collection('players').doc(p.id), u); 
                     }); 
                     
                     await b.commit(); 
                     setLoading(false); 
-                    postNews("📅 **VIRADA DE SEMANA**\nSalários caíram na conta dos jogadores!", 'infra'); 
-                    alert("Semana processada! Jogadores receberam."); 
-                }
-                
-                if(act==='SEASON') { 
-                    if(!confirm("⚠️ VIRAR TEMPORADA?")) return; 
-                    setLoading(true); 
-                    const b = db.batch(); 
-                    players.forEach(p => { 
-                        let u={}; 
-                        if(p.futureTransfer){u=p.futureTransfer; u.futureTransfer=firebase.firestore.FieldValue.delete();} 
-                        else if((p.contract<=1||p.contract===0)&&p.preContract){u.teamId=p.preContract.teamId; u.contract=1; u.status='NAO_A_VENDA'; u.preContract=firebase.firestore.FieldValue.delete();} 
-                        else { let nc=(p.contract||0)-1; if(nc<0)nc=0; u.contract=nc; if(nc===0)u.status='EXPIRADO'; } 
-                        b.update(db.collection('players').doc(p.id), u); 
-                    }); 
-                    await b.commit(); 
-                    setLoading(false); 
-                    postNews("🌞 **NOVA TEMPORADA**", 'season'); 
-                    alert("Ok"); 
+                    postNews("🌞 **NOVA TEMPORADA**\nJogadores evoluíram seus níveis!", 'season'); 
+                    alert("Temporada virada com sucesso!"); 
                 }
             };
             // --- RENDER ---
@@ -1207,9 +1209,16 @@
             const [tab, setTab] = useState('PERFIL'); 
 
             const myItems = (sales||[]).filter(s => s.buyerName === player.name);
+            
+            // --- CÁLCULOS DO RPG (ESTILO FIFA) ---
             const xpNeed = getXPNext(player.overall);
+            // Calcula qual seria o nível SE ele upasse agora (incluindo XP pendente)
+            const future = calcNewLevel(player.overall, (player.xp||0), (player.pendingXP||0));
+            const diffLvl = future.lvl - player.overall; // Ex: Se for nivel 70 e virar 72, diff é +2
+            
+            // Barra de XP baseada no XP atual apenas
             const xpPerc = Math.min(100, Math.max(0, ((player.xp || 0) / xpNeed) * 100));
-            const energy = player.energy !== undefined ? player.energy : 100; // Padrão 100 se não tiver
+            const energy = player.energy !== undefined ? player.energy : 100;
 
             return (
                 <div>
@@ -1219,10 +1228,28 @@
                         <small>{team?.name || 'Agente Livre'}</small>
                         
                         <div style={{display:'flex', justifyContent:'center', gap:20, marginTop:15}}>
+                            
+                            {/* OVERALL COM PREVISÃO DE EVOLUÇÃO */}
                             <div style={{textAlign:'center'}}>
-                                <div style={{fontSize:35, fontWeight:'900', color:'var(--warning)', lineHeight:1}}>{player.overall}</div>
-                                <span style={{fontSize:10, textTransform:'uppercase', color:'#888'}}>Nível</span>
+                                <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:5}}>
+                                    <div style={{fontSize:35, fontWeight:'900', color:'var(--warning)', lineHeight:1}}>
+                                        {player.overall}
+                                    </div>
+                                    {/* O NÚMERO MÁGICO VERDE/VERMELHO */}
+                                    {diffLvl !== 0 && (
+                                        <span style={{
+                                            fontSize: 16, 
+                                            fontWeight: 'bold', 
+                                            color: diffLvl > 0 ? '#00E676' : '#FF1744',
+                                            animation: 'pulse 1.5s infinite'
+                                        }}>
+                                            {diffLvl > 0 ? '+' : ''}{diffLvl}
+                                        </span>
+                                    )}
+                                </div>
+                                <span style={{fontSize:10, textTransform:'uppercase', color:'#888'}}>Nível (Prev: {future.lvl})</span>
                             </div>
+
                             <div style={{textAlign:'center'}}>
                                 <div style={{fontSize:35, fontWeight:'900', color: energy > 50 ? 'var(--primary)' : 'var(--danger)', lineHeight:1}}>{energy}%</div>
                                 <span style={{fontSize:10, textTransform:'uppercase', color:'#888'}}>Energia</span>
@@ -1233,7 +1260,24 @@
                         <div style={{position:'absolute', bottom:0, left:0, right:0, height:6, background:'#333'}}>
                             <div style={{width:`${xpPerc}%`, height:'100%', background:'var(--warning)', transition:'0.5s'}}></div>
                         </div>
-                        <div style={{position:'absolute', bottom:8, right:5, fontSize:9, color:'#ccc'}}>{player.xp||0} / {xpNeed} XP</div>
+                        {/* Mostra XP Numérico */}
+                        <div style={{position:'absolute', bottom:8, right:5, fontSize:9, color:'#ccc'}}>
+                            {player.xp||0} / {xpNeed} XP
+                        </div>
+                        
+                        {/* Balãozinho de XP Pendente (Súmula Recente) */}
+                        {player.pendingXP && player.pendingXP !== 0 && (
+                            <div style={{
+                                position:'absolute', top: 10, right: 10, 
+                                background: player.pendingXP > 0 ? 'rgba(0,255,0,0.2)' : 'rgba(255,0,0,0.2)', 
+                                border: player.pendingXP > 0 ? '1px solid #00E676' : '1px solid #FF1744',
+                                color: player.pendingXP > 0 ? '#00E676' : '#FF1744',
+                                padding: '2px 8px', borderRadius: 10, fontWeight: 'bold', fontSize: 10,
+                                animation: 'pulse 2s infinite'
+                            }}>
+                                {player.pendingXP > 0 ? '+' : ''}{player.pendingXP} XP (Semana)
+                            </div>
+                        )}
                     </div>
 
                     <div style={{display:'flex', gap:10, marginBottom:15}}>

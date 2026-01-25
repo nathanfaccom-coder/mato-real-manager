@@ -555,6 +555,7 @@
             };
 
             // 3. Função Mestra do Admin (Semana e Temporada)
+            // 3. Função Mestra do Admin (BLINDADA CONTRA ERROS)
             const adminAction = async (act, data) => {
                 if(act==='MARKET') { 
                     db.collection('config').doc('system').update({marketOpen: data}); 
@@ -568,38 +569,70 @@
                     setLoading(true); 
                     const b = db.batch(); 
                     
-                    // Jogadores: Recebem salário, energia 100% e guardam XP
+                    // 1. Jogadores: Recebem salário e XP
                     players.forEach(p => { 
                         if(p.teamId) { 
-                            const currentBal = parseFloat(p.balance) || 0;
-                            const salary = parseFloat(p.salary) || 0;
-                            const xpTotal = (p.xp || 0) + (p.pendingXP || 0); // Soma o pendente ao total
+                            // Verifica se o time do jogador ainda existe para evitar erro
+                            if (teams.some(t => t.id === p.teamId)) {
+                                const currentBal = parseFloat(p.balance) || 0;
+                                const salary = parseFloat(p.salary) || 0;
+                                const xpTotal = (p.xp || 0) + (p.pendingXP || 0);
 
-                            b.update(db.collection('players').doc(p.id), { 
-                                balance: currentBal + salary,
-                                energy: 100,
-                                xp: xpTotal,   // Guarda o XP total
-                                pendingXP: 0   // Limpa o balãozinho verde
-                            }); 
+                                b.update(db.collection('players').doc(p.id), { 
+                                    balance: currentBal + salary,
+                                    energy: 100,
+                                    xp: xpTotal,
+                                    pendingXP: 0
+                                }); 
+                            }
                         }
                     });
 
-                    // Times: Pagam salários e Recebem Patrocínio
+                    // 2. Times: Pagam salários e Recebem Patrocínio
                     teams.forEach(t => { 
                         const wages = players.filter(p=>p.teamId===t.id).reduce((a,p)=>a+(parseFloat(p.salary)||0),0); 
                         const income = sps.filter(s => s.teamId === t.id && s.status === 'ACTIVE').reduce((a,s) => a + parseFloat(s.value), 0); 
                         b.update(db.collection('teams').doc(t.id), {balance:(t.balance||0) + income - wages}); 
                     });
 
-                    // Empresas e Dívidas
+                    // 3. Empresas (Impostos)
                     companies.forEach(c => { if(c.status === 'ACTIVE') { const tax = (COMPANY_TYPES[c.companyType] || {}).tax || 0; b.update(db.collection('companies').doc(c.id), { balance: (c.balance||0) - tax }); } });
                     
-                    // (Lógica de dívidas mantida simplificada para economizar espaço)
-                    const ds = await db.collection('debts').get(); ds.docs.forEach(doc => { const d = doc.data(); if (d.weeksRemaining > 0) { b.update(db.collection('teams').doc(d.buyerId), {balance: firebase.firestore.FieldValue.increment(-d.installmentVal)}); b.update(db.collection('teams').doc(d.sellerId), {balance: firebase.firestore.FieldValue.increment(d.installmentVal)}); if (d.weeksRemaining - 1 === 0) { b.delete(doc.ref); } else { b.update(doc.ref, {weeksRemaining: d.weeksRemaining - 1}); } } });
+                    // 4. Dívidas (AQUI ESTAVA O ERRO: CORRIGIDO)
+                    const ds = await db.collection('debts').get(); 
+                    ds.docs.forEach(doc => { 
+                        const d = doc.data(); 
+                        
+                        // Verifica se Comprador e Vendedor ainda existem
+                        const buyerExists = teams.some(t => t.id === d.buyerId);
+                        const sellerExists = teams.some(t => t.id === d.sellerId);
+
+                        if (!buyerExists || !sellerExists) {
+                            // Se um dos times sumiu, apaga a dívida para não travar o jogo
+                            b.delete(doc.ref);
+                        } else if (d.weeksRemaining > 0) { 
+                            // Se ambos existem, processa o pagamento
+                            b.update(db.collection('teams').doc(d.buyerId), {balance: firebase.firestore.FieldValue.increment(-d.installmentVal)}); 
+                            b.update(db.collection('teams').doc(d.sellerId), {balance: firebase.firestore.FieldValue.increment(d.installmentVal)}); 
+                            
+                            if (d.weeksRemaining - 1 === 0) { 
+                                b.delete(doc.ref); 
+                                postNews(`✅ **DÍVIDA QUITADA**\n${d.buyerName} terminou de pagar ${d.playerName}.`, 'money'); 
+                            } else { 
+                                b.update(doc.ref, {weeksRemaining: d.weeksRemaining - 1}); 
+                                postNews(`💳 **PARCELA PAGA**\n${d.buyerName} pagou a parcela (${d.weeksRemaining}x) de ${d.playerName}.`, 'money-minus'); 
+                            } 
+                        } 
+                    });
                     
-                    await b.commit(); 
+                    try {
+                        await b.commit(); 
+                        alert("Semana processada com sucesso!"); 
+                    } catch (error) {
+                        console.error("Erro ao virar semana:", error);
+                        alert("Erro ao processar: " + error.message);
+                    }
                     setLoading(false); 
-                    alert("Semana processada com sucesso!"); 
                 }
                 
                 // VIRADA DE TEMPORADA (Evolução de Nível)
@@ -611,26 +644,35 @@
                     
                     players.forEach(p => { 
                         let u={}; 
-                        // Calcula o novo nível baseado no XP acumulado
                         const currentLvl = p.overall || 45;
                         const currentXP = p.xp || 0;
                         const res = calcNewLevel(currentLvl, currentXP, 0); 
                         
                         if (res.lvl !== currentLvl) {
-                            u.overall = res.lvl; // Atualiza o nível
-                            u.xp = res.xp;       // Atualiza o XP restante
+                            u.overall = res.lvl; 
+                            u.xp = res.xp;       
                         }
                         
-                        // Envelhece o contrato
                         let nc=(p.contract||0)-1; if(nc<0)nc=0; u.contract=nc; 
+                        
+                        // Também verifica se o jogador tem um time válido antes de atualizar contratos de pré-venda
+                        if((p.contract<=1||p.contract===0)&&p.preContract){
+                             if (teams.some(t => t.id === p.preContract.teamId)) {
+                                 u.teamId=p.preContract.teamId; u.contract=1; u.status='NAO_A_VENDA'; u.preContract=firebase.firestore.FieldValue.delete();
+                             }
+                        } 
                         
                         b.update(db.collection('players').doc(p.id), u); 
                     }); 
                     
-                    await b.commit(); 
+                    try {
+                        await b.commit(); 
+                        alert("Temporada virada! Níveis atualizados."); 
+                    } catch (error) {
+                        alert("Erro na temporada: " + error.message);
+                    }
                     setLoading(false); 
                     postNews("🌞 **NOVA TEMPORADA**", 'season'); 
-                    alert("Temporada virada! Níveis atualizados."); 
                 }
             };
             // --- RENDER ---
@@ -645,7 +687,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.75</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.76</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -834,7 +876,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | vv1.75(Company Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | vv1.76(Company Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

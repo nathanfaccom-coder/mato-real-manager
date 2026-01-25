@@ -480,7 +480,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.42.0</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.42.1</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -593,7 +593,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.42.0</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.42.1</div>
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
                         <div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR TIME</div>
@@ -773,18 +773,53 @@
             );
         };
 
-        const TeamDashboard = ({ team, players, isVisitor, onEdit, onAdd }) => (
-            <div>
-                <div style={{display:'flex', justifyContent:'space-between', marginBottom:10}}><h3>Elenco ({players.length})</h3>{!isVisitor && <button className="btn btn-green" style={{width:'auto'}} onClick={onAdd}>+ JOGADOR</button>}</div>
-                {players.sort((a,b)=>b.overall-a.overall).map(p => (
-                    <div key={p.id} className="card" onClick={()=>!isVisitor && onEdit(p)} style={{cursor: isVisitor?'default':'pointer'}}>
-                        <div style={{display:'flex', justifyContent:'space-between'}}><div><span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span><b>{p.name}</b> {p.rating > 0 && <span className="rating-badge">★ {p.rating}</span>}</div><span className="player-ov">{p.overall}</span></div>
-                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', fontSize:11, color:'#aaa', marginTop:5}}><div>Sal: {fmt(p.salary)}</div><div>Val: {fmt(p.value)}</div><div>Con: {p.contract}</div><div>Mul: {fmt(p.clause)}</div></div>
-                        <div className="stats-grid"><div className="stat-item"><span className="stat-lbl">⚽</span><span className="stat-val">{p.stats?.goals||0}</span></div><div className="stat-item"><span className="stat-lbl">👟</span><span className="stat-val">{p.stats?.assists||0}</span></div><div className="stat-item"><span className="stat-lbl">🛡️</span><span className="stat-val">{p.stats?.tackles||0}</span></div><div className="stat-item"><span className="stat-lbl">🧤</span><span className="stat-val">{p.stats?.saves||0}</span></div><div className="stat-item"><span className="stat-lbl">🟨</span><span className="stat-val">{p.stats?.yellows||0}</span></div><div className="stat-item"><span className="stat-lbl">🟥</span><span className="stat-val">{p.stats?.reds||0}</span></div></div>
+        const TeamDashboard = ({ team, players, isVisitor, onEdit, onAdd }) => {
+            // CÁLCULO AUTOMÁTICO DA FOLHA SALARIAL
+            const payroll = players.reduce((total, p) => total + (parseFloat(p.salary) || 0), 0);
+            
+            return (
+                <div>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:15}}>
+                        <div>
+                            <h3 style={{margin:0}}>Elenco ({players.length})</h3>
+                            {/* AQUI ESTÁ A CORREÇÃO: Exibe a Folha Salarial */}
+                            <small style={{color:'#ccc'}}>
+                                Folha: <span style={{color:'var(--danger)', fontWeight:'bold'}}>{fmt(payroll)}</span>/sem
+                            </small>
+                        </div>
+                        {!isVisitor && <button className="btn btn-green" style={{width:'auto', padding:'5px 15px'}} onClick={onAdd}>+ JOGADOR</button>}
                     </div>
-                ))}
-            </div>
-        );
+
+                    {players.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Nenhum jogador contratado.</p>}
+                    
+                    {players.sort((a,b)=>b.overall-a.overall).map(p => (
+                        <div key={p.id} className="card" onClick={()=>!isVisitor && onEdit(p)} style={{cursor: isVisitor?'default':'pointer'}}>
+                            <div style={{display:'flex', justifyContent:'space-between'}}>
+                                <div>
+                                    <span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span>
+                                    <b>{p.name}</b> {p.rating > 0 && <span className="rating-badge">★ {p.rating}</span>}
+                                </div>
+                                <span className="player-ov">{p.overall}</span>
+                            </div>
+                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', fontSize:11, color:'#aaa', marginTop:5}}>
+                                <div>Sal: {fmt(p.salary)}</div>
+                                <div>Val: {fmt(p.value)}</div>
+                                <div>Con: {p.contract}</div>
+                                <div>Mul: {fmt(p.clause)}</div>
+                            </div>
+                            <div className="stats-grid">
+                                <div className="stat-item"><span className="stat-lbl">⚽</span><span className="stat-val">{p.stats?.goals||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">👟</span><span className="stat-val">{p.stats?.assists||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🛡️</span><span className="stat-val">{p.stats?.tackles||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🧤</span><span className="stat-val">{p.stats?.saves||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🟨</span><span className="stat-val">{p.stats?.yellows||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🟥</span><span className="stat-val">{p.stats?.reds||0}</span></div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            );
+        };
 
         const StatsEditor = ({ players, teams, onSave }) => {
             const [search, setSearch] = useState(''); const [selP, setSelP] = useState(null); const [s, setS] = useState({});

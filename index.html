@@ -208,6 +208,48 @@
                     await db.collection('products').doc(id).delete();
                 }
             };
+            // --- ETAPA 3: Lógica de Shopping e Patrocínio ---
+            const requestSponsorship = async (companyId, val) => {
+                // Verifica se já existe pedido pendente ou ativo com essa empresa
+                if (sps.find(s => s.companyId === companyId && s.teamId === user.data.id)) {
+                    return alert("Já existe uma negociação ou contrato ativo com esta empresa.");
+                }
+                const comp = companies.find(c => c.id === companyId);
+                await db.collection('sponsorships').add({ 
+                    companyId, 
+                    companyName: comp.name, 
+                    teamId: user.data.id, 
+                    teamName: user.data.name, 
+                    value: parseFloat(val), 
+                    status: 'PENDING' 
+                });
+                alert("Proposta enviada para a empresa!");
+            };
+
+            const processSponsorship = async (s, status) => {
+                if (status === 'REJECTED' || status === 'CANCELLED') {
+                    if(confirm(status === 'REJECTED' ? "Recusar proposta?" : "Cancelar contrato?")) {
+                        await db.collection('sponsorships').doc(s.id).delete();
+                    }
+                } else if (status === 'ACTIVE') {
+                    await db.collection('sponsorships').doc(s.id).update({ status: 'ACTIVE' });
+                    postNews(`🤝 **NOVO PATROCÍNIO**\nA **${user.data.name}** agora patrocina o **${s.teamName}**!`, 'biz');
+                }
+            };
+
+            const buyProduct = async (prod, seller) => {
+                if (user.data.balance < prod.price) return alert("Saldo insuficiente!");
+                if (!confirm(`Comprar ${prod.name} por ${fmt(prod.price)}?`)) return;
+
+                const b = db.batch();
+                // Tira do Time
+                b.update(db.collection('teams').doc(user.data.id), { balance: user.data.balance - prod.price });
+                // Dá para a Empresa
+                b.update(db.collection('companies').doc(seller.id), { balance: seller.balance + prod.price });
+                
+                await b.commit();
+                alert("Compra realizada com sucesso!");
+            };
 
             const approveTeam = async (teamId, finalBalance) => { await db.collection('teams').doc(teamId).update({ status: 'ACTIVE', balance: parseFloat(finalBalance) }); const t = teams.find(x=>x.id===teamId); postNews(`🛡️ **NOVO CLUBE!**\nO **${t.name}** foi aprovado na Série ${t.serie}.`, 'infra'); alert("Aprovado!"); };
             const deleteTeam = async (teamId) => { if(!confirm("⚠️ PERIGO: Excluir time e jogadores?")) return; const batch = db.batch(); batch.delete(db.collection('teams').doc(teamId)); const snap = await db.collection('players').where('teamId', '==', teamId).get(); snap.docs.forEach(doc => batch.delete(doc.ref)); await batch.commit(); postNews("🚫 **CLUBE EXTINTO**\nUm time encerrou atividades.", 'infra'); };
@@ -382,26 +424,68 @@
                         {screen === 'PRESS_DASH' && (user.type==='PRESS' || user.type==='PRESS_WORKER') && (<div><h3>Painel de Imprensa ({user.data.name})</h3><div className="card"><button className="btn btn-blue" onClick={()=>setModal({type:'POST_NEWS'})}>ESCREVER NOTÍCIA</button><button className="btn btn-purple" onClick={()=>setModal({type:'STATS_SEARCH'})}>SÚMULA / ESTATÍSTICAS</button></div>{user.type==='PRESS' && journalists.filter(j=>j.newspaperId===user.data.id && j.status==='PENDING').map(j=><div key={j.id} className="card">{j.name}<button className="btn btn-green" onClick={()=>db.collection('journalists').doc(j.id).update({status:'ACTIVE'})}>APROVAR</button></div>)}</div>)}
                         {screen === 'ADMIN_TEAM' && adminTeam && <div><button className="btn" style={{background:'#333', marginBottom:10}} onClick={()=>{setAdminTeam(null); setScreen('HOME');}}>⬅ VOLTAR</button><h3 style={{color:'var(--purple)'}}>Editando: {adminTeam.name}</h3><TeamDashboard team={adminTeam} players={players.filter(p=>p.teamId===adminTeam.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} /></div>}
                         {screen === 'MARKET' && <Market me={user.data?.id} teams={teams} players={players} open={conf.marketOpen} isVis={user.type==='VISITOR'} onNeg={(p)=>setModal({type:'OFFER', data:p})} onPayClause={async(p)=>{/*Clause logic*/}} onPre={async(p)=>{/*Pre logic*/}} />}
+                        {/* TELA: SHOPPING GLOBAL */}
+                        {screen === 'SHOPPING' && <ShoppingScreen products={products} companies={companies} userTeam={user.type==='USER'} onBuy={buyProduct} />}
+                        
+                        {/* TELA: PATROCÍNIOS (Apenas para Times) */}
+                        {screen === 'SPONSORSHIPS' && user.type === 'USER' && (
+                            <div>
+                                <h3>Buscar Patrocínio</h3>
+                                <p style={{fontSize:11, color:'#aaa'}}>Envie propostas semanais para as empresas.</p>
+                                {companies.filter(c=>c.status==='ACTIVE').map(c => (
+                                    <div key={c.id} className="card">
+                                        <b>{c.name}</b> <small>({(COMPANY_TYPES[c.companyType] || {}).label})</small>
+                                        <div style={{display:'flex', gap:5, marginTop:5}}>
+                                            <button className="btn btn-purple" onClick={()=>{const v=prompt("Valor Semanal pedido (₣):"); if(v) requestSponsorship(c.id, v);}}>PEDIR PATROCÍNIO</button>
+                                        </div>
+                                    </div>
+                                ))}
+                                
+                                <hr style={{borderColor:'#333'}}/>
+                                <h4>Meus Contratos</h4>
+                                {sps.filter(s=>s.teamId===user.data.id).length === 0 && <p style={{color:'#666'}}>Sem contratos.</p>}
+                                {sps.filter(s=>s.teamId===user.data.id).map(s => (
+                                    <div key={s.id} className="card" style={{borderLeft:`4px solid ${s.status==='ACTIVE'?'var(--primary)':'#666'}`}}>
+                                        <b>{s.companyName}</b><br/>
+                                        Valor: {fmt(s.value)}/sem <small>({s.status === 'PENDING' ? 'Aguardando' : 'Ativo'})</small>
+                                        {s.status==='ACTIVE' && <button className="btn btn-red" style={{width:'auto', marginTop:5}} onClick={()=>{if(confirm("Encerrar contrato de patrocínio?")) db.collection('sponsorships').doc(s.id).delete();}}>ENCERRAR</button>}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         {screen === 'RANKING' && <Ranking teams={teams} players={players} />}
                         {screen === 'NEWS' && <div><h3>Notícias</h3>{news.map(n=><div key={n.id} className={`news-card news-${n.type}`}>{n.text}<br/><small style={{color:'#666'}}>{new Date(n.date).toLocaleString()}</small></div>)}</div>}
                         {screen === 'OFFERS' && <OffersScreen offers={offers} onAccept={acceptOffer} onReject={rejectOffer} onCounter={(o)=>setModal({type:'OFFER', data:{...players.find(p=>p.id===o.playerId), oldOffer:o}})} />}
                         
                         {/* ETAPA 1: Painel Provisório da Empresa */}
                         {screen === 'COMPANY_HOME' && user.type === 'COMPANY' && 
-    <CompanyDashboard 
-        company={user.data} 
-        products={products.filter(p => p.companyId === user.data.id)} 
-        onSaveProd={saveProduct} 
-        onDeleteProd={deleteProduct} 
-    />
-}
+                            <CompanyDashboard 
+                                company={user.data} 
+                                products={products.filter(p => p.companyId === user.data.id)} 
+                                sps={sps.filter(s => s.companyId === user.data.id)} // NOVO: Passa os patrocínios
+                                teams={teams}
+                                onSaveProd={saveProduct} 
+                                onDeleteProd={deleteProduct} 
+                                onProcessSpons={processSponsorship} // NOVO: Função de aceitar/recusar
+                            />
+                        }
                     </div>
 
                     <div className="bottom-nav">
-                        <div className={`nav-item ${screen==='HOME'||screen==='COMPANY_HOME'?'active':''}`} onClick={()=>setScreen(user.type.includes('PRESS') ? 'PRESS_DASH' : (user.type==='COMPANY' ? 'COMPANY_HOME' : 'HOME'))}><i className="fas fa-home"></i>{user.type==='ADMIN'?'ADM':'INÍCIO'}</div>
-                        <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>
-                        <div className={`nav-item ${screen==='RANKING'?'active':''}`} onClick={()=>setScreen('RANKING')}><i className="fas fa-trophy"></i>RANK</div>
-                        <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={()=>{setScreen('NEWS'); setNewNews(false); localStorage.setItem('lastRead', Date.now());}}><i className="fas fa-newspaper"></i>{newNews && <span style={{color:'red'}}>●</span>} NEWS</div>
+                        <div className={`nav-item ${screen==='HOME'||screen==='COMPANY_HOME'?'active':''}`} onClick={()=>setScreen(user.type.includes('PRESS')?'PRESS_DASH':(user.type==='COMPANY'?'COMPANY_HOME':'HOME'))}><i className="fas fa-home"></i>INÍCIO</div>
+                        
+                        {/* Botão Mercado só para quem não é empresa */}
+                        {user.type!=='COMPANY' && <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>}
+                        
+                        {/* NOVO: Botão Shopping */}
+                        {user.type!=='COMPANY' && <div className={`nav-item ${screen==='SHOPPING'?'active':''}`} onClick={()=>setScreen('SHOPPING')}><i className="fas fa-shopping-bag"></i>SHOP</div>}
+                        
+                        {/* NOVO: Botão Patrocínio (Só Times) */}
+                        {user.type==='USER' && <div className={`nav-item ${screen==='SPONSORSHIPS'?'active':''}`} onClick={()=>setScreen('SPONSORSHIPS')}><i className="fas fa-handshake"></i>PATRO</div>}
+                        
+                        {user.type!=='COMPANY' && <div className={`nav-item ${screen==='RANKING'?'active':''}`} onClick={()=>setScreen('RANKING')}><i className="fas fa-trophy"></i>RANK</div>}
+                        
+                        <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={()=>{setScreen('NEWS'); setNewNews(false); localStorage.setItem('lastRead', Date.now());}}><i className="fas fa-newspaper"></i>NEWS</div>
                     </div>
 
                     {modal && <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget && setModal(null)}>
@@ -487,7 +571,8 @@
             );
         };
         // --- NOVO COMPONENTE: PAINEL DA EMPRESA ---
-        const CompanyDashboard = ({ company, products, onSaveProd, onDeleteProd }) => {
+       // Painel da Empresa (Atualizado com Patrocínios)
+        const CompanyDashboard = ({ company, products, sps, teams, onSaveProd, onDeleteProd, onProcessSpons }) => {
             const [tab, setTab] = useState('PRODS'); 
             const [editP, setEditP] = useState(null); 
             
@@ -500,7 +585,6 @@
                     
                     {tab==='PRODS' && <div>
                         <button className="btn btn-green" onClick={()=>setEditP({name:'', price:'', img:'', desc:''})}>+ NOVO PRODUTO</button>
-                        {products.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Nenhum produto cadastrado.</p>}
                         {products.map(p => (
                             <div key={p.id} className="card" style={{display:'flex', gap:10, textAlign:'left'}}>
                                 <img src={p.img || 'https://via.placeholder.com/100'} style={{width:80, height:80, objectFit:'cover', borderRadius:6}} />
@@ -522,24 +606,70 @@
                             <h3>Saldo: {fmt(company.balance)}</h3>
                             <small>Imposto Semanal: {fmt((COMPANY_TYPES[company.companyType] || {}).tax || 0)}</small>
                         </div>
-                        <p style={{textAlign:'center', color:'#666'}}>Histórico financeiro em breve...</p>
+                        
+                        <h4>Solicitações de Patrocínio</h4>
+                        {sps.filter(s=>s.status==='PENDING').length === 0 && <p style={{color:'#666'}}>Nenhuma solicitação pendente.</p>}
+                        {sps.filter(s=>s.status==='PENDING').map(s => (
+                            <div key={s.id} className="card">
+                                <b>{s.teamName}</b> pede patrocínio.<br/>
+                                Valor Semanal: <span style={{color:'var(--warning)'}}>{fmt(s.value)}</span><br/>
+                                <div style={{display:'flex', gap:5, marginTop:5}}>
+                                    <button className="btn btn-green" onClick={()=>onProcessSpons(s, 'ACTIVE')}>ACEITAR</button>
+                                    <button className="btn btn-red" onClick={()=>onProcessSpons(s, 'REJECTED')}>RECUSAR</button>
+                                </div>
+                            </div>
+                        ))}
+
+                        <h4>Contratos Ativos (Pagamento Semanal)</h4>
+                        {sps.filter(s=>s.status==='ACTIVE').length === 0 && <p style={{color:'#666'}}>Nenhum contrato ativo.</p>}
+                        {sps.filter(s=>s.status==='ACTIVE').map(s => (
+                            <div key={s.id} className="card" style={{borderLeft:'4px solid var(--primary)'}}>
+                                <b>{s.teamName}</b><br/>
+                                Pagamento Semanal: {fmt(s.value)}
+                                <button className="btn btn-red" style={{marginTop:5}} onClick={()=>onProcessSpons(s, 'CANCELLED')}>CANCELAR CONTRATO</button>
+                            </div>
+                        ))}
                     </div>}
 
                     {editP && <div className="modal-overlay"><div className="modal-content">
                         <h3>{editP.id ? 'Editar' : 'Novo'} Produto</h3>
-                        <label>Nome do Produto</label>
-                        <input className="input-field" value={editP.name} onChange={e=>setEditP({...editP, name:e.target.value})} />
-                        <label>Preço (₣)</label>
-                        <input className="input-field" type="number" value={editP.price} onChange={e=>setEditP({...editP, price:e.target.value})} />
-                        <label>URL da Imagem (Opcional)</label>
-                        <input className="input-field" value={editP.img} placeholder="http://..." onChange={e=>setEditP({...editP, img:e.target.value})} />
-                        <label>Descrição</label>
-                        <textarea className="input-field" value={editP.desc} onChange={e=>setEditP({...editP, desc:e.target.value})} />
-                        <div style={{display:'flex', gap:10}}>
-                            <button className="btn btn-green" onClick={()=>{onSaveProd(editP); setEditP(null);}}>SALVAR</button>
-                            <button className="btn" onClick={()=>setEditP(null)}>CANCELAR</button>
-                        </div>
+                        <label>Nome</label><input className="input-field" value={editP.name} onChange={e=>setEditP({...editP, name:e.target.value})} />
+                        <label>Preço</label><input className="input-field" type="number" value={editP.price} onChange={e=>setEditP({...editP, price:e.target.value})} />
+                        <label>Imagem URL</label><input className="input-field" value={editP.img} onChange={e=>setEditP({...editP, img:e.target.value})} />
+                        <label>Descrição</label><textarea className="input-field" value={editP.desc} onChange={e=>setEditP({...editP, desc:e.target.value})} />
+                        <div style={{display:'flex', gap:10}}><button className="btn btn-green" onClick={()=>{onSaveProd(editP); setEditP(null);}}>SALVAR</button><button className="btn" onClick={()=>setEditP(null)}>CANCELAR</button></div>
                     </div></div>}
+                </div>
+            );
+        };
+
+        // Novo Componente Shopping
+        const ShoppingScreen = ({ products, companies, userTeam, onBuy }) => {
+            const [term, setTerm] = useState('');
+            const list = products.filter(p => p.name.toLowerCase().includes(term.toLowerCase()));
+            
+            return (
+                <div>
+                    <h3>Shopping Global</h3>
+                    <input className="input-field" placeholder="Buscar produto..." value={term} onChange={e=>setTerm(e.target.value)} />
+                    
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                        {list.map(p => { 
+                            const comp = companies.find(c => c.id === p.companyId); 
+                            if (comp?.status !== 'ACTIVE') return null; 
+                            
+                            return (
+                                <div key={p.id} className="card" style={{padding:10, position:'relative'}}>
+                                    <div style={{fontSize:9, background:'var(--purple)', position:'absolute', top:5, right:5, padding:'2px 5px', borderRadius:4}}>{comp.name}</div>
+                                    <img src={p.img || 'https://via.placeholder.com/100'} className="prod-img" style={{width:'100%', height:100, objectFit:'cover', borderRadius:4}} />
+                                    <div style={{fontWeight:'bold', fontSize:13, marginTop:5}}>{p.name}</div>
+                                    <div style={{color:'var(--primary)', fontWeight:'900'}}>{fmt(p.price)}</div>
+                                    {userTeam && <button className="btn btn-green" style={{marginTop:5, fontSize:10}} onClick={()=>onBuy(p, comp)}>COMPRAR</button>}
+                                </div>
+                            ); 
+                        })}
+                    </div>
+                    {list.length === 0 && <p style={{textAlign:'center', color:'#666'}}>Nenhum produto encontrado.</p>}
                 </div>
             );
         };

@@ -126,6 +126,7 @@
             const [companies, setCompanies] = useState([]);
             const [products, setProducts] = useState([]);
             const [sps, setSps] = useState([]);
+            const [sales, setSales] = useState([]);
             // ETAPA 1: Novo estado para empresas
         
 
@@ -147,6 +148,7 @@
                     db.collection('companies').onSnapshot(s => setCompanies(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('products').onSnapshot(s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('sponsorships').onSnapshot(s => setSps(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    db.collection('sales').orderBy('date', 'desc').limit(50).onSnapshot(s => setSales(s.docs.map(d => d.data()))),
                     db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => { const list = s.docs.map(d => ({id:d.id, ...d.data()})); setNews(list); const lastRead = localStorage.getItem('lastRead'); if (list.length && (!lastRead || list[0].date > parseInt(lastRead))) setNewNews(true); setLoading(false); })
                 ];
                 return () => unsubs.forEach(u => u());
@@ -239,16 +241,29 @@
 
             const buyProduct = async (prod, seller) => {
                 if (user.data.balance < prod.price) return alert("Saldo insuficiente!");
+                // Pergunta quantidade (Simples) ou compra 1 unidade
+                // Por segurança e simplicidade, mantemos 1 unidade por clique por enquanto, 
+                // mas registramos no histórico.
                 if (!confirm(`Comprar ${prod.name} por ${fmt(prod.price)}?`)) return;
 
                 const b = db.batch();
-                // Tira do Time
+                // 1. Tira do Time
                 b.update(db.collection('teams').doc(user.data.id), { balance: user.data.balance - prod.price });
-                // Dá para a Empresa
+                // 2. Dá para a Empresa
                 b.update(db.collection('companies').doc(seller.id), { balance: seller.balance + prod.price });
                 
+                // 3. NOVO: Cria o Registro da Venda (Histórico)
+                const saleRef = db.collection('sales').doc();
+                b.set(saleRef, {
+                    companyId: seller.id,
+                    productName: prod.name,
+                    buyerName: user.data.name,
+                    price: prod.price,
+                    date: Date.now()
+                });
+                
                 await b.commit();
-                alert("Compra realizada com sucesso!");
+                alert("Compra realizada!");
             };
 
             const approveTeam = async (teamId, finalBalance) => { await db.collection('teams').doc(teamId).update({ status: 'ACTIVE', balance: parseFloat(finalBalance) }); const t = teams.find(x=>x.id===teamId); postNews(`🛡️ **NOVO CLUBE!**\nO **${t.name}** foi aprovado na Série ${t.serie}.`, 'infra'); alert("Aprovado!"); };
@@ -457,16 +472,18 @@
                         {screen === 'NEWS' && <div><h3>Notícias</h3>{news.map(n=><div key={n.id} className={`news-card news-${n.type}`}>{n.text}<br/><small style={{color:'#666'}}>{new Date(n.date).toLocaleString()}</small></div>)}</div>}
                         {screen === 'OFFERS' && <OffersScreen offers={offers} onAccept={acceptOffer} onReject={rejectOffer} onCounter={(o)=>setModal({type:'OFFER', data:{...players.find(p=>p.id===o.playerId), oldOffer:o}})} />}
                         
-                        {/* ETAPA 1: Painel Provisório da Empresa */}
-                        {screen === 'COMPANY_HOME' && user.type === 'COMPANY' && 
+                        {/* ETAPA 1: Painel da Empresa (ATUALIZADO COM HISTÓRICO) */}
+                       {/* ETAPA 3 e 4: Painel da Empresa (Com Histórico e Patrocínios) */}
+                        {screen === 'COMPANY_DASH' && user.type === 'COMPANY' && 
                             <CompanyDashboard 
                                 company={user.data} 
                                 products={products.filter(p => p.companyId === user.data.id)} 
-                                sps={sps.filter(s => s.companyId === user.data.id)} // NOVO: Passa os patrocínios
+                                sps={sps.filter(s => s.companyId === user.data.id)}
+                                sales={sales} /* <--- ISSO AQUI É O PASSO 4! */
                                 teams={teams}
                                 onSaveProd={saveProduct} 
                                 onDeleteProd={deleteProduct} 
-                                onProcessSpons={processSponsorship} // NOVO: Função de aceitar/recusar
+                                onProcessSpons={processSponsorship} 
                             />
                         }
                     </div>

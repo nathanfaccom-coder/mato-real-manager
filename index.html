@@ -305,33 +305,52 @@
             const withdrawMoney = async (amount, reason) => { const val = parseFloat(amount.replace(',', '.')); if(isNaN(val) || val <= 0) return alert("Valor inválido!"); if(user.data.balance < val) return alert("Saldo insuficiente!"); await db.collection('teams').doc(user.data.id).update({ balance: firebase.firestore.FieldValue.increment(-val) }); postNews(`💸 **SAÍDA DE CAIXA**\nO **${user.data.name}** retirou ${fmt(val)}.\n📝 Motivo: ${reason}`, 'money-minus'); setModal(null); };
 
             const savePlayer = async (d) => {
-                const targetTeamId = (user.type==='ADMIN' && adminTeam) ? adminTeam.id : (user.type==='USER' ? user.data.id : d.teamId);
+                // CORREÇÃO: Garante que o ID do time nunca seja nulo
+                let targetTeamId = d.teamId; 
+                if (user.type === 'USER') targetTeamId = user.data.id;
+                if (user.type === 'ADMIN' && adminTeam) targetTeamId = adminTeam.id;
                 
-                // Payload Base
+                // Se ainda assim for nulo, avisa e para
+                if (!targetTeamId) return alert("Erro: Time não identificado. Tente novamente.");
+
                 let payload = { 
-                    name: d.name, position: d.position, overall: parseInt(d.overall)||0, 
-                    value: parseFloat(d.value)||0, salary: parseFloat(d.salary)||0, 
-                    clause: parseFloat(d.clause)||0, contract: parseInt(d.contract)||0, 
-                    mood: d.mood, status: d.status, teamId: targetTeamId, loan: false, 
-                    rating: d.rating ? parseFloat(d.rating) : 0,
-                    // AQUI: Salva a senha se ela foi digitada
+                    name: d.name, 
+                    position: d.position, 
+                    overall: parseInt(d.overall)||0, 
+                    value: parseFloat(d.value)||0, 
+                    salary: parseFloat(d.salary)||0, 
+                    clause: parseFloat(d.clause)||0, 
+                    contract: parseInt(d.contract)||0, 
+                    mood: d.mood, 
+                    status: d.status, 
+                    teamId: targetTeamId, // Usa o ID garantido
+                    loan: false, 
+                    rating: d.rating ? parseFloat(d.rating) : 0, 
                     password: d.password || '1234', 
                     stats: { 
-                        goals: parseInt(d.stats?.goals||0), assists: parseInt(d.stats?.assists||0), 
-                        tackles: parseInt(d.stats?.tackles||0), saves: parseInt(d.stats?.saves||0), 
-                        yellows: parseInt(d.stats?.yellows||0), reds: parseInt(d.stats?.reds||0) 
+                        goals: parseInt(d.stats?.goals||0), 
+                        assists: parseInt(d.stats?.assists||0), 
+                        tackles: parseInt(d.stats?.tackles||0), 
+                        saves: parseInt(d.stats?.saves||0), 
+                        yellows: parseInt(d.stats?.yellows||0), 
+                        reds: parseInt(d.stats?.reds||0) 
                     } 
                 };
 
                 if(d.id) {
                     const old = players.find(p=>p.id===d.id);
-                    if(user.type==='USER') payload.stats = old.stats || payload.stats; 
-                    // Se a senha veio vazia na edição, mantém a antiga
+                    if(user.type==='USER') payload.stats = old.stats || payload.stats;
                     if(!d.password) payload.password = old.password || '1234';
                     
                     if(user.type==='ADMIN') { 
-                        if(d.forcedTeamId && d.forcedTeamId !== old.teamId) { payload.teamId = d.forcedTeamId; payload.futureTransfer = firebase.firestore.FieldValue.delete(); postNews(`👮‍♂️ **INTERVENÇÃO**\nTransferência forçada de **${d.name}**!`, 'admin'); } 
-                        if(payload.rating > 0 && payload.rating !== old.rating) { postNews(`⭐ **NOVA AVALIAÇÃO**\nA Federação atualizou a nota de **${d.name}** para **${payload.rating}**!`, 'admin'); } 
+                        if(d.forcedTeamId && d.forcedTeamId !== old.teamId) { 
+                            payload.teamId = d.forcedTeamId; 
+                            payload.futureTransfer = firebase.firestore.FieldValue.delete(); 
+                            postNews(`👮‍♂️ **INTERVENÇÃO**\nTransferência forçada de **${d.name}**!`, 'admin'); 
+                        } 
+                        if(payload.rating > 0 && payload.rating !== old.rating) { 
+                            postNews(`⭐ **NOVA AVALIAÇÃO**\nA Federação atualizou a nota de **${d.name}** para **${payload.rating}**!`, 'admin'); 
+                        } 
                     }
                     await db.collection('players').doc(d.id).update(payload);
                 } else { 
@@ -689,7 +708,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.50 (Player Update)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.51 (Player Update)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

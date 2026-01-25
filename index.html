@@ -556,30 +556,36 @@
 
             // 3. Função Mestra do Admin (Semana e Temporada)
             // 3. Função Mestra do Admin (BLINDADA CONTRA ERROS)
+            // 3. Função Mestra do Admin (COM IMPOSTO DE 3% NOS JOGADORES)
             const adminAction = async (act, data) => {
                 if(act==='MARKET') { 
                     db.collection('config').doc('system').update({marketOpen: data}); 
                     postNews(data?"📢 JANELA ABERTA":"🔒 JANELA FECHADA", 'infra'); 
                 }
                 
-                // VIRADA DE SEMANA (Salário + Energia + Acumular XP)
+                // VIRADA DE SEMANA
                 if(act==='WEEK') { 
-                    if(!confirm("⚠️ VIRAR SEMANA?\n\n1. Pagar Salários (+)\n2. Recuperar Energia (100%)\n3. Acumular XP Pendente")) return;
+                    if(!confirm("⚠️ VIRAR SEMANA?\n\n1. Pagar Salários (+)\n2. Cobrar Imposto Jogador (3%)\n3. Recuperar Energia (100%)\n4. Empresas e XP")) return;
                     
                     setLoading(true); 
                     const b = db.batch(); 
                     
-                    // 1. Jogadores: Recebem salário e XP
+                    // 1. Jogadores: Salário (+) e Imposto de Fortuna (-)
                     players.forEach(p => { 
                         if(p.teamId) { 
-                            // Verifica se o time do jogador ainda existe para evitar erro
                             if (teams.some(t => t.id === p.teamId)) {
                                 const currentBal = parseFloat(p.balance) || 0;
                                 const salary = parseFloat(p.salary) || 0;
+                                
+                                // CÁLCULO DO IMPOSTO DE 3% (NOVIDADE)
+                                const tax = currentBal * 0.03; 
+                                const finalBalance = (currentBal + salary) - tax;
+
+                                // XP (Acumula para a temporada)
                                 const xpTotal = (p.xp || 0) + (p.pendingXP || 0);
 
                                 b.update(db.collection('players').doc(p.id), { 
-                                    balance: currentBal + salary,
+                                    balance: finalBalance,
                                     energy: 100,
                                     xp: xpTotal,
                                     pendingXP: 0
@@ -590,28 +596,39 @@
 
                     // 2. Times: Pagam salários e Recebem Patrocínio
                     teams.forEach(t => { 
+                        const currentBal = parseFloat(t.balance) || 0;
                         const wages = players.filter(p=>p.teamId===t.id).reduce((a,p)=>a+(parseFloat(p.salary)||0),0); 
                         const income = sps.filter(s => s.teamId === t.id && s.status === 'ACTIVE').reduce((a,s) => a + parseFloat(s.value), 0); 
-                        b.update(db.collection('teams').doc(t.id), {balance:(t.balance||0) + income - wages}); 
+                        
+                        b.update(db.collection('teams').doc(t.id), {
+                            balance: currentBal + income - wages
+                        }); 
                     });
 
-                    // 3. Empresas (Impostos)
-                    companies.forEach(c => { if(c.status === 'ACTIVE') { const tax = (COMPANY_TYPES[c.companyType] || {}).tax || 0; b.update(db.collection('companies').doc(c.id), { balance: (c.balance||0) - tax }); } });
+                    // 3. Empresas: Imposto Fixo (Correção aplicada)
+                    companies.forEach(c => { 
+                        if(c.status === 'ACTIVE') { 
+                            const currentBal = parseFloat(c.balance) || 0;
+                            // Se não tiver tipo, assume COMERCIO (50k) para não bugar
+                            const type = c.companyType || 'COMERCIO'; 
+                            const tax = (COMPANY_TYPES[type] || {}).tax || 50000; 
+                            
+                            b.update(db.collection('companies').doc(c.id), { 
+                                balance: currentBal - tax 
+                            }); 
+                        } 
+                    });
                     
-                    // 4. Dívidas (AQUI ESTAVA O ERRO: CORRIGIDO)
+                    // 4. Dívidas (Proteção contra times excluídos)
                     const ds = await db.collection('debts').get(); 
                     ds.docs.forEach(doc => { 
                         const d = doc.data(); 
-                        
-                        // Verifica se Comprador e Vendedor ainda existem
                         const buyerExists = teams.some(t => t.id === d.buyerId);
                         const sellerExists = teams.some(t => t.id === d.sellerId);
 
                         if (!buyerExists || !sellerExists) {
-                            // Se um dos times sumiu, apaga a dívida para não travar o jogo
-                            b.delete(doc.ref);
+                            b.delete(doc.ref); 
                         } else if (d.weeksRemaining > 0) { 
-                            // Se ambos existem, processa o pagamento
                             b.update(db.collection('teams').doc(d.buyerId), {balance: firebase.firestore.FieldValue.increment(-d.installmentVal)}); 
                             b.update(db.collection('teams').doc(d.sellerId), {balance: firebase.firestore.FieldValue.increment(d.installmentVal)}); 
                             
@@ -627,50 +644,29 @@
                     
                     try {
                         await b.commit(); 
-                        alert("Semana processada com sucesso!"); 
+                        alert("Semana processada! Impostos de 3% cobrados dos jogadores."); 
                     } catch (error) {
-                        console.error("Erro ao virar semana:", error);
-                        alert("Erro ao processar: " + error.message);
+                        alert("Erro: " + error.message);
                     }
                     setLoading(false); 
                 }
                 
-                // VIRADA DE TEMPORADA (Evolução de Nível)
+                // VIRADA DE TEMPORADA (Igual ao anterior)
                 if(act==='SEASON') { 
-                    if(!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Jogadores sobem de nível (Evolução)\n2. Contratos diminuem")) return; 
-                    
+                    if(!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos")) return; 
                     setLoading(true); 
                     const b = db.batch(); 
-                    
                     players.forEach(p => { 
                         let u={}; 
                         const currentLvl = p.overall || 45;
                         const currentXP = p.xp || 0;
                         const res = calcNewLevel(currentLvl, currentXP, 0); 
-                        
-                        if (res.lvl !== currentLvl) {
-                            u.overall = res.lvl; 
-                            u.xp = res.xp;       
-                        }
-                        
+                        if (res.lvl !== currentLvl) { u.overall = res.lvl; u.xp = res.xp; }
                         let nc=(p.contract||0)-1; if(nc<0)nc=0; u.contract=nc; 
-                        
-                        // Também verifica se o jogador tem um time válido antes de atualizar contratos de pré-venda
-                        if((p.contract<=1||p.contract===0)&&p.preContract){
-                             if (teams.some(t => t.id === p.preContract.teamId)) {
-                                 u.teamId=p.preContract.teamId; u.contract=1; u.status='NAO_A_VENDA'; u.preContract=firebase.firestore.FieldValue.delete();
-                             }
-                        } 
-                        
+                        if((p.contract<=1||p.contract===0)&&p.preContract){ if (teams.some(t => t.id === p.preContract.teamId)) { u.teamId=p.preContract.teamId; u.contract=1; u.status='NAO_A_VENDA'; u.preContract=firebase.firestore.FieldValue.delete(); } } 
                         b.update(db.collection('players').doc(p.id), u); 
                     }); 
-                    
-                    try {
-                        await b.commit(); 
-                        alert("Temporada virada! Níveis atualizados."); 
-                    } catch (error) {
-                        alert("Erro na temporada: " + error.message);
-                    }
+                    try { await b.commit(); alert("Temporada virada!"); } catch (e) { alert("Erro: "+e.message); }
                     setLoading(false); 
                     postNews("🌞 **NOVA TEMPORADA**", 'season'); 
                 }
@@ -687,7 +683,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.76</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.77</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -876,7 +872,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | vv1.76(Company Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77(Company Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

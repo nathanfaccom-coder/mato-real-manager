@@ -575,7 +575,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.59</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.60</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -675,7 +675,7 @@
                             <PlayerDashboard 
                                 player={players.find(p=>p.id===user.data.id) || user.data} 
                                 team={teams.find(t=>t.id===user.data.teamId)} 
-                                sales={sales} 
+                                sales={sales || []} 
                                 onUpdatePassword={async(newP)=>{ await db.collection('players').doc(user.data.id).update({password: newP}); alert("Senha alterada!"); }} 
                             />
                         }
@@ -739,7 +739,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.59 (Player Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.60 (Player Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

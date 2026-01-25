@@ -480,7 +480,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.42.1</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.42.2</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -492,7 +492,35 @@
                     </div>
 
                     <div className="container">
-                        {screen === 'HOME' && user.type === 'ADMIN' && <AdminPanel teams={teams} papers={papers} journalists={journalists} companies={companies} reqs={reqs} config={conf} onAct={adminAction} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{/*Fin logic*/}} onReject={(id)=>db.collection('financeRequests').doc(id).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam} onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} onDeletePaper={deletePaper} onDeleteJourno={deleteJournalist} onRejectPaper={(id)=>db.collection('newspapers').doc(id).delete()} onConfig={(t)=>setModal({type:'SETTINGS', data:t})} 
+                        {screen === 'HOME' && user.type === 'ADMIN' && 
+                            <AdminPanel 
+                                teams={teams} 
+                                papers={papers} 
+                                journalists={journalists} 
+                                companies={companies} 
+                                reqs={reqs} 
+                                config={conf} 
+                                onAct={adminAction} 
+                                onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} 
+                                onApprove={async(r)=>{/*Fin logic*/}} 
+                                onReject={(id)=>db.collection('financeRequests').doc(id).delete()} 
+                                onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} 
+                                onApproveTeam={approveTeam} 
+                                onUpdateBal={updateBalance} 
+                                onDeleteTeam={deleteTeam} 
+                                onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} 
+                                onDeletePaper={deletePaper} 
+                                onDeleteJourno={deleteJournalist} 
+                                onRejectPaper={(id)=>db.collection('newspapers').doc(id).delete()} 
+                                onConfig={(t)=>setModal({type:'SETTINGS', data:t})} 
+                                
+                                // --- GARANTA QUE ESTAS 3 LINHAS ESTEJAM AQUI ---
+                                onApproveComp={async(id)=>{await db.collection('companies').doc(id).update({status:'ACTIVE'}); alert("Empresa Aprovada!");}}
+                                onDeleteComp={async(id)=>{if(confirm("Excluir Empresa?")) await db.collection('companies').doc(id).delete();}}
+                                onUpdateCompBal={async(id, val)=>{ await db.collection('companies').doc(id).update({balance: parseFloat(val)}); alert("Saldo Alterado!"); }}
+                                // -----------------------------------------------
+                            />
+                        }
                         // ETAPA 1: Funções de Admin para Empresas
                         onApproveComp={async(id)=>{await db.collection('companies').doc(id).update({status:'ACTIVE'}); alert("Empresa Aprovada!");}}
                         onDeleteComp={async(id)=>{if(confirm("Excluir Empresa?")) await db.collection('companies').doc(id).delete();}}
@@ -593,7 +621,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.42.1</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.42.2</div>
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
                         <div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR TIME</div>
@@ -898,7 +926,7 @@
             );
         };
 
-        const AdminPanel = ({ teams, papers, journalists, companies, reqs, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onConfig, onApprovePaper, onDeletePaper, onDeleteJourno, onRejectPaper, onApproveComp, onDeleteComp }) => (
+        const AdminPanel = ({ onUpdateCompBal, teams, papers, journalists, companies, reqs, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onConfig, onApprovePaper, onDeletePaper, onDeleteJourno, onRejectPaper, onApproveComp, onDeleteComp }) => (
             <div>
                 <h3>Painel Master</h3>
                 <div className="card">
@@ -926,7 +954,15 @@
                     <div key={c.id} className="card">
                         <b>{c.name}</b> {c.status==='BLOCKED' && <span style={{color:'red'}}>(BLOQUEADA)</span>}<br/>
                         Saldo: {fmt(c.balance)}
-                        <button className="btn btn-red" style={{marginTop:5}} onClick={()=>onDeleteComp(c.id)}>EXCLUIR</button>
+                        <div style={{display:'flex', gap:5, marginTop:5}}>
+                            {/* NOVO: Botão de Alterar Saldo */}
+                            <button className="btn btn-green" onClick={()=>{
+                                const n = prompt("Novo Saldo da Empresa:", c.balance); 
+                                if(n !== null) onUpdateCompBal(c.id, n);
+                            }}>$</button>
+                            
+                            <button className="btn btn-red" onClick={()=>onDeleteComp(c.id)}>EXCLUIR</button>
+                        </div>
                     </div>
                 ))}
 

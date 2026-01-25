@@ -528,8 +528,10 @@
                 alert("Tabela atualizada!"); 
             };
 
-            // 2. Função para lançar Súmula (Gols e XP)
+            // 2. Função para lançar Súmula (ATUALIZADA: MÉDIA DA IMPRENSA)
             const saveMatchStats = async (player, match, xpGained) => {
+                if(match.rating === '' || match.rating === null) return alert("Dê uma nota para a atuação!");
+                
                 const b = db.batch(); 
                 const pRef = db.collection('players').doc(player.id);
                 
@@ -542,15 +544,25 @@
                     yellows: (player.stats?.yellows||0) + match.yellows, 
                     reds: (player.stats?.reds||0) + match.reds 
                 };
+
+                // CÁLCULO DA MÉDIA DA IMPRENSA
+                const currentSum = player.pressRatingSum || 0; // Soma total das notas
+                const currentCount = player.pressRatingCount || 0; // Quantas vezes foi avaliado
+                const newSum = currentSum + parseFloat(match.rating);
+                const newCount = currentCount + 1;
+                const newAvg = newSum / newCount; // Nova média
                 
-                // Salva estatísticas e ADICIONA o XP no "Pendente"
+                // Salva estatísticas, XP Pendente e a Nova Média
                 b.update(pRef, { 
                     stats: newStats, 
-                    pendingXP: (player.pendingXP || 0) + xpGained 
+                    pendingXP: (player.pendingXP || 0) + xpGained,
+                    pressRatingSum: newSum,
+                    pressRatingCount: newCount,
+                    pressRatingAvg: parseFloat(newAvg.toFixed(1)) // Média arredondada (Ex: 7.5)
                 });
                 
                 await b.commit(); 
-                alert(`Desempenho lançado! Jogador recebeu +${xpGained} XP (Pendente).`); 
+                alert(`Súmula lançada com sucesso!`); 
                 setModal(null);
             };
 
@@ -1161,8 +1173,21 @@
                     <label>Status</label><select className="input-field" value={f.status} onChange={e=>setF({...f, status:e.target.value})}><option value="NAO_A_VENDA">Não Listado</option><option value="VENDA">À Venda</option><option value="EMPRESTIMO">Empréstimo</option><option value="INTRANSFERIVEL">Bloqueado</option></select>
                     <label>Humor</label><select className="input-field" value={f.mood} onChange={e=>setF({...f, mood:e.target.value})}><option>🤩</option><option>😐</option><option>😡</option></select>
                     
-                    {isAdmin && <div style={{border:'1px solid var(--purple)', padding:5, borderRadius:5, margin:'5px 0'}}><label style={{color:'var(--purple)'}}>Nota (0.0 - 10.0)</label><input className="input-field" type="number" step="0.1" min="0" max="10" value={f.rating} onChange={e=>setF({...f, rating:e.target.value})} /></div>}
-                    
+{isAdmin && (
+                        <div style={{border:'1px solid var(--purple)', padding:8, borderRadius:5, margin:'5px 0'}}>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5}}>
+                                <label style={{color:'var(--purple)', fontWeight:'bold'}}>Nota Oficial (Admin)</label>
+                                {/* MOSTRA A SUGESTÃO AQUI */}
+                                {initial?.pressRatingAvg && (
+                                    <span style={{fontSize:10, background:'#333', padding:'2px 6px', borderRadius:4}}>
+                                        📰 Média Imprensa: <span style={{color:'var(--warning)'}}>{initial.pressRatingAvg}</span> ({initial.pressRatingCount} jogos)
+                                    </span>
+                                )}
+                            </div>
+                            <input className="input-field" type="number" step="0.1" min="0" max="10" value={f.rating} onChange={e=>setF({...f, rating:e.target.value})} />
+                            <small style={{color:'#888', fontSize:10}}>Esta é a nota usada para calcular o XP.</small>
+                        </div>
+                    )}                    
                     {isAdmin && <div style={{border:'1px solid var(--primary)', padding:8, borderRadius:8, marginTop:10}}>
                         <label style={{color:'var(--primary)', display:'block', marginBottom:5}}>Estatísticas (Admin)</label>
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:5}}>
@@ -1425,13 +1450,13 @@
 
         const MatchPerformanceForm = ({ players, teams, onSaveStats }) => {
             const [selP, setSelP] = useState(null);
-            const [match, setMatch] = useState({ goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0, rating:6.0, result:'NENHUM' });
+            const [match, setMatch] = useState({ goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0, rating:'', result:'NENHUM' }); // rating vazio no inicio
             const [search, setSearch] = useState('');
 
-            // Calcula XP em tempo real
+            // Calcula XP (INTERNO - O JORNALISTA NÃO VÊ MAIS)
+            // IMPORTANTE: Usa selP.rating (Nota Oficial) e não match.rating
             const calcMatchXP = () => {
                 let xp = 0;
-                // Garante que XP_RULES existe, senão usa valores padrão
                 const R = (typeof XP_RULES !== 'undefined') ? XP_RULES : { GOAL: 150, ASSIST: 120, TACKLE: 80, SAVE: 100, WIN: 300, DRAW: 100, LOSS: -100, YELLOW: -50, RED: -200, RATING_MULT: 50 };
                 
                 xp += (match.goals || 0) * R.GOAL;
@@ -1445,7 +1470,8 @@
                 if (match.result === 'EMPATE') xp += R.DRAW;
                 if (match.result === 'DERROTA') xp += R.LOSS;
                 
-                xp += (parseFloat(match.rating) || 0) * R.RATING_MULT;
+                // AQUI A MUDANÇA: Usa a nota do ADMIN (selP.rating) para o XP
+                xp += (parseFloat(selP.rating) || 0) * R.RATING_MULT;
                 
                 return parseInt(xp);
             };
@@ -1465,20 +1491,28 @@
                             <div><label>🟥 Vermelho</label><input className="input-field" type="number" value={match.reds} onChange={e=>setMatch({...match, reds:parseInt(e.target.value)})} /></div>
                         </div>
                         <hr style={{borderColor:'#444'}}/>
-                        <label>⭐ Nota (0-10)</label>
-                        <input className="input-field" type="number" step="0.1" value={match.rating} onChange={e=>setMatch({...match, rating:e.target.value})} />
+                        
+                        {/* TRAVA DE SEGURANÇA NA NOTA */}
+                        <label>⭐ Nota da Atuação (Jornalista)</label>
+                        <input className="input-field" type="number" step="0.1" min="0" max="10" placeholder="0.0 a 10.0" 
+                            value={match.rating} 
+                            onChange={e=> {
+                                let v = parseFloat(e.target.value);
+                                if(v > 10) v = 10; // Trava em 10
+                                if(v < 0) v = 0;
+                                setMatch({...match, rating: v})
+                            }} 
+                        />
                         
                         <label>🚩 Resultado do Time</label>
                         <select className="input-field" value={match.result} onChange={e=>setMatch({...match, result:e.target.value})}>
                             <option value="NENHUM">-- Neutro --</option>
-                            <option value="VITORIA">Vitória (Bônus XP)</option>
+                            <option value="VITORIA">Vitória</option>
                             <option value="EMPATE">Empate</option>
-                            <option value="DERROTA">Derrota (Perde XP)</option>
+                            <option value="DERROTA">Derrota</option>
                         </select>
                         
-                        <div style={{textAlign:'center', padding:10, background:'#000', borderRadius:5, marginTop:5}}>
-                            XP Previsto: <span style={{color: calcMatchXP() >= 0 ? 'var(--primary)' : 'var(--danger)', fontWeight:'bold'}}>{calcMatchXP() > 0 ? '+' : ''}{calcMatchXP()}</span>
-                        </div>
+                        {/* REMOVIDO O DISPLAY DE XP PREVISTO */}
                     </div>
                     <div style={{display:'flex', gap:10}}>
                         <button className="btn btn-green" onClick={()=>onSaveStats(selP, match, calcMatchXP())}>LANÇAR NA SÚMULA</button>
@@ -1486,6 +1520,21 @@
                     </div>
                 </div>
             );
+
+            return (
+                <div>
+                    <h3>Lançar Desempenho</h3>
+                    <input className="input-field" placeholder="Buscar jogador..." value={search} onChange={e=>setSearch(e.target.value)} />
+                    <div style={{maxHeight:300, overflowY:'auto'}}>
+                        {search.length > 0 && filtered.map(p => (
+                            <div key={p.id} className="card" onClick={()=>{setSelP(p); setMatch({goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0, rating:'', result:'NENHUM'});}}>
+                                <b>{p.name}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
 
             return (
                 <div>

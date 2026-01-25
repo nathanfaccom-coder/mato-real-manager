@@ -98,6 +98,16 @@
             'MEDIA': { label: 'Média Empresa', start: 20000000, tax: 350000, desc: 'Poder moderado. Imposto médio.' },
             'GRANDE': { label: 'Grande Empresa', start: 100000000, tax: 2000000, desc: 'Gigante do mercado. Imposto alto.' }
         };
+        const PROD_CATS = {
+            'CHUTEIRA': '👟 Chuteira',
+            'LUVAS': '🧤 Luvas/Acessórios',
+            'CONSUMIVEL': '⚡ Consumível/Energia',
+            'VEICULO': '🚗 Veículo',
+            'IMOVEL': '🏠 Imóvel',
+            'TECNOLOGIA': '📱 Tecnologia',
+            'LUXO': '💎 Luxo/Moda',
+            'SAUDE': '💊 Saúde'
+        };
 
         const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
             let details = [];
@@ -225,20 +235,25 @@
             // --- ETAPA 2: Lógica de Produtos ---
             const saveProduct = async (p) => {
                 const price = parseFloat(p.price);
+                // Adicionei o campo "cat" no payload
+                const payload = { 
+                    name: p.name, 
+                    price, 
+                    img: p.img, 
+                    desc: p.desc,
+                    cat: p.cat || 'CHUTEIRA', // Salva a categoria
+                    companyId: user.data.id 
+                };
+
                 if (p.id) {
                     const old = products.find(x=>x.id===p.id);
-                    if (old && price < old.price) {
-                        postNews(`🚨 **PROMOÇÃO!**\nA **${user.data.name}** baixou o preço de **${p.name}**!\nDe: ${fmt(old.price)} ➝ Por: ${fmt(price)}`, 'biz');
-                    }
-                    await db.collection('products').doc(p.id).update({ name: p.name, price, img: p.img, desc: p.desc });
+                    if (old && price < old.price) { postNews(`🚨 **PROMOÇÃO!**\nA **${user.data.name}** baixou o preço de **${p.name}**!\nDe: ${fmt(old.price)} ➝ Por: ${fmt(price)}`, 'biz'); }
+                    // Remove companyId do update para segurança, mas mantém o resto
+                    delete payload.companyId; 
+                    await db.collection('products').doc(p.id).update(payload);
                 } else {
-                    await db.collection('products').add({ companyId: user.data.id, name: p.name, price, img: p.img, desc: p.desc });
-                    postNews(`🛍️ **NOVIDADE**\nA **${user.data.name}** lançou o produto: **${p.name}** por ${fmt(price)}.`, 'biz');
-                }
-            };
-            const deleteProduct = async (id) => {
-                if(confirm("Tem certeza que deseja excluir este produto?")) {
-                    await db.collection('products').doc(id).delete();
+                    await db.collection('products').add(payload);
+                    postNews(`🛍️ **NOVIDADE**\nA **${user.data.name}** lançou: **${p.name}** (${PROD_CATS[payload.cat]}) por ${fmt(price)}.`, 'biz');
                 }
             };
             // --- ETAPA 3: Lógica de Shopping e Patrocínio ---
@@ -560,7 +575,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.58</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.59</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -724,7 +739,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.58 (Player Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.59 (Player Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -799,7 +814,7 @@
         };
         // --- NOVO COMPONENTE: PAINEL DA EMPRESA ---
        // Painel da Empresa (Atualizado com Patrocínios)
-        const CompanyDashboard = ({ company, products, sps, sales, teams, onSaveProd, onDeleteProd, onProcessSpons }) => {
+       const CompanyDashboard = ({ company, products, sps, sales, teams, onSaveProd, onDeleteProd, onProcessSpons }) => {
             const [tab, setTab] = useState('PRODS'); 
             const [editP, setEditP] = useState(null); 
             
@@ -811,12 +826,15 @@
                     </div>
                     
                     {tab==='PRODS' && <div>
-                        <button className="btn btn-green" onClick={()=>setEditP({name:'', price:'', img:'', desc:''})}>+ NOVO PRODUTO</button>
+                        {/* AQUI: Adicionei cat:'CHUTEIRA' no estado inicial */}
+                        <button className="btn btn-green" onClick={()=>setEditP({name:'', price:'', img:'', desc:'', cat:'CHUTEIRA'})}>+ NOVO PRODUTO</button>
+                        
                         {products.map(p => (
                             <div key={p.id} className="card" style={{display:'flex', gap:10, textAlign:'left'}}>
                                 <img src={p.img || 'https://via.placeholder.com/100'} style={{width:80, height:80, objectFit:'cover', borderRadius:6}} />
                                 <div style={{flex:1}}>
-                                    <b>{p.name}</b><br/>
+                                    <span style={{fontSize:10, background:'#333', padding:'2px 6px', borderRadius:4, color:'#aaa'}}>{PROD_CATS[p.cat] || p.cat}</span>
+                                    <div style={{fontWeight:'bold', marginTop:2}}>{p.name}</div>
                                     <span style={{color:'var(--primary)', fontWeight:'bold'}}>{fmt(p.price)}</span>
                                     <p style={{fontSize:11, color:'#aaa', margin:'5px 0'}}>{p.desc}</p>
                                 </div>
@@ -829,60 +847,39 @@
                     </div>}
 
                     {tab==='FIN' && <div>
-                        <div className="highlight-card">
-                            <h3>Saldo: {fmt(company.balance)}</h3>
-                            <small>Imposto Semanal: {fmt((COMPANY_TYPES[company.companyType] || {}).tax || 0)}</small>
-                        </div>
-                        {/* NOVO: BLOCO DE HISTÓRICO DE VENDAS */}
+                        <div className="highlight-card"><h3>Saldo: {fmt(company.balance)}</h3><small>Imposto Semanal: {fmt((COMPANY_TYPES[company.companyType] || {}).tax || 0)}</small></div>
                         <h4 style={{marginTop:20, color:'#ddd'}}>Histórico de Vendas</h4>
                         <div style={{maxHeight:200, overflowY:'auto', background:'rgba(0,0,0,0.3)', padding:10, borderRadius:8, marginBottom:15, border:'1px solid #333'}}>
-                            {(!sales || sales.filter(s => s.companyId === company.id).length === 0) && 
-                                <p style={{color:'#666', textAlign:'center', fontSize:11, margin:0}}>Nenhuma venda recente.</p>
-                            }
+                            {(!sales || sales.filter(s => s.companyId === company.id).length === 0) && <p style={{color:'#666', textAlign:'center', fontSize:11, margin:0}}>Nenhuma venda recente.</p>}
                             {(sales || []).filter(s => s.companyId === company.id).map((s, i) => (
                                 <div key={i} style={{borderBottom:'1px solid #444', padding:'8px 0', fontSize:11, textAlign:'left'}}>
-                                    <div style={{display:'flex', justifyContent:'space-between'}}>
-                                        <b style={{color:'var(--primary)'}}>+ {fmt(s.price)}</b>
-                                        <span style={{color:'#888'}}>{new Date(s.date).toLocaleDateString()}</span>
-                                    </div>
-                                    <div style={{marginTop:2}}>
-                                        👤 <span style={{color:'#fff', fontWeight:'bold'}}>{s.buyerName}</span> comprou 1x <span style={{color:'var(--purple)'}}>{s.productName}</span>
-                                    </div>
+                                    <div style={{display:'flex', justifyContent:'space-between'}}><b style={{color:'var(--primary)'}}>+ {fmt(s.price)}</b><span style={{color:'#888'}}>{new Date(s.date).toLocaleDateString()}</span></div>
+                                    <div style={{marginTop:2}}>👤 <span style={{color:'#fff', fontWeight:'bold'}}>{s.buyerName}</span> comprou 1x <span style={{color:'var(--purple)'}}>{s.productName}</span></div>
                                 </div>
                             ))}
                         </div>
-                        {/* ---------------------------------- */}
-                        <h4>Solicitações de Patrocínio</h4>
-                        {sps.filter(s=>s.status==='PENDING').length === 0 && <p style={{color:'#666'}}>Nenhuma solicitação pendente.</p>}
-                        {sps.filter(s=>s.status==='PENDING').map(s => (
-                            <div key={s.id} className="card">
-                                <b>{s.teamName}</b> pede patrocínio.<br/>
-                                Valor Semanal: <span style={{color:'var(--warning)'}}>{fmt(s.value)}</span><br/>
-                                <div style={{display:'flex', gap:5, marginTop:5}}>
-                                    <button className="btn btn-green" onClick={()=>onProcessSpons(s, 'ACTIVE')}>ACEITAR</button>
-                                    <button className="btn btn-red" onClick={()=>onProcessSpons(s, 'REJECTED')}>RECUSAR</button>
-                                </div>
-                            </div>
-                        ))}
-
-                        <h4>Contratos Ativos (Pagamento Semanal)</h4>
-                        {sps.filter(s=>s.status==='ACTIVE').length === 0 && <p style={{color:'#666'}}>Nenhum contrato ativo.</p>}
-                        {sps.filter(s=>s.status==='ACTIVE').map(s => (
-                            <div key={s.id} className="card" style={{borderLeft:'4px solid var(--primary)'}}>
-                                <b>{s.teamName}</b><br/>
-                                Pagamento Semanal: {fmt(s.value)}
-                                <button className="btn btn-red" style={{marginTop:5}} onClick={()=>onProcessSpons(s, 'CANCELLED')}>CANCELAR CONTRATO</button>
-                            </div>
-                        ))}
+                        <h4>Solicitações</h4>{sps.filter(s=>s.status==='PENDING').length === 0 && <p style={{color:'#666'}}>Nenhuma.</p>}{sps.filter(s=>s.status==='PENDING').map(s => (<div key={s.id} className="card"><b>{s.teamName}</b> pede patrocínio.<br/>Valor: <span style={{color:'var(--warning)'}}>{fmt(s.value)}</span><br/><div style={{display:'flex', gap:5, marginTop:5}}><button className="btn btn-green" onClick={()=>onProcessSpons(s, 'ACTIVE')}>ACEITAR</button><button className="btn btn-red" onClick={()=>onProcessSpons(s, 'REJECTED')}>RECUSAR</button></div></div>))}
+                        <h4>Contratos Ativos</h4>{sps.filter(s=>s.status==='ACTIVE').length === 0 && <p style={{color:'#666'}}>Nenhum.</p>}{sps.filter(s=>s.status==='ACTIVE').map(s => (<div key={s.id} className="card" style={{borderLeft:'4px solid var(--primary)'}}><b>{s.teamName}</b><br/>Pagamento: {fmt(s.value)}<button className="btn btn-red" style={{marginTop:5}} onClick={()=>onProcessSpons(s, 'CANCELLED')}>CANCELAR</button></div>))}
                     </div>}
 
                     {editP && <div className="modal-overlay"><div className="modal-content">
                         <h3>{editP.id ? 'Editar' : 'Novo'} Produto</h3>
+                        
+                        {/* NOVO: SELEÇÃO DE CATEGORIA */}
+                        <label>Categoria</label>
+                        <select className="input-field" value={editP.cat || 'CHUTEIRA'} onChange={e=>setEditP({...editP, cat:e.target.value})}>
+                            {Object.keys(PROD_CATS).map(key => <option key={key} value={key}>{PROD_CATS[key]}</option>)}
+                        </select>
+
                         <label>Nome</label><input className="input-field" value={editP.name} onChange={e=>setEditP({...editP, name:e.target.value})} />
                         <label>Preço</label><input className="input-field" type="number" value={editP.price} onChange={e=>setEditP({...editP, price:e.target.value})} />
                         <label>Imagem URL</label><input className="input-field" value={editP.img} onChange={e=>setEditP({...editP, img:e.target.value})} />
                         <label>Descrição</label><textarea className="input-field" value={editP.desc} onChange={e=>setEditP({...editP, desc:e.target.value})} />
-                        <div style={{display:'flex', gap:10}}><button className="btn btn-green" onClick={()=>{onSaveProd(editP); setEditP(null);}}>SALVAR</button><button className="btn" onClick={()=>setEditP(null)}>CANCELAR</button></div>
+                        
+                        <div style={{display:'flex', gap:10}}>
+                            <button className="btn btn-green" onClick={()=>{onSaveProd(editP); setEditP(null);}}>SALVAR</button>
+                            <button className="btn" onClick={()=>setEditP(null)}>CANCELAR</button>
+                        </div>
                     </div></div>}
                 </div>
             );
@@ -905,10 +902,21 @@
                             
                             return (
                                 <div key={p.id} className="card" style={{padding:10, position:'relative'}}>
-                                    <div style={{fontSize:9, background:'var(--purple)', position:'absolute', top:5, right:5, padding:'2px 5px', borderRadius:4}}>{comp.name}</div>
+                                    {/* Nome da Empresa */}
+                                    <div style={{fontSize:9, background:'var(--purple)', position:'absolute', top:5, right:5, padding:'2px 5px', borderRadius:4, zIndex:10}}>
+                                        {comp.name}
+                                    </div>
+                                    
                                     <img src={p.img || 'https://via.placeholder.com/100'} className="prod-img" style={{width:'100%', height:100, objectFit:'cover', borderRadius:4}} />
-                                    <div style={{fontWeight:'bold', fontSize:13, marginTop:5}}>{p.name}</div>
-                                    <div style={{color:'var(--primary)', fontWeight:'900'}}>{fmt(p.price)}</div>
+                                    
+                                    {/* Categoria Badge */}
+                                    <span style={{fontSize:9, color:'#888', display:'block', marginTop:5}}>
+                                        {PROD_CATS[p.cat] || 'Item'}
+                                    </span>
+
+                                    <div style={{fontWeight:'bold', fontSize:13, lineHeight:'1.2em'}}>{p.name}</div>
+                                    <div style={{color:'var(--primary)', fontWeight:'900', fontSize:14}}>{fmt(p.price)}</div>
+                                    
                                     {userTeam && <button className="btn btn-green" style={{marginTop:5, fontSize:10}} onClick={()=>onBuy(p, comp)}>COMPRAR</button>}
                                 </div>
                             ); 

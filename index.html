@@ -683,7 +683,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.77</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.78</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -872,7 +872,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77(Company Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.78(Company Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1421,6 +1421,113 @@
             return (<div><h3>Ranking e Estatísticas</h3><div className="rank-tabs"><div className={`rank-tab ${view==='TEAMS'?'active':''}`} onClick={()=>setView('TEAMS')}>💰 Clubes</div><div className={`rank-tab ${view==='OVERALL'?'active':''}`} onClick={()=>setView('OVERALL')}>⭐ Craques</div><div className={`rank-tab ${view==='SALARY'?'active':''}`} onClick={()=>setView('SALARY')}>💸 Salários</div><div className={`rank-tab ${view==='GOALS'?'active':''}`} onClick={()=>setView('GOALS')}>⚽ Artilheiros</div><div className={`rank-tab ${view==='ASSIST'?'active':''}`} onClick={()=>setView('ASSIST')}>👟 Garçons</div><div className={`rank-tab ${view==='TACKLES'?'active':''}`} onClick={()=>setView('TACKLES')}>🛡️ Desarmes</div><div className={`rank-tab ${view==='SAVES'?'active':''}`} onClick={()=>setView('SAVES')}>🧤 Paredões</div><div className={`rank-tab ${view==='YEL'?'active':''}`} onClick={()=>setView('YEL')}>🟨 Amarelos</div><div className={`rank-tab ${view==='RED'?'active':''}`} onClick={()=>setView('RED')}>🟥 Vermelhos</div></div>{view==='TEAMS' && renderTeams()}{view==='OVERALL' && renderPlayers('overall', 'Ov:', 'var(--warning)', false)}{view==='SALARY' && renderPlayers('salary', '', 'var(--primary)', false)}{view==='GOALS' && renderPlayers('goals', '⚽', '#fff')}{view==='ASSIST' && renderPlayers('assists', '👟', '#fff')}{view==='TACKLES' && renderPlayers('tackles', '🛡️', '#fff')}{view==='SAVES' && renderPlayers('saves', '🧤', '#fff')}{view==='YEL' && renderPlayers('yellows', '🟨', 'yellow')}{view==='RED' && renderPlayers('reds', '🟥', 'red')}</div>);
         };
 
+// --- COMPONENTES QUE FALTAVAM (Súmula e Tabela) ---
+
+        const MatchPerformanceForm = ({ players, teams, onSaveStats }) => {
+            const [selP, setSelP] = useState(null);
+            const [match, setMatch] = useState({ goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0, rating:6.0, result:'NENHUM' });
+            const [search, setSearch] = useState('');
+
+            // Calcula XP em tempo real
+            const calcMatchXP = () => {
+                let xp = 0;
+                // Garante que XP_RULES existe, senão usa valores padrão
+                const R = (typeof XP_RULES !== 'undefined') ? XP_RULES : { GOAL: 150, ASSIST: 120, TACKLE: 80, SAVE: 100, WIN: 300, DRAW: 100, LOSS: -100, YELLOW: -50, RED: -200, RATING_MULT: 50 };
+                
+                xp += (match.goals || 0) * R.GOAL;
+                xp += (match.assists || 0) * R.ASSIST;
+                xp += (match.tackles || 0) * R.TACKLE;
+                xp += (match.saves || 0) * R.SAVE;
+                xp += (match.yellows || 0) * R.YELLOW;
+                xp += (match.reds || 0) * R.RED;
+                
+                if (match.result === 'VITORIA') xp += R.WIN;
+                if (match.result === 'EMPATE') xp += R.DRAW;
+                if (match.result === 'DERROTA') xp += R.LOSS;
+                
+                xp += (parseFloat(match.rating) || 0) * R.RATING_MULT;
+                
+                return parseInt(xp);
+            };
+
+            const filtered = players.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+
+            if (selP) return (
+                <div>
+                    <h3 style={{color:'var(--primary)'}}>Súmula: {selP.name}</h3>
+                    <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8, marginBottom:10}}>
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                            <div><label>⚽ Gols</label><input className="input-field" type="number" value={match.goals} onChange={e=>setMatch({...match, goals:parseInt(e.target.value)})} /></div>
+                            <div><label>👟 Assistências</label><input className="input-field" type="number" value={match.assists} onChange={e=>setMatch({...match, assists:parseInt(e.target.value)})} /></div>
+                            <div><label>🛡️ Desarmes</label><input className="input-field" type="number" value={match.tackles} onChange={e=>setMatch({...match, tackles:parseInt(e.target.value)})} /></div>
+                            <div><label>🧤 Defesas</label><input className="input-field" type="number" value={match.saves} onChange={e=>setMatch({...match, saves:parseInt(e.target.value)})} /></div>
+                            <div><label>🟨 Amarelo</label><input className="input-field" type="number" value={match.yellows} onChange={e=>setMatch({...match, yellows:parseInt(e.target.value)})} /></div>
+                            <div><label>🟥 Vermelho</label><input className="input-field" type="number" value={match.reds} onChange={e=>setMatch({...match, reds:parseInt(e.target.value)})} /></div>
+                        </div>
+                        <hr style={{borderColor:'#444'}}/>
+                        <label>⭐ Nota (0-10)</label>
+                        <input className="input-field" type="number" step="0.1" value={match.rating} onChange={e=>setMatch({...match, rating:e.target.value})} />
+                        
+                        <label>🚩 Resultado do Time</label>
+                        <select className="input-field" value={match.result} onChange={e=>setMatch({...match, result:e.target.value})}>
+                            <option value="NENHUM">-- Neutro --</option>
+                            <option value="VITORIA">Vitória (Bônus XP)</option>
+                            <option value="EMPATE">Empate</option>
+                            <option value="DERROTA">Derrota (Perde XP)</option>
+                        </select>
+                        
+                        <div style={{textAlign:'center', padding:10, background:'#000', borderRadius:5, marginTop:5}}>
+                            XP Previsto: <span style={{color: calcMatchXP() >= 0 ? 'var(--primary)' : 'var(--danger)', fontWeight:'bold'}}>{calcMatchXP() > 0 ? '+' : ''}{calcMatchXP()}</span>
+                        </div>
+                    </div>
+                    <div style={{display:'flex', gap:10}}>
+                        <button className="btn btn-green" onClick={()=>onSaveStats(selP, match, calcMatchXP())}>LANÇAR NA SÚMULA</button>
+                        <button className="btn" onClick={()=>setSelP(null)}>VOLTAR</button>
+                    </div>
+                </div>
+            );
+
+            return (
+                <div>
+                    <h3>Lançar Desempenho</h3>
+                    <input className="input-field" placeholder="Buscar jogador..." value={search} onChange={e=>setSearch(e.target.value)} />
+                    <div style={{maxHeight:300, overflowY:'auto'}}>
+                        {search.length > 0 && filtered.map(p => (
+                            <div key={p.id} className="card" onClick={()=>{setSelP(p); setMatch({goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0, rating:6.0, result:'NENHUM'});}}>
+                                <b>{p.name}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const TeamStandingsEditor = ({ teams, onUpdateTeamStats }) => {
+            return (
+                <div>
+                    <h3>Editar Tabela (Jornalista)</h3>
+                    <div style={{maxHeight:400, overflowY:'auto'}}>
+                        {teams.filter(t=>t.status!=='PENDING').map(t => (
+                            <div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                <div style={{width:'30%'}}><b>{t.name}</b></div>
+                                <div style={{display:'flex', gap:5}}>
+                                    <div style={{textAlign:'center'}}><small>V</small><input className="input-field" type="number" style={{width:40, padding:5, marginBottom:0}} defaultValue={t.stats?.wins||0} id={`w-${t.id}`} /></div>
+                                    <div style={{textAlign:'center'}}><small>E</small><input className="input-field" type="number" style={{width:40, padding:5, marginBottom:0}} defaultValue={t.stats?.draws||0} id={`d-${t.id}`} /></div>
+                                    <div style={{textAlign:'center'}}><small>D</small><input className="input-field" type="number" style={{width:40, padding:5, marginBottom:0}} defaultValue={t.stats?.losses||0} id={`l-${t.id}`} /></div>
+                                    <button className="btn btn-green" style={{width:'auto', height:35, marginTop:18}} onClick={()=>{
+                                        const w = parseInt(document.getElementById(`w-${t.id}`).value)||0;
+                                        const d = parseInt(document.getElementById(`d-${t.id}`).value)||0;
+                                        const l = parseInt(document.getElementById(`l-${t.id}`).value)||0;
+                                        onUpdateTeamStats(t.id, {wins:w, draws:d, losses:l});
+                                    }}>💾</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+        
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<ErrorBoundary><App /></ErrorBoundary>);
     </script>

@@ -108,6 +108,20 @@
             'LUXO': '💎 Luxo/Moda',
             'SAUDE': '💊 Saúde'
         };
+        // --- REGRAS DE XP (RPG) ---
+        const XP_RULES = {
+            GOAL: 150,       // Atacante ama
+            ASSIST: 120,     // Garçom
+            TACKLE: 80,      // Defensor
+            SAVE: 100,       // Goleiro
+            WIN: 300,        // Vitória do time
+            DRAW: 100,       // Empate
+            LOSS: -100,      // Derrota (pune o time todo)
+            YELLOW: -50,     // Disciplina
+            RED: -200,       // Expulsão grave
+            RATING_MULT: 50, // Multiplicador da Nota (Nota 10 = 500 XP!)
+            CLEAN_SHEET: 200 // (Bônus futuro para defesa sem levar gols)
+        };
         // --- SISTEMA DE RPG (NÍVEL, XP, ENERGIA) ---
         const MIN_LEVEL = 45;
         const MAX_LEVEL = 100;
@@ -530,7 +544,33 @@
                     if(!confirm("⚠️ VIRAR SEMANA?\n\nIsso irá:\n1. Pagar Salários aos Jogadores (+)\n2. Cobrar Times (-)\n3. Processar Patrocínios e Impostos")) return;
                     
                     setLoading(true); 
-                    const b = db.batch(); 
+                    const b = db.batch();
+                    // 1. Pagar Salários, Recuperar Energia E PROCESSAR XP PENDENTE
+                    players.forEach(p => {
+                        if(p.teamId) {
+                            const currentBal = p.balance || 0;
+                            const salary = p.salary || 0;
+                            
+                            // Processa o XP Pendente (Acumulado)
+                            let finalXP = p.xp || 0;
+                            let finalLvl = p.overall || 45;
+                            
+                            if (p.pendingXP) {
+                                // Usa a função de cálculo de nível que criamos antes
+                                const res = calcNewLevel(finalLvl, finalXP, p.pendingXP);
+                                finalLvl = res.lvl;
+                                finalXP = res.xp;
+                            }
+
+                            b.update(db.collection('players').doc(p.id), { 
+                                balance: currentBal + salary,
+                                energy: 100,
+                                overall: finalLvl, // Atualiza Nível
+                                xp: finalXP,       // Atualiza XP
+                                pendingXP: 0       // Reseta o pendente
+                            });
+                        }
+                    });
                     
                     // 1. Pagar Salários aos Jogadores (NOVO)
                     players.forEach(p => {
@@ -620,7 +660,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.63</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.64</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -665,6 +705,17 @@
                         {screen === 'HOME' && user.type === 'USER' && <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />}
                         {screen === 'HOME' && user.type === 'VISITOR' && <VisitorDashboard players={players} teams={teams} />}
                         {screen === 'PRESS_DASH' && (user.type==='PRESS' || user.type==='PRESS_WORKER') && (<div><h3>Painel de Imprensa ({user.data.name})</h3><div className="card"><button className="btn btn-blue" onClick={()=>setModal({type:'POST_NEWS'})}>ESCREVER NOTÍCIA</button><button className="btn btn-purple" onClick={()=>setModal({type:'STATS_SEARCH'})}>SÚMULA / ESTATÍSTICAS</button></div>{user.type==='PRESS' && journalists.filter(j=>j.newspaperId===user.data.id && j.status==='PENDING').map(j=><div key={j.id} className="card">{j.name}<button className="btn btn-green" onClick={()=>db.collection('journalists').doc(j.id).update({status:'ACTIVE'})}>APROVAR</button></div>)}</div>)}
+                       {screen === 'PRESS_DASH' && (user.type==='PRESS' || user.type==='PRESS_WORKER') && (
+                            <div>
+                                <h3>Painel de Imprensa ({user.data.name})</h3>
+                                <div className="card">
+                                    <button className="btn btn-blue" onClick={()=>setModal({type:'POST_NEWS'})}>ESCREVER NOTÍCIA</button>
+                                    {/* Botão Súmula agora chama o form novo */}
+                                    <button className="btn btn-purple" onClick={()=>setModal({type:'MATCH_PERFORMANCE'})}>LANÇAR SÚMULA (XP)</button>
+                                    {/* Novo botão de Tabela */}
+                                    <button className="btn btn-gold" onClick={()=>setModal({type:'TEAM_TABLE'})}>EDITAR TABELA</button>
+                                </div>
+                                {/* ... resto do código de aprovação ... */}
                         {screen === 'ADMIN_TEAM' && adminTeam && <div><button className="btn" style={{background:'#333', marginBottom:10}} onClick={()=>{setAdminTeam(null); setScreen('HOME');}}>⬅ VOLTAR</button><h3 style={{color:'var(--purple)'}}>Editando: {adminTeam.name}</h3><TeamDashboard team={adminTeam} players={players.filter(p=>p.teamId===adminTeam.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} /></div>}
                         {screen === 'MARKET' && <Market me={user.data?.id} teams={teams} players={players} open={conf.marketOpen} isVis={user.type==='VISITOR'} onNeg={(p)=>setModal({type:'OFFER', data:p})} onPayClause={async(p)=>{/*Clause logic*/}} onPre={async(p)=>{/*Pre logic*/}} />}
                         {/* TELA: SHOPPING GLOBAL */}
@@ -760,6 +811,8 @@
                             {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={async(id)=>{db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} onRenew={renewContract} isOwner={user.type==='USER' && modal.data?.teamId===user.data?.id} />}
                             {modal.type==='OFFER' && <OfferForm target={modal.data} myPlayers={players.filter(p=>p.teamId===user.data.id)} onSend={sendOffer} />}
                             {modal.type==='SETTINGS' && <SettingsForm team={modal.data || user.data} isAdmin={user.type==='ADMIN'} onUp={(d)=>{const tid=(modal.data?.id)||user.data.id; db.collection('teams').doc(tid).update(d); setModal(null);}} onUpgrade={()=>{/*Upgrade logic*/}} onReq={(t,a,d)=>{db.collection('financeRequests').add({teamId:user.data.id, teamName:user.data.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!");}} onWithdraw={withdrawMoney} />}
+                            {modal.type==='MATCH_PERFORMANCE' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} />}
+                            {modal.type==='TEAM_TABLE' && <TeamStandingsEditor teams={teams} onUpdateTeamStats={updateTeamStats} />}
                             {modal.type==='POST_NEWS' && <div><h3>Nova Notícia</h3><input className="input-field" placeholder="Manchete / Texto" id="news-body" /><button className="btn btn-blue" onClick={()=>{postNews(`📰 **${user.data.name}:**\n${document.getElementById('news-body').value}`, 'press'); setModal(null);}}>PUBLICAR</button></div>}
                             {modal.type==='STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
                         </div>
@@ -1040,11 +1093,107 @@
             );
         };
 
-        const StatsEditor = ({ players, teams, onSave }) => {
-            const [search, setSearch] = useState(''); const [selP, setSelP] = useState(null); const [s, setS] = useState({});
+        // NOVO: Formulário de Desempenho na Partida (Súmula RPG)
+        const MatchPerformanceForm = ({ players, teams, onSaveStats }) => {
+            const [selP, setSelP] = useState(null);
+            const [match, setMatch] = useState({ goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0, rating:6.0, result:'NENHUM' });
+            const [search, setSearch] = useState('');
+
+            // Calcula XP em tempo real para o admin ver
+            const calcMatchXP = () => {
+                let xp = 0;
+                xp += (match.goals || 0) * XP_RULES.GOAL;
+                xp += (match.assists || 0) * XP_RULES.ASSIST;
+                xp += (match.tackles || 0) * XP_RULES.TACKLE;
+                xp += (match.saves || 0) * XP_RULES.SAVE;
+                xp += (match.yellows || 0) * XP_RULES.YELLOW;
+                xp += (match.reds || 0) * XP_RULES.RED;
+                
+                if (match.result === 'VITORIA') xp += XP_RULES.WIN;
+                if (match.result === 'EMPATE') xp += XP_RULES.DRAW;
+                if (match.result === 'DERROTA') xp += XP_RULES.LOSS;
+                
+                // Nota (0 a 10) * Multiplicador
+                xp += (parseFloat(match.rating) || 0) * XP_RULES.RATING_MULT;
+                
+                return parseInt(xp);
+            };
+
             const filtered = players.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
-            if (selP) return ( <div><h3>Editando: {selP.name}</h3><div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}><div><label>Gols</label><input className="input-field" type="number" value={s.goals} onChange={e=>setS({...s, goals:parseInt(e.target.value)})} /></div><div><label>Assistências</label><input className="input-field" type="number" value={s.assists} onChange={e=>setS({...s, assists:parseInt(e.target.value)})} /></div><div><label>Desarmes</label><input className="input-field" type="number" value={s.tackles} onChange={e=>setS({...s, tackles:parseInt(e.target.value)})} /></div><div><label>Defesas</label><input className="input-field" type="number" value={s.saves} onChange={e=>setS({...s, saves:parseInt(e.target.value)})} /></div><div><label>Amarelos</label><input className="input-field" type="number" value={s.yellows} onChange={e=>setS({...s, yellows:parseInt(e.target.value)})} /></div><div><label>Vermelhos</label><input className="input-field" type="number" value={s.reds} onChange={e=>setS({...s, reds:parseInt(e.target.value)})} /></div></div><button className="btn btn-green" onClick={()=>onSave(selP.id, s)}>SALVAR ESTATÍSTICAS</button><button className="btn" onClick={()=>setSelP(null)}>VOLTAR</button></div> );
-            return (<div><input className="input-field" placeholder="Buscar jogador..." value={search} onChange={e=>setSearch(e.target.value)} /><div style={{maxHeight:300, overflowY:'auto'}}>{search.length > 0 && filtered.map(p => (<div key={p.id} className="card" onClick={()=>{setSelP(p); setS(p.stats || {goals:0,assists:0,tackles:0,saves:0,yellows:0,reds:0})}}><b>{p.name}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small></div>))}</div></div>);
+
+            if (selP) return (
+                <div>
+                    <h3 style={{color:'var(--primary)'}}>Súmula: {selP.name}</h3>
+                    <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8, marginBottom:10}}>
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                            <div><label>⚽ Gols</label><input className="input-field" type="number" value={match.goals} onChange={e=>setMatch({...match, goals:parseInt(e.target.value)})} /></div>
+                            <div><label>👟 Assistências</label><input className="input-field" type="number" value={match.assists} onChange={e=>setMatch({...match, assists:parseInt(e.target.value)})} /></div>
+                            <div><label>🛡️ Desarmes</label><input className="input-field" type="number" value={match.tackles} onChange={e=>setMatch({...match, tackles:parseInt(e.target.value)})} /></div>
+                            <div><label>🧤 Defesas</label><input className="input-field" type="number" value={match.saves} onChange={e=>setMatch({...match, saves:parseInt(e.target.value)})} /></div>
+                            <div><label>🟨 Amarelo</label><input className="input-field" type="number" value={match.yellows} onChange={e=>setMatch({...match, yellows:parseInt(e.target.value)})} /></div>
+                            <div><label>🟥 Vermelho</label><input className="input-field" type="number" value={match.reds} onChange={e=>setMatch({...match, reds:parseInt(e.target.value)})} /></div>
+                        </div>
+                        <hr style={{borderColor:'#444'}}/>
+                        <label>⭐ Nota da Partida (0-10)</label>
+                        <input className="input-field" type="number" step="0.1" value={match.rating} onChange={e=>setMatch({...match, rating:e.target.value})} />
+                        
+                        <label>🚩 Resultado do Time</label>
+                        <select className="input-field" value={match.result} onChange={e=>setMatch({...match, result:e.target.value})}>
+                            <option value="NENHUM">-- Neutro --</option>
+                            <option value="VITORIA">Vitória (+{XP_RULES.WIN} XP)</option>
+                            <option value="EMPATE">Empate (+{XP_RULES.DRAW} XP)</option>
+                            <option value="DERROTA">Derrota ({XP_RULES.LOSS} XP)</option>
+                        </select>
+                        
+                        <div style={{textAlign:'center', padding:10, background:'#000', borderRadius:5, marginTop:5}}>
+                            XP Previsto: <span style={{color: calcMatchXP() >= 0 ? 'var(--primary)' : 'var(--danger)', fontWeight:'bold'}}>{calcMatchXP() > 0 ? '+' : ''}{calcMatchXP()}</span>
+                        </div>
+                    </div>
+                    <div style={{display:'flex', gap:10}}>
+                        <button className="btn btn-green" onClick={()=>onSaveStats(selP, match, calcMatchXP())}>LANÇAR NA SÚMULA</button>
+                        <button className="btn" onClick={()=>setSelP(null)}>VOLTAR</button>
+                    </div>
+                </div>
+            );
+
+            return (
+                <div>
+                    <h3>Lançar Desempenho</h3>
+                    <input className="input-field" placeholder="Buscar jogador..." value={search} onChange={e=>setSearch(e.target.value)} />
+                    <div style={{maxHeight:300, overflowY:'auto'}}>
+                        {search.length > 0 && filtered.map(p => (
+                            <div key={p.id} className="card" onClick={()=>{setSelP(p); setMatch({goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0, rating:6.0, result:'NENHUM'});}}>
+                                <b>{p.name}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+        const TeamStandingsEditor = ({ teams, onUpdateTeamStats }) => {
+            return (
+                <div>
+                    <h3>Editar Tabela (Jornalista)</h3>
+                    <div style={{maxHeight:400, overflowY:'auto'}}>
+                        {teams.filter(t=>t.status!=='PENDING').map(t => (
+                            <div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                <div style={{width:'30%'}}><b>{t.name}</b></div>
+                                <div style={{display:'flex', gap:5}}>
+                                    <div style={{textAlign:'center'}}><small>V</small><input className="input-field" type="number" style={{width:40, padding:5, marginBottom:0}} defaultValue={t.stats?.wins||0} id={`w-${t.id}`} /></div>
+                                    <div style={{textAlign:'center'}}><small>E</small><input className="input-field" type="number" style={{width:40, padding:5, marginBottom:0}} defaultValue={t.stats?.draws||0} id={`d-${t.id}`} /></div>
+                                    <div style={{textAlign:'center'}}><small>D</small><input className="input-field" type="number" style={{width:40, padding:5, marginBottom:0}} defaultValue={t.stats?.losses||0} id={`l-${t.id}`} /></div>
+                                    <button className="btn btn-green" style={{width:'auto', height:35, marginTop:18}} onClick={()=>{
+                                        const w = parseInt(document.getElementById(`w-${t.id}`).value)||0;
+                                        const d = parseInt(document.getElementById(`d-${t.id}`).value)||0;
+                                        const l = parseInt(document.getElementById(`l-${t.id}`).value)||0;
+                                        onUpdateTeamStats(t.id, {wins:w, draws:d, losses:l});
+                                    }}>💾</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
         };
 
         const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams, onRenew, isOwner }) => {
@@ -1240,6 +1389,19 @@
                         <button className={`btn ${tab==='PERFIL'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('PERFIL')}>PERFIL</button>
                         <button className={`btn ${tab==='INV'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('INV')}>MOCHILA ({myItems.length})</button>
                     </div>
+                    {/* Indicador de XP Pendente (Estilo FIFA) */}
+                        {player.pendingXP && player.pendingXP !== 0 && (
+                            <div style={{
+                                position:'absolute', top: 10, right: 10, 
+                                background: player.pendingXP > 0 ? 'rgba(0,255,0,0.2)' : 'rgba(255,0,0,0.2)', 
+                                border: player.pendingXP > 0 ? '1px solid #00E676' : '1px solid #FF1744',
+                                color: player.pendingXP > 0 ? '#00E676' : '#FF1744',
+                                padding: '5px 10px', borderRadius: 20, fontWeight: 'bold', fontSize: 12,
+                                animation: 'pulse 2s infinite'
+                            }}>
+                                {player.pendingXP > 0 ? '+' : ''}{player.pendingXP} XP
+                            </div>
+                        )}
 
                     {tab==='PERFIL' && <div>
                         <div className="card" style={{borderLeft:'4px solid var(--primary)', background:'linear-gradient(90deg, #1b2e1b, #1E1E1E)'}}>
@@ -1285,6 +1447,38 @@
                 </div>
             );
         };
+        const updateTeamStats = async (tid, stats) => {
+                await db.collection('teams').doc(tid).update({ stats });
+                alert("Tabela atualizada!");
+            };
+
+            // Lança Desempenho e XP Pendente (Admin/Súmula)
+            const saveMatchStats = async (player, match, xpGained) => {
+                const b = db.batch();
+                const pRef = db.collection('players').doc(player.id);
+                
+                // 1. Atualiza Stats Totais (Acumula)
+                const newStats = {
+                    goals: (player.stats?.goals||0) + match.goals,
+                    assists: (player.stats?.assists||0) + match.assists,
+                    tackles: (player.stats?.tackles||0) + match.tackles,
+                    saves: (player.stats?.saves||0) + match.saves,
+                    yellows: (player.stats?.yellows||0) + match.yellows,
+                    reds: (player.stats?.reds||0) + match.reds
+                };
+                
+                // 2. Adiciona XP ao "Pendente" (Acumula para virada de temporada/semana)
+                const currentPending = player.pendingXP || 0;
+                
+                b.update(pRef, { 
+                    stats: newStats,
+                    pendingXP: currentPending + xpGained // Acumula o XP
+                });
+
+                await b.commit();
+                alert(`Desempenho lançado! ${player.name} tem ${xpGained} XP pendente.`);
+                setModal(null);
+            };
         const OffersScreen = ({ offers, onAccept, onReject, onCounter }) => (<div><h3>Propostas</h3>{offers.map(o=><div key={o.id} className="card" style={{borderLeft:'4px solid gold'}}><b style={{color:'var(--primary)'}}>{o.playerName}</b><br/><small>De: {o.buyerName}</small><p style={{background:'#333', padding:5, borderRadius:5, whiteSpace:'pre-wrap', fontSize:11}}>{o.description}</p><div style={{display:'flex', gap:5}}><button className="btn btn-green" onClick={()=>onAccept(o)}>ACEITAR</button><button className="btn btn-blue" onClick={()=>onCounter(o)}>CONTRA</button><button className="btn btn-red" onClick={()=>onReject(o)}>RECUSAR</button></div></div>)}</div>);
         
         const Ranking = ({ teams, players }) => {

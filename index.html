@@ -556,7 +556,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.53</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.54</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -664,17 +664,29 @@
                     </div>
 
                     <div className="bottom-nav">
-                        <div className={`nav-item ${screen==='HOME'||screen==='COMPANY_HOME'?'active':''}`} onClick={()=>setScreen(user.type.includes('PRESS')?'PRESS_DASH':(user.type==='COMPANY'?'COMPANY_HOME':'HOME'))}><i className="fas fa-home"></i>INÍCIO</div>
+                        {/* AQUI ESTAVA O PROBLEMA: Atualizei a lógica do clique para incluir o PLAYER */}
+                        <div 
+                            className={`nav-item ${['HOME','COMPANY_HOME','COMPANY_DASH','PLAYER_DASH'].includes(screen)?'active':''}`} 
+                            onClick={() => {
+                                if(user.type.includes('PRESS')) setScreen('PRESS_DASH');
+                                else if(user.type === 'COMPANY') setScreen('COMPANY_HOME');
+                                else if(user.type === 'PLAYER') setScreen('PLAYER_DASH'); // <--- AGORA ELE SABE PARA ONDE IR!
+                                else setScreen('HOME');
+                            }}
+                        >
+                            <i className="fas fa-home"></i>INÍCIO
+                        </div>
+
+                        {/* Botão Mercado (esconde para empresa e jogador) */}
+                        {user.type!=='COMPANY' && user.type!=='PLAYER' && <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>}
                         
-                        {/* Botão Mercado só para quem não é empresa */}
-                        {user.type!=='COMPANY' && <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>}
+                        {/* Botão Shopping (esconde para empresa e jogador) - Se quiser que jogador compre, tire o && user.type!=='PLAYER' */}
+                        {user.type!=='COMPANY' && user.type!=='PLAYER' && <div className={`nav-item ${screen==='SHOPPING'?'active':''}`} onClick={()=>setScreen('SHOPPING')}><i className="fas fa-shopping-bag"></i>SHOP</div>}
                         
-                        {/* NOVO: Botão Shopping */}
-                        {user.type!=='COMPANY' && <div className={`nav-item ${screen==='SHOPPING'?'active':''}`} onClick={()=>setScreen('SHOPPING')}><i className="fas fa-shopping-bag"></i>SHOP</div>}
-                        
-                        {/* NOVO: Botão Patrocínio (Só Times) */}
+                        {/* Botão Patrocínio (Só Times) */}
                         {user.type==='USER' && <div className={`nav-item ${screen==='SPONSORSHIPS'?'active':''}`} onClick={()=>setScreen('SPONSORSHIPS')}><i className="fas fa-handshake"></i>PATRO</div>}
                         
+                        {/* Ranking (todos menos empresa veem) */}
                         {user.type!=='COMPANY' && <div className={`nav-item ${screen==='RANKING'?'active':''}`} onClick={()=>setScreen('RANKING')}><i className="fas fa-trophy"></i>RANK</div>}
                         
                         <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={()=>{setScreen('NEWS'); setNewNews(false); localStorage.setItem('lastRead', Date.now());}}><i className="fas fa-newspaper"></i>NEWS</div>
@@ -709,7 +721,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.53 (Player Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.54 (Player Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

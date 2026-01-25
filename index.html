@@ -136,9 +136,7 @@
             const [companies, setCompanies] = useState([]);
             const [products, setProducts] = useState([]);
             const [sps, setSps] = useState([]);
-            // ETAPA 1: Novo estado para empresas
-        
-
+            
             const [screen, setScreen] = useState('HOME');
             const [modal, setModal] = useState(null);
             const [loading, setLoading] = useState(true);
@@ -154,7 +152,7 @@
                     db.collection('financeRequests').onSnapshot(s => setReqs(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('newspapers').onSnapshot(s => setPapers(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('journalists').onSnapshot(s => setJournalists(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    // ETAPA 1: Escutar coleção de empresas
+                    
                     db.collection('companies').onSnapshot(s => setCompanies(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('products').onSnapshot(s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('sponsorships').onSnapshot(s => setSps(s.docs.map(d => ({id:d.id, ...d.data()})))),
@@ -170,7 +168,7 @@
                     if (me) setUser(prev => ({...prev, data: me}));
                     return db.collection('offers').where('sellerId', '==', user.data.id).onSnapshot(s => setOffers(s.docs.map(d => ({id:d.id, ...d.data()}))));
                 }
-                // ETAPA 1: Atualização de sessão se for Empresa
+                
                 if (user?.type === 'COMPANY') {
                     const me = companies.find(c => c.id === user.data.id);
                     if (me) {
@@ -226,7 +224,7 @@
             const createNewspaper = async (name, pass, owner) => { await db.collection('newspapers').add({ name, password: pass, ownerName: owner, status: 'PENDING' }); alert("Jornal criado! Aguarde Federação."); };
             const createJournalist = async (name, pass, paperId) => { await db.collection('journalists').add({ name, password: pass, newspaperId: paperId, status: 'PENDING' }); alert("Conta criada! Aguarde seu Chefe."); };
             
-            // ETAPA 1: Cadastro de Empresa
+            
             const createCompany = async (f) => {
                 if(!f.n || !f.p) return alert("Preencha tudo!");
                 await db.collection('companies').add({ name: f.n, owner: f.owner, password: f.p, companyType: f.type, balance: COMPANY_TYPES[f.type].start, status: 'PENDING' });
@@ -575,7 +573,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.60</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.61</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -739,7 +737,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.60 (Player Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.61 (Player Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

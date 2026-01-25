@@ -173,21 +173,45 @@
             const postNews = (text, type='normal') => db.collection('news').add({ text, type, date: Date.now() });
 
             const login = (id, pwd, type) => {
-                if (type === 'TEAM') { const t = teams.find(x => x.id === id); if (t && t.password === pwd) { if (t.status === 'PENDING') alert("⏳ Aguarde a Federação."); else { setUser({type:'USER', data:t}); setScreen('HOME'); } } else alert("Erro!"); } 
-                else if (type === 'PAPER') { const p = papers.find(x => x.id === id); if (p && p.password === pwd) { if (p.status === 'PENDING') alert("⏳ Aguarde a Federação."); else { setUser({type:'PRESS', data:p}); setScreen('PRESS_DASH'); } } else alert("Erro!"); } 
-                else if (type === 'JOURNALIST') { const j = journalists.find(x => x.id === id); if (j && j.password === pwd) { if (j.status === 'PENDING') alert("⏳ Aguarde o Dono do Jornal."); else { setUser({type:'PRESS_WORKER', data:j}); setScreen('PRESS_DASH'); } } else alert("Erro!"); }
-                // ETAPA 1: Login de Empresa
-                else if (type === 'COMPANY') { const c = companies.find(x => x.id === id); if (c && c.password === pwd) { if (c.status === 'PENDING') alert("⏳ Aguarde a Federação."); else if (c.status === 'BLOCKED') alert("🚫 Empresa Bloqueada."); else { setUser({type:'COMPANY', data:c}); setScreen('COMPANY_HOME'); } } else alert("Erro!"); }
+                if (type === 'TEAM') { 
+                    const t = teams.find(x => x.id === id); 
+                    if (t && t.password === pwd) { 
+                        if (t.status === 'PENDING') alert("⏳ Aguarde a Federação."); 
+                        else { setUser({type:'USER', data:t}); setScreen('HOME'); } 
+                    } else alert("Erro!"); 
+                } 
+                else if (type === 'PAPER') { 
+                    const p = papers.find(x => x.id === id); 
+                    if (p && p.password === pwd) { 
+                        if (p.status === 'PENDING') alert("⏳ Aguarde a Federação."); 
+                        else { setUser({type:'PRESS', data:p}); setScreen('PRESS_DASH'); } 
+                    } else alert("Erro!"); 
+                } 
+                else if (type === 'JOURNALIST') { 
+                    const j = journalists.find(x => x.id === id); 
+                    if (j && j.password === pwd) { 
+                        if (j.status === 'PENDING') alert("⏳ Aguarde o Dono do Jornal."); 
+                        else { setUser({type:'PRESS_WORKER', data:j}); setScreen('PRESS_DASH'); } 
+                    } else alert("Erro!"); 
+                }
+                else if (type === 'COMPANY') { 
+                    const c = companies.find(x => x.id === id); 
+                    if (c && c.password === pwd) { 
+                        if (c.status === 'PENDING') alert("⏳ Aguarde a Federação."); 
+                        else if (c.status === 'BLOCKED') alert("🚫 Empresa Bloqueada."); 
+                        else { setUser({type:'COMPANY', data:c}); setScreen('COMPANY_HOME'); } 
+                    } else alert("Erro!"); 
+                }
+                // AQUI ENTRA A LÓGICA DO JOGADOR (DENTRO DA FUNÇÃO)
+                else if (type === 'PLAYER') { 
+                     const pl = players.find(x => x.id === id); 
+                     const pass = pl.password || '1234'; 
+                     if (pl && pass === pwd) { 
+                         setUser({type:'PLAYER', data:pl}); 
+                         setScreen('PLAYER_DASH'); 
+                     } else alert("Senha incorreta!"); 
+                }
             };
-            else if (type === 'PLAYER') { 
-     const pl = players.find(x => x.id === id); 
-     // Se não tiver senha salva ainda, usa '1234' como padrão
-     const pass = pl.password || '1234'; 
-     if (pl && pass === pwd) { 
-         setUser({type:'PLAYER', data:pl}); 
-         setScreen('PLAYER_DASH'); 
-     } else alert("Senha incorreta!"); 
-}
 
             const loginAdmin = () => { setUser({ type: 'ADMIN', data: { id: 'admin', name: 'FEDERAÇÃO (ADM)', balance: 0, logo: null, stadiumLevel: 1, serie: 'ADM' } }); setScreen('HOME'); };
             const createTeam = async (name, bal, serie, pass, logo) => { if(teams.find(t=>t.name.toLowerCase()===name.toLowerCase())) return alert("Nome em uso!"); await db.collection('teams').add({ name, balance: parseFloat(bal), serie, password: pass, stadiumLevel: 1, logo: logo||null, status: 'PENDING' }); alert("Criado! Aguarde aprovação."); };

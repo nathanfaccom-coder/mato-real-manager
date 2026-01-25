@@ -202,7 +202,6 @@
                         else { setUser({type:'COMPANY', data:c}); setScreen('COMPANY_HOME'); } 
                     } else alert("Erro!"); 
                 }
-                // AQUI ENTRA A LÓGICA DO JOGADOR (DENTRO DA FUNÇÃO)
                 else if (type === 'PLAYER') { 
                      const pl = players.find(x => x.id === id); 
                      const pass = pl.password || '1234'; 
@@ -212,7 +211,6 @@
                      } else alert("Senha incorreta!"); 
                 }
             };
-
             const loginAdmin = () => { setUser({ type: 'ADMIN', data: { id: 'admin', name: 'FEDERAÇÃO (ADM)', balance: 0, logo: null, stadiumLevel: 1, serie: 'ADM' } }); setScreen('HOME'); };
             const createTeam = async (name, bal, serie, pass, logo) => { if(teams.find(t=>t.name.toLowerCase()===name.toLowerCase())) return alert("Nome em uso!"); await db.collection('teams').add({ name, balance: parseFloat(bal), serie, password: pass, stadiumLevel: 1, logo: logo||null, status: 'PENDING' }); alert("Criado! Aguarde aprovação."); };
             const createNewspaper = async (name, pass, owner) => { await db.collection('newspapers').add({ name, password: pass, ownerName: owner, status: 'PENDING' }); alert("Jornal criado! Aguarde Federação."); };
@@ -579,10 +577,7 @@
                                 // -----------------------------------------------
                             />
                         }
-                          {// ETAPA 1: Funções de Admin para Empresas
-                        onApproveComp={async(id)=>{await db.collection('companies').doc(id).update({status:'ACTIVE'}); alert("Empresa Aprovada!");}}
-                        onDeleteComp={async(id)=>{if(confirm("Excluir Empresa?")) await db.collection('companies').doc(id).delete();}}
-                        />}
+                          
                         {screen === 'HOME' && user.type === 'USER' && <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />}
                         {screen === 'HOME' && user.type === 'VISITOR' && <VisitorDashboard players={players} teams={teams} />}
                         {screen === 'PRESS_DASH' && (user.type==='PRESS' || user.type==='PRESS_WORKER') && (<div><h3>Painel de Imprensa ({user.data.name})</h3><div className="card"><button className="btn btn-blue" onClick={()=>setModal({type:'POST_NEWS'})}>ESCREVER NOTÍCIA</button><button className="btn btn-purple" onClick={()=>setModal({type:'STATS_SEARCH'})}>SÚMULA / ESTATÍSTICAS</button></div>{user.type==='PRESS' && journalists.filter(j=>j.newspaperId===user.data.id && j.status==='PENDING').map(j=><div key={j.id} className="card">{j.name}<button className="btn btn-green" onClick={()=>db.collection('journalists').doc(j.id).update({status:'ACTIVE'})}>APROVAR</button></div>)}</div>)}

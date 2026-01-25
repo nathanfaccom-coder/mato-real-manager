@@ -476,15 +476,15 @@
                        {/* ETAPA 3 e 4: Painel da Empresa (Com Histórico e Patrocínios) */}
                         {screen === 'COMPANY_DASH' && user.type === 'COMPANY' && 
                             <CompanyDashboard 
-                                company={user.data} 
-                                products={products.filter(p => p.companyId === user.data.id)} 
-                                sps={sps.filter(s => s.companyId === user.data.id)}
-                                sales={sales} /* <--- ISSO AQUI É O PASSO 4! */
-                                teams={teams}
-                                onSaveProd={saveProduct} 
-                                onDeleteProd={deleteProduct} 
-                                onProcessSpons={processSponsorship} 
-                            />
+    company={user.data} 
+    products={products.filter(p=>p.companyId===user.data.id)} 
+    sps={sps.filter(s=>s.companyId===user.data.id)} 
+    sales={sales || []}  /* <--- ESSA LINHA ERA A PEÇA QUE FALTAVA! */
+    teams={teams} 
+    onSaveProd={saveProduct} 
+    onDeleteProd={deleteProduct} 
+    onProcessSpons={processSponsorship} 
+/>
                         }
                     </div>
 

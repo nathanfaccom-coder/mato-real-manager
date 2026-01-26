@@ -528,8 +528,9 @@
                 alert("Tabela atualizada!"); 
             };
 
-            // 2. Função para lançar Súmula (ATUALIZADA: MÉDIA DA IMPRENSA)
+            // 2. Função para lançar Súmula (ATUALIZADA: CÁLCULO DA MÉDIA)
             const saveMatchStats = async (player, match, xpGained) => {
+                // Validação: Não deixa salvar sem nota
                 if(match.rating === '' || match.rating === null) return alert("Dê uma nota para a atuação!");
                 
                 const b = db.batch(); 
@@ -545,29 +546,27 @@
                     reds: (player.stats?.reds||0) + match.reds 
                 };
 
-                // CÁLCULO DA MÉDIA DA IMPRENSA
-                const currentSum = player.pressRatingSum || 0; // Soma total das notas
-                const currentCount = player.pressRatingCount || 0; // Quantas vezes foi avaliado
+                // --- CÁLCULO DA MÉDIA DA IMPRENSA ---
+                const currentSum = player.pressRatingSum || 0; // Soma acumulada
+                const currentCount = player.pressRatingCount || 0; // Qtd de jogos
                 const newSum = currentSum + parseFloat(match.rating);
                 const newCount = currentCount + 1;
-                const newAvg = newSum / newCount; // Nova média
+                const newAvg = newSum / newCount; // Nova média matemática
                 
-                // Salva estatísticas, XP Pendente e a Nova Média
+                // Salva tudo: Stats, XP Pendente e a Média Atualizada
                 b.update(pRef, { 
                     stats: newStats, 
                     pendingXP: (player.pendingXP || 0) + xpGained,
                     pressRatingSum: newSum,
                     pressRatingCount: newCount,
-                    pressRatingAvg: parseFloat(newAvg.toFixed(1)) // Média arredondada (Ex: 7.5)
+                    pressRatingAvg: parseFloat(newAvg.toFixed(1)) // Ex: 7.5
                 });
                 
                 await b.commit(); 
-                alert(`Súmula lançada com sucesso!`); 
+                alert(`Súmula lançada! Média do jogador agora é: ${newAvg.toFixed(1)}`); 
                 setModal(null);
             };
-
-            // 3. Função Mestra do Admin (Semana e Temporada)
-            // 3. Função Mestra do Admin (BLINDADA CONTRA ERROS)
+            
             // 3. Função Mestra do Admin (COM IMPOSTO DE 3% NOS JOGADORES)
             const adminAction = async (act, data) => {
                 if(act==='MARKET') { 
@@ -695,7 +694,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.79</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.80</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -884,7 +883,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.79(Company Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.80(Company Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1177,15 +1176,17 @@
                         <div style={{border:'1px solid var(--purple)', padding:8, borderRadius:5, margin:'5px 0'}}>
                             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5}}>
                                 <label style={{color:'var(--purple)', fontWeight:'bold'}}>Nota Oficial (Admin)</label>
-                                {/* MOSTRA A SUGESTÃO AQUI */}
+                                
+                                {/* AQUI: MOSTRA A MÉDIA DA IMPRENSA COMO SUGESTÃO */}
                                 {initial?.pressRatingAvg && (
-                                    <span style={{fontSize:10, background:'#333', padding:'2px 6px', borderRadius:4}}>
-                                        📰 Média Imprensa: <span style={{color:'var(--warning)'}}>{initial.pressRatingAvg}</span> ({initial.pressRatingCount} jogos)
+                                    <span style={{fontSize:10, background:'#333', padding:'2px 6px', borderRadius:4, border:'1px solid #555'}}>
+                                        📰 Imprensa: <span style={{color:'var(--warning)', fontWeight:'bold'}}>{initial.pressRatingAvg}</span> ({initial.pressRatingCount} jgs)
                                     </span>
                                 )}
                             </div>
+                            
                             <input className="input-field" type="number" step="0.1" min="0" max="10" value={f.rating} onChange={e=>setF({...f, rating:e.target.value})} />
-                            <small style={{color:'#888', fontSize:10}}>Esta é a nota usada para calcular o XP.</small>
+                            <small style={{color:'#888', fontSize:10}}>O XP é calculado com base NESTA nota, não na da imprensa.</small>
                         </div>
                     )}                    
                     {isAdmin && <div style={{border:'1px solid var(--primary)', padding:8, borderRadius:8, marginTop:10}}>

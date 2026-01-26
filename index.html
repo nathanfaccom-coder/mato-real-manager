@@ -567,6 +567,34 @@
                 alert(`Súmula lançada! Média do jogador agora é: ${newAvg.toFixed(1)}`); 
                 setModal(null);
             };
+// --- NOVA FUNÇÃO: AÇÕES DE CARREIRA DO JOGADOR ---
+            const handlePlayerActions = async (type, p) => {
+                const team = teams.find(t => t.id === p.teamId);
+                
+                // 1. PEDIR TRANSFERÊNCIA
+                if (type === 'TRANSFER_REQUEST') {
+                    if (!team) return alert("Já és um Agente Livre!");
+                    if (p.status === 'VENDA') return alert("Já estás na lista de transferências.");
+                    if (!confirm(`Tens a certeza que queres pedir para sair do ${team.name}? O adepto não vai gostar...`)) return;
+
+                    await db.collection('players').doc(p.id).update({
+                        status: 'VENDA',
+                        mood: '😡'
+                    });
+                    postNews(`💣 **CRISE NO ${team.name.toUpperCase()}!**\nO jogador **${p.name}** está insatisfeito e pediu para ser colocado na lista de transferências!`, 'rumor');
+                    alert("O pedido foi feito. O teu humor piorou.");
+                }
+
+                // 2. PEDIR AUMENTO
+                if (type === 'ASK_RAISE') {
+                    if (!team) return alert("Precisas de um clube para pedir aumento.");
+                    if (!confirm("Ir à imprensa pedir um aumento salarial?")) return;
+
+                    // Apenas lança a notícia para pressionar o dono
+                    postNews(`💰 **POLÉMICA**\n**${p.name}** declara publicamente: "Mereço ganhar mais no ${team.name}. Espero uma renovação em breve."`, 'press');
+                    alert("Declaração feita à imprensa! O presidente foi notificado.");
+                }
+            };
             
             // 3. Função Mestra do Admin (COM IMPOSTO DE 3% NOS JOGADORES)
             const adminAction = async (act, data) => {
@@ -695,7 +723,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.81</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.82</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -810,12 +838,12 @@
                                 onProcessSpons={processSponsorship} 
                             />
                         }
-                        {/* ADICIONEI "sales={sales}" AQUI */}
                         {screen === 'PLAYER_DASH' && user.type === 'PLAYER' && 
                             <PlayerDashboard 
                                 player={players.find(p=>p.id===user.data.id) || user.data} 
                                 team={teams.find(t=>t.id===user.data.teamId)} 
                                 sales={sales || []} 
+                                onAction={handlePlayerActions} // <--- ADICIONE ESTA LINHA AQUI
                                 onUpdatePassword={async(newP)=>{ await db.collection('players').doc(user.data.id).update({password: newP}); alert("Senha alterada!"); }} 
                             />
                         }
@@ -884,7 +912,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.81(Company Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.82(Company Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1314,8 +1342,7 @@
             return <div><label>Nome</label><input className="input-field" value={form.name} onChange={e=>setF({...form, name:e.target.value})} /><label>Logo</label><input className="input-field" value={form.logo} onChange={e=>setF({...form, logo:e.target.value})} />{isAdmin && <label>Saldo (ADM)</label>} {isAdmin && <input className="input-field" type="number" value={form.balance} onChange={e=>setF({...form, balance:parseFloat(e.target.value)})} />}{isAdmin && <label>Série (ADM)</label>}{isAdmin && <select className="input-field" value={form.serie} onChange={e=>setF({...form, serie:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>{s}</option>)}</select>}<button className="btn btn-blue" onClick={()=>onUp(form)}>SALVAR</button><hr style={{borderColor:'#444'}}/><p>Estádio Nível {team.stadiumLevel||1}</p><button className="btn btn-purple" onClick={onUpgrade}>EVOLUIR (₣ {fmt(COSTS[team.stadiumLevel]||0).replace('₣ ','')})</button><hr style={{borderColor:'#444'}}/><button className="btn btn-green" onClick={()=>{const v=prompt("Valor");const m=prompt("Motivo"); if(v)onReq('INJECTION',v,m)}}>PEDIR INJEÇÃO</button><button className="btn btn-gold" onClick={()=>{const v=prompt("Valor");const m=prompt("Empresa"); if(v)onReq('SPONSORSHIP',v,m)}}>PEDIR PATROCÍNIO</button><button className="btn btn-red" onClick={()=>{const v=prompt("Valor a retirar:"); if(v){ const m=prompt("Motivo:"); if(m) onWithdraw(v, m); }}}>RETIRAR DINHEIRO</button></div>;
         };
 
-        // --- PAINEL DO JOGADOR (Versão: Histórico + Conquistas) ---
-        const PlayerDashboard = ({ player, team, sales, onUpdatePassword }) => {
+        const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction }) => {
             const [newPass, setNewPass] = useState('');
             const [tab, setTab] = useState('PERFIL'); 
 
@@ -1328,32 +1355,24 @@
             const xpPerc = Math.min(100, Math.max(0, ((player.xp || 0) / xpNeed) * 100));
             const energy = player.energy !== undefined ? player.energy : 100;
 
-            // Sistema de Conquistas (Feitos da Temporada)
+            // Conquistas Simples
             const getAchievements = () => {
                 const list = [];
                 const s = player.stats || {};
                 if (s.goals >= 1) list.push({icon:'⚽', name:'Primeiro Gol', color:'#fff'});
-                if (s.goals >= 5) list.push({icon:'🔥', name:'Artilheiro', color:'var(--warning)'});
-                if (s.goals >= 10) list.push({icon:'👑', name:'Rei da Área', color:'gold'});
-                
-                if (s.assists >= 1) list.push({icon:'👟', name:'Garçom', color:'#fff'});
+                if (s.goals >= 10) list.push({icon:'🔥', name:'Artilheiro', color:'gold'});
                 if (s.assists >= 10) list.push({icon:'🎩', name:'Maestro', color:'var(--secondary)'});
-                
                 if (s.tackles >= 10) list.push({icon:'🧱', name:'Paredão', color:'#aaa'});
-                if (s.saves >= 5) list.push({icon:'🧤', name:'Santo', color:'var(--primary)'});
-                
                 if (player.overall >= 80) list.push({icon:'⭐', name:'Craque', color:'var(--purple)'});
-                if (team && team.serie === 'A') list.push({icon:'🅰️', name:'Elite', color:'#fff'});
-                
                 return list;
             };
             const badges = getAchievements();
 
             return (
                 <div>
-                    {/* CABEÇALHO RPG COM BARRA DE XP */}
+                    {/* CABEÇALHO COM BARRA DE XP */}
                     <div className="highlight-card" style={{textAlign:'center', paddingBottom:30, position:'relative'}}>
-                        <h2 style={{margin:0}}>{player.name}</h2>
+                        <h2 style={{margin:0}}>{player.name} <span style={{fontSize:14}}>{player.mood}</span></h2>
                         <small style={{color:'#ccc'}}>{team?.name || 'Agente Livre'}</small>
                         
                         <div style={{display:'flex', justifyContent:'center', gap:30, marginTop:15}}>
@@ -1364,6 +1383,8 @@
                                 </div>
                                 <span style={{fontSize:10, textTransform:'uppercase', color:'#888'}}>Nível Atual</span>
                             </div>
+                            
+                            {/* ENERGIA (APENAS VISUALIZAÇÃO) */}
                             <div style={{textAlign:'center'}}>
                                 <div style={{fontSize:40, fontWeight:'900', color: energy > 50 ? 'var(--primary)' : 'var(--danger)', lineHeight:1}}>{energy}%</div>
                                 <span style={{fontSize:10, textTransform:'uppercase', color:'#888'}}>Energia</span>
@@ -1379,20 +1400,18 @@
                         </div>
                     </div>
 
-                    <div style={{display:'flex', gap:10, marginBottom:15}}>
+                    <div style={{display:'flex', gap:10, marginBottom:15, overflowX:'auto'}}>
                         <button className={`btn ${tab==='PERFIL'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('PERFIL')}>PERFIL</button>
+                        <button className={`btn ${tab==='ACOES'?'btn-red':'btn-ghost'}`} onClick={()=>setTab('ACOES')}>AÇÕES</button>
                         <button className={`btn ${tab==='CARREIRA'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('CARREIRA')}>CARREIRA</button>
                         <button className={`btn ${tab==='INV'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('INV')}>MOCHILA ({myItems.length})</button>
                     </div>
 
                     {tab==='PERFIL' && <div>
-                        {/* Cartão Financeiro */}
                         <div className="card" style={{borderLeft:'4px solid var(--primary)', background:'linear-gradient(90deg, #1b2e1b, #1E1E1E)'}}>
                             <h3 style={{marginTop:0, color:'var(--primary)'}}>🏦 {fmt(player.balance)}</h3>
                             <small style={{color:'#aaa'}}>Salário: {fmt(player.salary)} | Passe: {fmt(player.value)}</small>
                         </div>
-
-                        {/* Grid de Stats */}
                         <div className="card">
                             <h3>📊 Estatísticas da Temporada</h3>
                             <div className="stats-grid" style={{gridTemplateColumns:'1fr 1fr 1fr'}}>
@@ -1404,59 +1423,59 @@
                                 <div className="stat-item"><span className="stat-lbl">🟥 Verm</span><span className="stat-val">{player.stats?.reds||0}</span></div>
                             </div>
                         </div>
+                    </div>}
 
-                        {/* Segurança */}
+                    {tab==='ACOES' && <div>
+                        <h3>⚡ Gestão de Carreira</h3>
+                        
+                        {/* AVISO SOBRE ENERGIA */}
+                        <div className="card" style={{borderLeft:'4px solid #fff'}}>
+                            <h4>🏋️ Treino Físico</h4>
+                            <p style={{fontSize:11, color:'#aaa'}}>A gestão da tua energia e treinos é responsabilidade exclusiva da equipa técnica do {team?.name || 'clube'}.</p>
+                            <div style={{background:'#333', padding:5, borderRadius:4, fontSize:10, textAlign:'center'}}>
+                                Energia Atual: <b style={{color: energy > 50 ? 'var(--primary)' : 'var(--danger)'}}>{energy}%</b>
+                            </div>
+                        </div>
+
                         <div className="card" style={{borderLeft:'4px solid var(--danger)'}}>
-                            <h3>🔐 Segurança</h3>
+                            <h4>📢 O Gabinete do Presidente</h4>
+                            <p style={{fontSize:11, color:'#aaa'}}>Toma decisões importantes sobre o teu futuro.</p>
+                            
+                            {team ? (
+                                <div style={{display:'flex', gap:10, flexDirection:'column'}}>
+                                    <button className="btn btn-gold" onClick={()=>onAction('ASK_RAISE', player)}>💰 PEDIR AUMENTO SALARIAL</button>
+                                    <button className="btn btn-red" onClick={()=>onAction('TRANSFER_REQUEST', player)}>😡 PEDIR TRANSFERÊNCIA</button>
+                                </div>
+                            ) : (
+                                <p style={{color:'var(--primary)', fontWeight:'bold'}}>Estás livre no mercado!</p>
+                            )}
+                        </div>
+
+                        <div className="card">
+                            <h4>🔐 Segurança</h4>
                             <div style={{display:'flex', gap:5}}>
                                 <input className="input-field" type="password" placeholder="Nova Senha" value={newPass} onChange={e=>setNewPass(e.target.value)} style={{marginBottom:0}} />
-                                <button className="btn btn-red" style={{width:'auto'}} onClick={()=>{ if(!newPass) return alert("Digite uma senha!"); onUpdatePassword(newPass); setNewPass(''); }}>ALTERAR</button>
+                                <button className="btn btn-purple" style={{width:'auto'}} onClick={()=>{ if(!newPass) return alert("Digite uma senha!"); onUpdatePassword(newPass); setNewPass(''); }}>ALTERAR</button>
                             </div>
                         </div>
                     </div>}
 
                     {tab==='CARREIRA' && <div>
-                        {/* Conquistas (Feitos) */}
                         <div className="card">
-                            <h3>🏆 Feitos da Temporada</h3>
-                            {badges.length === 0 && <p style={{color:'#666', fontSize:11}}>Jogue partidas para desbloquear conquistas.</p>}
+                            <h3>🏆 Conquistas</h3>
+                            {badges.length === 0 && <p style={{color:'#666', fontSize:11}}>Joga para desbloquear.</p>}
                             <div style={{display:'flex', flexWrap:'wrap', gap:8}}>
-                                {badges.map((b, i) => (
-                                    <div key={i} style={{background:'#333', padding:'5px 10px', borderRadius:20, display:'flex', alignItems:'center', gap:5, border:`1px solid ${b.color}`}}>
-                                        <span>{b.icon}</span>
-                                        <span style={{fontSize:11, fontWeight:'bold', color:b.color}}>{b.name}</span>
-                                    </div>
-                                ))}
+                                {badges.map((b, i) => (<div key={i} style={{background:'#333', padding:'5px 10px', borderRadius:20, display:'flex', alignItems:'center', gap:5, border:`1px solid ${b.color}`}}><span>{b.icon}</span><span style={{fontSize:11, fontWeight:'bold', color:b.color}}>{b.name}</span></div>))}
                             </div>
                         </div>
-
-                        {/* Histórico de Clubes */}
                         <div className="card" style={{borderLeft:'4px solid #fff'}}>
                             <h3>🌍 Histórico de Clubes</h3>
-                            {(!player.history || player.history.length === 0) && <p style={{color:'#666', fontSize:11}}>Nenhuma transferência registrada.</p>}
-                            
                             <div style={{display:'flex', flexDirection:'column-reverse', gap:10}}>
                                 {(player.history || []).map((h, i) => (
                                     <div key={i} style={{display:'flex', alignItems:'center', justifyContent:'space-between', background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8}}>
-                                        {/* Origem */}
-                                        <div style={{display:'flex', flexDirection:'column', alignItems:'center', width:'30%'}}>
-                                            {h.logoFrom ? <img src={h.logoFrom} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/> : <span style={{fontSize:20}}>🏟️</span>}
-                                            <span style={{fontSize:9, color:'#aaa', marginTop:3}}>{h.from}</span>
-                                        </div>
-
-                                        {/* Detalhes do Meio */}
-                                        <div style={{flex:1, textAlign:'center'}}>
-                                            <div style={{color:'var(--primary)', fontSize:14}}>➡</div>
-                                            <div style={{fontSize:10, color:'var(--warning)', fontWeight:'bold'}}>{h.type}</div>
-                                            <div style={{fontSize:9, color:'#fff'}}>{h.value > 0 ? fmt(h.value) : 'Grátis'}</div>
-                                            <div style={{fontSize:8, color:'#666'}}>{new Date(h.date).toLocaleDateString()}</div>
-                                        </div>
-
-                                        {/* Destino */}
-                                        <div style={{display:'flex', flexDirection:'column', alignItems:'center', width:'30%'}}>
-                                            {h.logoTo ? <img src={h.logoTo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/> : <span style={{fontSize:20}}>🏟️</span>}
-                                            <span style={{fontSize:9, color:'#fff', fontWeight:'bold', marginTop:3}}>{h.to}</span>
-                                        </div>
+                                        <span style={{fontSize:9, color:'#aaa'}}>{h.from}</span>
+                                        <div style={{textAlign:'center'}}><div style={{color:'var(--primary)', fontSize:12}}>➡</div><div style={{fontSize:9, color:'#fff'}}>{h.value > 0 ? fmt(h.value) : 'Grátis'}</div></div>
+                                        <span style={{fontSize:9, fontWeight:'bold'}}>{h.to}</span>
                                     </div>
                                 ))}
                             </div>
@@ -1465,16 +1484,8 @@
 
                     {tab==='INV' && <div>
                         <h3>🎒 Mochila</h3>
-                        {myItems.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Nenhum item comprado.</p>}
-                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                            {myItems.map((item, index) => (
-                                <div key={index} className="card" style={{border:'1px solid #444', textAlign:'center', padding:10}}>
-                                    <div style={{fontSize:24}}>📦</div>
-                                    <div style={{fontWeight:'bold', fontSize:12, marginTop:5}}>{item.productName}</div>
-                                    <div style={{fontSize:10, color:'#aaa'}}>Preço Pago: {fmt(item.price)}</div>
-                                </div>
-                            ))}
-                        </div>
+                        {myItems.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Vazia.</p>}
+                        {myItems.map((item, index) => (<div key={index} className="card" style={{border:'1px solid #444', textAlign:'center', padding:10}}><div style={{fontSize:24}}>📦</div><div style={{fontWeight:'bold', fontSize:12}}>{item.productName}</div><div style={{fontSize:10, color:'#aaa'}}>Preço: {fmt(item.price)}</div></div>))}
                     </div>}
                 </div>
             );

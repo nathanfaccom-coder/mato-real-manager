@@ -527,7 +527,49 @@
                 await db.collection('teams').doc(tid).update({ stats }); 
                 alert("Tabela atualizada!"); 
             };
-
+// --- DIREITOS DO JOGADOR (Carreira) ---
+            const playerCareerAction = async (type, p) => {
+                const team = teams.find(t=>t.id===p.teamId);
+                
+                // 1. PAGAR MULTA (RESCISÃO)
+                if(type==='PAY_FINE'){
+                    if(!team) return alert("Você já é um Agente Livre!");
+                    if(p.balance < p.clause) return alert(`Saldo insuficiente! Você precisa de ${fmt(p.clause)}.`);
+                    
+                    if(!confirm(`⚠️ ATENÇÃO!\n\nDeseja pagar ${fmt(p.clause)} do seu próprio bolso para rescindir com o ${team.name}?\n\nVocê ficará SEM CLUBE imediatamente.`)) return;
+                    
+                    const b = db.batch();
+                    // Tira dinheiro do jogador, zera contrato e time
+                    b.update(db.collection('players').doc(p.id), {
+                        balance: p.balance - p.clause, 
+                        teamId: null, 
+                        contract: 0, 
+                        status: 'LIVRE', 
+                        salary: 0,
+                        mood: '🤩' // Fica feliz por estar livre
+                    });
+                    // Paga ao time
+                    b.update(db.collection('teams').doc(team.id), {
+                        balance: (team.balance || 0) + p.clause
+                    });
+                    
+                    await b.commit();
+                    postNews(`⚖️ **RESCISÃO UNILATERAL**\nBOMBA! O jogador **${p.name}** pagou sua própria multa de ${fmt(p.clause)} e abandonou o **${team.name}**!`, 'transfer');
+                    alert("Você agora é um Agente Livre! Negocie com quem quiser.");
+                }
+                
+                // 2. PEDIR TRANSFERÊNCIA (Forçar Saída)
+                if(type==='REQUEST_TRANSFER'){
+                    if(!team) return alert("Você não tem time!");
+                    if(p.status === 'VENDA') return alert("Você já está na lista de transferências.");
+                    
+                    if(!confirm("Declarar publicamente que quer sair do clube?\nIsso vai mudar seu status para 'À VENDA' e piorar seu humor.")) return;
+                    
+                    await db.collection('players').doc(p.id).update({status: 'VENDA', mood: '😡'});
+                    postNews(`📢 **INSATISFAÇÃO**\n**${p.name}** declarou que não quer mais jogar no **${team.name}** e pediu para ser negociado imediatamente!`, 'rumor');
+                    alert("Pedido feito! Os outros times agora sabem que você quer sair.");
+                }
+            };
             // 2. Função para lançar Súmula (ATUALIZADA: CÁLCULO DA MÉDIA)
             const saveMatchStats = async (player, match, xpGained) => {
                 // Validação: Não deixa salvar sem nota
@@ -815,6 +857,7 @@
                                 player={players.find(p=>p.id===user.data.id) || user.data} 
                                 team={teams.find(t=>t.id===user.data.teamId)} 
                                 sales={sales || []} 
+                                onCareerAction={playerCareerAction}
                                 onUpdatePassword={async(newP)=>{ await db.collection('players').doc(user.data.id).update({password: newP}); alert("Senha alterada!"); }} 
                             />
                         }
@@ -1313,19 +1356,16 @@
             return <div><label>Nome</label><input className="input-field" value={form.name} onChange={e=>setF({...form, name:e.target.value})} /><label>Logo</label><input className="input-field" value={form.logo} onChange={e=>setF({...form, logo:e.target.value})} />{isAdmin && <label>Saldo (ADM)</label>} {isAdmin && <input className="input-field" type="number" value={form.balance} onChange={e=>setF({...form, balance:parseFloat(e.target.value)})} />}{isAdmin && <label>Série (ADM)</label>}{isAdmin && <select className="input-field" value={form.serie} onChange={e=>setF({...form, serie:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>{s}</option>)}</select>}<button className="btn btn-blue" onClick={()=>onUp(form)}>SALVAR</button><hr style={{borderColor:'#444'}}/><p>Estádio Nível {team.stadiumLevel||1}</p><button className="btn btn-purple" onClick={onUpgrade}>EVOLUIR (₣ {fmt(COSTS[team.stadiumLevel]||0).replace('₣ ','')})</button><hr style={{borderColor:'#444'}}/><button className="btn btn-green" onClick={()=>{const v=prompt("Valor");const m=prompt("Motivo"); if(v)onReq('INJECTION',v,m)}}>PEDIR INJEÇÃO</button><button className="btn btn-gold" onClick={()=>{const v=prompt("Valor");const m=prompt("Empresa"); if(v)onReq('SPONSORSHIP',v,m)}}>PEDIR PATROCÍNIO</button><button className="btn btn-red" onClick={()=>{const v=prompt("Valor a retirar:"); if(v){ const m=prompt("Motivo:"); if(m) onWithdraw(v, m); }}}>RETIRAR DINHEIRO</button></div>;
         };
 
-        const PlayerDashboard = ({ player, team, sales, onUpdatePassword }) => {
+        const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onCareerAction, onUseItem }) => {
             const [newPass, setNewPass] = useState('');
             const [tab, setTab] = useState('PERFIL'); 
 
             const myItems = (sales||[]).filter(s => s.buyerName === player.name);
             
-            // --- CÁLCULOS DO RPG (ESTILO FIFA) ---
-            const xpNeed = getXPNext(player.overall);
-            // Calcula qual seria o nível SE ele upasse agora (incluindo XP pendente)
-            const future = calcNewLevel(player.overall, (player.xp||0), (player.pendingXP||0));
-            const diffLvl = future.lvl - player.overall; // Ex: Se for nivel 70 e virar 72, diff é +2
-            
-            // Barra de XP baseada no XP atual apenas
+            // RPG Stats
+            const xpNeed = (player.overall * 100);
+            const future = (typeof calcNewLevel !== 'undefined') ? calcNewLevel(player.overall, (player.xp||0), (player.pendingXP||0)) : {lvl:player.overall, xp:0};
+            const diffLvl = future.lvl - player.overall;
             const xpPerc = Math.min(100, Math.max(0, ((player.xp || 0) / xpNeed) * 100));
             const energy = player.energy !== undefined ? player.energy : 100;
 
@@ -1337,61 +1377,37 @@
                         <small>{team?.name || 'Agente Livre'}</small>
                         
                         <div style={{display:'flex', justifyContent:'center', gap:20, marginTop:15}}>
-                            
-                            {/* OVERALL COM PREVISÃO DE EVOLUÇÃO */}
                             <div style={{textAlign:'center'}}>
                                 <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:5}}>
-                                    <div style={{fontSize:35, fontWeight:'900', color:'var(--warning)', lineHeight:1}}>
-                                        {player.overall}
-                                    </div>
-                                    {/* O NÚMERO MÁGICO VERDE/VERMELHO */}
-                                    {diffLvl !== 0 && (
-                                        <span style={{
-                                            fontSize: 16, 
-                                            fontWeight: 'bold', 
-                                            color: diffLvl > 0 ? '#00E676' : '#FF1744',
-                                            animation: 'pulse 1.5s infinite'
-                                        }}>
-                                            {diffLvl > 0 ? '+' : ''}{diffLvl}
-                                        </span>
-                                    )}
+                                    <div style={{fontSize:35, fontWeight:'900', color:'var(--warning)', lineHeight:1}}>{player.overall}</div>
+                                    {diffLvl !== 0 && <span style={{fontSize: 16, fontWeight: 'bold', color: diffLvl > 0 ? '#00E676' : '#FF1744', animation: 'pulse 1.5s infinite'}}>{diffLvl > 0 ? '+' : ''}{diffLvl}</span>}
                                 </div>
-                                <span style={{fontSize:10, textTransform:'uppercase', color:'#888'}}>Nível (Prev: {future.lvl})</span>
+                                <span style={{fontSize:10, textTransform:'uppercase', color:'#888'}}>Nível</span>
                             </div>
-
                             <div style={{textAlign:'center'}}>
                                 <div style={{fontSize:35, fontWeight:'900', color: energy > 50 ? 'var(--primary)' : 'var(--danger)', lineHeight:1}}>{energy}%</div>
                                 <span style={{fontSize:10, textTransform:'uppercase', color:'#888'}}>Energia</span>
                             </div>
                         </div>
 
-                        {/* Barra de XP */}
+                        {/* XP Bar */}
                         <div style={{position:'absolute', bottom:0, left:0, right:0, height:6, background:'#333'}}>
                             <div style={{width:`${xpPerc}%`, height:'100%', background:'var(--warning)', transition:'0.5s'}}></div>
                         </div>
-                        {/* Mostra XP Numérico */}
-                        <div style={{position:'absolute', bottom:8, right:5, fontSize:9, color:'#ccc'}}>
-                            {player.xp||0} / {xpNeed} XP
-                        </div>
+                        <div style={{position:'absolute', bottom:8, right:5, fontSize:9, color:'#ccc'}}>{player.xp||0} / {xpNeed} XP</div>
                         
-                        {/* Balãozinho de XP Pendente (Súmula Recente) */}
+                        {/* XP Pendente */}
                         {player.pendingXP && player.pendingXP !== 0 && (
-                            <div style={{
-                                position:'absolute', top: 10, right: 10, 
-                                background: player.pendingXP > 0 ? 'rgba(0,255,0,0.2)' : 'rgba(255,0,0,0.2)', 
-                                border: player.pendingXP > 0 ? '1px solid #00E676' : '1px solid #FF1744',
-                                color: player.pendingXP > 0 ? '#00E676' : '#FF1744',
-                                padding: '2px 8px', borderRadius: 10, fontWeight: 'bold', fontSize: 10,
-                                animation: 'pulse 2s infinite'
-                            }}>
-                                {player.pendingXP > 0 ? '+' : ''}{player.pendingXP} XP (Semana)
+                            <div style={{position:'absolute', top: 10, right: 10, background: player.pendingXP > 0 ? 'rgba(0,255,0,0.2)' : 'rgba(255,0,0,0.2)', border: player.pendingXP > 0 ? '1px solid #00E676' : '1px solid #FF1744', color: player.pendingXP > 0 ? '#00E676' : '#FF1744', padding: '2px 8px', borderRadius: 10, fontWeight: 'bold', fontSize: 10, animation: 'pulse 2s infinite'}}>
+                                {player.pendingXP > 0 ? '+' : ''}{player.pendingXP} XP
                             </div>
                         )}
                     </div>
 
                     <div style={{display:'flex', gap:10, marginBottom:15}}>
                         <button className={`btn ${tab==='PERFIL'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('PERFIL')}>PERFIL</button>
-                        <button className={`btn ${tab==='INV'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('INV')}>MOCHILA ({myItems.length})</button>
+                        <button className={`btn ${tab==='CONTRATO'?'btn-red':'btn-ghost'}`} onClick={()=>setTab('CONTRATO')}>CARREIRA</button>
+                        <button className={`btn ${tab==='INV'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('INV')}>MOCHILA</button>
                     </div>
 
                     {tab==='PERFIL' && <div>
@@ -1399,7 +1415,6 @@
                             <h3 style={{marginTop:0, color:'var(--primary)'}}>🏦 {fmt(player.balance)}</h3>
                             <small style={{color:'#aaa'}}>Salário: {fmt(player.salary)} | Posição: {player.position}</small>
                         </div>
-
                         <div className="card">
                             <h3>📊 Atributos</h3>
                             <div className="stats-grid" style={{gridTemplateColumns:'1fr 1fr 1fr'}}>
@@ -1411,7 +1426,6 @@
                                 <div className="stat-item"><span className="stat-lbl">🟥 Verm</span><span className="stat-val">{player.stats?.reds||0}</span></div>
                             </div>
                         </div>
-
                         <div className="card" style={{borderLeft:'4px solid var(--purple)'}}>
                             <h3>🔐 Segurança</h3>
                             <div style={{display:'flex', gap:5}}>
@@ -1421,16 +1435,49 @@
                         </div>
                     </div>}
 
+                    {/* NOVA ABA: CARREIRA / CONTRATO */}
+                    {tab==='CONTRATO' && <div>
+                        <div className="card">
+                            <h3>📜 Meu Contrato</h3>
+                            {team ? (
+                                <div style={{textAlign:'left', fontSize:12, lineHeight:1.6}}>
+                                    <div>Clube: <b>{team.name}</b></div>
+                                    <div>Vínculo: <b>{player.contract} temporadas</b></div>
+                                    <div>Salário: <b style={{color:'var(--primary)'}}>{fmt(player.salary)}/sem</b></div>
+                                    <div>Multa Rescisória: <b style={{color:'var(--warning)'}}>{fmt(player.clause)}</b></div>
+                                    <div>Status Atual: <b>{player.status === 'VENDA' ? 'À VENDA (Insatisfeito)' : 'NORMAL'}</b></div>
+                                    <hr style={{borderColor:'#444'}}/>
+                                    
+                                    <p style={{color:'#aaa', fontSize:10}}>DIREITOS DO ATLETA</p>
+                                    
+                                    <button className="btn btn-red" onClick={()=>onCareerAction('PAY_FINE', player)}>
+                                        💸 PAGAR MULTA E SAIR ({fmt(player.clause)})
+                                    </button>
+                                    <small style={{display:'block', marginBottom:10, color:'#666'}}>Use seu dinheiro para rescindir unilateralmente.</small>
+
+                                    <button className="btn btn-gold" onClick={()=>onCareerAction('REQUEST_TRANSFER', player)}>
+                                        📢 PEDIR PARA SER NEGOCIADO
+                                    </button>
+                                    <small style={{display:'block', marginBottom:10, color:'#666'}}>Declara insatisfação e avisa o mercado.</small>
+                                </div>
+                            ) : (
+                                <div style={{textAlign:'center', padding:20, color:'#00E676'}}>
+                                    <h3>VOCÊ ESTÁ LIVRE!</h3>
+                                    <p>Aguarde propostas no menu de Ofertas ou contate os donos de times.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>}
+
                     {tab==='INV' && <div>
                         <h3>Mochila</h3>
                         {myItems.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Vazia.</p>}
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
                             {myItems.map((item, index) => (
                                 <div key={index} className="card" style={{border:'1px solid #444', textAlign:'center', padding:10}}>
-                                    <div style={{fontSize:24}}>{PROD_CATS[item.cat]?.split(' ')[0] || '📦'}</div>
+                                    <div style={{fontSize:24}}>{item.productName.charAt(0)}</div>
                                     <div style={{fontWeight:'bold', fontSize:12}}>{item.productName}</div>
-                                    <div style={{fontSize:10, color:'#aaa'}}>{PROD_CATS[item.cat]}</div>
-                                    <button className="btn btn-green" style={{fontSize:10, padding:5, marginTop:5}}>USAR</button>
+                                    {onUseItem && <button className="btn btn-green" style={{fontSize:10, padding:5, marginTop:5}} onClick={()=>onUseItem(item, player)}>USAR</button>}
                                 </div>
                             ))}
                         </div>

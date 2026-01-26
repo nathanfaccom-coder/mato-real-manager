@@ -748,46 +748,60 @@
                     setLoading(false); 
                 }
                 
-                // VIRADA DE TEMPORADA (Igual ao anterior)
+                // VIRADA DE TEMPORADA (Evolução de Nível + Contratos + Passes Livres)
                 if(act==='SEASON') { 
-                    if(!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos")) return; 
+                    if(!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos (-1 ano)\n3. Jogadores sem contrato viram LIVRES")) return; 
+                    
                     setLoading(true); 
                     const b = db.batch(); 
+                    
                     players.forEach(p => { 
                         let u={}; 
+                        
+                        // 1. Evolução de Nível (Mantido)
                         const currentLvl = p.overall || 45;
                         const currentXP = p.xp || 0;
                         const res = calcNewLevel(currentLvl, currentXP, 0); 
                         if (res.lvl !== currentLvl) { u.overall = res.lvl; u.xp = res.xp; }
-                        // 1. Calcula quanto tempo sobra (diminui 1 ano)
+                        
+                        // --- NOVA LÓGICA DE CONTRATOS ---
                         let nc = (p.contract || 0) - 1;
 
-                        // 2. PRÉ-CONTRATO: Se ele já tinha assinado com outro time para sair
+                        // A. PRÉ-CONTRATO (Já tinha assinado para sair)
                         if ((p.contract <= 1 || p.contract === 0) && p.preContract) {
                              if (teams.some(t => t.id === p.preContract.teamId)) {
-                                 u.teamId = p.preContract.teamId; // Vai pro time novo
+                                 u.teamId = p.preContract.teamId; 
                                  u.contract = 1;
                                  u.status = 'NAO_A_VENDA';
                                  u.preContract = firebase.firestore.FieldValue.delete();
                              }
                         } 
-                        // 3. FIM DE CONTRATO: Se não tem pra onde ir e o tempo acabou -> RUA (LIVRES)
+                        // B. FIM DE CONTRATO (Vai para a Rua/LIVRES)
                         else if (nc < 0) {
                             u.contract = 0;
-                            u.teamId = null;   // Remove do time atual
-                            u.status = 'LIVRE'; // Fica disponível no mercado "Passes Livres"
-                            u.salary = 0;      // Para de receber salário
+                            u.teamId = null;    // Remove do time
+                            u.status = 'LIVRE'; // Aparece na aba LIVRES
+                            u.salary = 0;       // Para de receber
                             u.mood = '😐';
                         } 
-                        // 4. VIDA NORMAL: Só diminui o tempo e continua no time
+                        // C. VIDA NORMAL (Só diminui o tempo)
                         else {
                             u.contract = nc;
                         }
-                    try { await b.commit(); alert("Temporada virada!"); } catch (e) { alert("Erro: "+e.message); }
+                        
+                        b.update(db.collection('players').doc(p.id), u); 
+                    }); 
+                    
+                    try { 
+                        await b.commit(); 
+                        alert("Temporada virada! Contratos e Níveis atualizados."); 
+                    } catch (e) { 
+                        alert("Erro: "+e.message); 
+                    }
+                    
                     setLoading(false); 
-                    postNews("🌞 **NOVA TEMPORADA**", 'season'); 
+                    postNews("🌞 **NOVA TEMPORADA**\nContratos foram atualizados e o mercado de Livres está aberto!", 'season'); 
                 }
-            };
             // --- RENDER ---
             if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
             // CORREÇÃO: Adicionei "players={players}" logo depois de "teams={teams}"

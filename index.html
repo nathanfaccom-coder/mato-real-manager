@@ -754,7 +754,7 @@
                     </div>
 
                     <div className="container">
-                        {screen === 'HOME' && user.type === 'ADMIN' && 
+                       {screen === 'HOME' && user.type === 'ADMIN' && 
                             <AdminPanel 
                                 teams={teams} 
                                 papers={papers} 
@@ -763,6 +763,7 @@
                                 reqs={reqs} 
                                 config={conf} 
                                 onAct={adminAction} 
+                                fixPlayersData={fixPlayersData}
                                 onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} 
                                 onApprove={async(r)=>{/*Fin logic*/}} 
                                 onReject={(id)=>db.collection('financeRequests').doc(id).delete()} 
@@ -776,11 +777,9 @@
                                 onRejectPaper={(id)=>db.collection('newspapers').doc(id).delete()} 
                                 onConfig={(t)=>setModal({type:'SETTINGS', data:t})} 
                                 
-                                // --- GARANTA QUE ESTAS 3 LINHAS ESTEJAM AQUI ---
                                 onApproveComp={async(id)=>{await db.collection('companies').doc(id).update({status:'ACTIVE'}); alert("Empresa Aprovada!");}}
                                 onDeleteComp={async(id)=>{if(confirm("Excluir Empresa?")) await db.collection('companies').doc(id).delete();}}
                                 onUpdateCompBal={async(id, val)=>{ await db.collection('companies').doc(id).update({balance: parseFloat(val)}); alert("Saldo Alterado!"); }}
-                                // -----------------------------------------------
                             />
                         }
                           
@@ -1440,7 +1439,7 @@
                 </div></div>
             );
         };
-        const AdminPanel = ({ onUpdateCompBal, teams, papers, journalists, companies, reqs, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onConfig, onApprovePaper, onDeletePaper, onDeleteJourno, onRejectPaper, onApproveComp, onDeleteComp }) => (
+        const AdminPanel = ({ fixPlayersData, onUpdateCompBal, teams, papers, journalists, companies, reqs, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onConfig, onApprovePaper, onDeletePaper, onDeleteJourno, onRejectPaper, onApproveComp, onDeleteComp }) => (
             <div>
                 <h3>Painel Master</h3>
                 <div className="card">
@@ -1451,7 +1450,7 @@
                     <button className="btn btn-gold" onClick={()=>{ const t=prompt("Título"); const b=prompt("Texto"); if(t)onPost(t,b,'admin'); }}>COMUNICADO</button>
                 </div>
 
-                {/* CORREÇÃO AQUI: Adicionado ?.label e || 'Desconhecido' para não travar se o tipo não existir */}
+                {/* Restante do seu código do AdminPanel... */}
                 {(companies||[]).some(c=>c.status==='PENDING') && <h4>Empresas Pendentes</h4>}
                 {(companies||[]).filter(c=>c.status==='PENDING').map(c => (
                     <div key={c.id} className="card" style={{borderLeft:'4px solid var(--purple)'}}>
@@ -1470,17 +1469,15 @@
                         <b>{c.name}</b> {c.status==='BLOCKED' && <span style={{color:'red'}}>(BLOQUEADA)</span>}<br/>
                         Saldo: {fmt(c.balance)}
                         <div style={{display:'flex', gap:5, marginTop:5}}>
-                            {/* NOVO: Botão de Alterar Saldo */}
                             <button className="btn btn-green" onClick={()=>{
                                 const n = prompt("Novo Saldo da Empresa:", c.balance); 
                                 if(n !== null) onUpdateCompBal(c.id, n);
                             }}>$</button>
-                            
                             <button className="btn btn-red" onClick={()=>onDeleteComp(c.id)}>EXCLUIR</button>
                         </div>
                     </div>
                 ))}
-
+                {/* Aqui continua o resto do código de Times, Jornais, etc que você já tem */}
                 {(teams||[]).some(t=>t.status==='PENDING') && <h4>Times Pendentes</h4>}
                 {(teams||[]).filter(t=>t.status==='PENDING').map(t=><div key={t.id} className="card" style={{borderLeft:'4px solid var(--warning)'}}><b>{t.name}</b><div style={{display:'flex', gap:5}}><input className="input-field" style={{marginBottom:0, width:100}} defaultValue={t.balance} id={`bal-${t.id}`} /><button className="btn btn-green" onClick={()=>onApproveTeam(t.id, document.getElementById(`bal-${t.id}`).value)}>V</button><button className="btn btn-red" onClick={()=>onDeleteTeam(t.id)}>X</button></div></div>)}
                 

@@ -567,7 +567,8 @@
                 alert(`Súmula lançada! Média do jogador agora é: ${newAvg.toFixed(1)}`); 
                 setModal(null);
             };
-// --- NOVA FUNÇÃO: AÇÕES DE CARREIRA DO JOGADOR ---
+// --- NOVA FUNÇÃO: AÇÕES DO JOGADOR (COMPLETA) ---
+            // --- NOVA FUNÇÃO: AÇÕES DO JOGADOR (COMPLETA) ---
             const handlePlayerActions = async (type, p) => {
                 const team = teams.find(t => t.id === p.teamId);
                 
@@ -593,6 +594,31 @@
                     // Apenas lança a notícia para pressionar o dono
                     postNews(`💰 **POLÉMICA**\n**${p.name}** declara publicamente: "Mereço ganhar mais no ${team.name}. Espero uma renovação em breve."`, 'press');
                     alert("Declaração feita à imprensa! O presidente foi notificado.");
+                }
+
+                // 3. DECLARAR FELICIDADE (NOVO)
+                if (type === 'DECLARE_HAPPY') {
+                    if (!team) return alert("Precisas de um clube para estar feliz!");
+                    if (p.mood === '🤩') return alert("Já estás radiante com o clube!");
+                    
+                    if (!confirm(`Declarar amor ao ${team.name}?`)) return;
+
+                    await db.collection('players').doc(p.id).update({
+                        mood: '🤩'
+                    });
+                    postNews(`❤️ **AMOR À CAMISOLA**\n**${p.name}** declara: "Estou muito feliz no ${team.name} e quero fazer história aqui!"`, 'press');
+                    alert("A torcida adorou a tua declaração!");
+                }
+                
+                // 4. MODO NEUTRO (NOVO)
+                if (type === 'BECOME_NEUTRAL') {
+                    if (!team) return;
+                    if (p.mood === '😐') return alert("Já estás neutro.");
+                    
+                    await db.collection('players').doc(p.id).update({
+                        mood: '😐'
+                    });
+                    alert("Decidiste focar apenas no futebol. Humor neutro.");
                 }
             };
             
@@ -723,7 +749,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.82</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.83</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -912,7 +938,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.82(Company Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.83(Company Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1444,6 +1470,12 @@
                             {team ? (
                                 <div style={{display:'flex', gap:10, flexDirection:'column'}}>
                                     <button className="btn btn-gold" onClick={()=>onAction('ASK_RAISE', player)}>💰 PEDIR AUMENTO SALARIAL</button>
+                                    
+                                    <div style={{display:'flex', gap:5}}>
+                                        <button className="btn btn-green" style={{flex:1}} onClick={()=>onAction('DECLARE_HAPPY', player)}>🤩 ESTOU FELIZ</button>
+                                        <button className="btn btn-ghost" style={{flex:1}} onClick={()=>onAction('BECOME_NEUTRAL', player)}>😐 FICAR NEUTRO</button>
+                                    </div>
+
                                     <button className="btn btn-red" onClick={()=>onAction('TRANSFER_REQUEST', player)}>😡 PEDIR TRANSFERÊNCIA</button>
                                 </div>
                             ) : (

@@ -193,14 +193,16 @@
                 return () => unsubs.forEach(u => u());
             }, []);
 
+            // ATUALIZAÇÃO: Gerencia login e carregamento de dados (Times e Empresas)
             useEffect(() => {
+                // 1. LÓGICA PARA TIMES (USER) - Com suporte a Ofertas Enviadas e Recebidas
                 if (user?.type === 'USER') {
                     const me = teams.find(t => t.id === user.data.id);
                     if (me) setUser(prev => ({...prev, data: me}));
                     
-                    // CORREÇÃO: Carrega ofertas RECEBIDAS (Venda) e ENVIADAS (Compra)
+                    // Carrega ofertas RECEBIDAS (Venda)
                     const unsub1 = db.collection('offers').where('sellerId', '==', user.data.id).onSnapshot(s => {
-                        const received = s.docs.map(d => ({id:d.id, ...d.data(), mode: 'INBOX'})); // Recebidas
+                        const received = s.docs.map(d => ({id:d.id, ...d.data(), mode: 'INBOX'})); 
                         setOffers(prev => {
                             const sent = prev.filter(o => o.mode === 'OUTBOX');
                             // Junta e remove duplicadas
@@ -208,8 +210,9 @@
                         });
                     });
 
+                    // Carrega ofertas ENVIADAS (Compra)
                     const unsub2 = db.collection('offers').where('buyerId', '==', user.data.id).onSnapshot(s => {
-                        const sent = s.docs.map(d => ({id:d.id, ...d.data(), mode: 'OUTBOX'})); // Enviadas
+                        const sent = s.docs.map(d => ({id:d.id, ...d.data(), mode: 'OUTBOX'})); 
                         setOffers(prev => {
                             const received = prev.filter(o => o.mode === 'INBOX');
                             return [...received, ...sent].filter((v,i,a)=>a.findIndex(t=>(t.id===v.id))===i);
@@ -219,6 +222,7 @@
                     return () => { unsub1(); unsub2(); };
                 }
                 
+                // 2. LÓGICA PARA EMPRESAS (COMPANY) - Restaurada
                 if (user?.type === 'COMPANY') {
                     const me = companies.find(c => c.id === user.data.id);
                     if (me) {

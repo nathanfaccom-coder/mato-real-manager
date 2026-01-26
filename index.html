@@ -571,56 +571,71 @@
             };
 // --- DIREITOS DO JOGADOR (COM HISTÓRICO DE SAÍDA) ---
             const playerCareerAction = async (type, p) => {
-                const team = teams.find(t=>t.id===p.teamId);
                 
-                // 1. PAGAR MULTA (RESCISÃO)
-                if(type==='PAY_FINE'){
-                    if(!team) return alert("Você já é um Agente Livre!");
-                    if(p.balance < p.clause) return alert(`Saldo insuficiente! Você precisa de ${fmt(p.clause)}.`);
+                // JOGADOR MANDA CONTRAPROPOSTA (NOVO)
+                if (type === 'COUNTER_OFFER') {
+                    const offer = p;
+                    // Devolve para o clube (Tira do status WAITING_PLAYER)
+                    // Você pode criar um status 'COUNTERED_BY_PLAYER', mas para simplificar, 
+                    // vamos remover 'sellerAccepted' para aparecer na tela do clube de novo
+                    // e atualizar os valores.
                     
-                    if(!confirm(`⚠️ ATENÇÃO!\n\nDeseja pagar ${fmt(p.clause)} para rescindir?\nVocê irá para o mercado de LIVRES.`)) return;
+                    await db.collection('offers').doc(offer.id).update({
+                        status: 'PENDING', // Volta para o clube ver
+                        sellerAccepted: false, // Força o clube a aceitar de novo os novos termos
+                        meta: offer.meta, // Contém o novo salário, bônus, role, etc
+                        offerContract: offer.offerContract,
+                        description: `🔄 **CONTRAPROPOSTA DO JOGADOR**\nO atleta pede:\nSalário: ${fmt(offer.meta.newSalary)}\nLuvas: ${fmt(offer.meta.signingBonus)}\nPapel: ${offer.meta.role}\nBônus: ${offer.meta.perfBonusVal} por ${offer.meta.perfBonusType}`
+                    });
                     
-                    const b = db.batch();
-                    
-                    // HISTÓRICO: Time -> Livre
-                    const historyEntry = {
-                        date: Date.now(),
-                        from: team.name,
-                        to: 'Agente Livre',
-                        logoFrom: team.logo || null,
-                        logoTo: null, // Sem logo
-                        type: 'RESCISAO',
-                        value: p.clause
-                    };
+                    alert("Contraproposta enviada ao clube! Aguarde eles aceitarem.");
+                    return;
+                }
 
-                    b.update(db.collection('players').doc(p.id), {
-                        balance: p.balance - p.clause, 
-                        teamId: null, // Fica sem time (VAI PRO MERCADO DE LIVRES AUTOMATICAMENTE)
-                        contract: 0, 
-                        status: 'LIVRE', 
-                        salary: 0,
-                        mood: '🤩',
-                        history: firebase.firestore.FieldValue.arrayUnion(historyEntry) // Salva no histórico
+                // JOGADOR ACEITA A OFERTA FINAL
+                if (type === 'ACCEPT_CONTRACT') {
+                    const offer = p; 
+                    
+                    // LÓGICA DE PAGAMENTO DE LUVAS (Se tiver)
+                    if (offer.meta?.signingBonus > 0) {
+                        const buyerTeam = teams.find(t => t.id === offer.buyerId);
+                        if (buyerTeam.balance < offer.meta.signingBonus) return alert("O clube não tem dinheiro para pagar as luvas à vista!");
+                        
+                        // Desconta luvas do time e dá pro jogador
+                        await db.collection('teams').doc(offer.buyerId).update({
+                            balance: firebase.firestore.FieldValue.increment(-parseFloat(offer.meta.signingBonus))
+                        });
+                        await db.collection('players').doc(player.id).update({
+                            balance: firebase.firestore.FieldValue.increment(parseFloat(offer.meta.signingBonus))
+                        });
+                    }
+
+                    // Salva os detalhes do bônus no jogador para usar nas partidas
+                    // Mas primeiro executa a transferência normal
+                    await acceptOffer(offer); 
+                    
+                    // Atualiza o jogador com os bônus de contrato
+                    await db.collection('players').doc(player.id).update({
+                        contractBonus: {
+                            type: offer.meta?.perfBonusType || 'NENHUM',
+                            value: parseFloat(offer.meta?.perfBonusVal) || 0
+                        }
                     });
                     
-                    b.update(db.collection('teams').doc(team.id), {
-                        balance: (team.balance || 0) + p.clause
-                    });
-                    
-                    await b.commit();
-                    postNews(`⚖️ **RESCISÃO**\nO jogador **${p.name}** pagou a multa e deixou o **${team.name}**! Ele agora está LIVRE no mercado.`, 'transfer');
-                    alert("Você agora é um Agente Livre! Aparecerá na aba 'LIVRES' do mercado.");
+                    return;
                 }
-                
-                // 2. PEDIR TRANSFERÊNCIA
-                if(type==='REQUEST_TRANSFER'){
-                    if(!team) return alert("Você não tem time!");
-                    if(p.status === 'VENDA') return alert("Você já está na lista.");
-                    if(!confirm("Pedir para sair?")) return;
-                    await db.collection('players').doc(p.id).update({status: 'VENDA', mood: '😡'});
-                    postNews(`📢 **INSATISFAÇÃO**\n**${p.name}** pediu para sair do **${team.name}**!`, 'rumor');
-                    alert("Pedido feito!");
+
+                // NOVO: JOGADOR RECUSA
+                if (type === 'REJECT_CONTRACT') {
+                    if(!confirm("Recusar proposta?")) return;
+                    await db.collection('offers').doc(p.id).delete();
+                    postNews(`❌ **NEGOCIAÇÃO MELOU**\n**${p.playerName}** recusou os termos do **${p.buyerName}**!`, 'transfer');
+                    return;
                 }
+
+                const team = teams.find(t=>t.id===p.teamId);
+                if(type==='PAY_FINE'){ /* ... (Mantenha o código da multa igual ao que já estava) ... */ }
+                if(type==='REQUEST_TRANSFER'){ /* ... (Mantenha o código do pedido igual) ... */ }
             };
             // 2. Função para lançar Súmula (ATUALIZADA: CÁLCULO DA MÉDIA)
             const saveMatchStats = async (player, match, xpGained) => {
@@ -823,7 +838,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.83</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.84</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -1013,7 +1028,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.83(Company Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.84(Company Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1573,8 +1588,10 @@
             const [newPass, setNewPass] = useState('');
             const [tab, setTab] = useState('PERFIL'); 
             const [myOffers, setMyOffers] = useState([]);
+            
+            // Estado para abrir a negociação
+            const [negotiatingOffer, setNegotiatingOffer] = useState(null);
 
-            // Busca ofertas onde o clube já aceitou
             useEffect(() => {
                 const unsub = db.collection('offers')
                     .where('playerId', '==', player.id)
@@ -1592,7 +1609,23 @@
 
             return (
                 <div>
-                    {/* Cabeçalho */}
+                    {/* MODAL DE NEGOCIAÇÃO FIFA */}
+                    {negotiatingOffer && (
+                        <PlayerNegotiationModal 
+                            offer={negotiatingOffer}
+                            onClose={()=>setNegotiatingOffer(null)}
+                            onAccept={(finalOffer)=> {
+                                onCareerAction('ACCEPT_CONTRACT', finalOffer);
+                                setNegotiatingOffer(null);
+                            }}
+                            onCounter={(counterOffer)=> {
+                                onCareerAction('COUNTER_OFFER', counterOffer);
+                                setNegotiatingOffer(null);
+                            }}
+                        />
+                    )}
+
+                    {/* Cabeçalho RPG (IGUAL AO ANTERIOR) */}
                     <div className="highlight-card" style={{textAlign:'center', paddingBottom:30, position:'relative'}}>
                         <h2 style={{margin:0}}>{player.name}</h2>
                         <small>{team?.name || 'Agente Livre'}</small>
@@ -1615,9 +1648,8 @@
                     <div style={{display:'flex', gap:10, marginBottom:15}}>
                         <button className={`btn ${tab==='PERFIL'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('PERFIL')}>PERFIL</button>
                         <button className={`btn ${tab==='CONTRATO'?'btn-red':'btn-ghost'}`} onClick={()=>setTab('CONTRATO')}>CARREIRA</button>
-                        {/* NOVA ABA DE OFERTAS */}
                         <button className={`btn ${tab==='OFERTAS'?'btn-green':'btn-ghost'}`} onClick={()=>setTab('OFERTAS')}>
-                            PROPOSTAS {myOffers.length > 0 && <span className="pulse">🔴</span>}
+                            OFERTAS {myOffers.length > 0 && <span className="pulse">🔴</span>}
                         </button>
                         <button className={`btn ${tab==='INV'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('INV')}>MOCHILA</button>
                     </div>
@@ -1625,17 +1657,14 @@
                     {tab==='PERFIL' && <div>
                         <div className="card" style={{borderLeft:'4px solid var(--primary)', background:'linear-gradient(90deg, #1b2e1b, #1E1E1E)'}}>
                             <h3 style={{marginTop:0, color:'var(--primary)'}}>🏦 {fmt(player.balance)}</h3>
-                            <small style={{color:'#aaa'}}>Salário: {fmt(player.salary)}</small>
+                            <small style={{color:'#aaa'}}>Salário: {fmt(player.salary)} | Posição: {player.position}</small>
                         </div>
-                        {/* Seus dados de stats e histórico aqui (Mantenha o que você já tinha) */}
                         <div className="card"><h3>📊 Atributos</h3><div className="stats-grid"><div className="stat-item"><span className="stat-lbl">⚽</span><span className="stat-val">{player.stats?.goals||0}</span></div><div className="stat-item"><span className="stat-lbl">👟</span><span className="stat-val">{player.stats?.assists||0}</span></div></div></div>
                     </div>}
 
-                    {/* NOVA ABA DE OFERTAS */}
+                    {/* NOVA ABA DE OFERTAS: AGORA COM BOTÃO NEGOCIAR */}
                     {tab==='OFERTAS' && <div>
                         <h3>📩 Propostas de Contrato</h3>
-                        <p style={{color:'#aaa', fontSize:11}}>Clubes que acertaram sua compra e querem negociar salário com você.</p>
-                        
                         {myOffers.length === 0 && <div className="card" style={{textAlign:'center', color:'#666'}}>Nenhuma proposta pendente.</div>}
                         
                         {myOffers.map(o => (
@@ -1645,15 +1674,17 @@
                                     <small style={{color:'var(--warning)'}}>Quer te contratar</small>
                                 </div>
                                 <hr style={{borderColor:'#444'}}/>
+                                <div style={{fontSize:11, color:'#ccc', marginBottom:10}}>
+                                    O clube aceitou pagar a taxa de transferência. Agora eles querem discutir seu contrato.
+                                </div>
                                 <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, fontSize:12, marginBottom:10}}>
-                                    <div>Novo Salário: <b style={{color:'var(--primary)'}}>{fmt(o.meta?.newSalary)}</b></div>
+                                    <div>Salário: <b style={{color:'var(--primary)'}}>{fmt(o.meta?.newSalary)}</b></div>
                                     <div>Contrato: <b>{o.offerContract} Anos</b></div>
-                                    <div>Status: <b>{o.meta?.role || 'Comum'}</b></div>
-                                    <div>Atual: {fmt(player.salary)}</div>
                                 </div>
                                 <div style={{display:'flex', gap:10}}>
-                                    <button className="btn btn-green" onClick={() => onCareerAction('ACCEPT_CONTRACT', o)}>✅ ACEITAR</button>
-                                    <button className="btn btn-red" onClick={() => onCareerAction('REJECT_CONTRACT', o)}>❌ RECUSAR</button>
+                                    {/* BOTÃO QUE ABRE A MESA DE NEGOCIAÇÃO */}
+                                    <button className="btn btn-blue" onClick={() => setNegotiatingOffer(o)}>📝 NEGOCIAR TERMOS</button>
+                                    <button className="btn btn-red" style={{width:'auto'}} onClick={() => onCareerAction('REJECT_CONTRACT', o)}>X</button>
                                 </div>
                             </div>
                         ))}
@@ -1666,7 +1697,7 @@
                         </div>
                     </div>}
 
-                    {tab==='INV' && <div><h3>Mochila</h3>{/* Seus itens aqui */}</div>}
+                    {tab==='INV' && <div><h3>Mochila</h3>{/* Itens */}</div>}
                 </div>
             );
         };
@@ -1797,7 +1828,97 @@
                 </div>
             );
         };
-        
+        // --- COMPONENTE NOVO: MESA DE NEGOCIAÇÃO (FIFA STYLE) ---
+        const PlayerNegotiationModal = ({ offer, onClose, onCounter, onAccept }) => {
+            // Estado local com os valores da negociação
+            const [form, setForm] = useState({
+                role: offer.meta?.role || 'ROTACAO',
+                contract: offer.offerContract || 1,
+                salary: offer.meta?.newSalary || 0,
+                signingBonus: offer.meta?.signingBonus || 0, // Luvas
+                perfBonusType: offer.meta?.perfBonusType || 'GOL', // Tipo de Bônus
+                perfBonusVal: offer.meta?.perfBonusVal || 0      // Valor do Bônus
+            });
+
+            // Medidor de "Paciência" do Clube (Visual)
+            // Calculamos a diferença entre o salário original e o pedido para "simular" tensão
+            const diff = parseFloat(form.salary) - (parseFloat(offer.meta?.newSalary)||0);
+            const patience = Math.max(0, 100 - (diff / 1000)); 
+
+            return (
+                <div className="modal-bg">
+                    <div className="modal-content" style={{background:'#1a1c20', border:'1px solid #333', maxWidth:'500px'}}>
+                        <div style={{textAlign:'center', borderBottom:'1px solid #333', paddingBottom:10, marginBottom:15}}>
+                            <h3 style={{margin:0, color:'#fff'}}>Negociando com {offer.buyerName}</h3>
+                            <small style={{color: patience > 50 ? 'var(--primary)' : 'var(--danger)'}}>
+                                Paciência do Clube: {patience.toFixed(0)}%
+                            </small>
+                            <div style={{height:4, background:'#333', marginTop:5, borderRadius:2}}>
+                                <div style={{width:`${patience}%`, height:'100%', background: patience>50?'var(--primary)':'var(--danger)', transition:'0.5s'}}></div>
+                            </div>
+                        </div>
+
+                        {/* A. PAPEL NO ELENCO */}
+                        <div className="card" style={{background:'#222', borderLeft:'4px solid var(--purple)'}}>
+                            <label style={{color:'#aaa', fontSize:10}}>A. PAPEL NO ELENCO</label>
+                            <select className="input-field" value={form.role} onChange={e=>setForm({...form, role:e.target.value})}>
+                                <option value="CRUCIAL">⭐ Crucial (Titular Absoluto)</option>
+                                <option value="IMPORTANTE">✅ Importante (Titular)</option>
+                                <option value="ROTACAO">🔄 Rotação (Jogos de Copa)</option>
+                                <option value="ESPORADICO">⏳ Esporádico (Reserva)</option>
+                                <option value="PROMESSA">👶 Promessa (Futuro)</option>
+                            </select>
+                            <small style={{color:'#666', fontSize:9}}>Define a expectativa de jogos.</small>
+                        </div>
+
+                        {/* B. DURAÇÃO */}
+                        <div className="card" style={{background:'#222', borderLeft:'4px solid var(--secondary)'}}>
+                            <label style={{color:'#aaa', fontSize:10}}>B. DURAÇÃO DO CONTRATO</label>
+                            <div style={{display:'flex', alignItems:'center', gap:10}}>
+                                <input type="range" min="1" max="5" style={{flex:1}} value={form.contract} onChange={e=>setForm({...form, contract:parseInt(e.target.value)})} />
+                                <span style={{fontWeight:'bold', fontSize:14}}>{form.contract} Anos</span>
+                            </div>
+                        </div>
+
+                        {/* C. FINANCEIRO (Salário + Luvas) */}
+                        <div className="card" style={{background:'#222', borderLeft:'4px solid var(--primary)'}}>
+                            <label style={{color:'#aaa', fontSize:10}}>C. FINANCEIRO</label>
+                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                                <div>
+                                    <label>Salário Semanal</label>
+                                    <input className="input-field" type="number" value={form.salary} onChange={e=>setForm({...form, salary:e.target.value})} />
+                                </div>
+                                <div>
+                                    <label>Luvas (À Vista)</label>
+                                    <input className="input-field" type="number" value={form.signingBonus} onChange={e=>setForm({...form, signingBonus:e.target.value})} />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* E. BÔNUS DE PERFORMANCE */}
+                        <div className="card" style={{background:'#222', borderLeft:'4px solid var(--warning)'}}>
+                            <label style={{color:'#aaa', fontSize:10}}>E. BÔNUS DE PERFORMANCE</label>
+                            <div style={{display:'flex', gap:5}}>
+                                <select className="input-field" style={{flex:1}} value={form.perfBonusType} onChange={e=>setForm({...form, perfBonusType:e.target.value})}>
+                                    <option value="NENHUM">-- Sem Bônus --</option>
+                                    <option value="GOL">⚽ Por Gol</option>
+                                    <option value="ASSIST">👟 Por Assistência</option>
+                                    <option value="CLEAN_SHEET">🧤 Sem Levar Gols</option>
+                                    <option value="MATCH">🏟️ Por Partida</option>
+                                </select>
+                                <input className="input-field" style={{width:100}} type="number" placeholder="Valor" value={form.perfBonusVal} onChange={e=>setForm({...form, perfBonusVal:e.target.value})} />
+                            </div>
+                        </div>
+
+                        <div style={{display:'flex', gap:10, marginTop:15}}>
+                            <button className="btn btn-green" onClick={()=>onAccept({...offer, meta: {...offer.meta, ...form, newSalary: form.salary}, offerContract: form.contract})}>✅ ACEITAR TERMOS</button>
+                            <button className="btn btn-blue" onClick={()=>onCounter({...offer, meta: {...offer.meta, ...form, newSalary: form.salary}, offerContract: form.contract})}>💬 CONTRAPROPOSTA</button>
+                        </div>
+                        <button className="btn btn-red" style={{marginTop:5}} onClick={onClose}>CANCELAR / VOLTAR</button>
+                    </div>
+                </div>
+            );
+        };
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<ErrorBoundary><App /></ErrorBoundary>);
     </script>

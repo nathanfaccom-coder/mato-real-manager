@@ -359,10 +359,7 @@
                 alert("Sistema FIFA inicializado para todos!");
             };
             const updateStats = async (pid, newStats) => { await db.collection('players').doc(pid).update({ stats: newStats }); alert("Estatísticas Atualizadas!"); setModal(null); };
-    
-            
-            // --- LÓGICA DE NEGOCIAÇÃO FIFA (NOVA) ---
-            
+  
             const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
     const v = parseFloat(value || 0);
     const isClause = type === 'COMPRA' && target.clause > 0 && v >= target.clause;

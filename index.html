@@ -194,7 +194,69 @@
                 ];
                 return () => unsubs.forEach(u => u());
             }, []);
-// --- REGRAS DO SISTEMA DE CONTRATOS (FIFA) ---
+
+            // --- 1. LÓGICA DE LOGIN (ESSENCIAL PARA ENTRAR NO JOGO) ---
+            const login = (id, pwd, type) => {
+                const findAndLogin = (list, screenType, userRole, checkStatus = true) => {
+                    const found = list.find(x => x.id === id);
+                    const pass = found?.password || '1234';
+                    if (found && pass === pwd) {
+                        if (checkStatus && found.status === 'PENDING') return alert("⏳ Aguarde a Federação.");
+                        setUser({type: userRole, data: found});
+                        setScreen(screenType);
+                    } else {
+                        alert("ID ou Senha incorretos!");
+                    }
+                };
+                if (type === 'TEAM') findAndLogin(teams, 'HOME', 'USER');
+                else if (type === 'PAPER') findAndLogin(papers, 'PRESS_DASH', 'PRESS');
+                else if (type === 'JOURNALIST') findAndLogin(journalists, 'PRESS_DASH', 'PRESS_WORKER');
+                else if (type === 'COMPANY') findAndLogin(companies, 'COMPANY_HOME', 'COMPANY');
+                else if (type === 'PLAYER') findAndLogin(players, 'PLAYER_DASH', 'PLAYER', false);
+            };
+
+            // --- 2. REGRAS FIFA (SALVAR JOGADOR E CORRIGIR BANCO) ---
+            const savePlayer = async (p) => {
+                const isNew = !p.id;
+                const ref = isNew ? db.collection('players').doc() : db.collection('players').doc(p.id);
+                const old = isNew ? {} : (players.find(pl => pl.id === p.id) || {});
+                const data = {
+                    ...p,
+                    overall: Math.max(45, parseInt(p.overall || old.overall || 45)),
+                    salary: parseFloat(p.salary || old.salary || 1000), 
+                    clause: parseFloat(p.clause || old.clause || 1000000),
+                    balance: parseFloat(p.balance || old.balance || 0),
+                    history: p.history || old.history || [],
+                    xp: p.xp !== undefined ? p.xp : (old.xp || 0),
+                    energy: p.energy !== undefined ? p.energy : (old.energy || 100),
+                    stats: p.stats || old.stats || { goals: 0, assists: 0, tackles: 0, saves: 0, yellows: 0, reds: 0 },
+                    teamId: p.teamId || old.teamId || 'FREE'
+                };
+                if (!isNew && data.overall !== old.overall) data.xp = 0;
+                if (isNew) delete data.id;
+                await ref.set(data, { merge: true });
+                setModal(null);
+                if (isNew) postNews(`🆕 **REFORÇO**\nO mercado recebe **${data.name}** (Nível ${data.overall}).`, 'transfer');
+                else alert("Jogador atualizado!");
+            };
+
+            const fixPlayersData = async () => {
+                if(!confirm("Deseja padronizar os contratos de todos os jogadores?")) return;
+                const snapshot = await db.collection('players').get();
+                const b = db.batch();
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    b.update(db.collection('players').doc(doc.id), {
+                        salary: d.salary || 1000,
+                        clause: d.clause || 1000000,
+                        balance: d.balance || 0,
+                        history: d.history || []
+                    });
+                });
+                await b.commit();
+                alert("Sistema FIFA inicializado!");
+            };
+
     
             const loginAdmin = () => { setUser({ type: 'ADMIN', data: { id: 'admin', name: 'FEDERAÇÃO (ADM)', balance: 0, logo: null, stadiumLevel: 1, serie: 'ADM' } }); setScreen('HOME'); };
             const createTeam = async (name, bal, serie, pass, logo) => { if(teams.find(t=>t.name.toLowerCase()===name.toLowerCase())) return alert("Nome em uso!"); await db.collection('teams').add({ name, balance: parseFloat(bal), serie, password: pass, stadiumLevel: 1, logo: logo||null, status: 'PENDING' }); alert("Criado! Aguarde aprovação."); };

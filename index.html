@@ -593,22 +593,84 @@
                 alert("Tabela atualizada!"); 
             };
 // --- DIREITOS DO JOGADOR (COM HISTÓRICO DE SAÍDA) ---
+            // --- DIREITOS DO JOGADOR (CORRIGIDO E FECHADO) ---
             const playerCareerAction = async (type, p) => {
                 
-                // JOGADOR MANDA CONTRAPROPOSTA
+                // 1. JOGADOR MANDA CONTRAPROPOSTA
                 if (type === 'COUNTER_OFFER') {
                     const offer = p;
                     await db.collection('offers').doc(offer.id).update({
-                        status: 'PLAYER_COUNTER', // <--- MUDANÇA IMPORTANTE: STATUS NOVO
+                        status: 'PLAYER_COUNTER', 
                         sellerAccepted: false, 
                         meta: offer.meta, 
                         offerContract: offer.offerContract,
                         description: `🔄 **CONTRAPROPOSTA DO JOGADOR**\nO atleta pede:\nSalário: ${fmt(offer.meta.newSalary)}\nLuvas: ${fmt(offer.meta.signingBonus)}\nPapel: ${offer.meta.role}\nBônus: ${offer.meta.perfBonusVal} por ${offer.meta.perfBonusType}`
                     });
-                    
                     alert("Contraproposta enviada ao clube interessado!");
                     return;
                 }
+
+                // 2. JOGADOR ACEITA
+                if (type === 'ACCEPT_CONTRACT') {
+                    const offer = p; 
+                    
+                    // Verifica Luvas
+                    if (offer.meta?.signingBonus > 0) {
+                        const buyerTeam = teams.find(t => t.id === offer.buyerId);
+                        if (buyerTeam.balance < offer.meta.signingBonus) return alert("O clube não tem dinheiro para as luvas!");
+                        
+                        // Paga Luvas
+                        const b = db.batch();
+                        b.update(db.collection('teams').doc(offer.buyerId), { balance: firebase.firestore.FieldValue.increment(-parseFloat(offer.meta.signingBonus)) });
+                        b.update(db.collection('players').doc(player.id), { balance: firebase.firestore.FieldValue.increment(parseFloat(offer.meta.signingBonus)) });
+                        await b.commit();
+                    }
+
+                    await acceptOffer(offer); 
+                    
+                    // Salva Bônus no Jogador
+                    await db.collection('players').doc(player.id).update({
+                        contractBonus: { type: offer.meta?.perfBonusType || 'NENHUM', value: parseFloat(offer.meta?.perfBonusVal) || 0 }
+                    });
+                    return;
+                }
+
+                // 3. JOGADOR RECUSA
+                if (type === 'REJECT_CONTRACT') {
+                    if(!confirm("Recusar proposta?")) return;
+                    await db.collection('offers').doc(p.id).delete();
+                    postNews(`❌ **NEGOCIAÇÃO MELOU**\nO jogador recusou os termos do **${p.buyerName}**!`, 'transfer');
+                    return;
+                }
+
+                // 4. AÇÕES ANTIGAS (MULTA E PEDIDO DE SAÍDA) - RESTAURADAS
+                const team = teams.find(t=>t.id===p.teamId);
+                
+                if(type==='PAY_FINE'){
+                    if(!team) return alert("Você já é um Agente Livre!");
+                    if(p.balance < p.clause) return alert(`Saldo insuficiente! Você precisa de ${fmt(p.clause)}.`);
+                    if(!confirm(`Pagar multa de ${fmt(p.clause)} e rescindir?`)) return;
+                    
+                    const b = db.batch();
+                    const historyEntry = { date: Date.now(), from: team.name, to: 'Livre', logoFrom: team.logo, logoTo: null, type: 'RESCISAO', value: p.clause };
+                    
+                    b.update(db.collection('players').doc(p.id), { balance: p.balance - p.clause, teamId: null, contract: 0, status: 'LIVRE', salary: 0, mood: '🤩', history: firebase.firestore.FieldValue.arrayUnion(historyEntry) });
+                    b.update(db.collection('teams').doc(team.id), { balance: (team.balance || 0) + p.clause });
+                    
+                    await b.commit();
+                    postNews(`⚖️ **RESCISÃO**\n**${p.name}** pagou a multa e deixou o **${team.name}**!`, 'transfer');
+                    alert("Você agora é um Agente Livre!");
+                }
+                
+                if(type==='REQUEST_TRANSFER'){
+                    if(!team) return alert("Você não tem time!");
+                    if(p.status === 'VENDA') return alert("Você já está na lista.");
+                    if(!confirm("Pedir para sair?")) return;
+                    await db.collection('players').doc(p.id).update({status: 'VENDA', mood: '😡'});
+                    postNews(`📢 **INSATISFAÇÃO**\n**${p.name}** pediu para sair do **${team.name}**!`, 'rumor');
+                    alert("Pedido feito!");
+                }
+            };
             // 2. Função para lançar Súmula (ATUALIZADA: CÁLCULO DA MÉDIA)
             const saveMatchStats = async (player, match, xpGained) => {
                 // Validação: Não deixa salvar sem nota

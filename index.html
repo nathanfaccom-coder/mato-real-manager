@@ -194,7 +194,47 @@
                 ];
                 return () => unsubs.forEach(u => u());
             }, []);
+// --- REGRAS DO SISTEMA DE CONTRATOS (FIFA) ---
+            
+            // 1. Função que garante que o jogador tenha Salário e Multa ao ser salvo
+            const savePlayer = async (p) => {
+                const isNew = !p.id;
+                const ref = isNew ? db.collection('players').doc() : db.collection('players').doc(p.id);
+                
+                const data = {
+                    ...p,
+                    salary: parseFloat(p.salary || 1000), 
+                    clause: parseFloat(p.clause || 1000000),
+                    balance: parseFloat(p.balance || 0),
+                    history: p.history || [],
+                    overall: parseInt(p.overall || 45),
+                    xp: p.xp || 0,
+                    energy: p.energy !== undefined ? p.energy : 100
+                };
+                if (isNew) delete data.id;
 
+                await ref.set(data, { merge: true });
+                setModal(null);
+                alert("Jogador salvo com sucesso!");
+            };
+
+            // 2. Botão de "Faxina": Arruma os jogadores antigos que estão sem esses dados
+            const fixPlayersData = async () => {
+                if(!confirm("Deseja atualizar todos os jogadores para o novo sistema de contratos?")) return;
+                const snapshot = await db.collection('players').get();
+                const b = db.batch();
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    b.update(db.collection('players').doc(doc.id), {
+                        salary: d.salary || 1000,
+                        clause: d.clause || 1000000,
+                        balance: d.balance || 0,
+                        history: d.history || []
+                    });
+                });
+                await b.commit();
+                alert("Banco de dados atualizado com sucesso!");
+            };
             useEffect(() => {
                 if (user?.type === 'USER') {
                     const me = teams.find(t => t.id === user.data.id);
@@ -415,59 +455,65 @@
             // --- LÓGICA DE NEGOCIAÇÃO FIFA (NOVA) ---
             
             const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
-                const v = parseFloat(value||0);
-                // Detecta se é pagamento de multa (apenas se for COMPRA e valor >= multa)
-                const isClause = type === 'COMPRA' && target.clause > 0 && v >= target.clause;
-                
-                const actingTeamName = user.data.name; 
-                const targetPlayerName = target.name;
-                
-                // Formata o texto descritivo
-                let details = `💰 Taxa: ${fmt(v)}\n`;
-                if(type === 'TROCA') details = `🔄 Troca (Volta: ${meta.cashDir} ${fmt(v)})\n`;
-                details += `📝 Contrato: ${meta.contract} anos\n`;
-                details += `💵 Salário: ${fmt(meta.newSalary)}/sem\n`;
-                details += `🧤 Luvas: ${fmt(meta.signingBonus)}\n`;
-                details += `👔 Papel: ${meta.role}`;
+    const v = parseFloat(value || 0);
+    const isClause = type === 'COMPRA' && target.clause > 0 && v >= target.clause;
+    const actingTeamName = user.data.name;
+    const targetPlayerName = target.name;
 
-                // Define o Status Inicial
-                let status = 'WAITING_SELLER';
-                if (isClause) status = 'WAITING_PLAYER'; 
-                if (old && old.status === 'WAITING_PLAYER') status = 'PLAYER_COUNTER'; // Jogador respondendo
+    let details = `💰 Taxa: ${fmt(v)}\n`;
+    if (type === 'TROCA') details = `🔄 Troca (Volta: ${meta.cashDir} ${fmt(v)})\n`;
+    details += `📝 Contrato: ${meta.contract} anos\n`;
+    details += `💵 Salário: ${fmt(meta.newSalary)}/sem\n`;
+    details += `🧤 Luvas: ${fmt(meta.signingBonus)}\n`;
+    details += `👔 Papel: ${meta.role}`;
 
-                const pl = { 
-                    playerId: target.id, 
-                    playerName: target.name, 
-                    buyerId: user.data.id, 
-                    buyerName: user.data.name, 
-                    sellerId: target.teamId || 'FREE', 
-                    type, 
-                    value: v, 
-                    description: details, 
-                    status: status, 
-                    meta: {
-                        contract: parseInt(meta.contract),
-                        newSalary: parseFloat(meta.newSalary),
-                        signingBonus: parseFloat(meta.signingBonus),
-                        role: meta.role,
-                        isClause: isClause
-                    },
-                    date: Date.now() 
-                };
+    // --- LÓGICA DE STATUS REVISADA ---
+    let status = 'WAITING_SELLER';
+    
+    if (isClause) {
+        status = 'WAITING_PLAYER';
+    } else if (old && old.id) {
+        // Se eu sou o SELLER (Dono) respondendo, agora a bola vai para o BUYER (Comprador)
+        // Se eu sou o BUYER (Comprador) respondendo, agora a bola vai para o SELLER (Dono)
+        status = (user.data.id === old.sellerId) ? 'WAITING_BUYER' : 'WAITING_SELLER';
+    }
+    
+    if (old && old.status === 'WAITING_PLAYER') status = 'PLAYER_COUNTER'; 
 
-                const b = db.batch(); 
-                if(old && old.id) b.delete(db.collection('offers').doc(old.id)); 
-                b.set(db.collection('offers').doc(), pl); 
-                await b.commit();
-                
-                let msg = "";
-                if(status === 'WAITING_PLAYER') msg = `🚨 **CLÁUSULA PAGA!**\nO **${actingTeamName}** pagou a multa de **${targetPlayerName}**! A decisão agora é do jogador.`;
-                else if (status === 'PLAYER_COUNTER') msg = `🔄 **CONTRAPROPOSTA**\n**${targetPlayerName}** enviou novos termos ao **${actingTeamName}**.`;
-                else msg = `💼 **OFERTA**\nO **${actingTeamName}** enviou uma proposta ao clube por **${targetPlayerName}**.\n${details}`;
-                
-                postNews(msg, 'transfer'); 
-                setModal(null); alert("Proposta enviada!");
-            };
+    const pl = {
+        playerId: target.id,
+        playerName: target.name,
+        buyerId: old?.buyerId || user.data.id, // Mantém o ID original do comprador
+        buyerName: old?.buyerName || user.data.name,
+        sellerId: target.teamId || old?.sellerId || 'FREE',
+        type,
+        value: v,
+        description: details,
+        status: status,
+        meta: {
+            contract: parseInt(meta.contract),
+            newSalary: parseFloat(meta.newSalary),
+            signingBonus: parseFloat(meta.signingBonus),
+            role: meta.role,
+            isClause: isClause
+        },
+        date: Date.now()
+    };
+
+    const b = db.batch();
+    if (old && old.id) b.delete(db.collection('offers').doc(old.id));
+    b.set(db.collection('offers').doc(), pl);
+    await b.commit();
+
+    let msg = "";
+    if (status === 'WAITING_PLAYER') msg = `🚨 **CLÁUSULA PAGA!**\nO **${actingTeamName}** pagou a multa de **${targetPlayerName}**! A decisão agora é do jogador.`;
+    else if (status === 'PLAYER_COUNTER') msg = `🔄 **CONTRAPROPOSTA**\n**${targetPlayerName}** enviou novos termos ao **${actingTeamName}**.`;
+    else if (status === 'WAITING_BUYER') msg = `🔄 **CONTRAPROPOSTA**\nO vendedor de **${targetPlayerName}** enviou novos termos ao **${pl.buyerName}**.`;
+    else msg = `💼 **OFERTA**\nO **${actingTeamName}** enviou uma proposta ao clube por **${targetPlayerName}**.\n${details}`;
+
+    postNews(msg, 'transfer');
+    setModal(null); alert("Proposta enviada!");
+};
 
             const acceptOffer = async (o) => {
                 const buy = teams.find(t=>t.id===o.buyerId); 
@@ -1475,6 +1521,7 @@
                     <button className={`btn ${config.marketOpen?'btn-red':'btn-green'}`} onClick={()=>onAct('MARKET', !config.marketOpen)}>{config.marketOpen?'FECHAR MERCADO':'ABRIR MERCADO'}</button>
                     <button className="btn btn-purple" onClick={()=>onAct('WEEK')}>VIRAR SEMANA (Cobr. Impostos)</button>
                     <button className="btn btn-red" onClick={()=>onAct('SEASON')}>VIRAR TEMPORADA</button>
+                    <button className="btn btn-ghost" onClick={fixPlayersData}>🔧 CORRIGIR DADOS FIFA</button>
                     <button className="btn btn-gold" onClick={()=>{ const t=prompt("Título"); const b=prompt("Texto"); if(t)onPost(t,b,'admin'); }}>COMUNICADO</button>
                 </div>
 
@@ -1623,14 +1670,101 @@
                 </div>
             );
         };
-        const OffersScreen = ({ offers, onAccept, onReject, onCounter }) => (<div><h3>Propostas</h3>{offers.map(o=><div key={o.id} className="card" style={{borderLeft:'4px solid gold'}}><b style={{color:'var(--primary)'}}>{o.playerName}</b><br/><small>De: {o.buyerName}</small><p style={{background:'#333', padding:5, borderRadius:5, whiteSpace:'pre-wrap', fontSize:11}}>{o.description}</p><div style={{display:'flex', gap:5}}><button className="btn btn-green" onClick={()=>onAccept(o)}>ACEITAR</button><button className="btn btn-blue" onClick={()=>onCounter(o)}>CONTRA</button><button className="btn btn-red" onClick={()=>onReject(o)}>RECUSAR</button></div></div>)}</div>);
-        
+        const OffersScreen = ({ offers, onAccept, onReject, onCounter }) => (
+    <div>
+        <h3>Propostas</h3>
+        {offers.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Nenhuma proposta pendente.</p>}
+        {offers.map(o => {
+            // TRAVA DE SEGURANÇA:
+            // Esconde botões se:
+            // 1. Eu sou o Comprador e o status é WAITING_SELLER (bola com o dono)
+            // 2. Eu sou o Vendedor (Dono) e o status é WAITING_BUYER (bola com o comprador)
+            const aguardandoOutraParte = 
+                (user.data.id === o.buyerId && o.status === 'WAITING_SELLER') || 
+                (user.data.id === o.sellerId && o.status === 'WAITING_BUYER');
+
+            return (
+                <div key={o.id} className="card" style={{borderLeft: '4px solid gold'}}>
+                    <b style={{color:'var(--primary)'}}>{o.playerName}</b><br/>
+                    <small>Envolvidos: {o.buyerName} ↔️ {teams.find(t=>t.id===o.sellerId)?.name || 'Dono'}</small>
+                    <p style={{background:'#333', padding:5, borderRadius:5, whiteSpace:'pre-wrap', fontSize:11}}>{o.description}</p>
+                    
+                    {aguardandoOutraParte ? (
+                        <div style={{textAlign: 'center', color: '#aaa', padding: '10px', border: '1px dashed #444', fontSize: '12px', borderRadius: '5px'}}>
+                            ⌛ Aguardando resposta do outro time...
+                        </div>
+                    ) : (
+                        <div style={{display:'flex', gap:5}}>
+                            <button className="btn btn-green" onClick={() => onAccept(o)}>ACEITAR</button>
+                            <button className="btn btn-blue" onClick={() => onCounter(o)}>CONTRA</button>
+                            <button className="btn btn-red" onClick={() => onReject(o)}>RECUSAR</button>
+                        </div>
+                    )}
+                </div>
+            );
+        })}
+    </div>
+);
         const Ranking = ({ teams, players }) => {
-            const [view, setView] = useState('TEAMS');
-            const renderTeams = () => teams.filter(t=>t.status!=='PENDING').map(t=>{ const sv=players.filter(p=>p.teamId===t.id).reduce((a,b)=>a+(b.value||0),0); return {...t, w: t.balance+sv, sv}}).sort((a,b)=>b.w-a.w).map((t,i)=><div key={t.id} className="card" style={{display:'flex', alignItems:'center', gap:10}}><b style={{fontSize:20, color:'#555', width:30}}>{i+1}</b>{t.logo?<img src={t.logo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/>:<div style={{width:30}}></div>}<div style={{flex:1}}><b>{t.name}</b><br/><small style={{color:'var(--primary)'}}>Patrimônio: {fmt(t.w)}</small><br/><small style={{fontSize:9, color:'#888'}}>Caixa: {fmt(t.balance)} | Elenco: {fmt(t.sv)}</small></div></div>);
-            const renderPlayers = (sortKey, label, color, isStat=true) => { let sorted = []; if(isStat) sorted = players.filter(p=>p.stats && p.stats[sortKey] > 0).sort((a,b)=>b.stats[sortKey]-a.stats[sortKey]); else sorted = players.sort((a,b)=>b[sortKey]-a[sortKey]); return sorted.map((p,i)=>(<div key={p.id} className="card" style={{display:'flex', alignItems:'center', gap:10}}><b style={{fontSize:20, color:'#555', width:30}}>{i+1}</b><div style={{flex:1}}><b>{p.name}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small></div><div style={{fontWeight:'bold', fontSize:14, color:color}}>{label} {isStat ? p.stats[sortKey] : (sortKey==='salary' ? fmt(p[sortKey]) : p[sortKey])}</div></div>)); };
-            return (<div><h3>Ranking e Estatísticas</h3><div className="rank-tabs"><div className={`rank-tab ${view==='TEAMS'?'active':''}`} onClick={()=>setView('TEAMS')}>💰 Clubes</div><div className={`rank-tab ${view==='OVERALL'?'active':''}`} onClick={()=>setView('OVERALL')}>⭐ Craques</div><div className={`rank-tab ${view==='SALARY'?'active':''}`} onClick={()=>setView('SALARY')}>💸 Salários</div><div className={`rank-tab ${view==='GOALS'?'active':''}`} onClick={()=>setView('GOALS')}>⚽ Artilheiros</div><div className={`rank-tab ${view==='ASSIST'?'active':''}`} onClick={()=>setView('ASSIST')}>👟 Garçons</div><div className={`rank-tab ${view==='TACKLES'?'active':''}`} onClick={()=>setView('TACKLES')}>🛡️ Desarmes</div><div className={`rank-tab ${view==='SAVES'?'active':''}`} onClick={()=>setView('SAVES')}>🧤 Paredões</div><div className={`rank-tab ${view==='YEL'?'active':''}`} onClick={()=>setView('YEL')}>🟨 Amarelos</div><div className={`rank-tab ${view==='RED'?'active':''}`} onClick={()=>setView('RED')}>🟥 Vermelhos</div></div>{view==='TEAMS' && renderTeams()}{view==='OVERALL' && renderPlayers('overall', 'Ov:', 'var(--warning)', false)}{view==='SALARY' && renderPlayers('salary', '', 'var(--primary)', false)}{view==='GOALS' && renderPlayers('goals', '⚽', '#fff')}{view==='ASSIST' && renderPlayers('assists', '👟', '#fff')}{view==='TACKLES' && renderPlayers('tackles', '🛡️', '#fff')}{view==='SAVES' && renderPlayers('saves', '🧤', '#fff')}{view==='YEL' && renderPlayers('yellows', '🟨', 'yellow')}{view==='RED' && renderPlayers('reds', '🟥', 'red')}</div>);
-        };
+    const [view, setView] = useState('TEAMS');
+    
+    const renderTeams = () => teams.filter(t=>t.status!=='PENDING').map(t=>{ 
+        const sv = players.filter(p=>p.teamId===t.id).reduce((a,b)=>a+(b.value||0),0); 
+        return {...t, w: t.balance+sv, sv}
+    }).sort((a,b)=>b.w-a.w).map((t,i)=>(
+        <div key={t.id} className="card" style={{display:'flex', alignItems:'center', gap:10}}>
+            <b style={{fontSize:20, color:'#555', width:30}}>{i+1}</b>
+            {t.logo ? <img src={t.logo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/> : <div style={{width:30}}></div>}
+            <div style={{flex:1}}>
+                <b>{t.name}</b><br/>
+                <small style={{color:'var(--primary)'}}>Patrimônio: {fmt(t.w)}</small><br/>
+                <small style={{fontSize:9, color:'#888'}}>Caixa: {fmt(t.balance)} | Elenco: {fmt(t.sv)}</small>
+            </div>
+        </div>
+    ));
+
+    const renderPlayers = (sortKey, label, color, isStat=true) => { 
+        let sorted = []; 
+        if(isStat) sorted = players.filter(p=>p.stats && p.stats[sortKey] > 0).sort((a,b)=>b.stats[sortKey]-a.stats[sortKey]); 
+        else sorted = players.sort((a,b)=>b[sortKey]-a[sortKey]); 
+        
+        return sorted.map((p,i)=>(
+            <div key={p.id} className="card" style={{display:'flex', alignItems:'center', gap:10}}>
+                <b style={{fontSize:20, color:'#555', width:30}}>{i+1}</b>
+                <div style={{flex:1}}>
+                    <b>{p.name}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small>
+                </div>
+                <div style={{fontWeight:'bold', fontSize:14, color:color}}>{label} {isStat ? p.stats[sortKey] : (sortKey==='salary' ? fmt(p[sortKey]) : p[sortKey])}</div>
+            </div>
+        )); 
+    };
+
+    return (
+        <div>
+            <h3>Ranking e Estatísticas</h3>
+            <div className="rank-tabs">
+                <div className={`rank-tab ${view==='TEAMS'?'active':''}`} onClick={()=>setView('TEAMS')}>💰 Clubes</div>
+                <div className={`rank-tab ${view==='OVERALL'?'active':''}`} onClick={()=>setView('OVERALL')}>⭐ Craques</div>
+                <div className={`rank-tab ${view==='SALARY'?'active':''}`} onClick={()=>setView('SALARY')}>💸 Salários</div>
+                <div className={`rank-tab ${view==='GOALS'?'active':''}`} onClick={()=>setView('GOALS')}>⚽ Artilheiros</div>
+                <div className={`rank-tab ${view==='ASSIST'?'active':''}`} onClick={()=>setView('ASSIST')}>👟 Garçons</div>
+                <div className={`rank-tab ${view==='TACKLES'?'active':''}`} onClick={()=>setView('TACKLES')}>🛡️ Desarmes</div>
+                <div className={`rank-tab ${view==='SAVES'?'active':''}`} onClick={()=>setView('SAVES')}>🧤 Paredões</div>
+                <div className={`rank-tab ${view==='YEL'?'active':''}`} onClick={()=>setView('YEL')}>🟨 Amarelos</div>
+                <div className={`rank-tab ${view==='RED'?'active':''}`} onClick={()=>setView('RED')}>🟥 Vermelhos</div>
+            </div>
+            {view==='TEAMS' && renderTeams()}
+            {view==='OVERALL' && renderPlayers('overall', 'Ov:', 'var(--warning)', false)}
+            {view==='SALARY' && renderPlayers('salary', '', 'var(--primary)', false)}
+            {view==='GOALS' && renderPlayers('goals', '⚽', '#fff')}
+            {view==='ASSIST' && renderPlayers('assists', '👟', '#fff')}
+            {view==='TACKLES' && renderPlayers('tackles', '🛡️', '#fff')}
+            {view==='SAVES' && renderPlayers('saves', '🧤', '#fff')}
+            {view==='YEL' && renderPlayers('yellows', '🟨', 'yellow')}
+            {view==='RED' && renderPlayers('reds', '🟥', 'red')}
+        </div>
+    );
+};
 
 // --- COMPONENTES QUE FALTAVAM (Súmula e Tabela) ---
 

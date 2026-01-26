@@ -215,31 +215,6 @@
                 else if (type === 'PLAYER') findAndLogin(players, 'PLAYER_DASH', 'PLAYER', false);
             };
 
-            // --- 2. REGRAS FIFA (SALVAR JOGADOR E CORRIGIR BANCO) ---
-            const savePlayer = async (p) => {
-                const isNew = !p.id;
-                const ref = isNew ? db.collection('players').doc() : db.collection('players').doc(p.id);
-                const old = isNew ? {} : (players.find(pl => pl.id === p.id) || {});
-                const data = {
-                    ...p,
-                    overall: Math.max(45, parseInt(p.overall || old.overall || 45)),
-                    salary: parseFloat(p.salary || old.salary || 1000), 
-                    clause: parseFloat(p.clause || old.clause || 1000000),
-                    balance: parseFloat(p.balance || old.balance || 0),
-                    history: p.history || old.history || [],
-                    xp: p.xp !== undefined ? p.xp : (old.xp || 0),
-                    energy: p.energy !== undefined ? p.energy : (old.energy || 100),
-                    stats: p.stats || old.stats || { goals: 0, assists: 0, tackles: 0, saves: 0, yellows: 0, reds: 0 },
-                    teamId: p.teamId || old.teamId || 'FREE'
-                };
-                if (!isNew && data.overall !== old.overall) data.xp = 0;
-                if (isNew) delete data.id;
-                await ref.set(data, { merge: true });
-                setModal(null);
-                if (isNew) postNews(`🆕 **REFORÇO**\nO mercado recebe **${data.name}** (Nível ${data.overall}).`, 'transfer');
-                else alert("Jogador atualizado!");
-            };
-
             const fixPlayersData = async () => {
                 if(!confirm("Deseja padronizar os contratos de todos os jogadores?")) return;
                 const snapshot = await db.collection('players').get();
@@ -403,23 +378,6 @@
                 }
             };
 
-            // --- FUNÇÃO DE FAXINA (COLE LOGO ABAIXO) ---
-            const fixPlayersData = async () => {
-                if(!confirm("Deseja padronizar os contratos de todos os jogadores?")) return;
-                const snapshot = await db.collection('players').get();
-                const b = db.batch();
-                snapshot.forEach(doc => {
-                    const d = doc.data();
-                    b.update(db.collection('players').doc(doc.id), {
-                        salary: d.salary || 1000,
-                        clause: d.clause || 1000000,
-                        balance: d.balance || 0,
-                        history: d.history || []
-                    });
-                });
-                await b.commit();
-                alert("Sistema FIFA inicializado para todos!");
-            };
             const updateStats = async (pid, newStats) => { await db.collection('players').doc(pid).update({ stats: newStats }); alert("Estatísticas Atualizadas!"); setModal(null); };
   
             const sendOffer = async (target, type, value, swapIds, con, meta, old) => {

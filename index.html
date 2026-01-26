@@ -992,11 +992,12 @@
                                     onReject={rejectOffer}
                                     onCounter={sendOffer} 
                                 />
-                            }
+                          }
                         </div>
                     </div>}
-
-        // --- COMPONENTS ---
+                </div> 
+            ); 
+        }
         const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor }) => {
             const [tab, setTab] = useState('LOGIN'); 
             const [subTab, setSubTab] = useState('TEAM'); 
@@ -1503,7 +1504,44 @@
             useEffect(() => { setF({name: team.name, logo: team.logo, balance: team.balance, serie: team.serie}); }, [team]);
             return <div><label>Nome</label><input className="input-field" value={form.name} onChange={e=>setF({...form, name:e.target.value})} /><label>Logo</label><input className="input-field" value={form.logo} onChange={e=>setF({...form, logo:e.target.value})} />{isAdmin && <label>Saldo (ADM)</label>} {isAdmin && <input className="input-field" type="number" value={form.balance} onChange={e=>setF({...form, balance:parseFloat(e.target.value)})} />}{isAdmin && <label>Série (ADM)</label>}{isAdmin && <select className="input-field" value={form.serie} onChange={e=>setF({...form, serie:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>{s}</option>)}</select>}<button className="btn btn-blue" onClick={()=>onUp(form)}>SALVAR</button><hr style={{borderColor:'#444'}}/><p>Estádio Nível {team.stadiumLevel||1}</p><button className="btn btn-purple" onClick={onUpgrade}>EVOLUIR (₣ {fmt(COSTS[team.stadiumLevel]||0).replace('₣ ','')})</button><hr style={{borderColor:'#444'}}/><button className="btn btn-green" onClick={()=>{const v=prompt("Valor");const m=prompt("Motivo"); if(v)onReq('INJECTION',v,m)}}>PEDIR INJEÇÃO</button><button className="btn btn-gold" onClick={()=>{const v=prompt("Valor");const m=prompt("Empresa"); if(v)onReq('SPONSORSHIP',v,m)}}>PEDIR PATROCÍNIO</button><button className="btn btn-red" onClick={()=>{const v=prompt("Valor a retirar:"); if(v){ const m=prompt("Motivo:"); if(m) onWithdraw(v, m); }}}>RETIRAR DINHEIRO</button></div>;
         };
+const PlayerNegotiationModal = ({ offer, onClose, onCounter, onAccept, onReject }) => {
+            const [form, setForm] = React.useState({
+                newSalary: offer.meta.newSalary,
+                signingBonus: offer.meta.signingBonus,
+                contract: offer.meta.contract,
+                role: offer.meta.role
+            });
 
+            return (
+                <div className="modal-bg" style={{zIndex:9999}}><div className="modal-content" style={{border:'2px solid gold'}}>
+                    <h3>📋 Proposta do {offer.buyerName}</h3>
+                    <p style={{fontSize:12, color:'#aaa'}}>Analise os termos ou peça mais.</p>
+                    <div style={{background:'#222', padding:10, borderRadius:8, marginBottom:15}}>
+                        <label>Salário Semanal</label>
+                        <input className="input-field" type="number" value={form.newSalary} onChange={e=>setForm({...form, newSalary:e.target.value})} />
+                        <label>Luvas (Prêmio)</label>
+                        <input className="input-field" type="number" value={form.signingBonus} onChange={e=>setForm({...form, signingBonus:e.target.value})} />
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                            <div><label>Anos</label><input className="input-field" type="number" value={form.contract} onChange={e=>setForm({...form, contract:e.target.value})} /></div>
+                            <div><label>Papel</label>
+                                <select className="input-field" value={form.role} onChange={e=>setForm({...form, role:e.target.value})}>
+                                    <option value="CRUCIAL">⭐ Crucial</option>
+                                    <option value="TITULAR">✅ Titular</option>
+                                    <option value="ROTACAO">🔄 Rotação</option>
+                                    <option value="RESERVA">Reserva</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div style={{display:'flex', gap:5}}>
+                        <button className="btn btn-green" onClick={()=>onAccept({...offer, meta: {...offer.meta, ...form}})}>✅ ACEITAR</button>
+                        <button className="btn btn-blue" onClick={()=>onCounter(offer, offer.type, offer.value, [], 0, form, offer)}>💬 NEGOCIAR</button>
+                    </div>
+                    <button className="btn btn-red" style={{marginTop:5}} onClick={()=>onReject(offer)}>❌ RECUSAR</button>
+                    <button className="btn btn-ghost" style={{marginTop:5}} onClick={onClose}>FECHAR</button>
+                </div></div>
+            );
+        };
         const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, offers, onNeg }) => { 
             const [newPass, setNewPass] = useState('');
             const [tab, setTab] = useState('PERFIL'); 

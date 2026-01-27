@@ -755,7 +755,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.90</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.90.1</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -853,8 +853,7 @@
                         )}
                         {screen === 'RANKING' && <Ranking teams={teams} players={players} />}
                         {screen === 'NEWS' && <div><h3>Notícias</h3>{news.map(n=><div key={n.id} className={`news-card news-${n.type}`}>{n.text}<br/><small style={{color:'#666'}}>{new Date(n.date).toLocaleString()}</small></div>)}</div>}
-                        {screen === 'OFFERS' && <OffersScreen offers={offers} onAccept={acceptOffer} onReject={rejectOffer} onCounter={(o)=>setModal({type:'OFFER', data:{...players.find(p=>p.id===o.playerId), oldOffer:o}})} />}
-                        
+{screen === 'OFFERS' && <OffersScreen user={user} offers={offers} onAccept={acceptOffer} onReject={rejectOffer} onCounter={(o)=>setModal({type:'OFFER', data:{...players.find(p=>p.id===o.playerId), oldOffer:o}})} />}                        
                         {/* ETAPA 1: Painel da Empresa (ATUALIZADO COM HISTÓRICO) */}
                        {/* ETAPA 3 e 4: Painel da Empresa (Com Histórico e Patrocínios) */}
                         {/* PAINEL DA EMPRESA (CORRIGIDO: V3) */}
@@ -944,7 +943,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.1</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1586,12 +1585,12 @@
                 </div>
             );
         };
-        const OffersScreen = ({ offers, onAccept, onReject, onCounter }) => {
-            // Filtra ofertas onde eu sou o destinatário (recipientId) ou o dono atual (sellerId)
-            const myOffers = offers.filter(o => o.recipientId === user.data.id || (o.sellerId === user.data.id && !o.recipientId));
+        const OffersScreen = ({ user, offers, onAccept, onReject, onCounter }) => {
+    // Agora o filtro abaixo vai funcionar porque o 'user' existe aqui dentro:
+    const myOffers = offers.filter(o => o.recipientId === user.data.id);
 
-            return (
-                <div>
+    return (
+        <div>
                     <h3>Propostas ({myOffers.length})</h3>
                     {myOffers.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Nenhuma proposta pendente para você.</p>}
                     {myOffers.map(o => (

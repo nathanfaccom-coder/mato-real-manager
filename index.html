@@ -758,7 +758,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.91</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.92</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -998,7 +998,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91(Company Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92(Company Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1353,6 +1353,7 @@
             const old = target.oldOffer || {}; 
             const isCounter = !!old.id;
 
+            // ESTADO INICIAL: Garante valores padrão para evitar erro de banco
             const [t, setT] = useState(old.type || 'COMPRA'); 
             const [v, setV] = useState(old.value || target.value || 0); 
             const [sal, setSal] = useState(old.meta?.newSalary || target.salary || 0);
@@ -1372,6 +1373,7 @@
                     <div className="modal-content" style={{maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto'}}>
                         <h3 style={{color:'var(--primary)'}}>{isCounter ? 'Contraproposta' : `Negociar ${target.name}`}</h3>
                         
+                        {/* 1. ACORDO ENTRE CLUBES */}
                         <div style={{borderBottom: '1px solid #444', paddingBottom: 15, marginBottom: 15}}>
                             <label style={{fontSize: '11px', color: 'gold', fontWeight: 'bold', textTransform: 'uppercase'}}>1. Acordo entre Clubes</label>
                             <div style={{display:'flex', gap:5, margin:'10px 0'}}>
@@ -1391,21 +1393,43 @@
                             )}
                         </div>
 
+                        {/* 2. CONTRATO DO JOGADOR */}
                         <div>
                             <label style={{fontSize: '11px', color: 'cyan', fontWeight: 'bold', textTransform: 'uppercase'}}>2. Contrato do Jogador</label>
                             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10}}>
                                 <div><small>Salário Mensal</small><input className="input-field" type="number" value={sal} onChange={e=>setSal(e.target.value)} /></div>
                                 <div><small>Luvas (Assinatura)</small><input className="input-field" type="number" value={luv} onChange={e=>setLuv(e.target.value)} /></div>
                             </div>
+                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                                <div><small>Duração (Anos)</small><input className="input-field" type="number" value={con} onChange={e=>setCon(e.target.value)} /></div>
+                                <div><small>Papel no Elenco</small>
+                                    <select className="input-field" value={role} onChange={e=>setRole(e.target.value)}>
+                                        <option value="CRUCIAL">⭐ Crucial</option>
+                                        <option value="TITULAR">✅ Titular</option>
+                                        <option value="ROTACAO">🔄 Rotação</option>
+                                        <option value="RESERVA">💤 Reserva</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
 
                         <div style={{display:'flex', gap:10, marginTop:20}}>
                             <button className="btn btn-green" style={{flex: 2}} onClick={() => {
+                                // LIMPEZA EXPERT: Converte strings para números puros antes de enviar ao Firebase
                                 const finalV = parseFloat(v) || 0;
                                 const finalSal = parseFloat(sal) || 0;
                                 const finalLuv = parseFloat(luv) || 0;
                                 const finalCon = parseInt(con) || 1;
-                                const cleanMeta = { ...meta, newSalary: finalSal, signingBonus: finalLuv, contract: finalCon, role: role };
+                                
+                                const cleanMeta = {
+                                    ...meta,
+                                    newSalary: finalSal,
+                                    signingBonus: finalLuv,
+                                    contract: finalCon,
+                                    role: role,
+                                    installments: parseInt(meta.installments) || 1
+                                };
+
                                 onSend(target, t, finalV, swaps, finalCon, cleanMeta, old);
                             }}>
                                 {isCounter ? 'ENVIAR CONTRAPROPOSTA' : 'ENVIAR OFERTA'}

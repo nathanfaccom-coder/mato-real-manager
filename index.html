@@ -412,22 +412,45 @@
             // --- SISTEMA DE NEGOCIAÇÃO CLÁSSICO (CLUBE x CLUBE) ---
             const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
                 try {
-                    const actingTeamName = user.data.name;
                     const v = parseFloat(value) || 0;
                     const contractYears = parseInt(con) || 1;
-                    const role = meta.role || 'ROTACAO';
+                    const actingTeamName = user.data.name;
+                    const targetPlayerName = target.name;
+
+                    // 📝 GERAÇÃO DE DESCRIÇÃO DETALHADA
+                    let details = `💰 Taxa: ${fmt(v)}\n`;
+                    if (meta.installments > 1) details += `📅 Parcelamento: ${meta.installments}x de ${fmt(v / meta.installments)}\n`;
+                    if (meta.sellOn > 0) details += `📈 Revenda: ${meta.sellOn}%\n`;
+                    details += `📝 Contrato: ${contractYears} anos\n`;
+                    details += `💵 Salário: ${fmt(meta.newSalary)}/sem\n`;
+                    details += `👔 Papel: ${meta.role || 'ROTACAO'}`;
+
+                    // 🔄 LÓGICA DE TURNOS (Dono x Comprador)
+                    let recipientId = target.teamId; 
+                    if (old && old.id) {
+                        // Se for contraproposta, envia para quem mandou a oferta anterior
+                        recipientId = (user.data.id === old.buyerId) ? old.sellerId : old.buyerId;
+                    }
 
                     const pl = {
                         playerId: target.id,
-                        playerName: target.name,
-                        buyerId: user.data.id,
-                        buyerName: actingTeamName,
-                        sellerId: target.teamId || 'FREE',
+                        playerName: targetPlayerName,
+                        buyerId: old?.buyerId || user.data.id,
+                        buyerName: old?.buyerName || actingTeamName,
+                        sellerId: target.teamId || old?.sellerId || 'FREE',
+                        recipientId: recipientId, // Novo campo para controle de quem vê
                         type: type,
                         value: v,
                         offerContract: contractYears,
-                        description: `💰 Taxa: ${fmt(v)}\n📝 Contrato: ${contractYears} anos\n👔 Papel: ${role}`,
-                        meta: { ...meta, role: role },
+                        description: details,
+                        meta: {
+                            ...meta,
+                            newSalary: parseFloat(meta.newSalary) || 0,
+                            signingBonus: parseFloat(meta.signingBonus) || 0,
+                            role: meta.role || 'ROTACAO',
+                            installments: parseInt(meta.installments) || 1,
+                            sellOn: parseInt(meta.sellOn) || 0
+                        },
                         date: Date.now()
                     };
 
@@ -436,69 +459,13 @@
                     b.set(db.collection('offers').doc(), pl);
                     await b.commit();
 
-                    postNews(`💼 **OFERTA**\nO **${actingTeamName}** enviou uma proposta por **${target.name}**.`, 'transfer');
+                    postNews(`🔄 **NEGOCIAÇÃO EM ANDAMENTO**\nNovos termos foram enviados por **${targetPlayerName}**!\n\n${details}`, 'transfer');
                     setModal(null); 
-                    alert("Proposta enviada!");
-                } catch (e) {
-                    alert("Erro ao enviar. Confira os valores.");
-                }
-            };
-
-            const acceptOffer = async (o) => {
-                const buy = teams.find(t=>t.id===o.buyerId);
-                const sel = teams.find(t=>t.id===user.data.id);
-                const p = players.find(x=>x.id===o.playerId);
-                
-                if (!buy || buy.balance < o.value) return alert("Comprador sem saldo!");
-                if (!confirm(`Vender ${p.name} por ${fmt(o.value)}?`)) return;
-
-                const b = db.batch();
-                b.update(db.collection('teams').doc(buy.id), {balance: buy.balance - o.value});
-                b.update(db.collection('teams').doc(sel.id), {balance: sel.balance + o.value});
-
-                const historyEntry = { date: Date.now(), from: sel.name, to: buy.name, type: o.type, value: o.value };
-                b.update(db.collection('players').doc(p.id), {
-                    teamId: buy.id,
-                    status: 'NAO_A_VENDA',
-                    contract: parseInt(o.offerContract) || 1,
-                    role: o.meta?.role || 'ROTACAO',
-                    history: firebase.firestore.FieldValue.arrayUnion(historyEntry)
-                });
-
-                b.delete(db.collection('offers').doc(o.id));
-                await b.commit();
-                
-                postNews(`🤝 **OFICIAL**\n**${p.name}** no **${buy.name}**!`, 'transfer');
-                alert("Transferência concluída!");
-            };
-            const renewContract = async (p) => {
-                try {
-                    const cost = (parseFloat(p.value) || 1000000) * 0.10; 
-                    if(user.data.balance < cost) return alert(`Sem saldo para luvas (Custo: ${fmt(cost)})`);
-                    if(!confirm(`Renovar com ${p.name} por +1 ano?\nCusto: ${fmt(cost)}`)) return;
-                    
-                    const b = db.batch();
-                    b.update(db.collection('teams').doc(user.data.id), {
-                        balance: firebase.firestore.FieldValue.increment(-cost)
-                    });
-                    b.update(db.collection('players').doc(p.id), {
-                        contract: (parseInt(p.contract)||0) + 1
-                    });
-                    
-                    await b.commit();
-                    postNews(`📝 **RENOVAÇÃO**\n**${p.name}** estendeu o seu vínculo com o **${user.data.name}**.`, 'transfer');
-                    setModal(null);
-                    alert("Contrato renovado!");
+                    alert("Proposta/Contraproposta enviada!");
                 } catch (e) {
                     console.error(e);
-                    alert("Erro ao renovar contrato.");
+                    alert("Erro ao enviar. Verifique os campos numéricos.");
                 }
-            };
-
-            const rejectOffer = async (o) => {
-                if(!confirm("Recusar esta proposta?")) return;
-                await db.collection('offers').doc(o.id).delete();
-                postNews(`❌ **NEGOCIAÇÃO ENCERRADA**\nO acordo por **${o.playerName}** não foi atingido.`, 'transfer');
             };
             // --- FUNÇÕES DE ESTATÍSTICAS E ADMIN (CORRIGIDAS) ---
 
@@ -702,7 +669,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.87</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.88</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -891,7 +858,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.87</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.88</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1533,13 +1500,30 @@
                 </div>
             );
         };
-        const OffersScreen = ({ offers, onAccept, onReject, onCounter }) => (<div><h3>Propostas</h3>{offers.map(o=><div key={o.id} className="card" style={{borderLeft:'4px solid gold'}}><b style={{color:'var(--primary)'}}>{o.playerName}</b><br/><small>De: {o.buyerName}</small><p style={{background:'#333', padding:5, borderRadius:5, whiteSpace:'pre-wrap', fontSize:11}}>{o.description}</p><div style={{display:'flex', gap:5}}><button className="btn btn-green" onClick={()=>onAccept(o)}>ACEITAR</button><button className="btn btn-blue" onClick={()=>onCounter(o)}>CONTRA</button><button className="btn btn-red" onClick={()=>onReject(o)}>RECUSAR</button></div></div>)}</div>);
-        
-        const Ranking = ({ teams, players }) => {
-            const [view, setView] = useState('TEAMS');
-            const renderTeams = () => teams.filter(t=>t.status!=='PENDING').map(t=>{ const sv=players.filter(p=>p.teamId===t.id).reduce((a,b)=>a+(b.value||0),0); return {...t, w: t.balance+sv, sv}}).sort((a,b)=>b.w-a.w).map((t,i)=><div key={t.id} className="card" style={{display:'flex', alignItems:'center', gap:10}}><b style={{fontSize:20, color:'#555', width:30}}>{i+1}</b>{t.logo?<img src={t.logo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/>:<div style={{width:30}}></div>}<div style={{flex:1}}><b>{t.name}</b><br/><small style={{color:'var(--primary)'}}>Patrimônio: {fmt(t.w)}</small><br/><small style={{fontSize:9, color:'#888'}}>Caixa: {fmt(t.balance)} | Elenco: {fmt(t.sv)}</small></div></div>);
-            const renderPlayers = (sortKey, label, color, isStat=true) => { let sorted = []; if(isStat) sorted = players.filter(p=>p.stats && p.stats[sortKey] > 0).sort((a,b)=>b.stats[sortKey]-a.stats[sortKey]); else sorted = players.sort((a,b)=>b[sortKey]-a[sortKey]); return sorted.map((p,i)=>(<div key={p.id} className="card" style={{display:'flex', alignItems:'center', gap:10}}><b style={{fontSize:20, color:'#555', width:30}}>{i+1}</b><div style={{flex:1}}><b>{p.name}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small></div><div style={{fontWeight:'bold', fontSize:14, color:color}}>{label} {isStat ? p.stats[sortKey] : (sortKey==='salary' ? fmt(p[sortKey]) : p[sortKey])}</div></div>)); };
-            return (<div><h3>Ranking e Estatísticas</h3><div className="rank-tabs"><div className={`rank-tab ${view==='TEAMS'?'active':''}`} onClick={()=>setView('TEAMS')}>💰 Clubes</div><div className={`rank-tab ${view==='OVERALL'?'active':''}`} onClick={()=>setView('OVERALL')}>⭐ Craques</div><div className={`rank-tab ${view==='SALARY'?'active':''}`} onClick={()=>setView('SALARY')}>💸 Salários</div><div className={`rank-tab ${view==='GOALS'?'active':''}`} onClick={()=>setView('GOALS')}>⚽ Artilheiros</div><div className={`rank-tab ${view==='ASSIST'?'active':''}`} onClick={()=>setView('ASSIST')}>👟 Garçons</div><div className={`rank-tab ${view==='TACKLES'?'active':''}`} onClick={()=>setView('TACKLES')}>🛡️ Desarmes</div><div className={`rank-tab ${view==='SAVES'?'active':''}`} onClick={()=>setView('SAVES')}>🧤 Paredões</div><div className={`rank-tab ${view==='YEL'?'active':''}`} onClick={()=>setView('YEL')}>🟨 Amarelos</div><div className={`rank-tab ${view==='RED'?'active':''}`} onClick={()=>setView('RED')}>🟥 Vermelhos</div></div>{view==='TEAMS' && renderTeams()}{view==='OVERALL' && renderPlayers('overall', 'Ov:', 'var(--warning)', false)}{view==='SALARY' && renderPlayers('salary', '', 'var(--primary)', false)}{view==='GOALS' && renderPlayers('goals', '⚽', '#fff')}{view==='ASSIST' && renderPlayers('assists', '👟', '#fff')}{view==='TACKLES' && renderPlayers('tackles', '🛡️', '#fff')}{view==='SAVES' && renderPlayers('saves', '🧤', '#fff')}{view==='YEL' && renderPlayers('yellows', '🟨', 'yellow')}{view==='RED' && renderPlayers('reds', '🟥', 'red')}</div>);
+        const OffersScreen = ({ offers, onAccept, onReject, onCounter }) => {
+            // Filtra ofertas onde eu sou o destinatário (recipientId) ou o dono atual (sellerId)
+            const myOffers = offers.filter(o => o.recipientId === user.data.id || (o.sellerId === user.data.id && !o.recipientId));
+
+            return (
+                <div>
+                    <h3>Propostas ({myOffers.length})</h3>
+                    {myOffers.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Nenhuma proposta pendente para você.</p>}
+                    {myOffers.map(o => (
+                        <div key={o.id} className="card" style={{borderLeft:'4px solid gold'}}>
+                            <b style={{color:'var(--primary)'}}>{o.playerName}</b><br/>
+                            <small>Proposta de: <b>{o.buyerName}</b></small>
+                            <div style={{background:'#222', padding:10, borderRadius:8, marginTop:5, whiteSpace:'pre-wrap', fontSize:12, border:'1px solid #333'}}>
+                                {o.description}
+                            </div>
+                            <div style={{display:'flex', gap:5, marginTop:10}}>
+                                <button className="btn btn-green" onClick={()=>onAccept(o)}>ACEITAR</button>
+                                <button className="btn btn-blue" onClick={()=>onCounter(o)}>CONTRA</button>
+                                <button className="btn btn-red" onClick={()=>onReject(o)}>RECUSAR</button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            );
         };
 
 // --- COMPONENTES QUE FALTAVAM (Súmula e Tabela) ---

@@ -1423,28 +1423,24 @@
                         </div>
 
                         {/* BOTÕES DE AÇÃO COM LIMPEZA DE DADOS */}
-                        <div style={{display:'flex', gap:10, marginTop:20}}>
-                            <button className="btn btn-green" style={{flex: 2}} onClick={() => {
-                                // LIMPEZA FINAL: Força os campos a serem números antes de disparar o onSend
-                                const finalV = parseFloat(v) || 0;
-                                const finalSal = parseFloat(sal) || 0;
-                                const finalLuv = parseFloat(luv) || 0;
-                                const finalCon = parseInt(con) || 1;
-                                const finalInst = parseInt(meta.installments) || 1;
+                        <button className="btn btn-green" style={{flex: 2}} onClick={() => {
+    // Aqui transformamos os campos de texto do formulário em números reais
+    const valorTaxa = parseFloat(v) || 0;
+    const tempoContrato = parseInt(con) || 1;
+    
+    // Criamos o meta com os valores limpos
+    const metaLimpo = {
+        ...meta,
+        newSalary: parseFloat(sal) || 0,
+        signingBonus: parseFloat(luv) || 0,
+        contract: tempoContrato,
+        role: role
+    };
 
-                                const cleanMeta = {
-                                    ...meta,
-                                    newSalary: finalSal,
-                                    signingBonus: finalLuv,
-                                    contract: finalCon,
-                                    installments: finalInst,
-                                    role: role
-                                };
-
-                                onSend(target, t, finalV, swaps, finalCon, cleanMeta, old);
-                            }}>
-                                {isCounter ? 'ENVIAR CONTRAPROPOSTA' : 'ENVIAR OFERTA'}
-                            </button>
+    onSend(target, t, valorTaxa, swaps, tempoContrato, metaLimpo, old);
+}}>
+    {isCounter ? 'ENVIAR CONTRAPROPOSTA' : 'ENVIAR OFERTA'}
+</button>
                             <button className="btn btn-red" style={{flex: 1}} onClick={()=>setModal(null)}>CANCELAR</button>
                         </div>
                     </div>

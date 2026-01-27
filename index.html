@@ -759,7 +759,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.90.5</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.90.6</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -1000,7 +1000,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.5</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.6</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1695,7 +1695,7 @@
 const Ranking = ({ teams, players }) => {
             const [view, setView] = React.useState('TEAMS');
 
-            // 🎯 Filtro para remover os "fantasmas" (jogadores sem time ou sem nome real)
+            // 🎯 Filtro para exibir apenas jogadores vinculados a times reais
             const validPlayers = players.filter(p => p.teamId && p.teamId !== 'FREE' && p.name);
 
             const renderTeams = () => teams
@@ -1757,6 +1757,10 @@ const Ranking = ({ teams, players }) => {
                         <div className={`rank-tab ${view === 'GOALS' ? 'active' : ''}`} onClick={() => setView('GOALS')}><i className="fas fa-futbol"></i> Gols</div>
                         <div className={`rank-tab ${view === 'ASSIST' ? 'active' : ''}`} onClick={() => setView('ASSIST')}><i className="fas fa-magic"></i> Assis</div>
                         <div className={`rank-tab ${view === 'TACKLES' ? 'active' : ''}`} onClick={() => setView('TACKLES')}><i className="fas fa-hand-paper"></i> Desar</div>
+                        {/* NOVAS ABAS ABAIXO */}
+                        <div className={`rank-tab ${view === 'SAVES' ? 'active' : ''}`} onClick={() => setView('SAVES')}><i className="fas fa-mitten"></i> Paredões</div>
+                        <div className={`rank-tab ${view === 'YEL' ? 'active' : ''}`} onClick={() => setView('YEL')}><i className="fas fa-square" style={{color:'yellow'}}></i> Amarelos</div>
+                        <div className={`rank-tab ${view === 'RED' ? 'active' : ''}`} onClick={() => setView('RED')}><i className="fas fa-square" style={{color:'red'}}></i> Vermelhos</div>
                     </div>
 
                     <div style={{ marginTop: 10, animation: 'fadeIn 0.3s' }}>
@@ -1766,10 +1770,15 @@ const Ranking = ({ teams, players }) => {
                         {view === 'GOALS' && renderPlayers('goals', '⚽', '#fff')}
                         {view === 'ASSIST' && renderPlayers('assists', '🎩', '#fff')}
                         {view === 'TACKLES' && renderPlayers('tackles', '🛡️', '#fff')}
+                        {view === 'SAVES' && renderPlayers('saves', '🧤', '#fff')}
+                        {view === 'YEL' && renderPlayers('yellows', '🟨', 'yellow')}
+                        {view === 'RED' && renderPlayers('reds', '🟥', 'red')}
                     </div>
                 </div>
             );
         };
+
+        
 // --- COMPONENTES QUE FALTAVAM (Súmula e Tabela) ---
 
         const MatchPerformanceForm = ({ players, teams, onSaveStats }) => {

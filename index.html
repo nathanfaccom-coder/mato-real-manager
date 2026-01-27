@@ -379,41 +379,57 @@
            // --- LÓGICA DE NEGOCIAÇÃO FIFA (SISTEMA DE TURNOS E FINANCEIRO) ---
             const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
                 try {
-                    const v = parseFloat(value) || 0;
-                    const actingTeamName = user.data.name;
+                    // 🛡️ LIMPEZA RADICAL (Anti-Erro de Valor)
+                    // Converte para texto e depois para número para limpar sujeira de digitação
+                    const cleanNum = (val) => {
+                        if (!val || val === "") return 0;
+                        let n = String(val).replace(',', '.'); // troca vírgula por ponto
+                        return isNaN(parseFloat(n)) ? 0 : parseFloat(n);
+                    };
 
-                    // Formatação para o card de notícias
+                    const v = cleanNum(value);
+                    const salary = cleanNum(meta.newSalary);
+                    const bonus = cleanNum(meta.signingBonus);
+                    const duration = Math.max(1, parseInt(con) || 1);
+                    const inst = Math.max(1, parseInt(meta.installments) || 1);
+                    const sell = cleanNum(meta.sellOn);
+
+                    const actingTeamName = user.data.name;
+                    const isClause = type === 'COMPRA' && target.clause > 0 && v >= target.clause;
+
+                    // Formatação visual do Card
                     let details = `💰 Taxa: ${fmt(v)}\n`;
-                    if (meta.installments > 1) details += `📅 Parcelas: ${meta.installments}x\n`;
-                    details += `📝 Contrato: ${con} anos\n`;
-                    details += `💵 Salário: ${fmt(meta.newSalary)}/sem\n`;
-                    details += `👔 Papel: ${meta.role}`;
+                    if (inst > 1) details += `📅 Parcelas: ${inst}x\n`;
+                    details += `📝 Contrato: ${duration} anos\n`;
+                    details += `💵 Salário: ${fmt(salary)}/sem\n`;
+                    details += `👔 Papel: ${meta.role || 'ROTACAO'}`;
 
                     let status = 'WAITING_SELLER';
-                    const isClause = type === 'COMPRA' && target.clause > 0 && v >= target.clause;
-                    
                     if (isClause) status = 'WAITING_PLAYER';
                     else if (old && old.id) {
                         status = (user.data.id === old.sellerId) ? 'WAITING_BUYER' : 'WAITING_SELLER';
                     }
                     if (old && old.status === 'WAITING_PLAYER') status = 'PLAYER_COUNTER'; 
 
+                    // 📦 PACOTE DE DADOS BLINDADO
                     const pl = {
-                        playerId: target.id,
-                        playerName: target.name,
-                        buyerId: old?.buyerId || user.data.id, 
-                        buyerName: old?.buyerName || user.data.name,
-                        sellerId: target.teamId || old?.sellerId || 'FREE',
-                        type,
+                        playerId: String(target.id),
+                        playerName: String(target.name),
+                        buyerId: String(old?.buyerId || user.data.id), 
+                        buyerName: String(old?.buyerName || user.data.name),
+                        sellerId: String(target.teamId || old?.sellerId || 'FREE'),
+                        type: String(type),
                         value: v,
                         description: details,
                         status: status,
                         swapPlayerIds: swapIds || [],
                         meta: {
-                            ...meta,
-                            contract: parseInt(con),
-                            newSalary: parseFloat(meta.newSalary) || 0,
-                            signingBonus: parseFloat(meta.signingBonus) || 0,
+                            contract: duration,
+                            newSalary: salary,
+                            signingBonus: bonus,
+                            role: String(meta.role || 'ROTACAO'),
+                            installments: inst,
+                            sellOn: sell,
                             isClause: isClause
                         },
                         date: Date.now()
@@ -424,12 +440,12 @@
                     b.set(db.collection('offers').doc(), pl);
                     await b.commit();
 
-                    postNews(`💼 **OFERTA**\nO **${actingTeamName}** enviou uma proposta por **${target.name}**.`, 'transfer');
+                    postNews(`💼 **NEGOCIAÇÃO**\nO **${actingTeamName}** enviou uma proposta por **${target.name}**.`, 'transfer');
                     setModal(null); 
                     alert("Proposta enviada!");
                 } catch (e) {
-                    console.error("ERRO FIREBASE:", e);
-                    alert("Erro ao enviar. Verifique se os valores são números válidos.");
+                    console.error("ERRO CRÍTICO NO BANCO:", e);
+                    alert("O banco de dados recusou o envio. Tente digitar números simples (sem pontos ou vírgulas).");
                 }
             };
             
@@ -661,7 +677,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.95</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.96</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -901,7 +917,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.95(Company Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.96(Company Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

@@ -355,65 +355,63 @@
             const updateBalance = async (teamId, newBal) => { await db.collection('teams').doc(teamId).update({ balance: parseFloat(newBal) }); alert("Atualizado!"); };
             const withdrawMoney = async (amount, reason) => { const val = parseFloat(amount.replace(',', '.')); if(isNaN(val) || val <= 0) return alert("Valor inválido!"); if(user.data.balance < val) return alert("Saldo insuficiente!"); await db.collection('teams').doc(user.data.id).update({ balance: firebase.firestore.FieldValue.increment(-val) }); postNews(`💸 **SAÍDA DE CAIXA**\nO **${user.data.name}** retirou ${fmt(val)}.\n📝 Motivo: ${reason}`, 'money-minus'); setModal(null); };
 
+            // --- FUNÇÃO DE SALVAR JOGADOR (CORRIGIDA) ---
             const savePlayer = async (d) => {
-                let targetTeamId = d.teamId; 
-                if (user.type === 'USER') targetTeamId = user.data.id;
-                if (user.type === 'ADMIN' && adminTeam) targetTeamId = adminTeam.id;
-                
-                if (!targetTeamId) return alert("Erro: Time não identificado.");
+                try {
+                    const isNew = !d.id;
+                    const ref = isNew ? db.collection('players').doc() : db.collection('players').doc(d.id);
+                    const old = isNew ? {} : (players.find(pl => pl.id === d.id) || {});
 
-                // Garante que o nível mínimo seja 45
-                let newLevel = parseInt(d.overall) || 45;
-                if (newLevel < 45) newLevel = 45;
-                if (newLevel > 100) newLevel = 100;
+                    // REGRA DE OURO: Define para qual time o jogador vai (USER ou ADMIN)
+                    let targetTeamId = d.teamId || old.teamId || 'FREE';
+                    if (user.type === 'USER') targetTeamId = user.data.id;
+                    if (user.type === 'ADMIN' && adminTeam) targetTeamId = adminTeam.id;
+                    if (d.forcedTeamId) targetTeamId = d.forcedTeamId;
 
-                let payload = { 
-                    name: d.name, position: d.position, 
-                    overall: newLevel, // Usa o nível validado
-                    value: parseFloat(d.value)||0, salary: parseFloat(d.salary)||0, 
-                    clause: parseFloat(d.clause)||0, contract: parseInt(d.contract)||0, 
-                    mood: d.mood, status: d.status, teamId: targetTeamId, loan: false, 
-                    rating: d.rating ? parseFloat(d.rating) : 0, 
-                    password: d.password || '1234',
-                    // Mantém XP e Energia ou inicia novos
-                    xp: d.xp || 0,
-                    energy: d.energy !== undefined ? d.energy : 100,
-                    stats: { goals: parseInt(d.stats?.goals||0), assists: parseInt(d.stats?.assists||0), tackles: parseInt(d.stats?.tackles||0), saves: parseInt(d.stats?.saves||0), yellows: parseInt(d.stats?.yellows||0), reds: parseInt(d.stats?.reds||0) } 
-                };
+                    const data = {
+                        name: d.name || "Jogador Novo",
+                        position: d.position || "ATA",
+                        overall: Math.max(45, parseInt(d.overall) || 45),
+                        value: parseFloat(d.value) || 0,
+                        salary: parseFloat(d.salary) || 1000,
+                        clause: parseFloat(d.clause) || 1000000,
+                        contract: parseInt(d.contract) || 1,
+                        mood: d.mood || '😐',
+                        status: d.status || 'NAO_A_VENDA',
+                        teamId: targetTeamId,
+                        password: d.password || old.password || '1234',
+                        balance: parseFloat(d.balance || old.balance || 0),
+                        xp: parseInt(d.xp || old.xp || 0),
+                        energy: parseInt(d.energy || old.energy || 100),
+                        stats: d.stats || old.stats || { goals: 0, assists: 0, tackles: 0, saves: 0, yellows: 0, reds: 0 }
+                    };
 
-                if (user.type === 'ADMIN') payload.balance = parseFloat(d.balance) || 0;
+                    if (!isNew && data.overall !== old.overall) data.xp = 0;
 
-                if(d.id) {
-                    const old = players.find(p=>p.id===d.id);
-                    if(user.type==='USER') payload.stats = old.stats || payload.stats;
-                    if(!d.password) payload.password = old.password || '1234';
+                    await ref.set(data, { merge: true });
+                    setModal(null);
                     
-                    // LÓGICA PEDIDA: Se mudou o nível manualmente, reseta o XP
-                    if (payload.overall !== old.overall) {
-                        payload.xp = 0; // Começa o nível novo do zero
+                    if (isNew) {
+                        const tName = teams.find(t => t.id === targetTeamId)?.name || "um clube";
+                        postNews(`🆕 **REFORÇO**\nO **${tName}** contratou **${data.name}**!`, 'transfer');
                     } else {
-                        // Se não mudou nível, mantém o XP antigo (caso o form não tenha enviado)
-                        payload.xp = old.xp || 0;
-                        payload.energy = old.energy !== undefined ? old.energy : 100;
+                        alert("Jogador atualizado!");
                     }
-
-                    if(user.type==='ADMIN') { 
-                        if(d.forcedTeamId && d.forcedTeamId !== old.teamId) { payload.teamId = d.forcedTeamId; payload.futureTransfer = firebase.firestore.FieldValue.delete(); postNews(`👮‍♂️ **INTERVENÇÃO**\nTransferência forçada de **${d.name}**!`, 'admin'); } 
-                        if(payload.rating > 0 && payload.rating !== old.rating) { postNews(`⭐ **NOVA AVALIAÇÃO**\nA Federação atualizou a nota de **${d.name}** para **${payload.rating}**!`, 'admin'); } 
-                    }
-                    await db.collection('players').doc(d.id).update(payload);
-                } else { 
-                    await db.collection('players').add(payload); 
-                    postNews(`🆕 **REFORÇO**\n${(teams.find(t=>t.id===payload.teamId)||{}).name} contrata **${d.name}** (Nível ${payload.overall}).`, 'transfer'); 
+                } catch (e) {
+                    console.error(e);
+                    alert("Erro ao salvar! Verifique se digitou apenas números nos campos de valor.");
                 }
-                setModal(null);
             };
-            const updateStats = async (pid, newStats) => { await db.collection('players').doc(pid).update({ stats: newStats }); alert("Estatísticas Atualizadas!"); setModal(null); };
-            // --- NEGOTIATION LOGIC REWORKED (FIXED TEXTS) ---
+
+            const updateStats = async (pid, newStats) => { 
+                await db.collection('players').doc(pid).update({ stats: newStats }); 
+                alert("Stats Atualizados!"); 
+                setModal(null); 
+            };
+
             // --- SISTEMA DE NEGOCIAÇÃO CLÁSSICO (CLUBE x CLUBE) ---
             const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
                 try {
-                    // Limpeza radical para evitar erro de campos numéricos
                     const actingTeamName = user.data.name;
                     const v = parseFloat(value) || 0;
                     const contractYears = parseInt(con) || 1;
@@ -429,12 +427,7 @@
                         value: v,
                         offerContract: contractYears,
                         description: `💰 Taxa: ${fmt(v)}\n📝 Contrato: ${contractYears} anos\n👔 Papel: ${role}`,
-                        meta: {
-                            ...meta,
-                            role: role,
-                            installments: parseInt(meta.installments) || 1,
-                            sellOn: parseInt(meta.sellOn) || 0
-                        },
+                        meta: { ...meta, role: role },
                         date: Date.now()
                     };
 
@@ -445,10 +438,9 @@
 
                     postNews(`💼 **OFERTA**\nO **${actingTeamName}** enviou uma proposta por **${target.name}**.`, 'transfer');
                     setModal(null); 
-                    alert("Proposta enviada ao clube!");
+                    alert("Proposta enviada!");
                 } catch (e) {
-                    console.error(e);
-                    alert("Erro ao enviar. Verifique os valores.");
+                    alert("Erro ao enviar. Confira os valores.");
                 }
             };
 
@@ -457,16 +449,13 @@
                 const sel = teams.find(t=>t.id===user.data.id);
                 const p = players.find(x=>x.id===o.playerId);
                 
-                if (buy.balance < o.value) return alert("O comprador não tem saldo!");
-                if (!confirm(`Aceitar vender ${p.name} por ${fmt(o.value)}?`)) return;
+                if (!buy || buy.balance < o.value) return alert("Comprador sem saldo!");
+                if (!confirm(`Vender ${p.name} por ${fmt(o.value)}?`)) return;
 
                 const b = db.batch();
-                
-                // Financeiro
                 b.update(db.collection('teams').doc(buy.id), {balance: buy.balance - o.value});
                 b.update(db.collection('teams').doc(sel.id), {balance: sel.balance + o.value});
 
-                // Transferência do Jogador
                 const historyEntry = { date: Date.now(), from: sel.name, to: buy.name, type: o.type, value: o.value };
                 b.update(db.collection('players').doc(p.id), {
                     teamId: buy.id,
@@ -479,8 +468,8 @@
                 b.delete(db.collection('offers').doc(o.id));
                 await b.commit();
                 
-                postNews(`🤝 **TRANSFERÊNCIA**\nO **${buy.name}** fechou a contratação de **${p.name}** junto ao **${sel.name}**!`, 'transfer');
-                alert("Negócio Fechado!");
+                postNews(`🤝 **OFICIAL**\n**${p.name}** no **${buy.name}**!`, 'transfer');
+                alert("Transferência concluída!");
             };
             // --- FUNÇÕES DE ESTATÍSTICAS E ADMIN (CORRIGIDAS) ---
 

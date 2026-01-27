@@ -1,7 +1,7 @@
 
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head>
+<head> 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Gerenciador de Times de Mato Real</title>
@@ -864,8 +864,7 @@
     />
 )}
 
-        // --- FUNÇÃO DO PRÉ-CONTRATO ---
-        onPre={async (p) => {
+    
             const buy = teams.find(t => t.id === user.data.id);
             if (!confirm(`Assinar pré-contrato com ${p.name}? Ele chegará de graça na próxima temporada.`)) return;
             
@@ -1353,7 +1352,7 @@
                             <div style={{display:'flex', justifyContent:'space-between'}}><div><span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span>{p.name} {p.rating>0 && <span className="rating-badge">★ {p.rating}</span>}</div><span className="player-ov">{p.overall}</span></div>
                             <div style={{fontSize:11, color:'#aaa', marginTop:5}}>{view==='GLOBAL' && <div>Time: {teams.find(t=>t.id===p.teamId)?.name}</div>}<div>Val: {fmt(p.value)} | Con: {p.contract}</div></div>
                             <div className="stats-grid"><div className="stat-item"><span className="stat-lbl">⚽</span><span className="stat-val">{p.stats?.goals||0}</span></div><div className="stat-item"><span className="stat-lbl">👟</span><span className="stat-val">{p.stats?.assists||0}</span></div><div className="stat-item"><span className="stat-lbl">🛡️</span><span className="stat-val">{p.stats?.tackles||0}</span></div><div className="stat-item"><span className="stat-lbl">🧤</span><span className="stat-val">{p.stats?.saves||0}</span></div><div className="stat-item"><span className="stat-lbl">🟨</span><span className="stat-val">{p.stats?.yellows||0}</span></div><div className="stat-item"><span className="stat-lbl">🟥</span><span className="stat-val">{p.stats?.reds||0}</span></div></div>
-// Dentro do return do componente Market, procure os botões:
+
 {!isVis && (
    <div style={{marginTop:5, display:'flex', gap:5}}>
     {(open || p.status==='EMPRESTIMO') && p.status!=='INTRANSFERIVEL' ? 

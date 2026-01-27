@@ -702,7 +702,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.85</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.86</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -891,7 +891,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.85</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.86</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1244,11 +1244,14 @@
 
         const OfferForm = ({ target, myPlayers, onSend }) => {
             const old = target.oldOffer || {};
+            const isCounter = !!old.id;
+
+            // ESTADOS INICIAIS
             const [t, setT] = useState(old.type || 'COMPRA');
             const [v, setV] = useState(old.value || '');
             const [con, setCon] = useState(old.offerContract || '1');
             const [role, setRole] = useState(old.meta?.role || 'ROTACAO');
-            const [meta, setMeta] = useState(old.meta || { installments: 1, sellOn: 0 });
+            const [meta, setMeta] = useState(old.meta || { sellOn: 0, wageSplit: 50, buyOpt: '', cashDir: 'PAY', installments: 1 });
             const [swaps, setSwaps] = useState(old.swapPlayerIds || []);
 
             const toggleSwap = (pid) => {
@@ -1257,13 +1260,55 @@
             };
 
             return (
-                <div className="modal-bg"><div className="modal-content">
-                    <h3>Negociar {target.name}</h3>
-                    <div style={{display:'flex', gap:5, marginBottom:10}}>{['COMPRA','EMPRESTIMO','TROCA'].map(x=><button key={x} className={`btn ${t===x?'btn-green':'btn-ghost'}`} onClick={()=>setT(x)}>{x}</button>)}</div>
+                <div className="modal-bg"><div className="modal-content" style={{maxWidth: '500px'}}>
+                    <h3 style={{color:'var(--primary)'}}>{isCounter ? 'Contraproposta' : `Negociar ${target.name}`}</h3>
                     
-                    <label>Valor da Taxa (₣)</label>
+                    {/* SELETOR DE TIPO */}
+                    <div style={{display:'flex', gap:5, marginBottom:15}}>
+                        {['COMPRA','EMPRESTIMO','TROCA'].map(x=><button key={x} className={`btn ${t===x?'btn-green':'btn-ghost'}`} onClick={()=>setT(x)} style={{flex: 1}}>{x}</button>)}
+                    </div>
+
+                    {/* CAMPO DE VALOR DINÂMICO */}
+                    <label>Valor da Taxa {t==='TROCA' ? `(${meta.cashDir==='PAY'?'Paga':'Recebe'})` : '(₣)'}</label>
                     <input className="input-field" type="number" value={v} onChange={e=>setV(e.target.value)} />
-                    
+
+                    {/* MECÂNICA EXCLUSIVA: COMPRA (Parcelas e Revenda) */}
+                    {t === 'COMPRA' && (
+                        <div className="card" style={{background: '#222', padding: '10px', marginBottom: 15}}>
+                            <label style={{fontSize: '11px', color: 'gold'}}>📦 PARCELAMENTO: {meta.installments || 1}x</label>
+                            <input type="range" min="1" max="12" value={meta.installments || 1} onChange={e=>setMeta({...meta, installments: parseInt(e.target.value)})} style={{width:'100%'}} />
+                            
+                            <label style={{fontSize: '11px', color: 'gold', marginTop: 10, display: 'block'}}>📈 CLÁUSULA DE REVENDA: {meta.sellOn || 0}%</label>
+                            <input type="range" min="0" max="50" value={meta.sellOn || 0} onChange={e=>setMeta({...meta, sellOn: parseInt(e.target.value)})} style={{width:'100%'}} />
+                        </div>
+                    )}
+
+                    {/* MECÂNICA EXCLUSIVA: EMPRÉSTIMO (Divisão de Salário e Opção de Compra) */}
+                    {t === 'EMPRESTIMO' && (
+                        <div className="card" style={{background: '#222', padding: '10px', marginBottom: 15}}>
+                            <label style={{fontSize: '11px', color: 'cyan'}}>💸 DIVISÃO SALARIAL (Dono paga {meta.wageSplit}%)</label>
+                            <input type="range" min="0" max="100" value={meta.wageSplit} onChange={e=>setMeta({...meta, wageSplit: parseInt(e.target.value)})} style={{width:'100%'}} />
+                            
+                            <label style={{fontSize: '11px', color: 'cyan', marginTop: 10, display: 'block'}}>🛒 OPÇÃO DE COMPRA (₣)</label>
+                            <input className="input-field" type="number" value={meta.buyOpt} onChange={e=>setMeta({...meta, buyOpt: e.target.value})} />
+                        </div>
+                    )}
+
+                    {/* MECÂNICA EXCLUSIVA: TROCA (Direção do Dinheiro e Seleção de Atletas) */}
+                    {t === 'TROCA' && (
+                        <div className="card" style={{background: '#222', padding: '10px', marginBottom: 15}}>
+                            <div style={{display:'flex', gap:5, marginBottom: 10}}>
+                                <button className={`btn ${meta.cashDir==='PAY'?'btn-blue':'btn-ghost'}`} onClick={()=>setMeta({...meta, cashDir:'PAY'})} style={{flex:1}}>PAGAR VOLTA</button>
+                                <button className={`btn ${meta.cashDir==='RECEIVE'?'btn-blue':'btn-ghost'}`} onClick={()=>setMeta({...meta, cashDir:'RECEIVE'})} style={{flex:1}}>RECEBER VOLTA</button>
+                            </div>
+                            <label style={{fontSize: '11px', color: 'var(--primary)'}}>🏃 JOGADORES ENVOLVIDOS (MÁX 3)</label>
+                            <div style={{maxHeight: 120, overflowY: 'auto', background: '#111', padding: 5, borderRadius: 5}}>
+                                {myPlayers.map(p=><div key={p.id} onClick={()=>toggleSwap(p.id)} style={{fontSize: 11, padding: 8, borderBottom: '1px solid #222', color: swaps.includes(p.id)?'var(--primary)':'#ccc', cursor: 'pointer'}}>{swaps.includes(p.id)?'✅ ':'+ '}{p.name} (Ov: {p.overall})</div>)}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* CAMPOS COMUNS: CONTRATO E PAPEL */}
                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
                         <div><label>Anos Contrato</label><input className="input-field" type="number" value={con} onChange={e=>setCon(e.target.value)} /></div>
                         <div><label>Papel no Elenco</label>
@@ -1276,8 +1321,25 @@
                         </div>
                     </div>
 
-                    <button className="btn btn-green" onClick={() => onSend(target, t, v, swaps, con, {...meta, role: role}, old)}>ENVIAR PROPOSTA</button>
-                    <button className="btn btn-red" onClick={()=>setModal(null)}>CANCELAR</button>
+                    {/* BOTÃO COM CONVERSÃO SEGURA */}
+                    <div style={{display:'flex', gap:10, marginTop:15}}>
+                        <button className="btn btn-green" style={{flex: 2}} onClick={() => {
+                            const finalV = parseFloat(v) || 0;
+                            const finalCon = parseInt(con) || 1;
+                            const cleanMeta = {
+                                ...meta,
+                                role: role,
+                                sellOn: parseInt(meta.sellOn) || 0,
+                                installments: parseInt(meta.installments) || 1,
+                                wageSplit: parseInt(meta.wageSplit) || 50,
+                                buyOpt: parseFloat(meta.buyOpt) || 0
+                            };
+                            onSend(target, t, finalV, swaps, finalCon, cleanMeta, old);
+                        }}>
+                            {isCounter ? 'ENVIAR CONTRAPROPOSTA' : 'ENVIAR PROPOSTA'}
+                        </button>
+                        <button className="btn btn-red" style={{flex: 1}} onClick={()=>setModal(null)}>CANCELAR</button>
+                    </div>
                 </div></div>
             );
         };

@@ -155,7 +155,6 @@
             return details.join('\n');
         };
 
-        
         function App() {
             const [user, setUser] = useState(null); 
             const [teams, setTeams] = useState([]);
@@ -195,44 +194,63 @@
                 return () => unsubs.forEach(u => u());
             }, []);
 
-            // --- 1. LÓGICA DE LOGIN (ESSENCIAL PARA ENTRAR NO JOGO) ---
-            const login = (id, pwd, type) => {
-                const findAndLogin = (list, screenType, userRole, checkStatus = true) => {
-                    const found = list.find(x => x.id === id);
-                    const pass = found?.password || '1234';
-                    if (found && pass === pwd) {
-                        if (checkStatus && found.status === 'PENDING') return alert("⏳ Aguarde a Federação.");
-                        setUser({type: userRole, data: found});
-                        setScreen(screenType);
-                    } else {
-                        alert("ID ou Senha incorretos!");
+            useEffect(() => {
+                if (user?.type === 'USER') {
+                    const me = teams.find(t => t.id === user.data.id);
+                    if (me) setUser(prev => ({...prev, data: me}));
+                    return db.collection('offers').where('sellerId', '==', user.data.id).onSnapshot(s => setOffers(s.docs.map(d => ({id:d.id, ...d.data()}))));
+                }
+                
+                if (user?.type === 'COMPANY') {
+                    const me = companies.find(c => c.id === user.data.id);
+                    if (me) {
+                        if (me.status === 'BLOCKED') { alert("🚫 Empresa Bloqueada/Falida."); window.location.reload(); }
+                        else setUser(prev => ({...prev, data: me}));
                     }
-                };
-                if (type === 'TEAM') findAndLogin(teams, 'HOME', 'USER');
-                else if (type === 'PAPER') findAndLogin(papers, 'PRESS_DASH', 'PRESS');
-                else if (type === 'JOURNALIST') findAndLogin(journalists, 'PRESS_DASH', 'PRESS_WORKER');
-                else if (type === 'COMPANY') findAndLogin(companies, 'COMPANY_HOME', 'COMPANY');
-                else if (type === 'PLAYER') findAndLogin(players, 'PLAYER_DASH', 'PLAYER', false);
-            };
+                }
+            }, [teams, companies, user?.data?.id]);
 
-            const fixPlayersData = async () => {
-                if(!confirm("Deseja padronizar os contratos de todos os jogadores?")) return;
-                const snapshot = await db.collection('players').get();
-                const b = db.batch();
-                snapshot.forEach(doc => {
-                    const d = doc.data();
-                    b.update(db.collection('players').doc(doc.id), {
-                        salary: d.salary || 1000,
-                        clause: d.clause || 1000000,
-                        balance: d.balance || 0,
-                        history: d.history || []
-                    });
-                });
-                await b.commit();
-                alert("Sistema FIFA inicializado!");
-            };
+            const postNews = (text, type='normal') => db.collection('news').add({ text, type, date: Date.now() });
 
-    
+            const login = (id, pwd, type) => {
+                if (type === 'TEAM') { 
+                    const t = teams.find(x => x.id === id); 
+                    if (t && t.password === pwd) { 
+                        if (t.status === 'PENDING') alert("⏳ Aguarde a Federação."); 
+                        else { setUser({type:'USER', data:t}); setScreen('HOME'); } 
+                    } else alert("Erro!"); 
+                } 
+                else if (type === 'PAPER') { 
+                    const p = papers.find(x => x.id === id); 
+                    if (p && p.password === pwd) { 
+                        if (p.status === 'PENDING') alert("⏳ Aguarde a Federação."); 
+                        else { setUser({type:'PRESS', data:p}); setScreen('PRESS_DASH'); } 
+                    } else alert("Erro!"); 
+                } 
+                else if (type === 'JOURNALIST') { 
+                    const j = journalists.find(x => x.id === id); 
+                    if (j && j.password === pwd) { 
+                        if (j.status === 'PENDING') alert("⏳ Aguarde o Dono do Jornal."); 
+                        else { setUser({type:'PRESS_WORKER', data:j}); setScreen('PRESS_DASH'); } 
+                    } else alert("Erro!"); 
+                }
+                else if (type === 'COMPANY') { 
+                    const c = companies.find(x => x.id === id); 
+                    if (c && c.password === pwd) { 
+                        if (c.status === 'PENDING') alert("⏳ Aguarde a Federação."); 
+                        else if (c.status === 'BLOCKED') alert("🚫 Empresa Bloqueada."); 
+                        else { setUser({type:'COMPANY', data:c}); setScreen('COMPANY_HOME'); } 
+                    } else alert("Erro!"); 
+                }
+                else if (type === 'PLAYER') { 
+                     const pl = players.find(x => x.id === id); 
+                     const pass = pl.password || '1234'; 
+                     if (pl && pass === pwd) { 
+                         setUser({type:'PLAYER', data:pl}); 
+                         setScreen('PLAYER_DASH'); 
+                     } else alert("Senha incorreta!"); 
+                }
+            };
             const loginAdmin = () => { setUser({ type: 'ADMIN', data: { id: 'admin', name: 'FEDERAÇÃO (ADM)', balance: 0, logo: null, stadiumLevel: 1, serie: 'ADM' } }); setScreen('HOME'); };
             const createTeam = async (name, bal, serie, pass, logo) => { if(teams.find(t=>t.name.toLowerCase()===name.toLowerCase())) return alert("Nome em uso!"); await db.collection('teams').add({ name, balance: parseFloat(bal), serie, password: pass, stadiumLevel: 1, logo: logo||null, status: 'PENDING' }); alert("Criado! Aguarde aprovação."); };
             const createNewspaper = async (name, pass, owner) => { await db.collection('newspapers').add({ name, password: pass, ownerName: owner, status: 'PENDING' }); alert("Jornal criado! Aguarde Federação."); };
@@ -336,119 +354,95 @@
             const deleteJournalist = async (id) => { if(!confirm("Demitir Jornalista?")) return; await db.collection('journalists').doc(id).delete(); alert("Demitido!"); };
             const updateBalance = async (teamId, newBal) => { await db.collection('teams').doc(teamId).update({ balance: parseFloat(newBal) }); alert("Atualizado!"); };
             const withdrawMoney = async (amount, reason) => { const val = parseFloat(amount.replace(',', '.')); if(isNaN(val) || val <= 0) return alert("Valor inválido!"); if(user.data.balance < val) return alert("Saldo insuficiente!"); await db.collection('teams').doc(user.data.id).update({ balance: firebase.firestore.FieldValue.increment(-val) }); postNews(`💸 **SAÍDA DE CAIXA**\nO **${user.data.name}** retirou ${fmt(val)}.\n📝 Motivo: ${reason}`, 'money-minus'); setModal(null); };
-// --- NOVA VERSÃO DO SAVEPLAYER (SISTEMA FIFA) ---
-            const savePlayer = async (p) => {
-                const isNew = !p.id;
-                const ref = isNew ? db.collection('players').doc() : db.collection('players').doc(p.id);
-                const old = isNew ? {} : (players.find(pl => pl.id === p.id) || {});
 
-                // REGRA DE SEGURANÇA: Se você é um time criando o jogador, o teamId DEVE ser o seu
-                let targetTeamId = p.teamId || old.teamId || 'FREE';
-                if (user.type === 'USER' && isNew) {
-                    targetTeamId = user.data.id;
-                }
+            const savePlayer = async (d) => {
+                let targetTeamId = d.teamId; 
+                if (user.type === 'USER') targetTeamId = user.data.id;
+                if (user.type === 'ADMIN' && adminTeam) targetTeamId = adminTeam.id;
+                
+                if (!targetTeamId) return alert("Erro: Time não identificado.");
 
-                const data = {
-                    ...p,
-                    overall: Math.max(45, parseInt(p.overall || old.overall || 45)),
-                    salary: parseFloat(p.salary || old.salary || 1000), 
-                    clause: parseFloat(p.clause || old.clause || 1000000),
-                    balance: parseFloat(p.balance || old.balance || 0),
-                    history: p.history || old.history || [],
-                    xp: p.xp !== undefined ? p.xp : (old.xp || 0),
-                    energy: p.energy !== undefined ? p.energy : (old.energy || 100),
-                    stats: p.stats || old.stats || { goals: 0, assists: 0, tackles: 0, saves: 0, yellows: 0, reds: 0 },
-                    teamId: targetTeamId // <--- Aqui garante que ele apareça no seu Elenco
+                // Garante que o nível mínimo seja 45
+                let newLevel = parseInt(d.overall) || 45;
+                if (newLevel < 45) newLevel = 45;
+                if (newLevel > 100) newLevel = 100;
+
+                let payload = { 
+                    name: d.name, position: d.position, 
+                    overall: newLevel, // Usa o nível validado
+                    value: parseFloat(d.value)||0, salary: parseFloat(d.salary)||0, 
+                    clause: parseFloat(d.clause)||0, contract: parseInt(d.contract)||0, 
+                    mood: d.mood, status: d.status, teamId: targetTeamId, loan: false, 
+                    rating: d.rating ? parseFloat(d.rating) : 0, 
+                    password: d.password || '1234',
+                    // Mantém XP e Energia ou inicia novos
+                    xp: d.xp || 0,
+                    energy: d.energy !== undefined ? d.energy : 100,
+                    stats: { goals: parseInt(d.stats?.goals||0), assists: parseInt(d.stats?.assists||0), tackles: parseInt(d.stats?.tackles||0), saves: parseInt(d.stats?.saves||0), yellows: parseInt(d.stats?.yellows||0), reds: parseInt(d.stats?.reds||0) } 
                 };
 
-                if (!isNew && data.overall !== old.overall) data.xp = 0;
-                if (isNew) delete data.id;
+                if (user.type === 'ADMIN') payload.balance = parseFloat(d.balance) || 0;
 
-                await ref.set(data, { merge: true });
-                setModal(null);
-                
-                if (isNew) {
-                    postNews(`🆕 **REFORÇO**\nO **${user.data.name}** anunciou a chegada de **${data.name}**!`, 'transfer');
-                } else {
-                    alert("Dados do jogador atualizados!");
-                }
-            };
-
-            const updateStats = async (pid, newStats) => { await db.collection('players').doc(pid).update({ stats: newStats }); alert("Estatísticas Atualizadas!"); setModal(null); };
-  
-           // --- LÓGICA DE NEGOCIAÇÃO FIFA (SISTEMA DE TURNOS E FINANCEIRO) ---
-            const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
-                try {
-                    // 🛡️ LIMPEZA RADICAL (Anti-Erro de Valor)
-                    // Converte para texto e depois para número para limpar sujeira de digitação
-                    const cleanNum = (val) => {
-                        if (!val || val === "") return 0;
-                        let n = String(val).replace(',', '.'); // troca vírgula por ponto
-                        return isNaN(parseFloat(n)) ? 0 : parseFloat(n);
-                    };
-
-                    const v = cleanNum(value);
-                    const salary = cleanNum(meta.newSalary);
-                    const bonus = cleanNum(meta.signingBonus);
-                    const duration = Math.max(1, parseInt(con) || 1);
-                    const inst = Math.max(1, parseInt(meta.installments) || 1);
-                    const sell = cleanNum(meta.sellOn);
-
-                    const actingTeamName = user.data.name;
-                    const isClause = type === 'COMPRA' && target.clause > 0 && v >= target.clause;
-
-                    // Formatação visual do Card
-                    let details = `💰 Taxa: ${fmt(v)}\n`;
-                    if (inst > 1) details += `📅 Parcelas: ${inst}x\n`;
-                    details += `📝 Contrato: ${duration} anos\n`;
-                    details += `💵 Salário: ${fmt(salary)}/sem\n`;
-                    details += `👔 Papel: ${meta.role || 'ROTACAO'}`;
-
-                    let status = 'WAITING_SELLER';
-                    if (isClause) status = 'WAITING_PLAYER';
-                    else if (old && old.id) {
-                        status = (user.data.id === old.sellerId) ? 'WAITING_BUYER' : 'WAITING_SELLER';
+                if(d.id) {
+                    const old = players.find(p=>p.id===d.id);
+                    if(user.type==='USER') payload.stats = old.stats || payload.stats;
+                    if(!d.password) payload.password = old.password || '1234';
+                    
+                    // LÓGICA PEDIDA: Se mudou o nível manualmente, reseta o XP
+                    if (payload.overall !== old.overall) {
+                        payload.xp = 0; // Começa o nível novo do zero
+                    } else {
+                        // Se não mudou nível, mantém o XP antigo (caso o form não tenha enviado)
+                        payload.xp = old.xp || 0;
+                        payload.energy = old.energy !== undefined ? old.energy : 100;
                     }
-                    if (old && old.status === 'WAITING_PLAYER') status = 'PLAYER_COUNTER'; 
 
-                    // 📦 PACOTE DE DADOS BLINDADO
-                    const pl = {
-                        playerId: String(target.id),
-                        playerName: String(target.name),
-                        buyerId: String(old?.buyerId || user.data.id), 
-                        buyerName: String(old?.buyerName || user.data.name),
-                        sellerId: String(target.teamId || old?.sellerId || 'FREE'),
-                        type: String(type),
-                        value: v,
-                        description: details,
-                        status: status,
-                        swapPlayerIds: swapIds || [],
-                        meta: {
-                            contract: duration,
-                            newSalary: salary,
-                            signingBonus: bonus,
-                            role: String(meta.role || 'ROTACAO'),
-                            installments: inst,
-                            sellOn: sell,
-                            isClause: isClause
-                        },
-                        date: Date.now()
-                    };
-
-                    const b = db.batch();
-                    if (old && old.id) b.delete(db.collection('offers').doc(old.id));
-                    b.set(db.collection('offers').doc(), pl);
-                    await b.commit();
-
-                    postNews(`💼 **NEGOCIAÇÃO**\nO **${actingTeamName}** enviou uma proposta por **${target.name}**.`, 'transfer');
-                    setModal(null); 
-                    alert("Proposta enviada!");
-                } catch (e) {
-                    console.error("ERRO CRÍTICO NO BANCO:", e);
-                    alert("O banco de dados recusou o envio. Tente digitar números simples (sem pontos ou vírgulas).");
+                    if(user.type==='ADMIN') { 
+                        if(d.forcedTeamId && d.forcedTeamId !== old.teamId) { payload.teamId = d.forcedTeamId; payload.futureTransfer = firebase.firestore.FieldValue.delete(); postNews(`👮‍♂️ **INTERVENÇÃO**\nTransferência forçada de **${d.name}**!`, 'admin'); } 
+                        if(payload.rating > 0 && payload.rating !== old.rating) { postNews(`⭐ **NOVA AVALIAÇÃO**\nA Federação atualizou a nota de **${d.name}** para **${payload.rating}**!`, 'admin'); } 
+                    }
+                    await db.collection('players').doc(d.id).update(payload);
+                } else { 
+                    await db.collection('players').add(payload); 
+                    postNews(`🆕 **REFORÇO**\n${(teams.find(t=>t.id===payload.teamId)||{}).name} contrata **${d.name}** (Nível ${payload.overall}).`, 'transfer'); 
                 }
+                setModal(null);
             };
-            
+            const updateStats = async (pid, newStats) => { await db.collection('players').doc(pid).update({ stats: newStats }); alert("Estatísticas Atualizadas!"); setModal(null); };
+            // --- NEGOTIATION LOGIC REWORKED (FIXED TEXTS) ---
+            const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
+                const actingTeamName = user.data.name; 
+                const targetPlayerName = target.name;
+                
+                // Limpeza básica para não dar erro de valor no Firebase
+                const finalValue = parseFloat(value) || 0;
+                const finalContract = parseInt(con) || 1;
+
+                const pl = { 
+                    playerId: target.id, 
+                    playerName: targetPlayerName, 
+                    buyerId: user.data.id, 
+                    buyerName: actingTeamName, 
+                    sellerId: target.teamId || 'FREE', 
+                    type, 
+                    value: finalValue, 
+                    swapPlayerIds: swapIds || [], 
+                    offerContract: finalContract, 
+                    description: `Taxa: ${fmt(finalValue)} | Contrato: ${finalContract} anos`, 
+                    meta: meta || {}, 
+                    date: Date.now() 
+                };
+
+                const b = db.batch(); 
+                if(old && old.id) b.delete(db.collection('offers').doc(old.id)); 
+                b.set(db.collection('offers').doc(), pl); 
+                await b.commit();
+
+                postNews(`🚨 **MERCADO**\nO **${actingTeamName}** enviou uma proposta por **${targetPlayerName}**!`, 'transfer'); 
+                setModal(null); 
+                alert("Enviada!");
+            };
+
             // --- FUNÇÕES DE ESTATÍSTICAS E ADMIN (CORRIGIDAS) ---
 
             // 1. Função para o Jornalista atualizar a tabela
@@ -495,8 +489,7 @@
                 alert(`Súmula lançada! Média do jogador agora é: ${newAvg.toFixed(1)}`); 
                 setModal(null);
             };
-// --- NOVA FUNÇÃO: AÇÕES DO JOGADOR (COMPLETA) ---
-            // --- NOVA FUNÇÃO: AÇÕES DO JOGADOR (COMPLETA) ---
+// --- NOVA FUNÇÃO: AÇÕES DE CARREIRA DO JOGADOR ---
             const handlePlayerActions = async (type, p) => {
                 const team = teams.find(t => t.id === p.teamId);
                 
@@ -522,31 +515,6 @@
                     // Apenas lança a notícia para pressionar o dono
                     postNews(`💰 **POLÉMICA**\n**${p.name}** declara publicamente: "Mereço ganhar mais no ${team.name}. Espero uma renovação em breve."`, 'press');
                     alert("Declaração feita à imprensa! O presidente foi notificado.");
-                }
-
-                // 3. DECLARAR FELICIDADE (NOVO)
-                if (type === 'DECLARE_HAPPY') {
-                    if (!team) return alert("Precisas de um clube para estar feliz!");
-                    if (p.mood === '🤩') return alert("Já estás radiante com o clube!");
-                    
-                    if (!confirm(`Declarar amor ao ${team.name}?`)) return;
-
-                    await db.collection('players').doc(p.id).update({
-                        mood: '🤩'
-                    });
-                    postNews(`❤️ **AMOR À CAMISOLA**\n**${p.name}** declara: "Estou muito feliz no ${team.name} e quero fazer história aqui!"`, 'press');
-                    alert("A torcida adorou a tua declaração!");
-                }
-                
-                // 4. MODO NEUTRO (NOVO)
-                if (type === 'BECOME_NEUTRAL') {
-                    if (!team) return;
-                    if (p.mood === '😐') return alert("Já estás neutro.");
-                    
-                    await db.collection('players').doc(p.id).update({
-                        mood: '😐'
-                    });
-                    alert("Decidiste focar apenas no futebol. Humor neutro.");
                 }
             };
             
@@ -677,7 +645,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.96</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.82</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -689,7 +657,7 @@
                     </div>
 
                     <div className="container">
-                       {screen === 'HOME' && user.type === 'ADMIN' && 
+                        {screen === 'HOME' && user.type === 'ADMIN' && 
                             <AdminPanel 
                                 teams={teams} 
                                 papers={papers} 
@@ -698,7 +666,7 @@
                                 reqs={reqs} 
                                 config={conf} 
                                 onAct={adminAction} 
-                                fixPlayersData={fixPlayersData}
+                                fixPlayersData={fixPlayersData} // <--- AGORA ESTÁ AQUI
                                 onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} 
                                 onApprove={async(r)=>{/*Fin logic*/}} 
                                 onReject={(id)=>db.collection('financeRequests').doc(id).delete()} 
@@ -796,9 +764,7 @@
                                 player={players.find(p=>p.id===user.data.id) || user.data} 
                                 team={teams.find(t=>t.id===user.data.teamId)} 
                                 sales={sales || []} 
-                                offers={offers} // <--- NOVO
-                                onNeg={(o)=>setModal({type:'PLAYER_NEGOTIATION', data:o})} // <--- NOVO
-                                onAction={handlePlayerActions}
+                                onAction={handlePlayerActions} // <--- ADICIONE ESTA LINHA AQUI
                                 onUpdatePassword={async(newP)=>{ await db.collection('players').doc(user.data.id).update({password: newP}); alert("Senha alterada!"); }} 
                             />
                         }
@@ -842,63 +808,13 @@
                             {modal.type==='TEAM_TABLE' && <TeamStandingsEditor teams={teams} onUpdateTeamStats={updateTeamStats} />}
                             {modal.type==='POST_NEWS' && <div><h3>Nova Notícia</h3><input className="input-field" placeholder="Manchete / Texto" id="news-body" /><button className="btn btn-blue" onClick={()=>{postNews(`📰 **${user.data.name}:**\n${document.getElementById('news-body').value}`, 'press'); setModal(null);}}>PUBLICAR</button></div>}
                             {modal.type==='STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
-                            
-                            {/* --- AQUI ESTÁ A PARTE NOVA DA NEGOCIAÇÃO --- */}
-                            {modal.type==='PLAYER_NEGOTIATION' && 
-                                <PlayerNegotiationModal 
-                                    offer={modal.data} 
-                                    onClose={()=>setModal(null)}
-                                    onAccept={acceptOffer} 
-                                    onReject={rejectOffer}
-                                    onCounter={sendOffer} 
-                                />
-                            }
                         </div>
                     </div>}
-                </div> 
-            ); 
+                </div>
+            );
         }
 
-        // --- COMPONENTES AUXILIARES ---
-
-        const PlayerNegotiationModal = ({ offer, onClose, onCounter, onAccept, onReject }) => {
-            const [form, setForm] = useState({
-                newSalary: offer.meta.newSalary,
-                signingBonus: offer.meta.signingBonus,
-                contract: offer.meta.contract,
-                role: offer.meta.role
-            });
-
-            return (
-                <div className="modal-bg" style={{zIndex:9999}}><div className="modal-content" style={{border:'2px solid gold'}}>
-                    <h3>📋 Proposta do {offer.buyerName}</h3>
-                    <div style={{background:'#222', padding:10, borderRadius:8, marginBottom:15}}>
-                        <label>Salário Semanal</label>
-                        <input className="input-field" type="number" value={form.newSalary} onChange={e=>setForm({...form, newSalary:e.target.value})} />
-                        <label>Luvas (Prêmio)</label>
-                        <input className="input-field" type="number" value={form.signingBonus} onChange={e=>setForm({...form, signingBonus:e.target.value})} />
-                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                            <div><label>Anos</label><input className="input-field" type="number" value={form.contract} onChange={e=>setForm({...form, contract:e.target.value})} /></div>
-                            <div><label>Papel</label>
-                                <select className="input-field" value={form.role} onChange={e=>setForm({...form, role:e.target.value})}>
-                                    <option value="CRUCIAL">⭐ Crucial</option>
-                                    <option value="TITULAR">✅ Titular</option>
-                                    <option value="ROTACAO">🔄 Rotação</option>
-                                    <option value="RESERVA">Reserva</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    <div style={{display:'flex', gap:5}}>
-                        <button className="btn btn-green" onClick={()=>onAccept({...offer, meta: {...offer.meta, ...form}})}>✅ ACEITAR</button>
-                        <button className="btn btn-blue" onClick={()=>onCounter(offer, offer.type, offer.value, [], 0, form, offer)}>💬 NEGOCIAR</button>
-                    </div>
-                    <button className="btn btn-red" style={{marginTop:5}} onClick={()=>onReject(offer)}>❌ RECUSAR</button>
-                    <button className="btn btn-ghost" style={{marginTop:5}} onClick={onClose}>FECHAR</button>
-                </div></div>
-            );
-        };
-        
+        // --- COMPONENTS ---
         const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor }) => {
             const [tab, setTab] = useState('LOGIN'); 
             const [subTab, setSubTab] = useState('TEAM'); 
@@ -917,7 +833,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.96(Company Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.82(Company Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1270,93 +1186,40 @@
 
         const OfferForm = ({ target, myPlayers, onSend }) => {
             const old = target.oldOffer || {}; 
-            const isCounter = !!old.id;
-
-            // ESTADOS INICIAIS BLINDADOS
             const [t, setT] = useState(old.type || 'COMPRA'); 
-            const [v, setV] = useState(old.value || target.value || 0); 
-            const [sal, setSal] = useState(old.meta?.newSalary || target.salary || 0);
-            const [con, setCon] = useState(old.meta?.contract || 1);
-            const [luv, setLuv] = useState(old.meta?.signingBonus || 0);
+            const [v, setV] = useState(old.value || ''); 
+            const [con, setCon] = useState(old.offerContract || '1'); 
             const [role, setRole] = useState(old.meta?.role || 'ROTACAO');
-            const [meta, setMeta] = useState(old.meta || { sellOn: 0, installments: 1 });
+            const [meta, setMeta] = useState(old.meta || { installments: 1, sellOn: 0 }); 
             const [swaps, setSwaps] = useState(old.swapPlayerIds || []);
 
-            const toggleSwap = (pid) => { 
-                if(swaps.includes(pid)) setSwaps(swaps.filter(id=>id!==pid)); 
-                else if(swaps.length < 3) setSwaps([...swaps, pid]); 
-            };
+            const toggleSwap = (pid) => { if(swaps.includes(pid)) setSwaps(swaps.filter(id=>id!==pid)); else if(swaps.length < 3) setSwaps([...swaps, pid]); };
 
             return (
-                <div className="modal-bg">
-                    <div className="modal-content" style={{maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto'}}>
-                        <h3 style={{color:'var(--primary)'}}>{isCounter ? 'Contraproposta' : `Negociar ${target.name}`}</h3>
-                        
-                        {/* 1. ACORDO ENTRE CLUBES */}
-                        <div style={{borderBottom: '1px solid #444', paddingBottom: 15, marginBottom: 15}}>
-                            <label style={{fontSize: '11px', color: 'gold', fontWeight: 'bold', textTransform: 'uppercase'}}>1. Acordo entre Clubes</label>
-                            <div style={{display:'flex', gap:5, margin:'10px 0'}}>
-                                {['COMPRA','EMPRESTIMO','TROCA'].map(x=><button key={x} className={`btn ${t===x?'btn-green':'btn-ghost'}`} onClick={()=>setT(x)} style={{flex: 1}}>{x}</button>)}
-                            </div>
-
-                            <label>Valor da Taxa (₣)</label>
-                            <input className="input-field" type="number" value={v} onChange={e=>setV(e.target.value)} />
-
-                            {t === 'COMPRA' && (
-                                <div className="card" style={{padding: '10px', background: '#222', marginBottom: 10}}>
-                                    <small>Parcelamento: <b>{meta.installments || 1}x</b></small>
-                                    <input type="range" min="1" max="12" value={meta.installments || 1} onChange={e=>setMeta({...meta, installments: parseInt(e.target.value)})} style={{width:'100%'}} />
-                                    <small style={{display:'block', marginTop:10}}>Cláusula de Revenda: <b>{meta.sellOn || 0}%</b></small>
-                                    <input type="range" min="0" max="50" value={meta.sellOn || 0} onChange={e=>setMeta({...meta, sellOn: parseInt(e.target.value)})} style={{width:'100%'}} />
-                                </div>
-                            )}
-                        </div>
-
-                        {/* 2. CONTRATO DO JOGADOR */}
-                        <div>
-                            <label style={{fontSize: '11px', color: 'cyan', fontWeight: 'bold', textTransform: 'uppercase'}}>2. Contrato do Jogador</label>
-                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10}}>
-                                <div><small>Salário Mensal</small><input className="input-field" type="number" value={sal} onChange={e=>setSal(e.target.value)} /></div>
-                                <div><small>Luvas (Assinatura)</small><input className="input-field" type="number" value={luv} onChange={e=>setLuv(e.target.value)} /></div>
-                            </div>
-                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                                <div><small>Duração (Anos)</small><input className="input-field" type="number" value={con} onChange={e=>setCon(e.target.value)} /></div>
-                                <div><small>Importância no Clube</small>
-                                    <select className="input-field" value={role} onChange={e=>setRole(e.target.value)}>
-                                        <option value="CRUCIAL">⭐ Crucial</option>
-                                        <option value="TITULAR">✅ Titular</option>
-                                        <option value="ROTACAO">🔄 Rotação</option>
-                                        <option value="RESERVA">💤 Reserva</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style={{display:'flex', gap:10, marginTop:20}}>
-                            <button className="btn btn-green" style={{flex: 2}} onClick={() => {
-                                const finalV = parseFloat(v) || 0;
-                                const finalSal = parseFloat(sal) || 0;
-                                const finalLuv = parseFloat(luv) || 0;
-                                const finalCon = parseInt(con) || 1;
-                                
-                                const cleanMeta = {
-                                    ...meta,
-                                    newSalary: finalSal,
-                                    signingBonus: finalLuv,
-                                    contract: finalCon,
-                                    role: role
-                                };
-                                onSend(target, t, finalV, swaps, finalCon, cleanMeta, old);
-                            }}>
-                                {isCounter ? 'ENVIAR CONTRAPROPOSTA' : 'ENVIAR OFERTA'}
-                            </button>
-                            <button className="btn btn-red" style={{flex: 1}} onClick={()=>setModal(null)}>CANCELAR</button>
+                <div className="modal-bg"><div className="modal-content">
+                    <h3>Negociar {target.name}</h3>
+                    <div style={{display:'flex', gap:5, marginBottom:10}}>{['COMPRA','EMPRESTIMO','TROCA'].map(x=><button key={x} className={`btn ${t===x?'btn-green':'btn-ghost'}`} onClick={()=>setT(x)}>{x}</button>)}</div>
+                    
+                    <label>Valor da Taxa (₣)</label>
+                    <input className="input-field" type="number" value={v} onChange={e=>setV(e.target.value)} />
+                    
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                        <div><label>Anos Contrato</label><input className="input-field" type="number" value={con} onChange={e=>setCon(e.target.value)} /></div>
+                        <div><label>Papel no Elenco</label>
+                            <select className="input-field" value={role} onChange={e=>setRole(e.target.value)}>
+                                <option value="CRUCIAL">⭐ Crucial</option>
+                                <option value="TITULAR">✅ Titular</option>
+                                <option value="ROTACAO">🔄 Rotação</option>
+                            </select>
                         </div>
                     </div>
-                </div>
+
+                    <button className="btn btn-green" onClick={()=>onSend(target, t, v, swaps, con, {...meta, role: role}, old)}>ENVIAR PROPOSTA</button>
+                    <button className="btn btn-red" onClick={()=>setModal(null)}>CANCELAR</button>
+                </div></div>
             );
         };
-
+        
         const AdminPanel = ({ fixPlayersData, onUpdateCompBal, teams, papers, journalists, companies, reqs, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onConfig, onApprovePaper, onDeletePaper, onDeleteJourno, onRejectPaper, onApproveComp, onDeleteComp }) => (
             <div>
                 <h3>Painel Master</h3>
@@ -1364,11 +1227,10 @@
                     <button className={`btn ${config.marketOpen?'btn-red':'btn-green'}`} onClick={()=>onAct('MARKET', !config.marketOpen)}>{config.marketOpen?'FECHAR MERCADO':'ABRIR MERCADO'}</button>
                     <button className="btn btn-purple" onClick={()=>onAct('WEEK')}>VIRAR SEMANA (Cobr. Impostos)</button>
                     <button className="btn btn-red" onClick={()=>onAct('SEASON')}>VIRAR TEMPORADA</button>
-                    <button className="btn btn-ghost" onClick={fixPlayersData}>🔧 CORRIGIR DADOS FIFA</button>
                     <button className="btn btn-gold" onClick={()=>{ const t=prompt("Título"); const b=prompt("Texto"); if(t)onPost(t,b,'admin'); }}>COMUNICADO</button>
                 </div>
 
-                {/* Restante do seu código do AdminPanel... */}
+                {/* CORREÇÃO AQUI: Adicionado ?.label e || 'Desconhecido' para não travar se o tipo não existir */}
                 {(companies||[]).some(c=>c.status==='PENDING') && <h4>Empresas Pendentes</h4>}
                 {(companies||[]).filter(c=>c.status==='PENDING').map(c => (
                     <div key={c.id} className="card" style={{borderLeft:'4px solid var(--purple)'}}>
@@ -1387,15 +1249,17 @@
                         <b>{c.name}</b> {c.status==='BLOCKED' && <span style={{color:'red'}}>(BLOQUEADA)</span>}<br/>
                         Saldo: {fmt(c.balance)}
                         <div style={{display:'flex', gap:5, marginTop:5}}>
+                            {/* NOVO: Botão de Alterar Saldo */}
                             <button className="btn btn-green" onClick={()=>{
                                 const n = prompt("Novo Saldo da Empresa:", c.balance); 
                                 if(n !== null) onUpdateCompBal(c.id, n);
                             }}>$</button>
+                            
                             <button className="btn btn-red" onClick={()=>onDeleteComp(c.id)}>EXCLUIR</button>
                         </div>
                     </div>
                 ))}
-                {/* Aqui continua o resto do código de Times, Jornais, etc que você já tem */}
+
                 {(teams||[]).some(t=>t.status==='PENDING') && <h4>Times Pendentes</h4>}
                 {(teams||[]).filter(t=>t.status==='PENDING').map(t=><div key={t.id} className="card" style={{borderLeft:'4px solid var(--warning)'}}><b>{t.name}</b><div style={{display:'flex', gap:5}}><input className="input-field" style={{marginBottom:0, width:100}} defaultValue={t.balance} id={`bal-${t.id}`} /><button className="btn btn-green" onClick={()=>onApproveTeam(t.id, document.getElementById(`bal-${t.id}`).value)}>V</button><button className="btn btn-red" onClick={()=>onDeleteTeam(t.id)}>X</button></div></div>)}
                 
@@ -1420,22 +1284,20 @@
             return <div><label>Nome</label><input className="input-field" value={form.name} onChange={e=>setF({...form, name:e.target.value})} /><label>Logo</label><input className="input-field" value={form.logo} onChange={e=>setF({...form, logo:e.target.value})} />{isAdmin && <label>Saldo (ADM)</label>} {isAdmin && <input className="input-field" type="number" value={form.balance} onChange={e=>setF({...form, balance:parseFloat(e.target.value)})} />}{isAdmin && <label>Série (ADM)</label>}{isAdmin && <select className="input-field" value={form.serie} onChange={e=>setF({...form, serie:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>{s}</option>)}</select>}<button className="btn btn-blue" onClick={()=>onUp(form)}>SALVAR</button><hr style={{borderColor:'#444'}}/><p>Estádio Nível {team.stadiumLevel||1}</p><button className="btn btn-purple" onClick={onUpgrade}>EVOLUIR (₣ {fmt(COSTS[team.stadiumLevel]||0).replace('₣ ','')})</button><hr style={{borderColor:'#444'}}/><button className="btn btn-green" onClick={()=>{const v=prompt("Valor");const m=prompt("Motivo"); if(v)onReq('INJECTION',v,m)}}>PEDIR INJEÇÃO</button><button className="btn btn-gold" onClick={()=>{const v=prompt("Valor");const m=prompt("Empresa"); if(v)onReq('SPONSORSHIP',v,m)}}>PEDIR PATROCÍNIO</button><button className="btn btn-red" onClick={()=>{const v=prompt("Valor a retirar:"); if(v){ const m=prompt("Motivo:"); if(m) onWithdraw(v, m); }}}>RETIRAR DINHEIRO</button></div>;
         };
 
-        const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, offers, onNeg }) => { 
+        const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction }) => {
             const [newPass, setNewPass] = useState('');
             const [tab, setTab] = useState('PERFIL'); 
+
             const myItems = (sales||[]).filter(s => s.buyerName === player.name);
             
-            // Filtra ofertas para este jogador
-            const myOffers = (offers||[]).filter(o => o.playerId === player.id && o.status === 'WAITING_PLAYER');
-
-            // Cálculos de XP (Mantidos)
+            // Cálculos de XP e Nível
             const xpNeed = getXPNext(player.overall);
             const future = calcNewLevel(player.overall, (player.xp||0), (player.pendingXP||0));
             const diffLvl = future.lvl - player.overall;
             const xpPerc = Math.min(100, Math.max(0, ((player.xp || 0) / xpNeed) * 100));
             const energy = player.energy !== undefined ? player.energy : 100;
-            
-            // Conquistas (Mantido)
+
+            // Conquistas Simples
             const getAchievements = () => {
                 const list = [];
                 const s = player.stats || {};
@@ -1450,10 +1312,11 @@
 
             return (
                 <div>
-                    {/* CABEÇALHO (MANTIDO) */}
+                    {/* CABEÇALHO COM BARRA DE XP */}
                     <div className="highlight-card" style={{textAlign:'center', paddingBottom:30, position:'relative'}}>
                         <h2 style={{margin:0}}>{player.name} <span style={{fontSize:14}}>{player.mood}</span></h2>
                         <small style={{color:'#ccc'}}>{team?.name || 'Agente Livre'}</small>
+                        
                         <div style={{display:'flex', justifyContent:'center', gap:30, marginTop:15}}>
                             <div style={{textAlign:'center'}}>
                                 <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:5}}>
@@ -1462,150 +1325,121 @@
                                 </div>
                                 <span style={{fontSize:10, textTransform:'uppercase', color:'#888'}}>Nível Atual</span>
                             </div>
+                            
+                            {/* ENERGIA (APENAS VISUALIZAÇÃO) */}
                             <div style={{textAlign:'center'}}>
                                 <div style={{fontSize:40, fontWeight:'900', color: energy > 50 ? 'var(--primary)' : 'var(--danger)', lineHeight:1}}>{energy}%</div>
                                 <span style={{fontSize:10, textTransform:'uppercase', color:'#888'}}>Energia</span>
                             </div>
                         </div>
+
+                        {/* Barra de Progresso */}
                         <div style={{position:'absolute', bottom:0, left:0, right:0, height:8, background:'#333'}}>
                             <div style={{width:`${xpPerc}%`, height:'100%', background:'linear-gradient(90deg, var(--warning), gold)', transition:'1s'}}></div>
                         </div>
-                        <div style={{position:'absolute', bottom:10, right:5, fontSize:9, color:'#fff', textShadow:'0 1px 2px black'}}>{player.xp||0} / {xpNeed} XP</div>
+                        <div style={{position:'absolute', bottom:10, right:5, fontSize:9, color:'#fff', textShadow:'0 1px 2px black'}}>
+                            {player.xp||0} / {xpNeed} XP
+                        </div>
                     </div>
 
                     <div style={{display:'flex', gap:10, marginBottom:15, overflowX:'auto'}}>
                         <button className={`btn ${tab==='PERFIL'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('PERFIL')}>PERFIL</button>
                         <button className={`btn ${tab==='ACOES'?'btn-red':'btn-ghost'}`} onClick={()=>setTab('ACOES')}>AÇÕES</button>
-                        <button className={`btn ${tab==='OFERTAS'?'btn-green':'btn-ghost'}`} onClick={()=>setTab('OFERTAS')}>OFERTAS {myOffers.length>0 && '🔴'}</button>
                         <button className={`btn ${tab==='CARREIRA'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('CARREIRA')}>CARREIRA</button>
-                        <button className={`btn ${tab==='INV'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('INV')}>MOCHILA</button>
+                        <button className={`btn ${tab==='INV'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('INV')}>MOCHILA ({myItems.length})</button>
                     </div>
 
                     {tab==='PERFIL' && <div>
-                        <div className="card" style={{borderLeft:'4px solid var(--primary)', background:'linear-gradient(90deg, #1b2e1b, #1E1E1E)'}}><h3 style={{marginTop:0, color:'var(--primary)'}}>🏦 {fmt(player.balance)}</h3><small style={{color:'#aaa'}}>Salário: {fmt(player.salary)} | Passe: {fmt(player.value)}</small></div>
-                        <div className="card"><h3>📊 Estatísticas</h3><div className="stats-grid" style={{gridTemplateColumns:'1fr 1fr 1fr'}}><div className="stat-item"><span className="stat-lbl">⚽ Gols</span><span className="stat-val">{player.stats?.goals||0}</span></div><div className="stat-item"><span className="stat-lbl">👟 Assis</span><span className="stat-val">{player.stats?.assists||0}</span></div><div className="stat-item"><span className="stat-lbl">🛡️ Desar</span><span className="stat-val">{player.stats?.tackles||0}</span></div><div className="stat-item"><span className="stat-lbl">🧤 Defes</span><span className="stat-val">{player.stats?.saves||0}</span></div><div className="stat-item"><span className="stat-lbl">🟨 Amar</span><span className="stat-val">{player.stats?.yellows||0}</span></div><div className="stat-item"><span className="stat-lbl">🟥 Verm</span><span className="stat-val">{player.stats?.reds||0}</span></div></div></div>
-                    </div>}
-
-                    {tab === 'OFERTAS' && <div>
-                        <h3>📩 Propostas de Contrato</h3>
-                        {myOffers.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Nenhuma proposta na mesa.</p>}
-                        {myOffers.map(o => (
-                            <div key={o.id} className="card" style={{borderLeft:'4px solid gold'}}>
-                                <div style={{display:'flex', justifyContent:'space-between'}}>
-                                    <b>{o.buyerName}</b>
-                                    <span style={{color:'var(--primary)', fontWeight:'bold'}}>{fmt(o.meta.newSalary)}/sem</span>
-                                </div>
-                                <div style={{fontSize:11, color:'#aaa', margin:'5px 0'}}>
-                                    Luvas: {fmt(o.meta.signingBonus)} | Contrato: {o.meta.contract} anos | Papel: {o.meta.role}
-                                </div>
-                                <button className="btn btn-blue" onClick={()=>onNeg(o)}>ANALISAR / NEGOCIAR</button>
+                        <div className="card" style={{borderLeft:'4px solid var(--primary)', background:'linear-gradient(90deg, #1b2e1b, #1E1E1E)'}}>
+                            <h3 style={{marginTop:0, color:'var(--primary)'}}>🏦 {fmt(player.balance)}</h3>
+                            <small style={{color:'#aaa'}}>Salário: {fmt(player.salary)} | Passe: {fmt(player.value)}</small>
+                        </div>
+                        <div className="card">
+                            <h3>📊 Estatísticas da Temporada</h3>
+                            <div className="stats-grid" style={{gridTemplateColumns:'1fr 1fr 1fr'}}>
+                                <div className="stat-item"><span className="stat-lbl">⚽ Gols</span><span className="stat-val">{player.stats?.goals||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">👟 Assis</span><span className="stat-val">{player.stats?.assists||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🛡️ Desar</span><span className="stat-val">{player.stats?.tackles||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🧤 Defes</span><span className="stat-val">{player.stats?.saves||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🟨 Amar</span><span className="stat-val">{player.stats?.yellows||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🟥 Verm</span><span className="stat-val">{player.stats?.reds||0}</span></div>
                             </div>
-                        ))}
+                        </div>
                     </div>}
 
-                    {tab==='ACOES' && <div><div className="card" style={{borderLeft:'4px solid var(--danger)'}}><h4>📢 O Gabinete</h4>{team ? (<div style={{display:'flex', gap:10, flexDirection:'column'}}><button className="btn btn-gold" onClick={()=>onAction('ASK_RAISE', player)}>💰 PEDIR AUMENTO</button><div style={{display:'flex', gap:5}}><button className="btn btn-green" style={{flex:1}} onClick={()=>onAction('DECLARE_HAPPY', player)}>🤩 ESTOU FELIZ</button><button className="btn btn-ghost" style={{flex:1}} onClick={()=>onAction('BECOME_NEUTRAL', player)}>😐 FICAR NEUTRO</button></div><button className="btn btn-red" onClick={()=>onAction('TRANSFER_REQUEST', player)}>😡 PEDIR TRANSFERÊNCIA</button></div>) : (<p style={{color:'var(--primary)', fontWeight:'bold'}}>Estás livre no mercado!</p>)}</div><div className="card"><h4>🔐 Segurança</h4><div style={{display:'flex', gap:5}}><input className="input-field" type="password" placeholder="Nova Senha" value={newPass} onChange={e=>setNewPass(e.target.value)} style={{marginBottom:0}} /><button className="btn btn-purple" style={{width:'auto'}} onClick={()=>{ if(!newPass) return alert("Digite uma senha!"); onUpdatePassword(newPass); setNewPass(''); }}>ALTERAR</button></div></div></div>}
-                    
-                    {tab==='CARREIRA' && <div><div className="card"><h3>🏆 Conquistas</h3>{badges.length === 0 && <p style={{color:'#666', fontSize:11}}>Joga para desbloquear.</p>}<div style={{display:'flex', flexWrap:'wrap', gap:8}}>{badges.map((b, i) => (<div key={i} style={{background:'#333', padding:'5px 10px', borderRadius:20, display:'flex', alignItems:'center', gap:5, border:`1px solid ${b.color}`}}><span>{b.icon}</span><span style={{fontSize:11, fontWeight:'bold', color:b.color}}>{b.name}</span></div>))}</div></div><div className="card" style={{borderLeft:'4px solid #fff'}}><h3>🌍 Histórico</h3><div style={{display:'flex', flexDirection:'column-reverse', gap:10}}>{(player.history || []).map((h, i) => (<div key={i} style={{display:'flex', alignItems:'center', justifyContent:'space-between', background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8}}><span style={{fontSize:9, color:'#aaa'}}>{h.from}</span><div style={{textAlign:'center'}}><div style={{color:'var(--primary)', fontSize:12}}>➡</div><div style={{fontSize:9, color:'#fff'}}>{h.value > 0 ? fmt(h.value) : 'Grátis'}</div></div><span style={{fontSize:9, fontWeight:'bold'}}>{h.to}</span></div>))}</div></div></div>}
-                    
-                    {tab==='INV' && <div><h3>🎒 Mochila</h3>{myItems.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Vazia.</p>}{myItems.map((item, index) => (<div key={index} className="card" style={{border:'1px solid #444', textAlign:'center', padding:10}}><div style={{fontSize:24}}>📦</div><div style={{fontWeight:'bold', fontSize:12}}>{item.productName}</div><div style={{fontSize:10, color:'#aaa'}}>Preço: {fmt(item.price)}</div></div>))}</div>}
+                    {tab==='ACOES' && <div>
+                        <h3>⚡ Gestão de Carreira</h3>
+                        
+                        {/* AVISO SOBRE ENERGIA */}
+                        <div className="card" style={{borderLeft:'4px solid #fff'}}>
+                            <h4>🏋️ Treino Físico</h4>
+                            <p style={{fontSize:11, color:'#aaa'}}>A gestão da tua energia e treinos é responsabilidade exclusiva da equipa técnica do {team?.name || 'clube'}.</p>
+                            <div style={{background:'#333', padding:5, borderRadius:4, fontSize:10, textAlign:'center'}}>
+                                Energia Atual: <b style={{color: energy > 50 ? 'var(--primary)' : 'var(--danger)'}}>{energy}%</b>
+                            </div>
+                        </div>
+
+                        <div className="card" style={{borderLeft:'4px solid var(--danger)'}}>
+                            <h4>📢 O Gabinete do Presidente</h4>
+                            <p style={{fontSize:11, color:'#aaa'}}>Toma decisões importantes sobre o teu futuro.</p>
+                            
+                            {team ? (
+                                <div style={{display:'flex', gap:10, flexDirection:'column'}}>
+                                    <button className="btn btn-gold" onClick={()=>onAction('ASK_RAISE', player)}>💰 PEDIR AUMENTO SALARIAL</button>
+                                    <button className="btn btn-red" onClick={()=>onAction('TRANSFER_REQUEST', player)}>😡 PEDIR TRANSFERÊNCIA</button>
+                                </div>
+                            ) : (
+                                <p style={{color:'var(--primary)', fontWeight:'bold'}}>Estás livre no mercado!</p>
+                            )}
+                        </div>
+
+                        <div className="card">
+                            <h4>🔐 Segurança</h4>
+                            <div style={{display:'flex', gap:5}}>
+                                <input className="input-field" type="password" placeholder="Nova Senha" value={newPass} onChange={e=>setNewPass(e.target.value)} style={{marginBottom:0}} />
+                                <button className="btn btn-purple" style={{width:'auto'}} onClick={()=>{ if(!newPass) return alert("Digite uma senha!"); onUpdatePassword(newPass); setNewPass(''); }}>ALTERAR</button>
+                            </div>
+                        </div>
+                    </div>}
+
+                    {tab==='CARREIRA' && <div>
+                        <div className="card">
+                            <h3>🏆 Conquistas</h3>
+                            {badges.length === 0 && <p style={{color:'#666', fontSize:11}}>Joga para desbloquear.</p>}
+                            <div style={{display:'flex', flexWrap:'wrap', gap:8}}>
+                                {badges.map((b, i) => (<div key={i} style={{background:'#333', padding:'5px 10px', borderRadius:20, display:'flex', alignItems:'center', gap:5, border:`1px solid ${b.color}`}}><span>{b.icon}</span><span style={{fontSize:11, fontWeight:'bold', color:b.color}}>{b.name}</span></div>))}
+                            </div>
+                        </div>
+                        <div className="card" style={{borderLeft:'4px solid #fff'}}>
+                            <h3>🌍 Histórico de Clubes</h3>
+                            <div style={{display:'flex', flexDirection:'column-reverse', gap:10}}>
+                                {(player.history || []).map((h, i) => (
+                                    <div key={i} style={{display:'flex', alignItems:'center', justifyContent:'space-between', background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8}}>
+                                        <span style={{fontSize:9, color:'#aaa'}}>{h.from}</span>
+                                        <div style={{textAlign:'center'}}><div style={{color:'var(--primary)', fontSize:12}}>➡</div><div style={{fontSize:9, color:'#fff'}}>{h.value > 0 ? fmt(h.value) : 'Grátis'}</div></div>
+                                        <span style={{fontSize:9, fontWeight:'bold'}}>{h.to}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>}
+
+                    {tab==='INV' && <div>
+                        <h3>🎒 Mochila</h3>
+                        {myItems.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Vazia.</p>}
+                        {myItems.map((item, index) => (<div key={index} className="card" style={{border:'1px solid #444', textAlign:'center', padding:10}}><div style={{fontSize:24}}>📦</div><div style={{fontWeight:'bold', fontSize:12}}>{item.productName}</div><div style={{fontSize:10, color:'#aaa'}}>Preço: {fmt(item.price)}</div></div>))}
+                    </div>}
                 </div>
             );
         };
-        const OffersScreen = ({ offers, onAccept, onReject, onCounter }) => (
-    <div>
-        <h3>Propostas</h3>
-        {offers.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Nenhuma proposta pendente.</p>}
-        {offers.map(o => {
-            // TRAVA DE SEGURANÇA:
-            // Esconde botões se:
-            // 1. Eu sou o Comprador e o status é WAITING_SELLER (bola com o dono)
-            // 2. Eu sou o Vendedor (Dono) e o status é WAITING_BUYER (bola com o comprador)
-            const aguardandoOutraParte = 
-                (user.data.id === o.buyerId && o.status === 'WAITING_SELLER') || 
-                (user.data.id === o.sellerId && o.status === 'WAITING_BUYER');
-
-            return (
-                <div key={o.id} className="card" style={{borderLeft: '4px solid gold'}}>
-                    <b style={{color:'var(--primary)'}}>{o.playerName}</b><br/>
-                    <small>Envolvidos: {o.buyerName} ↔️ {teams.find(t=>t.id===o.sellerId)?.name || 'Dono'}</small>
-                    <p style={{background:'#333', padding:5, borderRadius:5, whiteSpace:'pre-wrap', fontSize:11}}>{o.description}</p>
-                    
-                    {aguardandoOutraParte ? (
-                        <div style={{textAlign: 'center', color: '#aaa', padding: '10px', border: '1px dashed #444', fontSize: '12px', borderRadius: '5px'}}>
-                            ⌛ Aguardando resposta do outro time...
-                        </div>
-                    ) : (
-                        <div style={{display:'flex', gap:5}}>
-                            <button className="btn btn-green" onClick={() => onAccept(o)}>ACEITAR</button>
-                            <button className="btn btn-blue" onClick={() => onCounter(o)}>CONTRA</button>
-                            <button className="btn btn-red" onClick={() => onReject(o)}>RECUSAR</button>
-                        </div>
-                    )}
-                </div>
-            );
-        })}
-    </div>
-);
-        const Ranking = ({ teams, players }) => {
-    const [view, setView] = useState('TEAMS');
-    
-    const renderTeams = () => teams.filter(t=>t.status!=='PENDING').map(t=>{ 
-        const sv = players.filter(p=>p.teamId===t.id).reduce((a,b)=>a+(b.value||0),0); 
-        return {...t, w: t.balance+sv, sv}
-    }).sort((a,b)=>b.w-a.w).map((t,i)=>(
-        <div key={t.id} className="card" style={{display:'flex', alignItems:'center', gap:10}}>
-            <b style={{fontSize:20, color:'#555', width:30}}>{i+1}</b>
-            {t.logo ? <img src={t.logo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/> : <div style={{width:30}}></div>}
-            <div style={{flex:1}}>
-                <b>{t.name}</b><br/>
-                <small style={{color:'var(--primary)'}}>Patrimônio: {fmt(t.w)}</small><br/>
-                <small style={{fontSize:9, color:'#888'}}>Caixa: {fmt(t.balance)} | Elenco: {fmt(t.sv)}</small>
-            </div>
-        </div>
-    ));
-
-    const renderPlayers = (sortKey, label, color, isStat=true) => { 
-        let sorted = []; 
-        if(isStat) sorted = players.filter(p=>p.stats && p.stats[sortKey] > 0).sort((a,b)=>b.stats[sortKey]-a.stats[sortKey]); 
-        else sorted = players.sort((a,b)=>b[sortKey]-a[sortKey]); 
+        const OffersScreen = ({ offers, onAccept, onReject, onCounter }) => (<div><h3>Propostas</h3>{offers.map(o=><div key={o.id} className="card" style={{borderLeft:'4px solid gold'}}><b style={{color:'var(--primary)'}}>{o.playerName}</b><br/><small>De: {o.buyerName}</small><p style={{background:'#333', padding:5, borderRadius:5, whiteSpace:'pre-wrap', fontSize:11}}>{o.description}</p><div style={{display:'flex', gap:5}}><button className="btn btn-green" onClick={()=>onAccept(o)}>ACEITAR</button><button className="btn btn-blue" onClick={()=>onCounter(o)}>CONTRA</button><button className="btn btn-red" onClick={()=>onReject(o)}>RECUSAR</button></div></div>)}</div>);
         
-        return sorted.map((p,i)=>(
-            <div key={p.id} className="card" style={{display:'flex', alignItems:'center', gap:10}}>
-                <b style={{fontSize:20, color:'#555', width:30}}>{i+1}</b>
-                <div style={{flex:1}}>
-                    <b>{p.name}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small>
-                </div>
-                <div style={{fontWeight:'bold', fontSize:14, color:color}}>{label} {isStat ? p.stats[sortKey] : (sortKey==='salary' ? fmt(p[sortKey]) : p[sortKey])}</div>
-            </div>
-        )); 
-    };
-
-    return (
-        <div>
-            <h3>Ranking e Estatísticas</h3>
-            <div className="rank-tabs">
-                <div className={`rank-tab ${view==='TEAMS'?'active':''}`} onClick={()=>setView('TEAMS')}>💰 Clubes</div>
-                <div className={`rank-tab ${view==='OVERALL'?'active':''}`} onClick={()=>setView('OVERALL')}>⭐ Craques</div>
-                <div className={`rank-tab ${view==='SALARY'?'active':''}`} onClick={()=>setView('SALARY')}>💸 Salários</div>
-                <div className={`rank-tab ${view==='GOALS'?'active':''}`} onClick={()=>setView('GOALS')}>⚽ Artilheiros</div>
-                <div className={`rank-tab ${view==='ASSIST'?'active':''}`} onClick={()=>setView('ASSIST')}>👟 Garçons</div>
-                <div className={`rank-tab ${view==='TACKLES'?'active':''}`} onClick={()=>setView('TACKLES')}>🛡️ Desarmes</div>
-                <div className={`rank-tab ${view==='SAVES'?'active':''}`} onClick={()=>setView('SAVES')}>🧤 Paredões</div>
-                <div className={`rank-tab ${view==='YEL'?'active':''}`} onClick={()=>setView('YEL')}>🟨 Amarelos</div>
-                <div className={`rank-tab ${view==='RED'?'active':''}`} onClick={()=>setView('RED')}>🟥 Vermelhos</div>
-            </div>
-            {view==='TEAMS' && renderTeams()}
-            {view==='OVERALL' && renderPlayers('overall', 'Ov:', 'var(--warning)', false)}
-            {view==='SALARY' && renderPlayers('salary', '', 'var(--primary)', false)}
-            {view==='GOALS' && renderPlayers('goals', '⚽', '#fff')}
-            {view==='ASSIST' && renderPlayers('assists', '👟', '#fff')}
-            {view==='TACKLES' && renderPlayers('tackles', '🛡️', '#fff')}
-            {view==='SAVES' && renderPlayers('saves', '🧤', '#fff')}
-            {view==='YEL' && renderPlayers('yellows', '🟨', 'yellow')}
-            {view==='RED' && renderPlayers('reds', '🟥', 'red')}
-        </div>
-    );
-};
+        const Ranking = ({ teams, players }) => {
+            const [view, setView] = useState('TEAMS');
+            const renderTeams = () => teams.filter(t=>t.status!=='PENDING').map(t=>{ const sv=players.filter(p=>p.teamId===t.id).reduce((a,b)=>a+(b.value||0),0); return {...t, w: t.balance+sv, sv}}).sort((a,b)=>b.w-a.w).map((t,i)=><div key={t.id} className="card" style={{display:'flex', alignItems:'center', gap:10}}><b style={{fontSize:20, color:'#555', width:30}}>{i+1}</b>{t.logo?<img src={t.logo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/>:<div style={{width:30}}></div>}<div style={{flex:1}}><b>{t.name}</b><br/><small style={{color:'var(--primary)'}}>Patrimônio: {fmt(t.w)}</small><br/><small style={{fontSize:9, color:'#888'}}>Caixa: {fmt(t.balance)} | Elenco: {fmt(t.sv)}</small></div></div>);
+            const renderPlayers = (sortKey, label, color, isStat=true) => { let sorted = []; if(isStat) sorted = players.filter(p=>p.stats && p.stats[sortKey] > 0).sort((a,b)=>b.stats[sortKey]-a.stats[sortKey]); else sorted = players.sort((a,b)=>b[sortKey]-a[sortKey]); return sorted.map((p,i)=>(<div key={p.id} className="card" style={{display:'flex', alignItems:'center', gap:10}}><b style={{fontSize:20, color:'#555', width:30}}>{i+1}</b><div style={{flex:1}}><b>{p.name}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small></div><div style={{fontWeight:'bold', fontSize:14, color:color}}>{label} {isStat ? p.stats[sortKey] : (sortKey==='salary' ? fmt(p[sortKey]) : p[sortKey])}</div></div>)); };
+            return (<div><h3>Ranking e Estatísticas</h3><div className="rank-tabs"><div className={`rank-tab ${view==='TEAMS'?'active':''}`} onClick={()=>setView('TEAMS')}>💰 Clubes</div><div className={`rank-tab ${view==='OVERALL'?'active':''}`} onClick={()=>setView('OVERALL')}>⭐ Craques</div><div className={`rank-tab ${view==='SALARY'?'active':''}`} onClick={()=>setView('SALARY')}>💸 Salários</div><div className={`rank-tab ${view==='GOALS'?'active':''}`} onClick={()=>setView('GOALS')}>⚽ Artilheiros</div><div className={`rank-tab ${view==='ASSIST'?'active':''}`} onClick={()=>setView('ASSIST')}>👟 Garçons</div><div className={`rank-tab ${view==='TACKLES'?'active':''}`} onClick={()=>setView('TACKLES')}>🛡️ Desarmes</div><div className={`rank-tab ${view==='SAVES'?'active':''}`} onClick={()=>setView('SAVES')}>🧤 Paredões</div><div className={`rank-tab ${view==='YEL'?'active':''}`} onClick={()=>setView('YEL')}>🟨 Amarelos</div><div className={`rank-tab ${view==='RED'?'active':''}`} onClick={()=>setView('RED')}>🟥 Vermelhos</div></div>{view==='TEAMS' && renderTeams()}{view==='OVERALL' && renderPlayers('overall', 'Ov:', 'var(--warning)', false)}{view==='SALARY' && renderPlayers('salary', '', 'var(--primary)', false)}{view==='GOALS' && renderPlayers('goals', '⚽', '#fff')}{view==='ASSIST' && renderPlayers('assists', '👟', '#fff')}{view==='TACKLES' && renderPlayers('tackles', '🛡️', '#fff')}{view==='SAVES' && renderPlayers('saves', '🧤', '#fff')}{view==='YEL' && renderPlayers('yellows', '🟨', 'yellow')}{view==='RED' && renderPlayers('reds', '🟥', 'red')}</div>);
+        };
 
 // --- COMPONENTES QUE FALTAVAM (Súmula e Tabela) ---
 

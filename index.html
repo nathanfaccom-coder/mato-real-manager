@@ -376,25 +376,26 @@
 
             const updateStats = async (pid, newStats) => { await db.collection('players').doc(pid).update({ stats: newStats }); alert("Estatísticas Atualizadas!"); setModal(null); };
   
-            // --- LÓGICA DE NEGOCIAÇÃO FIFA (VERSÃO FINAL COM TRAVAS) ---
-            // --- LÓGICA DE NEGOCIAÇÃO FIFA (SISTEMA DE TURNOS E FINANCEIRO) ---
+           // --- LÓGICA DE NEGOCIAÇÃO FIFA (SISTEMA DE TURNOS E FINANCEIRO) ---
             const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
                 try {
-                    const v = parseFloat(value || 0);
-                    const installments = parseInt(meta.installments || 1);
-                    const sellOn = parseInt(meta.sellOn || 0);
-                    const signingBonus = parseFloat(meta.signingBonus || 0);
-                    const newSalary = parseFloat(meta.newSalary || 0);
+                    // LIMPEZA DE SEGURANÇA: Garante que tudo seja número puro para o banco não recusar
+                    const v = parseFloat(value) || 0;
+                    const installments = parseInt(meta.installments) || 1;
+                    const sellOn = parseInt(meta.sellOn) || 0;
+                    const signingBonus = parseFloat(meta.signingBonus) || 0;
+                    const newSalary = parseFloat(meta.newSalary) || 0;
+                    const contractYears = parseInt(con) || 1;
                     
                     const isClause = type === 'COMPRA' && target.clause > 0 && v >= target.clause;
                     const actingTeamName = user.data.name;
 
                     // 1. Formatação dos Detalhes para o Card
                     let details = `💰 Taxa: ${fmt(v)}\n`;
-                    if (type === 'TROCA') details = `🔄 Troca (Volta: ${meta.cashDir === 'PAY' ? 'Paga' : 'Recebe'} ${fmt(v)})\n`;
+                    if (type === 'TROCA') details = `🔄 Troca\n`;
                     if (installments > 1) details += `📅 Parcelas: ${installments}x\n`;
                     if (sellOn > 0) details += `📈 Revenda: ${sellOn}%\n`;
-                    details += `📝 Contrato: ${con} anos\n`;
+                    details += `📝 Contrato: ${contractYears} anos\n`;
                     details += `💵 Salário: ${fmt(newSalary)}/sem\n`;
                     if (signingBonus > 0) details += `🧤 Luvas: ${fmt(signingBonus)}\n`;
                     details += `👔 Papel: ${meta.role || 'ROTACAO'}`;
@@ -404,7 +405,7 @@
                     if (isClause) {
                         status = 'WAITING_PLAYER';
                     } else if (old && old.id) {
-                        // Inverte o turno: se o dono respondeu, volta para o comprador e vice-versa
+                        // Inverte o turno: se o dono respondeu, a bola volta para o comprador
                         status = (user.data.id === old.sellerId) ? 'WAITING_BUYER' : 'WAITING_SELLER';
                     }
                     if (old && old.status === 'WAITING_PLAYER') status = 'PLAYER_COUNTER'; 
@@ -421,7 +422,7 @@
                         status: status,
                         swapPlayerIds: swapIds || [],
                         meta: {
-                            contract: parseInt(con || 1),
+                            contract: contractYears,
                             newSalary: newSalary,
                             signingBonus: signingBonus,
                             role: meta.role || 'ROTACAO',
@@ -443,9 +444,10 @@
                     postNews(msg, 'transfer');
                     setModal(null); 
                     alert("Proposta enviada!");
+
                 } catch (e) {
-                    console.error(e);
-                    alert("Erro ao enviar proposta. Verifique os campos numéricos.");
+                    console.error("ERRO FIREBASE:", e);
+                    alert("Erro ao enviar proposta. Verifique se não digitou letras nos campos de preço.");
                 }
             };
 
@@ -454,7 +456,6 @@
                 const sel = teams.find(t=>t.id===o.sellerId); 
                 const p = players.find(x=>x.id===o.playerId); 
                 
-                // ETAPA 1: Clube Vendedor Aceita (Vai para o Jogador)
                 if (o.status === 'WAITING_SELLER' && user.type === 'USER' && user.data.id === o.sellerId) {
                     if (!confirm(`Aceitar vender ${p.name}? A bola passará para o jogador negociar o salário.`)) return;
                     await db.collection('offers').doc(o.id).update({ status: 'WAITING_PLAYER' });
@@ -462,21 +463,18 @@
                     return;
                 }
 
-                // ETAPA 2: Finalização Financeira (Taxa + Luvas)
-                let cost = o.value; 
-                let luvas = o.meta.signingBonus || 0; 
+                let cost = parseFloat(o.value) || 0; 
+                let luvas = parseFloat(o.meta?.signingBonus) || 0; 
                 let totalCost = cost + luvas;
 
-                if (buy.balance < totalCost) return alert(`O time comprador não tem saldo para Taxa + Luvas (${fmt(totalCost)})!`);
+                if (buy.balance < totalCost) return alert(`Saldo insuficiente para Taxa + Luvas (${fmt(totalCost)})!`);
 
                 const b = db.batch();
                 
-                // 1. Paga Taxa (Clube a Clube)
                 if (cost > 0 && o.sellerId !== 'FREE') {
                     b.update(db.collection('teams').doc(buy.id), {balance: firebase.firestore.FieldValue.increment(-cost)});
                     b.update(db.collection('teams').doc(o.sellerId), {balance: firebase.firestore.FieldValue.increment(cost)});
                     
-                    // Registro de Dívida (Se parcelado)
                     if (o.meta.installments > 1) {
                         const instVal = cost / o.meta.installments;
                         db.collection('debts').add({
@@ -488,14 +486,12 @@
                     }
                 }
 
-                // 2. Paga Luvas (Clube a Jogador)
                 if (luvas > 0) {
                     b.update(db.collection('teams').doc(buy.id), {balance: firebase.firestore.FieldValue.increment(-luvas)});
                     b.update(db.collection('players').doc(p.id), {balance: firebase.firestore.FieldValue.increment(luvas)});
                 }
 
-                // 3. Atualiza Jogador e Gera Histórico
-                const historyEntry = { date: Date.now(), from: sel ? sel.name : 'Livre', to: buy.name, logoFrom: sel?.logo||null, logoTo: buy.logo||null, type: o.type, value: cost };
+                const historyEntry = { date: Date.now(), from: sel ? sel.name : 'Livre', to: buy.name, type: o.type, value: cost };
                 
                 b.update(db.collection('players').doc(p.id), {
                     teamId: buy.id,
@@ -509,30 +505,31 @@
                 b.delete(db.collection('offers').doc(o.id));
                 await b.commit();
                 
-                postNews(`🤝 **OFICIAL: ${p.name.toUpperCase()} NO ${buy.name.toUpperCase()}!**\nSalário: ${fmt(o.meta.newSalary)} | Papel: ${o.meta.role}`, 'transfer');
+                postNews(`🤝 **OFICIAL: ${p.name.toUpperCase()} NO ${buy.name.toUpperCase()}!**`, 'transfer');
                 alert("Negócio Fechado!");
             };
 
             const rejectOffer = async (o) => {
                 if(!confirm("Recusar/Cancelar Negociação?")) return;
                 await db.collection('offers').doc(o.id).delete();
-                postNews(`❌ **NEGOCIAÇÃO ENCERRADA**\nAs conversas por **${o.playerName}** foram finalizadas sem acordo.`, 'transfer');
+                postNews(`❌ **NEGOCIAÇÃO ENCERRADA**\nAcordo por **${o.playerName}** não foi atingido.`, 'transfer');
             };
 
             const renewContract = async (p) => {
-                const cost = (p.value || 1000000) * 0.10; 
+                const cost = (parseFloat(p.value) || 1000000) * 0.10; 
                 if(user.data.balance < cost) return alert(`Sem saldo para luvas (Custo: ${fmt(cost)})`);
-                if(!confirm(`Renovar com ${p.name} por +1 ano?\nCusto: ${fmt(cost)}`)) return;
+                if(!confirm(`Renovar com ${p.name}?\nCusto: ${fmt(cost)}`)) return;
                 const b = db.batch();
                 b.update(db.collection('teams').doc(user.data.id), {balance: firebase.firestore.FieldValue.increment(-cost)});
                 b.update(db.collection('players').doc(p.id), {
-                    contract: (p.contract||0) + 1,
+                    contract: (parseInt(p.contract)||0) + 1,
                     balance: firebase.firestore.FieldValue.increment(cost)
                 });
                 await b.commit();
-                postNews(`📝 **RENOVAÇÃO**\n**${p.name}** renovou seu vínculo com o **${user.data.name}** por mais uma temporada.\n💰 Luvas: ${fmt(cost)}`, 'transfer');
+                postNews(`📝 **RENOVAÇÃO**\n**${p.name}** renovou com o **${user.data.name}**.`, 'transfer');
                 setModal(null);
             };
+            
             // --- FUNÇÕES DE ESTATÍSTICAS E ADMIN (CORRIGIDAS) ---
 
             // 1. Função para o Jornalista atualizar a tabela
@@ -761,7 +758,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.90</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.91</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -1001,7 +998,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90(Company Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91(Company Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

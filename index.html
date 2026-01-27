@@ -759,7 +759,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.90.3</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.90.4</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -825,8 +825,53 @@
                                 ))}
                             </div>
                         )}                        {screen === 'ADMIN_TEAM' && adminTeam && <div><button className="btn" style={{background:'#333', marginBottom:10}} onClick={()=>{setAdminTeam(null); setScreen('HOME');}}>⬅ VOLTAR</button><h3 style={{color:'var(--purple)'}}>Editando: {adminTeam.name}</h3><TeamDashboard team={adminTeam} players={players.filter(p=>p.teamId===adminTeam.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} /></div>}
-                        {screen === 'MARKET' && <Market me={user.data?.id} teams={teams} players={players} open={conf.marketOpen} isVis={user.type==='VISITOR'} onNeg={(p)=>setModal({type:'OFFER', data:p})} onPayClause={async(p)=>{/*Clause logic*/}} onPre={async(p)=>{/*Pre logic*/}} />}
-                        {/* TELA: SHOPPING GLOBAL */}
+// Localize a chamada do <Market ... /> dentro do App e substitua:
+{screen === 'MARKET' && (
+    <Market 
+        me={user.data?.id} 
+        teams={teams} 
+        players={players} 
+        open={conf.marketOpen} 
+        isVis={user.type==='VISITOR'} 
+        onNeg={(p)=>setModal({type:'OFFER', data:p})} 
+        
+        // --- FUNÇÃO DA MULTA ---
+        onPayClause={async (p) => {
+            const buy = teams.find(t => t.id === user.data.id);
+            const sel = teams.find(t => t.id === p.teamId);
+            if (buy.balance < p.clause) return alert("Saldo insuficiente para pagar a multa!");
+            if (!confirm(`Pagar a multa de ${fmt(p.clause)} por ${p.name}? O jogador virá na hora.`)) return;
+
+            const b = db.batch();
+            b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - p.clause });
+            b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + p.clause });
+            
+            const historyEntry = { date: Date.now(), from: sel.name, to: buy.name, type: 'MULTA', value: p.clause };
+            b.update(db.collection('players').doc(p.id), {
+                teamId: buy.id,
+                status: 'NAO_A_VENDA',
+                contract: 3, // Multa geralmente dá um contrato padrão longo
+                history: firebase.firestore.FieldValue.arrayUnion(historyEntry)
+            });
+            await b.commit();
+            postNews(`🚨 **BOMBA: MULTA PAGA!**\nO **${buy.name}** pagou a multa rescisória e tirou **${p.name}** do **${sel.name}**!`, 'transfer');
+            alert("Multa paga e jogador contratado!");
+        }}
+
+        // --- FUNÇÃO DO PRÉ-CONTRATO ---
+        onPre={async (p) => {
+            const buy = teams.find(t => t.id === user.data.id);
+            if (!confirm(`Assinar pré-contrato com ${p.name}? Ele chegará de graça na próxima temporada.`)) return;
+            
+            await db.collection('players').doc(p.id).update({
+                preContract: { teamId: buy.id, teamName: buy.name },
+                mood: '🤩'
+            });
+            postNews(`📝 **PRÉ-CONTRATO**\n**${p.name}** assinou um pré-vínculo com o **${buy.name}** e mudará de clube na próxima temporada!`, 'transfer');
+            alert("Pré-contrato assinado!");
+        }}
+    />
+)}                        {/* TELA: SHOPPING GLOBAL */}
                         {screen === 'SHOPPING' && <ShoppingScreen products={products} companies={companies} userTeam={user.type==='USER' || user.type==='PLAYER'} onBuy={buyProduct} />}
                         
                         {/* TELA: PATROCÍNIOS (Apenas para Times) */}
@@ -958,7 +1003,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.3</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.4</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1302,8 +1347,26 @@
                             <div style={{display:'flex', justifyContent:'space-between'}}><div><span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span>{p.name} {p.rating>0 && <span className="rating-badge">★ {p.rating}</span>}</div><span className="player-ov">{p.overall}</span></div>
                             <div style={{fontSize:11, color:'#aaa', marginTop:5}}>{view==='GLOBAL' && <div>Time: {teams.find(t=>t.id===p.teamId)?.name}</div>}<div>Val: {fmt(p.value)} | Con: {p.contract}</div></div>
                             <div className="stats-grid"><div className="stat-item"><span className="stat-lbl">⚽</span><span className="stat-val">{p.stats?.goals||0}</span></div><div className="stat-item"><span className="stat-lbl">👟</span><span className="stat-val">{p.stats?.assists||0}</span></div><div className="stat-item"><span className="stat-lbl">🛡️</span><span className="stat-val">{p.stats?.tackles||0}</span></div><div className="stat-item"><span className="stat-lbl">🧤</span><span className="stat-val">{p.stats?.saves||0}</span></div><div className="stat-item"><span className="stat-lbl">🟨</span><span className="stat-val">{p.stats?.yellows||0}</span></div><div className="stat-item"><span className="stat-lbl">🟥</span><span className="stat-val">{p.stats?.reds||0}</span></div></div>
-                            {!isVis && <div style={{marginTop:5, display:'flex', gap:5}}>{(open || p.status==='EMPRESTIMO') && p.status!=='INTRANSFERIVEL' ? <button className="btn btn-purple" style={{width:'auto', flex:1}} onClick={()=>onNeg(p)}>NEGOCIAR</button> : <button className="btn btn-ghost" style={{width:'auto', flex:1}} disabled>BLOQUEADO</button>}{p.clause>0 && <button className="btn btn-gold" style={{width:'auto'}} onClick={()=>onPayClause(p)}>MULTA</button>}{p.contract<=1 && !p.preContract && <button className="btn btn-blue" style={{width:'auto'}} onClick={()=>onPre(p)}>PRÉ</button>}</div>}
-                        </div>
+// Dentro do return do componente Market, procure os botões:
+{!isVis && (
+    <div style={{marginTop:5, display:'flex', gap:5}}>
+        {/* Botão Negociar normal */}
+        {(open || p.status==='EMPRESTIMO') && p.status!=='INTRANSFERIVEL' ? 
+            <button className="btn btn-purple" style={{flex:1}} onClick={()=>onNeg(p)}>NEGOCIAR</button> : 
+            <button className="btn btn-ghost" style={{flex:1}} disabled>BLOQUEADO</button>
+        }
+
+        {/* REGRA: Botão MULTA só aparece se clause > 0 */}
+        {parseFloat(p.clause) > 0 && (
+            <button className="btn btn-gold" style={{width:'auto'}} onClick={()=>onPayClause(p)}>MULTA</button>
+        )}
+
+        {/* REGRA: Botão PRÉ só aparece se contrato for exatamente 1 ano e não tiver pré-acordo */}
+        {parseInt(p.contract) === 1 && !p.preContract && (
+            <button className="btn btn-blue" style={{width:'auto'}} onClick={()=>onPre(p)}>PRÉ</button>
+        )}
+    </div>
+)}                        </div>
                     ))}
                 </div>
             );

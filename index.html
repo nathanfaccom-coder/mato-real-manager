@@ -831,13 +831,14 @@
         teams={teams} 
         players={players} 
         open={conf.marketOpen} 
-        isVis={user.type==='VISITOR'} 
-        onNeg={(p)=>setModal({type:'OFFER', data:p})} 
+        isVis={user.type === 'VISITOR'} 
+        onNeg={(p) => setModal({ type: 'OFFER', data: p })} 
         onPayClause={async (p) => {
             const buy = teams.find(t => t.id === user.data.id);
             const sel = teams.find(t => t.id === p.teamId);
             if (!buy || buy.balance < p.clause) return alert("Saldo insuficiente!");
             if (!confirm(`Pagar multa de ${fmt(p.clause)} por ${p.name}?`)) return;
+
             const b = db.batch();
             b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - p.clause });
             b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + p.clause });
@@ -851,32 +852,23 @@
             });
             await b.commit();
             postNews(`🚨 **MULTA PAGA!**\nO **${buy.name}** pagou a multa de **${p.name}**!`, 'transfer');
+            alert("Contratado via multa!");
         }}
         onPre={async (p) => {
             const buy = teams.find(t => t.id === user.data.id);
             if (!confirm(`Assinar pré-contrato com ${p.name}?`)) return;
             await db.collection('players').doc(p.id).update({
-                preContract: { teamId: buy.id, teamName: buy.name }
+                preContract: { teamId: buy.id, teamName: buy.name },
+                mood: '🤩'
             });
             postNews(`📝 **PRÉ-CONTRATO**\n**${p.name}** reforçará o **${buy.name}** na próxima temporada!`, 'transfer');
-            alert("Assinado!");
+            alert("Pré-contrato assinado!");
         }}
     />
 )}
 
     
-            const buy = teams.find(t => t.id === user.data.id);
-            if (!confirm(`Assinar pré-contrato com ${p.name}? Ele chegará de graça na próxima temporada.`)) return;
-            
-            await db.collection('players').doc(p.id).update({
-                preContract: { teamId: buy.id, teamName: buy.name },
-                mood: '🤩'
-            });
-            postNews(`📝 **PRÉ-CONTRATO**\n**${p.name}** assinou um pré-vínculo com o **${buy.name}** e mudará de clube na próxima temporada!`, 'transfer');
-            alert("Pré-contrato assinado!");
-        }}
-    />
-)}                        {/* TELA: SHOPPING GLOBAL */}
+                        {/* TELA: SHOPPING GLOBAL */}
                         {screen === 'SHOPPING' && <ShoppingScreen products={products} companies={companies} userTeam={user.type==='USER' || user.type==='PLAYER'} onBuy={buyProduct} />}
                         
                         {/* TELA: PATROCÍNIOS (Apenas para Times) */}

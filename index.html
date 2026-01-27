@@ -340,41 +340,37 @@
             const savePlayer = async (p) => {
                 const isNew = !p.id;
                 const ref = isNew ? db.collection('players').doc() : db.collection('players').doc(p.id);
-                
-                // Pegamos o que já existe para não perder dados importantes (como XP e Estatísticas)
                 const old = isNew ? {} : (players.find(pl => pl.id === p.id) || {});
+
+                // REGRA DE SEGURANÇA: Se você é um time criando o jogador, o teamId DEVE ser o seu
+                let targetTeamId = p.teamId || old.teamId || 'FREE';
+                if (user.type === 'USER' && isNew) {
+                    targetTeamId = user.data.id;
+                }
 
                 const data = {
                     ...p,
-                    // Garante que o nível não seja menor que 45
                     overall: Math.max(45, parseInt(p.overall || old.overall || 45)),
-                    // Sistema Financeiro: Se não tiver valor, coloca o padrão
                     salary: parseFloat(p.salary || old.salary || 1000), 
                     clause: parseFloat(p.clause || old.clause || 1000000),
                     balance: parseFloat(p.balance || old.balance || 0),
-                    // Mantém o histórico ou cria um novo vazio
                     history: p.history || old.history || [],
-                    // Mantém o RPG do jogador
                     xp: p.xp !== undefined ? p.xp : (old.xp || 0),
                     energy: p.energy !== undefined ? p.energy : (old.energy || 100),
                     stats: p.stats || old.stats || { goals: 0, assists: 0, tackles: 0, saves: 0, yellows: 0, reds: 0 },
-                    teamId: p.teamId || old.teamId || 'FREE'
+                    teamId: targetTeamId // <--- Aqui garante que ele apareça no seu Elenco
                 };
 
-                // Se o nível mudou manualmente, resetamos o XP para o novo nível
-                if (!isNew && data.overall !== old.overall) {
-                    data.xp = 0;
-                }
-
+                if (!isNew && data.overall !== old.overall) data.xp = 0;
                 if (isNew) delete data.id;
 
                 await ref.set(data, { merge: true });
                 setModal(null);
                 
                 if (isNew) {
-                    postNews(`🆕 **REFORÇO**\nO mercado recebe **${data.name}** (Nível ${data.overall}).`, 'transfer');
+                    postNews(`🆕 **REFORÇO**\nO **${user.data.name}** anunciou a chegada de **${data.name}**!`, 'transfer');
                 } else {
-                    alert("Jogador atualizado com sucesso!");
+                    alert("Dados do jogador atualizados!");
                 }
             };
 
@@ -756,7 +752,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.86</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.87</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -996,7 +992,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.86(Company Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.87(Company Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

@@ -1353,7 +1353,6 @@
             const old = target.oldOffer || {}; 
             const isCounter = !!old.id;
 
-            // ESTADO INICIAL: Garante que nada comece vazio para evitar erro de NaN
             const [t, setT] = useState(old.type || 'COMPRA'); 
             const [v, setV] = useState(old.value || target.value || 0); 
             const [sal, setSal] = useState(old.meta?.newSalary || target.salary || 0);
@@ -1373,7 +1372,6 @@
                     <div className="modal-content" style={{maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto'}}>
                         <h3 style={{color:'var(--primary)'}}>{isCounter ? 'Contraproposta' : `Negociar ${target.name}`}</h3>
                         
-                        {/* 1. ACORDO ENTRE CLUBES */}
                         <div style={{borderBottom: '1px solid #444', paddingBottom: 15, marginBottom: 15}}>
                             <label style={{fontSize: '11px', color: 'gold', fontWeight: 'bold', textTransform: 'uppercase'}}>1. Acordo entre Clubes</label>
                             <div style={{display:'flex', gap:5, margin:'10px 0'}}>
@@ -1391,56 +1389,27 @@
                                     <input type="range" min="0" max="50" value={meta.sellOn} onChange={e=>setMeta({...meta, sellOn: parseInt(e.target.value)})} style={{width:'100%'}} />
                                 </div>
                             )}
-
-                            {t === 'TROCA' && (
-                                <div>
-                                    <label>Incluir Jogadores (Máx 3):</label>
-                                    <div style={{maxHeight:100, overflowY:'auto', background:'#111', padding:5, borderRadius: 5, border: '1px solid #333'}}>
-                                        {myPlayers.map(p=><div key={p.id} onClick={()=>toggleSwap(p.id)} style={{fontSize:11, padding:8, borderBottom:'1px solid #222', color:swaps.includes(p.id)?'var(--primary)':'#ccc', cursor:'pointer'}}>{swaps.includes(p.id)?'✅ ':'+ '}{p.name} (Ov: {p.overall})</div>)}
-                                    </div>
-                                </div>
-                            )}
                         </div>
 
-                        {/* 2. CONTRATO DO JOGADOR */}
                         <div>
                             <label style={{fontSize: '11px', color: 'cyan', fontWeight: 'bold', textTransform: 'uppercase'}}>2. Contrato do Jogador</label>
                             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10}}>
                                 <div><small>Salário Mensal</small><input className="input-field" type="number" value={sal} onChange={e=>setSal(e.target.value)} /></div>
                                 <div><small>Luvas (Assinatura)</small><input className="input-field" type="number" value={luv} onChange={e=>setLuv(e.target.value)} /></div>
                             </div>
-                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                                <div><small>Duração (Anos)</small><input className="input-field" type="number" value={con} onChange={e=>setCon(e.target.value)} /></div>
-                                <div><small>Papel no Elenco</small>
-                                    <select className="input-field" value={role} onChange={e=>setRole(e.target.value)}>
-                                        <option value="CRUCIAL">⭐ Crucial</option>
-                                        <option value="TITULAR">✅ Titular</option>
-                                        <option value="ROTACAO">🔄 Rotação</option>
-                                        <option value="RESERVA">💤 Reserva</option>
-                                    </select>
-                                </div>
-                            </div>
                         </div>
 
-                        {/* BOTÕES DE AÇÃO COM LIMPEZA DE DADOS */}
-                        <button className="btn btn-green" style={{flex: 2}} onClick={() => {
-    // Aqui transformamos os campos de texto do formulário em números reais
-    const valorTaxa = parseFloat(v) || 0;
-    const tempoContrato = parseInt(con) || 1;
-    
-    // Criamos o meta com os valores limpos
-    const metaLimpo = {
-        ...meta,
-        newSalary: parseFloat(sal) || 0,
-        signingBonus: parseFloat(luv) || 0,
-        contract: tempoContrato,
-        role: role
-    };
-
-    onSend(target, t, valorTaxa, swaps, tempoContrato, metaLimpo, old);
-}}>
-    {isCounter ? 'ENVIAR CONTRAPROPOSTA' : 'ENVIAR OFERTA'}
-</button>
+                        <div style={{display:'flex', gap:10, marginTop:20}}>
+                            <button className="btn btn-green" style={{flex: 2}} onClick={() => {
+                                const finalV = parseFloat(v) || 0;
+                                const finalSal = parseFloat(sal) || 0;
+                                const finalLuv = parseFloat(luv) || 0;
+                                const finalCon = parseInt(con) || 1;
+                                const cleanMeta = { ...meta, newSalary: finalSal, signingBonus: finalLuv, contract: finalCon, role: role };
+                                onSend(target, t, finalV, swaps, finalCon, cleanMeta, old);
+                            }}>
+                                {isCounter ? 'ENVIAR CONTRAPROPOSTA' : 'ENVIAR OFERTA'}
+                            </button>
                             <button className="btn btn-red" style={{flex: 1}} onClick={()=>setModal(null)}>CANCELAR</button>
                         </div>
                     </div>

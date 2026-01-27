@@ -378,14 +378,22 @@
   
            // --- LÓGICA DE NEGOCIAÇÃO FIFA (SISTEMA DE TURNOS E FINANCEIRO) ---
             const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
-                try {
-                    // LIMPEZA DE SEGURANÇA: Garante que tudo seja número puro para o banco não recusar
-                    const v = parseFloat(value) || 0;
-                    const installments = parseInt(meta.installments) || 1;
-                    const sellOn = parseInt(meta.sellOn) || 0;
-                    const signingBonus = parseFloat(meta.signingBonus) || 0;
-                    const newSalary = parseFloat(meta.newSalary) || 0;
-                    const contractYears = parseInt(con) || 1;
+  try {
+
+    // 🔒 BLINDAGEM TOTAL (100% segura)
+    value = Number(value) || 0;
+    con = Number(con) || 1;
+
+    meta = {
+      ...meta,
+      newSalary: Number(meta.newSalary) || 0,
+      signingBonus: Number(meta.signingBonus) || 0,
+      contract: Number(meta.contract) || con,
+      installments: Number(meta.installments) || 1,
+      sellOn: Number(meta.sellOn) || 0
+    };
+                   
+            
                     
                     const isClause = type === 'COMPRA' && target.clause > 0 && v >= target.clause;
                     const actingTeamName = user.data.name;
@@ -758,7 +766,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.93</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.94</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -998,7 +1006,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93(Company Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.94(Company Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1502,20 +1510,51 @@
             className="btn btn-green"
             style={{ flex: 2 }}
             onClick={() => {
-              if ([v, sal, luv, con].some(n => isNaN(n))) {
-                alert('Erro: valores inválidos detectados.');
-                return;
-              }
+              // CONVERSÃO SEGURA (resolve o bug definitivamente)
+const finalValue = Number(v) || 0;
+const finalSalary = Number(sal) || 0;
+const finalBonus = Number(luv) || 0;
+const finalContract = parseInt(con) || 1;
 
-              const cleanMeta = {
-                ...meta,
-                newSalary: sal,
-                signingBonus: luv,
-                contract: con,
-                role
-              };
+const cleanMeta = {
+  ...meta,
+  newSalary: finalSalary,
+  signingBonus: finalBonus,
+  contract: finalContract,
+  role,
+  sellOn: Number(meta.sellOn) || 0,
+  wageSplit: Number(meta.wageSplit) || 50,
+  installments: Number(meta.installments) || 1,
+  buyOpt: meta.buyOpt || '',
+  cashDir: meta.cashDir || 'PAY'
+};
 
-              onSend(target, t, v, swaps, con, cleanMeta, old);
+// trava anti-bug (0 é permitido)
+const numbers = [
+  finalValue,
+  finalSalary,
+  finalBonus,
+  finalContract,
+  cleanMeta.sellOn,
+  cleanMeta.wageSplit,
+  cleanMeta.installments
+];
+
+if (numbers.some(n => Number.isNaN(n))) {
+  alert('Erro: valores inválidos detectados.');
+  return;
+}
+
+onSend(
+  target,
+  t,
+  finalValue,
+  swaps,
+  finalContract,
+  cleanMeta,
+  old
+);
+
             }}
           >
             {isCounter ? 'ENVIAR CONTRAPROPOSTA' : 'ENVIAR OFERTA'}

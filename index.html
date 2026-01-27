@@ -410,25 +410,28 @@
             };
 
             // --- SISTEMA DE NEGOCIAÇÃO CLÁSSICO (CLUBE x CLUBE) ---
-            const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
+           const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
                 try {
+                    // 🛡️ Blindagem de dados numéricos
                     const v = parseFloat(value) || 0;
                     const contractYears = parseInt(con) || 1;
                     const actingTeamName = user.data.name;
                     const targetPlayerName = target.name;
 
-                    // 📝 GERAÇÃO DE DESCRIÇÃO DETALHADA
+                    // 📝 GERAÇÃO DE DESCRIÇÃO DETALHADA PARA O CARD
                     let details = `💰 Taxa: ${fmt(v)}\n`;
                     if (meta.installments > 1) details += `📅 Parcelamento: ${meta.installments}x de ${fmt(v / meta.installments)}\n`;
                     if (meta.sellOn > 0) details += `📈 Revenda: ${meta.sellOn}%\n`;
                     details += `📝 Contrato: ${contractYears} anos\n`;
-                    details += `💵 Salário: ${fmt(meta.newSalary)}/sem\n`;
+                    details += `💵 Salário Sugerido: ${fmt(meta.newSalary)}/sem\n`;
                     details += `👔 Papel: ${meta.role || 'ROTACAO'}`;
 
                     // 🔄 LÓGICA DE TURNOS (Dono x Comprador)
+                    // Se não há oferta antiga, o destinatário é o dono atual do jogador
                     let recipientId = target.teamId; 
+                    
                     if (old && old.id) {
-                        // Se for contraproposta, envia para quem mandou a oferta anterior
+                        // Se for uma contraproposta, mandamos para quem nos enviou a última
                         recipientId = (user.data.id === old.buyerId) ? old.sellerId : old.buyerId;
                     }
 
@@ -438,7 +441,7 @@
                         buyerId: old?.buyerId || user.data.id,
                         buyerName: old?.buyerName || actingTeamName,
                         sellerId: target.teamId || old?.sellerId || 'FREE',
-                        recipientId: recipientId, // Novo campo para controle de quem vê
+                        recipientId: recipientId, // Define quem verá a oferta na aba de propostas
                         type: type,
                         value: v,
                         offerContract: contractYears,
@@ -455,16 +458,21 @@
                     };
 
                     const b = db.batch();
+                    // Se estivermos respondendo uma oferta, deletamos a antiga para não duplicar
                     if (old && old.id) b.delete(db.collection('offers').doc(old.id));
+                    
                     b.set(db.collection('offers').doc(), pl);
                     await b.commit();
 
-                    postNews(`🔄 **NEGOCIAÇÃO EM ANDAMENTO**\nNovos termos foram enviados por **${targetPlayerName}**!\n\n${details}`, 'transfer');
+                    // Notícia detalhada no jornal
+                    const msgHead = (old && old.id) ? "🔄 CONTRAPROPOSTA" : "💼 NOVA OFERTA";
+                    postNews(`${msgHead}\nO **${actingTeamName}** enviou termos detalhados por **${targetPlayerName}**!\n\n${details}`, 'transfer');
+                    
                     setModal(null); 
-                    alert("Proposta/Contraproposta enviada!");
+                    alert("Proposta enviada com sucesso!");
                 } catch (e) {
-                    console.error(e);
-                    alert("Erro ao enviar. Verifique os campos numéricos.");
+                    console.error("Erro no Firebase:", e);
+                    alert("Erro técnico: Verifique se os campos de preço e contrato contêm apenas números.");
                 }
             };
             // --- FUNÇÕES DE ESTATÍSTICAS E ADMIN (CORRIGIDAS) ---
@@ -669,7 +677,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.88</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.89</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -858,7 +866,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.88</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.89</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

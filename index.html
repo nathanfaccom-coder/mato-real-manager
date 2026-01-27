@@ -410,117 +410,78 @@
             };
             const updateStats = async (pid, newStats) => { await db.collection('players').doc(pid).update({ stats: newStats }); alert("Estatísticas Atualizadas!"); setModal(null); };
             // --- NEGOTIATION LOGIC REWORKED (FIXED TEXTS) ---
+            // --- SISTEMA DE NEGOCIAÇÃO CLÁSSICO (CLUBE x CLUBE) ---
             const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
-                const v = parseFloat(value||0);
-                const detailText = formatOfferDetails(type, v, con, meta, swapIds, players);
-                
-                const actingTeamName = user.data.name; 
-                const targetPlayerName = target.name;
-                const playerOwnerTeam = teams.find(t=>t.id===target.teamId)?.name || 'Desconhecido';
+                try {
+                    // Limpeza radical para evitar erro de campos numéricos
+                    const actingTeamName = user.data.name;
+                    const v = parseFloat(value) || 0;
+                    const contractYears = parseInt(con) || 1;
+                    const role = meta.role || 'ROTACAO';
 
-                let headline = "";
-                let sellerId = null;
+                    const pl = {
+                        playerId: target.id,
+                        playerName: target.name,
+                        buyerId: user.data.id,
+                        buyerName: actingTeamName,
+                        sellerId: target.teamId || 'FREE',
+                        type: type,
+                        value: v,
+                        offerContract: contractYears,
+                        description: `💰 Taxa: ${fmt(v)}\n📝 Contrato: ${contractYears} anos\n👔 Papel: ${role}`,
+                        meta: {
+                            ...meta,
+                            role: role,
+                            installments: parseInt(meta.installments) || 1,
+                            sellOn: parseInt(meta.sellOn) || 0
+                        },
+                        date: Date.now()
+                    };
 
-                if (old && old.id) {
-                    // COUNTER-OFFER: I am replying to someone who made an offer
-                    const originalProposer = teams.find(t=>t.id === old.buyerId)?.name;
-                    sellerId = old.buyerId; // The new "Seller" (recipient) is the one who proposed before
-                    
-                    if (user.data.id === target.teamId) {
-                        // I AM THE OWNER COUNTERING THE BUYER
-                        headline = `🔄 **CONTRAPROPOSTA**\nO **${actingTeamName}** (Dono) não gostou dos valores e pediu mais ao **${originalProposer}** pelo **${targetPlayerName}**!`;
-                    } else {
-                        // I AM THE BUYER COUNTERING THE OWNER (Tréplica)
-                        headline = `🔄 **NOVA OFERTA / TRÉPLICA**\nO **${actingTeamName}** insiste na negociação e enviou novos termos ao **${playerOwnerTeam}** por **${targetPlayerName}**!`;
-                    }
-                } else {
-                    // FRESH PROPOSAL: I am buying from current owner
-                    headline = `🚨 **MERCADO AGITADO**\nO **${actingTeamName}** enviou uma proposta oficial ao **${playerOwnerTeam}** pelo jogador **${targetPlayerName}**!`;
-                    sellerId = target.teamId;
+                    const b = db.batch();
+                    if (old && old.id) b.delete(db.collection('offers').doc(old.id));
+                    b.set(db.collection('offers').doc(), pl);
+                    await b.commit();
+
+                    postNews(`💼 **OFERTA**\nO **${actingTeamName}** enviou uma proposta por **${target.name}**.`, 'transfer');
+                    setModal(null); 
+                    alert("Proposta enviada ao clube!");
+                } catch (e) {
+                    console.error(e);
+                    alert("Erro ao enviar. Verifique os valores.");
                 }
-
-                if (!sellerId) { alert("ERRO: Vendedor não identificado."); return; }
-
-                const pl = { playerId: target.id, playerName: target.name, buyerId: user.data.id, buyerName: user.data.name, sellerId, type, value: v, swapPlayerIds: swapIds || [], offerContract: parseInt(con) || 1, description: detailText, meta: meta || {}, date: Date.now() };
-                const b = db.batch(); 
-                if(old && old.id) b.delete(db.collection('offers').doc(old.id)); 
-                b.set(db.collection('offers').doc(), pl); 
-                await b.commit();
-                postNews(`${headline}\n\n📄 **Detalhes da Oferta:**\n${detailText}`, 'transfer'); 
-                setModal(null); alert("Enviada!");
-            };
-
-            const rejectOffer = async (o) => {
-                if(!confirm("Recusar esta proposta?")) return;
-                
-                const actingTeamName = user.data.name;
-                const otherTeamName = teams.find(t=>t.id===o.buyerId)?.name || 'Outro Time';
-                const playerOwnerId = (players.find(p=>p.id===o.playerId)||{}).teamId;
-                
-                let text = "";
-                // If I am the owner rejecting a buy offer
-                if (user.data.id === playerOwnerId) {
-                    text = `❌ **NEGOCIAÇÃO FRACASSADA**\nO **${actingTeamName}** fez jogo duro e recusou a investida do **${otherTeamName}** pelo jogador **${o.playerName}**.`;
-                } else {
-                    // If I am the buyer rejecting a counter-offer from owner
-                    text = `❌ **RETIRADA**\nO **${actingTeamName}** não aceitou a contraproposta do **${otherTeamName}** e encerrou as negociações por **${o.playerName}**.`;
-                }
-
-                // UI UPDATE (Prevent Ghost)
-                setOffers(prev => prev.filter(off => off.id !== o.id));
-                
-                await db.collection('offers').doc(o.id).delete();
-                postNews(text, 'transfer');
             };
 
             const acceptOffer = async (o) => {
-                const buy = teams.find(t=>t.id===o.buyerId); const sel = teams.find(t=>t.id===user.data.id); const p = players.find(x=>x.id===o.playerId);
-                let cost = o.value; if(o.type === 'TROCA' && o.meta?.cashDir === 'RECEIVE') cost = -o.value; 
+                const buy = teams.find(t=>t.id===o.buyerId);
+                const sel = teams.find(t=>t.id===user.data.id);
+                const p = players.find(x=>x.id===o.playerId);
                 
-                if (o.type === 'COMPRA' && o.meta?.installments > 1) {
-                    if (buy.balance < (cost / o.meta.installments)) return alert("Saldo insuficiente para 1ª parcela!");
-                    db.collection('debts').add({ buyerId: buy.id, buyerName: buy.name, sellerId: sel.id, sellerName: sel.name, playerId: p.id, playerName: p.name, totalVal: cost, installmentVal: cost / o.meta.installments, weeksRemaining: parseInt(o.meta.installments), date: Date.now() });
-                    cost = 0; 
-                } else { if (buy.balance < cost) return alert("Sem saldo!"); }
-                
+                if (buy.balance < o.value) return alert("O comprador não tem saldo!");
+                if (!confirm(`Aceitar vender ${p.name} por ${fmt(o.value)}?`)) return;
+
                 const b = db.batch();
-                if(cost !== 0) { b.update(db.collection('teams').doc(buy.id), {balance: buy.balance - cost}); b.update(db.collection('teams').doc(sel.id), {balance: sel.balance + cost}); }
                 
-                let newsText = "";
-                if(o.type==='COMPRA') {
-                    if (p.sellOnDetails) { const prev = teams.find(t=>t.id === p.sellOnDetails.beneficiary); if (prev) { const cut = o.value * (p.sellOnDetails.percentage / 100); b.update(db.collection('teams').doc(sel.id), {balance: (sel.balance + cost) - cut}); b.update(db.collection('teams').doc(prev.id), {balance: prev.balance + cut}); postNews(`💰 **CLÁUSULA**\n${prev.name} recebeu ${fmt(cut)} pela venda de ${p.name}.`, 'money'); } }
-                    const up = { teamId: buy.id, status:'NAO_A_VENDA', loan:false, contract: parseInt(o.offerContract), sellOnDetails: null };
-                    if (o.meta?.sellOn > 0) up.sellOnDetails = { percentage: o.meta.sellOn, beneficiary: sel.id };
-                    if(conf.marketOpen) { b.update(db.collection('players').doc(p.id), up); newsText = `🤝 **NEGÓCIO FECHADO**\nO **${buy.name}** aceitou as exigências e contratou **${p.name}** do **${sel.name}**!`; } 
-                    else { b.update(db.collection('players').doc(p.id), {status:'VENDIDO', futureTransfer: up}); newsText = `🤝 **PRÉ-ACORDO**\nO **${buy.name}** garantiu a contratação de **${p.name}** para a próxima temporada.`; }
-                } else if(o.type==='EMPRESTIMO') {
-                    b.update(db.collection('players').doc(p.id), { teamId: buy.id, status:'NAO_A_VENDA', loan:true, loanFrom: sel.id, loanDetails: { wageSplit: o.meta?.wageSplit || 50, buyOption: o.meta?.buyOpt } });
-                    newsText = `🔄 **EMPRÉSTIMO**\nO **${buy.name}** acertou o empréstimo de **${p.name}** junto ao **${sel.name}**.`;
-                } else if(o.type==='TROCA') {
-                    if(!conf.marketOpen) return alert("Troca só com janela aberta!");
-                    b.update(db.collection('players').doc(p.id), {teamId: buy.id, status:'NAO_A_VENDA', contract: parseInt(o.offerContract)});
-                    if (o.swapPlayerIds) o.swapPlayerIds.forEach(id => b.update(db.collection('players').doc(id), {teamId: sel.id, status:'NAO_A_VENDA'}));
-                    newsText = `🔀 **TROCA BOMBÁSTICA**\n**${buy.name}** e **${sel.name}** chegaram a um acordo e trocaram jogadores!`;
-                }
-                
-                setOffers(prev => prev.filter(off => off.id !== o.id));
+                // Financeiro
+                b.update(db.collection('teams').doc(buy.id), {balance: buy.balance - o.value});
+                b.update(db.collection('teams').doc(sel.id), {balance: sel.balance + o.value});
+
+                // Transferência do Jogador
+                const historyEntry = { date: Date.now(), from: sel.name, to: buy.name, type: o.type, value: o.value };
+                b.update(db.collection('players').doc(p.id), {
+                    teamId: buy.id,
+                    status: 'NAO_A_VENDA',
+                    contract: parseInt(o.offerContract) || 1,
+                    role: o.meta?.role || 'ROTACAO',
+                    history: firebase.firestore.FieldValue.arrayUnion(historyEntry)
+                });
+
                 b.delete(db.collection('offers').doc(o.id));
                 await b.commit();
-                postNews(`${newsText}\n\n📄 **Termos do Acordo:**\n${o.description}`, 'transfer');
+                
+                postNews(`🤝 **TRANSFERÊNCIA**\nO **${buy.name}** fechou a contratação de **${p.name}** junto ao **${sel.name}**!`, 'transfer');
+                alert("Negócio Fechado!");
             };
-
-            const renewContract = async (p) => {
-                const cost = (p.value || 1000000) * 0.10; 
-                if(user.data.balance < cost) return alert(`Sem saldo para luvas (Custo: ${fmt(cost)})`);
-                if(!confirm(`Renovar com ${p.name} por +1 ano?\nCusto: ${fmt(cost)}`)) return;
-                const b = db.batch();
-                b.update(db.collection('teams').doc(user.data.id), {balance: user.data.balance - cost});
-                b.update(db.collection('players').doc(p.id), {contract: (p.contract||0) + 1});
-                await b.commit();
-                postNews(`📝 **RENOVAÇÃO**\n**${p.name}** renovou seu vínculo com o **${user.data.name}** por mais uma temporada.\n💰 Luvas: ${fmt(cost)}`, 'transfer');
-                setModal(null);
-            };
-
             // --- FUNÇÕES DE ESTATÍSTICAS E ADMIN (CORRIGIDAS) ---
 
             // 1. Função para o Jornalista atualizar a tabela
@@ -723,7 +684,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.82</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.83</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -912,7 +873,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.82(Company Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.83</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1264,17 +1225,42 @@
         };
 
         const OfferForm = ({ target, myPlayers, onSend }) => {
-            const old = target.oldOffer || {}; const [t, setT] = useState(old.type || 'COMPRA'); const [v, setV] = useState(old.value || target.oldVal || ''); const [con, setCon] = useState(old.offerContract || '1'); const [meta, setMeta] = useState(old.meta || { sellOn: 0, wageSplit: 50, buyOpt: '', cashDir: 'PAY', installments: 1 }); const [swaps, setSwaps] = useState(old.swapPlayerIds || []);
-            const toggleSwap = (pid) => { if(swaps.includes(pid)) setSwaps(swaps.filter(id=>id!==pid)); else if(swaps.length < 3) setSwaps([...swaps, pid]); };
+            const old = target.oldOffer || {};
+            const [t, setT] = useState(old.type || 'COMPRA');
+            const [v, setV] = useState(old.value || '');
+            const [con, setCon] = useState(old.offerContract || '1');
+            const [role, setRole] = useState(old.meta?.role || 'ROTACAO');
+            const [meta, setMeta] = useState(old.meta || { installments: 1, sellOn: 0 });
+            const [swaps, setSwaps] = useState(old.swapPlayerIds || []);
+
+            const toggleSwap = (pid) => {
+                if(swaps.includes(pid)) setSwaps(swaps.filter(id=>id!==pid));
+                else if(swaps.length < 3) setSwaps([...swaps, pid]);
+            };
+
             return (
-                <div className="modal-bg"><div className="modal-card"><h3>Negociar {target.name}</h3>
-                <div style={{display:'flex', gap:5, marginBottom:10}}>{['COMPRA','EMPRESTIMO','TROCA'].map(x=><button key={x} className={`btn ${t===x?'btn-green':'btn-ghost'}`} onClick={()=>setT(x)}>{x}</button>)}</div>
-                <label>Valor {t==='TROCA' ? `(${meta.cashDir==='PAY'?'Eu pago':'Eu recebo'})` : ''}</label><input className="input-field" type="number" value={v} onChange={e=>setV(e.target.value)} />
-                {t==='COMPRA' && ( <div style={{background:'#222', padding:10, borderRadius:8, marginBottom:10}}><label>Parcelas (Semanas): {meta.installments || 1}</label><input type="range" min="1" max="10" value={meta.installments || 1} onChange={e=>setMeta({...meta, installments:e.target.value})} style={{width:'100%'}} />{meta.installments > 1 && <div style={{fontSize:11, color:'var(--warning)', marginTop:5}}> {meta.installments}x de {fmt(v/meta.installments)}</div>}</div> )}
-                {t==='COMPRA' && <div><label>Revenda: {meta.sellOn}%</label><input type="range" style={{width:'100%'}} min="0" max="50" value={meta.sellOn} onChange={e=>setMeta({...meta, sellOn:e.target.value})} /></div>}
-                {t==='EMPRESTIMO' && <div style={{background:'#333', padding:10, borderRadius:8, marginBottom:10}}><label>Divisão Salarial (Eu pago {meta.wageSplit}%)</label><input type="range" style={{width:'100%'}} min="0" max="100" value={meta.wageSplit} onChange={e=>setMeta({...meta, wageSplit:e.target.value})} /><label>Opção de Compra</label><input className="input-field" type="number" value={meta.buyOpt} onChange={e=>setMeta({...meta, buyOpt:e.target.value})} /></div>}
-                {t==='TROCA' && <div><div style={{display:'flex', gap:5}}><button className={`btn ${meta.cashDir==='PAY'?'btn-blue':'btn-ghost'}`} onClick={()=>setMeta({...meta, cashDir:'PAY'})}>PAGAR</button><button className={`btn ${meta.cashDir==='RECEIVE'?'btn-blue':'btn-ghost'}`} onClick={()=>setMeta({...meta, cashDir:'RECEIVE'})}>RECEBER</button></div><label>Jogadores (Máx 3)</label><div style={{maxHeight:100, overflowY:'auto', background:'#222', padding:5}}>{myPlayers.map(p=><div key={p.id} onClick={()=>toggleSwap(p.id)} style={{padding:5, borderBottom:'1px solid #444', color:swaps.includes(p.id)?'var(--primary)':'#fff', cursor:'pointer'}}>{swaps.includes(p.id)?'✔ ':''}{p.name}</div>)}</div></div>}
-                <label>{t==='EMPRESTIMO'?'Duração':'Contrato'}</label><input className="input-field" type="number" value={con} onChange={e=>setCon(e.target.value)} /><button className="btn btn-green" onClick={()=>onSend(target, t, v, swaps, con, meta, old)}>ENVIAR</button></div></div>
+                <div className="modal-bg"><div className="modal-content">
+                    <h3>Negociar {target.name}</h3>
+                    <div style={{display:'flex', gap:5, marginBottom:10}}>{['COMPRA','EMPRESTIMO','TROCA'].map(x=><button key={x} className={`btn ${t===x?'btn-green':'btn-ghost'}`} onClick={()=>setT(x)}>{x}</button>)}</div>
+                    
+                    <label>Valor da Taxa (₣)</label>
+                    <input className="input-field" type="number" value={v} onChange={e=>setV(e.target.value)} />
+                    
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                        <div><label>Anos Contrato</label><input className="input-field" type="number" value={con} onChange={e=>setCon(e.target.value)} /></div>
+                        <div><label>Papel no Elenco</label>
+                            <select className="input-field" value={role} onChange={e=>setRole(e.target.value)}>
+                                <option value="CRUCIAL">⭐ Crucial</option>
+                                <option value="TITULAR">✅ Titular</option>
+                                <option value="ROTACAO">🔄 Rotação</option>
+                                <option value="RESERVA">💤 Reserva</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button className="btn btn-green" onClick={() => onSend(target, t, v, swaps, con, {...meta, role: role}, old)}>ENVIAR PROPOSTA</button>
+                    <button className="btn btn-red" onClick={()=>setModal(null)}>CANCELAR</button>
+                </div></div>
             );
         };
 

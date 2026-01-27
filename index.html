@@ -727,26 +727,55 @@
                     setLoading(false); 
                 }
                 
-                // VIRADA DE TEMPORADA (Igual ao anterior)
+               // VIRADA DE TEMPORADA (ATUALIZADO: Agentes Livres por Fim de Contrato)
                 if(act==='SEASON') { 
-                    if(!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos")) return; 
+                    if(!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos\n3. Liberar Jogadores sem Contrato")) return; 
                     setLoading(true); 
                     const b = db.batch(); 
                     players.forEach(p => { 
                         let u={}; 
+                        // 1. Evolução de Nível
                         const currentLvl = p.overall || 45;
                         const currentXP = p.xp || 0;
                         const res = calcNewLevel(currentLvl, currentXP, 0); 
                         if (res.lvl !== currentLvl) { u.overall = res.lvl; u.xp = res.xp; }
-                        let nc=(p.contract||0)-1; if(nc<0)nc=0; u.contract=nc; 
-                        if((p.contract<=1||p.contract===0)&&p.preContract){ if (teams.some(t => t.id === p.preContract.teamId)) { u.teamId=p.preContract.teamId; u.contract=1; u.status='NAO_A_VENDA'; u.preContract=firebase.firestore.FieldValue.delete(); } } 
+                        
+                        // 2. Envelhecimento de Contrato
+                        let nc = (parseInt(p.contract) || 0) - 1; 
+                        if(nc < 0) nc = 0; 
+                        u.contract = nc; 
+
+                        // 3. Lógica de Destino (Pré-contrato ou Free Agent)
+                        if (nc === 0) {
+                            if (p.preContract && teams.some(t => t.id === p.preContract.teamId)) {
+                                // Se tem pré-contrato, vai para o novo time
+                                u.teamId = p.preContract.teamId;
+                                u.contract = 1;
+                                u.status = 'NAO_A_VENDA';
+                                u.preContract = firebase.firestore.FieldValue.delete();
+                            } else {
+                                // Se não tem pré-contrato e chegou a 0, vira Free Agent
+                                u.teamId = 'FREE';
+                                u.status = 'VENDA'; // Aparece nos Agentes Livres
+                                u.mood = '😐';
+                            }
+                        }
+                        
                         b.update(db.collection('players').doc(p.id), u); 
                     }); 
-                    try { await b.commit(); alert("Temporada virada!"); } catch (e) { alert("Erro: "+e.message); }
+                    try { 
+                        await b.commit(); 
+                        alert("Temporada virada! Jogadores sem contrato agora são Agentes Livres."); 
+                    } catch (e) { 
+                        alert("Erro: " + e.message); 
+                    }
                     setLoading(false); 
-                    postNews("🌞 **NOVA TEMPORADA**", 'season'); 
+                    postNews("🌞 **NOVA TEMPORADA**\nOs contratos foram atualizados e novos Agentes Livres estão no mercado!", 'season'); 
                 }
-            };
+
+
+
+                
             // --- RENDER ---
             if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
             // CORREÇÃO: Adicionei "players={players}" logo depois de "teams={teams}"

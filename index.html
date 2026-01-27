@@ -1695,7 +1695,7 @@
 const Ranking = ({ teams, players }) => {
             const [view, setView] = React.useState('TEAMS');
 
-            // 🎯 Filtro para remover os "fantasmas" (jogadores sem time ou sem nome real)
+            // Filtra para não mostrar jogadores bugados (sem time)
             const validPlayers = players.filter(p => p.teamId && p.teamId !== 'FREE' && p.name);
 
             const renderTeams = () => teams
@@ -1706,16 +1706,12 @@ const Ranking = ({ teams, players }) => {
                 })
                 .sort((a, b) => b.totalWealth - a.totalWealth)
                 .map((t, i) => (
-                    <div key={t.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, borderLeft: i < 3 ? '4px solid gold' : '1px solid var(--border)' }}>
-                        <b style={{ fontSize: 22, color: i === 0 ? 'gold' : '#666', width: 30, textAlign: 'center' }}>{i + 1}</b>
-                        {t.logo ? <img src={t.logo} style={{ width: 45, height: 45, borderRadius: '50%', border: '2px solid #333', objectFit: 'cover' }} /> : <div style={{ width: 45, height: 45, borderRadius: '50%', background: '#333' }}></div>}
+                    <div key={t.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <b style={{ fontSize: 20, color: '#555', width: 30 }}>{i + 1}</b>
+                        {t.logo ? <img src={t.logo} style={{ width: 35, height: 35, borderRadius: '50%', objectFit: 'cover' }} /> : <div style={{ width: 35 }}></div>}
                         <div style={{ flex: 1 }}>
-                            <b style={{fontSize: 16}}>{t.name}</b><br />
-                            <small style={{ color: 'var(--primary)', fontWeight: '900', fontSize: 13 }}>Patrimônio: {fmt(t.totalWealth)}</small><br />
-                            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                                <small style={{ fontSize: 10, color: '#aaa' }}>🏦 Caixa: {fmt(t.balance)}</small>
-                                <small style={{ fontSize: 10, color: '#aaa' }}>👟 Elenco: {fmt(t.squadValue)}</small>
-                            </div>
+                            <b>{t.name}</b><br />
+                            <small style={{ color: 'var(--primary)', fontWeight: 'bold' }}>Patrimônio: {fmt(t.totalWealth)}</small>
                         </div>
                     </div>
                 ));
@@ -1728,20 +1724,14 @@ const Ranking = ({ teams, players }) => {
                     sorted = [...validPlayers].sort((a, b) => (parseFloat(b[sortKey]) || 0) - (parseFloat(a[sortKey]) || 0));
                 }
 
-                return sorted.slice(0, 25).map((p, i) => (
-                    <div key={p.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <b style={{ fontSize: 18, color: '#555', width: 25 }}>{i + 1}</b>
+                return sorted.slice(0, 20).map((p, i) => (
+                    <div key={p.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <b style={{ fontSize: 20, color: '#555', width: 30 }}>{i + 1}</b>
                         <div style={{ flex: 1 }}>
-                            <div style={{display:'flex', alignItems:'center', gap:5}}>
-                                <span className="badge-pos" style={{background: getPosColor(p.position), margin:0}}>{p.position}</span>
-                                <b>{p.name}</b>
-                            </div>
-                            <small style={{color:'#888'}}>{teams.find(t => t.id === p.teamId)?.name}</small>
+                            <b>{p.name}</b> <small>({teams.find(t => t.id === p.teamId)?.name})</small>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontWeight: '900', fontSize: 16, color: color }}>
-                                {label} {isStat ? p.stats[sortKey] : (sortKey === 'salary' || sortKey === 'value' ? fmt(p[sortKey]).replace('₣ ','') : p[sortKey])}
-                            </div>
+                        <div style={{ fontWeight: 'bold', fontSize: 14, color: color }}>
+                            {label} {isStat ? p.stats[sortKey] : (sortKey === 'salary' ? fmt(p[sortKey]) : p[sortKey])}
                         </div>
                     </div>
                 ));
@@ -1749,27 +1739,36 @@ const Ranking = ({ teams, players }) => {
 
             return (
                 <div>
-                    <h3 style={{display:'flex', alignItems:'center', gap:10}}><i className="fas fa-trophy" style={{color:'gold'}}></i> Ranking Mato Real</h3>
+                    <h3>Ranking e Estatísticas</h3>
+                    {/* Aqui estão os botões (abas) que você clica no topo do Ranking */}
                     <div className="rank-tabs">
-                        <div className={`rank-tab ${view === 'TEAMS' ? 'active' : ''}`} onClick={() => setView('TEAMS')}><i className="fas fa-shield-alt"></i> Clubes</div>
-                        <div className={`rank-tab ${view === 'OVERALL' ? 'active' : ''}`} onClick={() => setView('OVERALL')}><i className="fas fa-star"></i> Craques</div>
-                        <div className={`rank-tab ${view === 'SALARY' ? 'active' : ''}`} onClick={() => setView('SALARY')}><i className="fas fa-money-bill-wave"></i> Salários</div>
-                        <div className={`rank-tab ${view === 'GOALS' ? 'active' : ''}`} onClick={() => setView('GOALS')}><i className="fas fa-futbol"></i> Gols</div>
-                        <div className={`rank-tab ${view === 'ASSIST' ? 'active' : ''}`} onClick={() => setView('ASSIST')}><i className="fas fa-magic"></i> Assis</div>
-                        <div className={`rank-tab ${view === 'TACKLES' ? 'active' : ''}`} onClick={() => setView('TACKLES')}><i className="fas fa-hand-paper"></i> Desar</div>
+                        <div className={`rank-tab ${view === 'TEAMS' ? 'active' : ''}`} onClick={() => setView('TEAMS')}>💰 Clubes</div>
+                        <div className={`rank-tab ${view === 'OVERALL' ? 'active' : ''}`} onClick={() => setView('OVERALL')}>⭐ Craques</div>
+                        <div className={`rank-tab ${view === 'SALARY' ? 'active' : ''}`} onClick={() => setView('SALARY')}>💸 Salários</div>
+                        <div className={`rank-tab ${view === 'GOALS' ? 'active' : ''}`} onClick={() => setView('GOALS')}>⚽ Gols</div>
+                        <div className={`rank-tab ${view === 'ASSIST' ? 'active' : ''}`} onClick={() => setView('ASSIST')}>👟 Assis</div>
+                        <div className={`rank-tab ${view === 'SAVES' ? 'active' : ''}`} onClick={() => setView('SAVES')}>🧤 Defesas</div>
+                        <div className={`rank-tab ${view === 'YEL' ? 'active' : ''}`} onClick={() => setView('YEL')}>🟨 Amarelos</div>
+                        <div className={`rank-tab ${view === 'RED' ? 'active' : ''}`} onClick={() => setView('RED')}>🟥 Vermelhos</div>
                     </div>
 
-                    <div style={{ marginTop: 10, animation: 'fadeIn 0.3s' }}>
+                    <div style={{ marginTop: 10 }}>
                         {view === 'TEAMS' && renderTeams()}
                         {view === 'OVERALL' && renderPlayers('overall', 'Ov:', 'var(--warning)', false)}
-                        {view === 'SALARY' && renderPlayers('salary', '₣', 'var(--primary)', false)}
+                        {view === 'SALARY' && renderPlayers('salary', '', 'var(--primary)', false)}
                         {view === 'GOALS' && renderPlayers('goals', '⚽', '#fff')}
-                        {view === 'ASSIST' && renderPlayers('assists', '🎩', '#fff')}
-                        {view === 'TACKLES' && renderPlayers('tackles', '🛡️', '#fff')}
+                        {view === 'ASSIST' && renderPlayers('assists', '👟', '#fff')}
+                        {view === 'SAVES' && renderPlayers('saves', '🧤', '#fff')}
+                        {view === 'YEL' && renderPlayers('yellows', '🟨', 'yellow')}
+                        {view === 'RED' && renderPlayers('reds', '🟥', 'red')}
                     </div>
                 </div>
             );
         };
+
+
+
+        
 // --- COMPONENTES QUE FALTAVAM (Súmula e Tabela) ---
 
         const MatchPerformanceForm = ({ players, teams, onSaveStats }) => {

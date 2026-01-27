@@ -377,67 +377,76 @@
             const updateStats = async (pid, newStats) => { await db.collection('players').doc(pid).update({ stats: newStats }); alert("Estatísticas Atualizadas!"); setModal(null); };
   
             // --- LÓGICA DE NEGOCIAÇÃO FIFA (VERSÃO FINAL COM TRAVAS) ---
+            // --- LÓGICA DE NEGOCIAÇÃO FIFA (SISTEMA DE TURNOS E FINANCEIRO) ---
             const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
-                const v = parseFloat(value || 0);
-                const isClause = type === 'COMPRA' && target.clause > 0 && v >= target.clause;
-                const actingTeamName = user.data.name;
-                const targetPlayerName = target.name;
+                try {
+                    const v = parseFloat(value || 0);
+                    const installments = parseInt(meta.installments || 1);
+                    const sellOn = parseInt(meta.sellOn || 0);
+                    const signingBonus = parseFloat(meta.signingBonus || 0);
+                    const newSalary = parseFloat(meta.newSalary || 0);
+                    
+                    const isClause = type === 'COMPRA' && target.clause > 0 && v >= target.clause;
+                    const actingTeamName = user.data.name;
 
-                // 1. Formatação dos Detalhes para o Card
-                let details = `💰 Taxa: ${fmt(v)}\n`;
-                if (type === 'TROCA') details = `🔄 Troca (Volta: ${meta.cashDir === 'PAY' ? 'Paga' : 'Recebe'} ${fmt(v)})\n`;
-                if (meta.installments > 1) details += `📅 Parcelas: ${meta.installments}x\n`;
-                details += `📝 Contrato: ${con} anos\n`;
-                details += `💵 Salário: ${fmt(meta.newSalary)}/sem\n`;
-                details += `🧤 Luvas: ${fmt(meta.signingBonus)}\n`;
-                details += `👔 Papel: ${meta.role}`;
+                    // 1. Formatação dos Detalhes para o Card
+                    let details = `💰 Taxa: ${fmt(v)}\n`;
+                    if (type === 'TROCA') details = `🔄 Troca (Volta: ${meta.cashDir === 'PAY' ? 'Paga' : 'Recebe'} ${fmt(v)})\n`;
+                    if (installments > 1) details += `📅 Parcelas: ${installments}x\n`;
+                    if (sellOn > 0) details += `📈 Revenda: ${sellOn}%\n`;
+                    details += `📝 Contrato: ${con} anos\n`;
+                    details += `💵 Salário: ${fmt(newSalary)}/sem\n`;
+                    if (signingBonus > 0) details += `🧤 Luvas: ${fmt(signingBonus)}\n`;
+                    details += `👔 Papel: ${meta.role || 'ROTACAO'}`;
 
-                // 2. Lógica de Status (Bate e Volta)
-                let status = 'WAITING_SELLER';
-                if (isClause) {
-                    status = 'WAITING_PLAYER';
-                } else if (old && old.id) {
-                    // Se eu sou o DONO (Seller) e respondi, a bola vai para o COMPRADOR (Buyer)
-                    status = (user.data.id === old.sellerId) ? 'WAITING_BUYER' : 'WAITING_SELLER';
+                    // 2. Lógica de Status (Sistema de Turnos)
+                    let status = 'WAITING_SELLER';
+                    if (isClause) {
+                        status = 'WAITING_PLAYER';
+                    } else if (old && old.id) {
+                        // Inverte o turno: se o dono respondeu, volta para o comprador e vice-versa
+                        status = (user.data.id === old.sellerId) ? 'WAITING_BUYER' : 'WAITING_SELLER';
+                    }
+                    if (old && old.status === 'WAITING_PLAYER') status = 'PLAYER_COUNTER'; 
+
+                    const pl = {
+                        playerId: target.id,
+                        playerName: target.name,
+                        buyerId: old?.buyerId || user.data.id, 
+                        buyerName: old?.buyerName || user.data.name,
+                        sellerId: target.teamId || old?.sellerId || 'FREE',
+                        type,
+                        value: v,
+                        description: details,
+                        status: status,
+                        swapPlayerIds: swapIds || [],
+                        meta: {
+                            contract: parseInt(con || 1),
+                            newSalary: newSalary,
+                            signingBonus: signingBonus,
+                            role: meta.role || 'ROTACAO',
+                            installments: installments,
+                            sellOn: sellOn,
+                            isClause: isClause
+                        },
+                        date: Date.now()
+                    };
+
+                    const b = db.batch();
+                    if (old && old.id) b.delete(db.collection('offers').doc(old.id));
+                    b.set(db.collection('offers').doc(), pl);
+                    await b.commit();
+
+                    let msg = `💼 **OFERTA**\nO **${actingTeamName}** enviou uma proposta por **${target.name}**.`;
+                    if (isClause) msg = `🚨 **MULTA PAGA!**\nO **${actingTeamName}** pagou a multa de **${target.name}**!`;
+                    
+                    postNews(msg, 'transfer');
+                    setModal(null); 
+                    alert("Proposta enviada!");
+                } catch (e) {
+                    console.error(e);
+                    alert("Erro ao enviar proposta. Verifique os campos numéricos.");
                 }
-                if (old && old.status === 'WAITING_PLAYER') status = 'PLAYER_COUNTER'; 
-
-                const pl = {
-                    playerId: target.id,
-                    playerName: target.name,
-                    buyerId: old?.buyerId || user.data.id, 
-                    buyerName: old?.buyerName || user.data.name,
-                    sellerId: target.teamId || old?.sellerId || 'FREE',
-                    type,
-                    value: v,
-                    description: details,
-                    status: status,
-                    swapPlayerIds: swapIds || [],
-                    meta: {
-                        contract: parseInt(con),
-                        newSalary: parseFloat(meta.newSalary),
-                        signingBonus: parseFloat(meta.signingBonus),
-                        role: meta.role,
-                        installments: parseInt(meta.installments || 1),
-                        sellOn: parseInt(meta.sellOn || 0),
-                        isClause: isClause
-                    },
-                    date: Date.now()
-                };
-
-                const b = db.batch();
-                if (old && old.id) b.delete(db.collection('offers').doc(old.id));
-                b.set(db.collection('offers').doc(), pl);
-                await b.commit();
-
-                let msg = "";
-                if (status === 'WAITING_PLAYER') msg = `🚨 **CLÁUSULA PAGA!**\nO **${actingTeamName}** pagou a multa de **${targetPlayerName}**! A decisão agora é do jogador.`;
-                else if (status === 'PLAYER_COUNTER') msg = `🔄 **CONTRAPROPOSTA**\n**${targetPlayerName}** enviou novos termos ao **${actingTeamName}**.`;
-                else if (status === 'WAITING_BUYER') msg = `🔄 **CONTRAPROPOSTA**\nO vendedor de **${targetPlayerName}** enviou novos termos ao **${pl.buyerName}**.`;
-                else msg = `💼 **OFERTA**\nO **${actingTeamName}** enviou uma proposta ao clube por **${targetPlayerName}**.\n${details}`;
-
-                postNews(msg, 'transfer');
-                setModal(null); alert("Proposta enviada!");
             };
 
             const acceptOffer = async (o) => {
@@ -453,7 +462,7 @@
                     return;
                 }
 
-                // ETAPA 2: Finalização Financeira
+                // ETAPA 2: Finalização Financeira (Taxa + Luvas)
                 let cost = o.value; 
                 let luvas = o.meta.signingBonus || 0; 
                 let totalCost = cost + luvas;
@@ -467,7 +476,7 @@
                     b.update(db.collection('teams').doc(buy.id), {balance: firebase.firestore.FieldValue.increment(-cost)});
                     b.update(db.collection('teams').doc(o.sellerId), {balance: firebase.firestore.FieldValue.increment(cost)});
                     
-                    // Lógica de Parcelamento (Se houver)
+                    // Registro de Dívida (Se parcelado)
                     if (o.meta.installments > 1) {
                         const instVal = cost / o.meta.installments;
                         db.collection('debts').add({
@@ -479,13 +488,13 @@
                     }
                 }
 
-                // 2. Paga Luvas ao Jogador
+                // 2. Paga Luvas (Clube a Jogador)
                 if (luvas > 0) {
                     b.update(db.collection('teams').doc(buy.id), {balance: firebase.firestore.FieldValue.increment(-luvas)});
                     b.update(db.collection('players').doc(p.id), {balance: firebase.firestore.FieldValue.increment(luvas)});
                 }
 
-                // 3. Atualiza Jogador e Histórico
+                // 3. Atualiza Jogador e Gera Histórico
                 const historyEntry = { date: Date.now(), from: sel ? sel.name : 'Livre', to: buy.name, logoFrom: sel?.logo||null, logoTo: buy.logo||null, type: o.type, value: cost };
                 
                 b.update(db.collection('players').doc(p.id), {
@@ -752,7 +761,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.87</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.88</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -992,7 +1001,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.87(Company Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.88(Company Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

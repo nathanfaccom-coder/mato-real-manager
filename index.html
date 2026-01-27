@@ -758,7 +758,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.92</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.93</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -998,7 +998,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92(Company Fix)</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93(Company Fix)</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1350,96 +1350,190 @@
         };
 
         const OfferForm = ({ target, myPlayers, onSend }) => {
-            const old = target.oldOffer || {}; 
-            const isCounter = !!old.id;
+  const old = target.oldOffer || {};
+  const isCounter = !!old.id;
 
-            // ESTADO INICIAL: Garante valores padrão para evitar erro de banco
-            const [t, setT] = useState(old.type || 'COMPRA'); 
-            const [v, setV] = useState(old.value || target.value || 0); 
-            const [sal, setSal] = useState(old.meta?.newSalary || target.salary || 0);
-            const [con, setCon] = useState(old.meta?.contract || 1);
-            const [luv, setLuv] = useState(old.meta?.signingBonus || 0);
-            const [role, setRole] = useState(old.meta?.role || 'ROTACAO');
-            const [meta, setMeta] = useState(old.meta || { sellOn: 0, wageSplit: 50, buyOpt: '', cashDir: 'PAY', installments: 1 });
-            const [swaps, setSwaps] = useState(old.swapPlayerIds || []);
+  // ===== ESTADOS (TODOS NUMÉRICOS DE VERDADE) =====
+  const [t, setT] = useState(old.type || 'COMPRA');
+  const [v, setV] = useState(Number(old.value ?? target.value ?? 0));
+  const [sal, setSal] = useState(Number(old.meta?.newSalary ?? target.salary ?? 0));
+  const [con, setCon] = useState(Number(old.meta?.contract ?? 1));
+  const [luv, setLuv] = useState(Number(old.meta?.signingBonus ?? 0));
+  const [role, setRole] = useState(old.meta?.role || 'ROTACAO');
 
-            const toggleSwap = (pid) => { 
-                if(swaps.includes(pid)) setSwaps(swaps.filter(id=>id!==pid)); 
-                else if(swaps.length < 3) setSwaps([...swaps, pid]); 
-            };
+  const [meta, setMeta] = useState({
+    sellOn: Number(old.meta?.sellOn ?? 0),
+    wageSplit: Number(old.meta?.wageSplit ?? 50),
+    buyOpt: old.meta?.buyOpt || '',
+    cashDir: old.meta?.cashDir || 'PAY',
+    installments: Number(old.meta?.installments ?? 1)
+  });
 
-            return (
-                <div className="modal-bg">
-                    <div className="modal-content" style={{maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto'}}>
-                        <h3 style={{color:'var(--primary)'}}>{isCounter ? 'Contraproposta' : `Negociar ${target.name}`}</h3>
-                        
-                        {/* 1. ACORDO ENTRE CLUBES */}
-                        <div style={{borderBottom: '1px solid #444', paddingBottom: 15, marginBottom: 15}}>
-                            <label style={{fontSize: '11px', color: 'gold', fontWeight: 'bold', textTransform: 'uppercase'}}>1. Acordo entre Clubes</label>
-                            <div style={{display:'flex', gap:5, margin:'10px 0'}}>
-                                {['COMPRA','EMPRESTIMO','TROCA'].map(x=><button key={x} className={`btn ${t===x?'btn-green':'btn-ghost'}`} onClick={()=>setT(x)} style={{flex: 1}}>{x}</button>)}
-                            </div>
+  const [swaps, setSwaps] = useState(old.swapPlayerIds || []);
 
-                            <label>Valor da Taxa (₣)</label>
-                            <input className="input-field" type="number" value={v} onChange={e=>setV(e.target.value)} />
+  const toggleSwap = (pid) => {
+    if (swaps.includes(pid)) setSwaps(swaps.filter(id => id !== pid));
+    else if (swaps.length < 3) setSwaps([...swaps, pid]);
+  };
 
-                            {t === 'COMPRA' && (
-                                <div className="card" style={{padding: '10px', background: '#222', marginBottom: 10}}>
-                                    <small>Parcelamento: <b>{meta.installments}x</b></small>
-                                    <input type="range" min="1" max="12" value={meta.installments} onChange={e=>setMeta({...meta, installments: parseInt(e.target.value)})} style={{width:'100%'}} />
-                                    <small style={{display:'block', marginTop:10}}>Cláusula de Revenda: <b>{meta.sellOn}%</b></small>
-                                    <input type="range" min="0" max="50" value={meta.sellOn} onChange={e=>setMeta({...meta, sellOn: parseInt(e.target.value)})} style={{width:'100%'}} />
-                                </div>
-                            )}
-                        </div>
+  return (
+    <div className="modal-bg">
+      <div className="modal-content" style={{ maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }}>
+        <h3 style={{ color: 'var(--primary)' }}>
+          {isCounter ? 'Contraproposta' : `Negociar ${target.name}`}
+        </h3>
 
-                        {/* 2. CONTRATO DO JOGADOR */}
-                        <div>
-                            <label style={{fontSize: '11px', color: 'cyan', fontWeight: 'bold', textTransform: 'uppercase'}}>2. Contrato do Jogador</label>
-                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10}}>
-                                <div><small>Salário Mensal</small><input className="input-field" type="number" value={sal} onChange={e=>setSal(e.target.value)} /></div>
-                                <div><small>Luvas (Assinatura)</small><input className="input-field" type="number" value={luv} onChange={e=>setLuv(e.target.value)} /></div>
-                            </div>
-                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                                <div><small>Duração (Anos)</small><input className="input-field" type="number" value={con} onChange={e=>setCon(e.target.value)} /></div>
-                                <div><small>Papel no Elenco</small>
-                                    <select className="input-field" value={role} onChange={e=>setRole(e.target.value)}>
-                                        <option value="CRUCIAL">⭐ Crucial</option>
-                                        <option value="TITULAR">✅ Titular</option>
-                                        <option value="ROTACAO">🔄 Rotação</option>
-                                        <option value="RESERVA">💤 Reserva</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
+        {/* ===== 1. ACORDO ENTRE CLUBES ===== */}
+        <div style={{ borderBottom: '1px solid #444', paddingBottom: 15, marginBottom: 15 }}>
+          <label style={{ fontSize: '11px', color: 'gold', fontWeight: 'bold', textTransform: 'uppercase' }}>
+            1. Acordo entre Clubes
+          </label>
 
-                        <div style={{display:'flex', gap:10, marginTop:20}}>
-                            <button className="btn btn-green" style={{flex: 2}} onClick={() => {
-                                // LIMPEZA EXPERT: Converte strings para números puros antes de enviar ao Firebase
-                                const finalV = parseFloat(v) || 0;
-                                const finalSal = parseFloat(sal) || 0;
-                                const finalLuv = parseFloat(luv) || 0;
-                                const finalCon = parseInt(con) || 1;
-                                
-                                const cleanMeta = {
-                                    ...meta,
-                                    newSalary: finalSal,
-                                    signingBonus: finalLuv,
-                                    contract: finalCon,
-                                    role: role,
-                                    installments: parseInt(meta.installments) || 1
-                                };
+          <div style={{ display: 'flex', gap: 5, margin: '10px 0' }}>
+            {['COMPRA', 'EMPRESTIMO', 'TROCA'].map(x => (
+              <button
+                key={x}
+                className={`btn ${t === x ? 'btn-green' : 'btn-ghost'}`}
+                onClick={() => setT(x)}
+                style={{ flex: 1 }}
+              >
+                {x}
+              </button>
+            ))}
+          </div>
 
-                                onSend(target, t, finalV, swaps, finalCon, cleanMeta, old);
-                            }}>
-                                {isCounter ? 'ENVIAR CONTRAPROPOSTA' : 'ENVIAR OFERTA'}
-                            </button>
-                            <button className="btn btn-red" style={{flex: 1}} onClick={()=>setModal(null)}>CANCELAR</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
+          <label>Valor da Taxa (₣)</label>
+          <input
+            className="input-field"
+            type="number"
+            value={v}
+            min="0"
+            onChange={e => setV(Number(e.target.value) || 0)}
+          />
+
+          {t === 'COMPRA' && (
+            <div className="card" style={{ padding: 10, background: '#222', marginBottom: 10 }}>
+              <small>Parcelamento: <b>{meta.installments}x</b></small>
+              <input
+                type="range"
+                min="1"
+                max="12"
+                value={meta.installments}
+                onChange={e => setMeta({ ...meta, installments: Number(e.target.value) })}
+                style={{ width: '100%' }}
+              />
+
+              <small style={{ display: 'block', marginTop: 10 }}>
+                Cláusula de Revenda: <b>{meta.sellOn}%</b>
+              </small>
+              <input
+                type="range"
+                min="0"
+                max="50"
+                value={meta.sellOn}
+                onChange={e => setMeta({ ...meta, sellOn: Number(e.target.value) })}
+                style={{ width: '100%' }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* ===== 2. CONTRATO DO JOGADOR ===== */}
+        <div>
+          <label style={{ fontSize: '11px', color: 'cyan', fontWeight: 'bold', textTransform: 'uppercase' }}>
+            2. Contrato do Jogador
+          </label>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+            <div>
+              <small>Salário Mensal</small>
+              <input
+                className="input-field"
+                type="number"
+                value={sal}
+                min="0"
+                onChange={e => setSal(Number(e.target.value) || 0)}
+              />
+            </div>
+
+            <div>
+              <small>Luvas (Assinatura)</small>
+              <input
+                className="input-field"
+                type="number"
+                value={luv}
+                min="0"
+                onChange={e => setLuv(Number(e.target.value) || 0)}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <small>Duração (Anos)</small>
+              <input
+                className="input-field"
+                type="number"
+                min="1"
+                value={con}
+                onChange={e => setCon(Number(e.target.value) || 1)}
+              />
+            </div>
+
+            <div>
+              <small>Papel no Elenco</small>
+              <select
+                className="input-field"
+                value={role}
+                onChange={e => setRole(e.target.value)}
+              >
+                <option value="CRUCIAL">⭐ Crucial</option>
+                <option value="TITULAR">✅ Titular</option>
+                <option value="ROTACAO">🔄 Rotação</option>
+                <option value="RESERVA">💤 Reserva</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* ===== BOTÕES ===== */}
+        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+          <button
+            className="btn btn-green"
+            style={{ flex: 2 }}
+            onClick={() => {
+              if ([v, sal, luv, con].some(n => isNaN(n))) {
+                alert('Erro: valores inválidos detectados.');
+                return;
+              }
+
+              const cleanMeta = {
+                ...meta,
+                newSalary: sal,
+                signingBonus: luv,
+                contract: con,
+                role
+              };
+
+              onSend(target, t, v, swaps, con, cleanMeta, old);
+            }}
+          >
+            {isCounter ? 'ENVIAR CONTRAPROPOSTA' : 'ENVIAR OFERTA'}
+          </button>
+
+          <button
+            className="btn btn-red"
+            style={{ flex: 1 }}
+            onClick={() => setModal(null)}
+          >
+            CANCELAR
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
         const AdminPanel = ({ fixPlayersData, onUpdateCompBal, teams, papers, journalists, companies, reqs, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onConfig, onApprovePaper, onDeletePaper, onDeleteJourno, onRejectPaper, onApproveComp, onDeleteComp }) => (
             <div>
                 <h3>Painel Master</h3>

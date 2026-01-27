@@ -475,6 +475,84 @@
                     alert("Erro técnico: Verifique se os campos de preço e contrato contêm apenas números.");
                 }
             };
+            const acceptOffer = async (o) => {
+                try {
+                    const buy = teams.find(t => t.id === o.buyerId);
+                    const sel = teams.find(t => t.id === o.sellerId);
+                    const p = players.find(x => x.id === o.playerId);
+                    
+                    if (!buy || !sel || !p) return alert("Erro: Dados incompletos.");
+                    
+                    // Cálculo de entrada para parcelamento ou valor total
+                    const valorEntrada = o.meta?.installments > 1 ? (o.value / o.meta.installments) : o.value;
+                    if (buy.balance < valorEntrada) return alert("O comprador não tem saldo para fechar o negócio!");
+
+                    if (!confirm(`Confirmar venda de ${p.name} por ${fmt(o.value)}?`)) return;
+
+                    const b = db.batch();
+                    
+                    // 1. Parte Financeira
+                    if (o.meta?.installments > 1) {
+                        b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - valorEntrada });
+                        b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorEntrada });
+                        
+                        // Registro automático da dívida para o Admin cobrar
+                        db.collection('debts').add({
+                            buyerId: buy.id, buyerName: buy.name,
+                            sellerId: sel.id, sellerName: sel.name,
+                            playerName: p.name, installmentVal: valorEntrada,
+                            weeksRemaining: parseInt(o.meta.installments) - 1, date: Date.now()
+                        });
+                    } else {
+                        b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - o.value });
+                        b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + o.value });
+                    }
+
+                    // 2. Transferência do Jogador (Salva Salário, Contrato e Revenda)
+                    const historyEntry = { date: Date.now(), from: sel.name, to: buy.name, type: o.type, value: o.value };
+                    
+                    b.update(db.collection('players').doc(p.id), {
+                        teamId: buy.id,
+                        status: 'NAO_A_VENDA',
+                        contract: parseInt(o.offerContract) || 1,
+                        salary: parseFloat(o.meta?.newSalary) || p.salary,
+                        role: o.meta?.role || 'ROTACAO',
+                        sellOnDetails: o.meta?.sellOn > 0 ? { percentage: o.meta.sellOn, beneficiary: sel.id } : null,
+                        history: firebase.firestore.FieldValue.arrayUnion(historyEntry)
+                    });
+
+                    // 3. Limpa a proposta do banco
+                    b.delete(db.collection('offers').doc(o.id));
+                    
+                    await b.commit();
+                    postNews(`🤝 **NEGÓCIO FECHADO**\nO **${buy.name}** fechou a contratação de **${p.name}**!`, 'transfer');
+                    alert("Transferência concluída!");
+                } catch (e) {
+                    console.error(e);
+                    alert("Erro ao aceitar proposta.");
+                }
+            };
+
+            const rejectOffer = async (o) => {
+                if(!confirm("Encerrar negociação?")) return;
+                await db.collection('offers').doc(o.id).delete();
+                postNews(`❌ **SEM ACORDO**\nAs conversas por **${o.playerName}** foram encerradas.`, 'transfer');
+            };
+
+            const renewContract = async (p) => {
+                const cost = (parseFloat(p.value) || 1000000) * 0.10; 
+                if(user.data.balance < cost) return alert(`Sem saldo para luvas (Custo: ${fmt(cost)})`);
+                if(!confirm(`Renovar com ${p.name}?\nCusto: ${fmt(cost)}`)) return;
+                const b = db.batch();
+                b.update(db.collection('teams').doc(user.data.id), {balance: firebase.firestore.FieldValue.increment(-cost)});
+                b.update(db.collection('players').doc(p.id), {
+                    contract: (parseInt(p.contract)||0) + 1,
+                    balance: firebase.firestore.FieldValue.increment(cost)
+                });
+                await b.commit();
+                postNews(`📝 **RENOVAÇÃO**\n**${p.name}** renovou com o **${user.data.name}**.`, 'transfer');
+                setModal(null);
+            };
             // --- FUNÇÕES DE ESTATÍSTICAS E ADMIN (CORRIGIDAS) ---
 
             // 1. Função para o Jornalista atualizar a tabela
@@ -677,7 +755,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.89</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.90</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -866,7 +944,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.89</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

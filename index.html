@@ -347,14 +347,6 @@ function App() {
             setScreen('HOME'); 
         };
 
-        // 2. Criação de Novo Time
-        const createTeam = async (name, bal, serie, pass, logo) => { 
-            if(teams.find(t=>t.name.toLowerCase()===name.toLowerCase())) return alert("Nome em uso!"); 
-            await db.collection('teams').add({ 
-                name, balance: parseFloat(bal), serie, password: pass, stadiumLevel: 1, logo: logo||null, status: 'PENDING' 
-            }); 
-            alert("Criado! Aguarde aprovação."); 
-        };
 
         // 3. Criação de Jornal
         const createNewspaper = async (name, pass, owner) => { 

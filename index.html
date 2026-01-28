@@ -1779,8 +1779,6 @@
         
 const Ranking = ({ teams, players }) => {
             const [view, setView] = React.useState('TEAMS');
-
-            // Filtra para não mostrar jogadores bugados (sem time)
             const validPlayers = players.filter(p => p.teamId && p.teamId !== 'FREE' && p.name);
 
             const renderTeams = () => teams
@@ -1825,7 +1823,6 @@ const Ranking = ({ teams, players }) => {
             return (
                 <div>
                     <h3>Ranking e Estatísticas</h3>
-                    {/* Aqui estão os botões (abas) que você clica no topo do Ranking */}
                     <div className="rank-tabs">
                         <div className={`rank-tab ${view === 'TEAMS' ? 'active' : ''}`} onClick={() => setView('TEAMS')}>💰 Clubes</div>
                         <div className={`rank-tab ${view === 'OVERALL' ? 'active' : ''}`} onClick={() => setView('OVERALL')}>⭐ Craques</div>
@@ -1836,7 +1833,6 @@ const Ranking = ({ teams, players }) => {
                         <div className={`rank-tab ${view === 'YEL' ? 'active' : ''}`} onClick={() => setView('YEL')}>🟨 Amarelos</div>
                         <div className={`rank-tab ${view === 'RED' ? 'active' : ''}`} onClick={() => setView('RED')}>🟥 Vermelhos</div>
                     </div>
-
                     <div style={{ marginTop: 10 }}>
                         {view === 'TEAMS' && renderTeams()}
                         {view === 'OVERALL' && renderPlayers('overall', 'Ov:', 'var(--warning)', false)}
@@ -1850,11 +1846,6 @@ const Ranking = ({ teams, players }) => {
                 </div>
             );
         };
-
-
-
-        
-// --- COMPONENTES QUE FALTAVAM (Súmula e Tabela) ---
 
         const MatchPerformanceForm = ({ players, teams, onSaveStats }) => {
             const [selP, setSelP] = React.useState(null);
@@ -1892,20 +1883,18 @@ const Ranking = ({ teams, players }) => {
                             <div><label>🟥 Vermelho</label><input className="input-field" type="number" value={match.reds} onChange={e=>setMatch({...match, reds:parseInt(e.target.value)})} /></div>
                         </div>
                         <hr style={{borderColor:'#444'}}/>
-                        <label>⭐ Nota da Atuação (Jornalista)</label>
-                        <input className="input-field" type="number" step="0.1" min="0" max="10" value={match.rating} onChange={e=>setMatch({...match, rating: parseFloat(e.target.value)})} />
-                        <label>🚩 Resultado do Time</label>
+                        <label>⭐ Nota da Atuação</label>
+                        <input className="input-field" type="number" step="0.1" value={match.rating} onChange={e=>setMatch({...match, rating: e.target.value})} />
+                        <label>🚩 Resultado</label>
                         <select className="input-field" value={match.result} onChange={e=>setMatch({...match, result:e.target.value})}>
-                            <option value="NENHUM">-- Neutro --</option>
+                            <option value="NENHUM">Neutro</option>
                             <option value="VITORIA">Vitória</option>
                             <option value="EMPATE">Empate</option>
                             <option value="DERROTA">Derrota</option>
                         </select>
                     </div>
-                    <div style={{display:'flex', gap:10}}>
-                        <button className="btn btn-green" onClick={()=>onSaveStats(selP, match, calcMatchXP())}>LANÇAR NA SÚMULA</button>
-                        <button className="btn" onClick={()=>setSelP(null)}>VOLTAR</button>
-                    </div>
+                    <button className="btn btn-green" onClick={()=>onSaveStats(selP, match, calcMatchXP())}>SALVAR</button>
+                    <button className="btn" onClick={()=>setSelP(null)}>VOLTAR</button>
                 </div>
             );
 
@@ -1927,25 +1916,24 @@ const Ranking = ({ teams, players }) => {
         const TeamStandingsEditor = ({ teams, onUpdateTeamStats }) => {
             return (
                 <div>
-                    <h3>Editar Tabela (Jornalista)</h3>
-                    <div style={{maxHeight:400, overflowY:'auto'}}>
-                        {teams.filter(t=>t.status!=='PENDING').map(t => (
-                            <div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                <div style={{width:'30%'}}><b>{t.name}</b></div>
-                                <div style={{display:'flex', gap:5, alignItems:'flex-end'}}>
-                                    <div style={{textAlign:'center'}}><small>V</small><input className="input-field" type="number" style={{width:40, padding:5, marginBottom:0}} defaultValue={t.stats?.wins||0} id={`w-${t.id}`} /></div>
-                                    <div style={{textAlign:'center'}}><small>E</small><input className="input-field" type="number" style={{width:40, padding:5, marginBottom:0}} defaultValue={t.stats?.draws||0} id={`d-${t.id}`} /></div>
-                                    <div style={{textAlign:'center'}}><small>D</small><input className="input-field" type="number" style={{width:40, padding:5, marginBottom:0}} defaultValue={t.stats?.losses||0} id={`l-${t.id}`} /></div>
-                                    <button className="btn btn-green" style={{width:'auto', height:35, marginBottom:0}} onClick={()=>{
-                                        const w = parseInt(document.getElementById(`w-${t.id}`).value)||0;
-                                        const d = parseInt(document.getElementById(`d-${t.id}`).value)||0;
-                                        const l = parseInt(document.getElementById(`l-${t.id}`).value)||0;
-                                        onUpdateTeamStats(t.id, {wins:w, draws:d, losses:l});
-                                    }}>💾</button>
-                                </div>
+                    <h3>Editar Tabela</h3>
+                    {teams.filter(t=>t.status!=='PENDING').map(t => (
+                        <div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                            <b>{t.name}</b>
+                            <div style={{display:'flex', gap:5}}>
+                                <input className="input-field" type="number" style={{width:40, marginBottom:0}} defaultValue={t.stats?.wins||0} id={`w-${t.id}`} />
+                                <input className="input-field" type="number" style={{width:40, marginBottom:0}} defaultValue={t.stats?.draws||0} id={`d-${t.id}`} />
+                                <input className="input-field" type="number" style={{width:40, marginBottom:0}} defaultValue={t.stats?.losses||0} id={`l-${t.id}`} />
+                                <button className="btn btn-green" style={{width:'auto'}} onClick={()=>{
+                                    onUpdateTeamStats(t.id, {
+                                        wins: parseInt(document.getElementById(`w-${t.id}`).value),
+                                        draws: parseInt(document.getElementById(`d-${t.id}`).value),
+                                        losses: parseInt(document.getElementById(`l-${t.id}`).value)
+                                    });
+                                }}>💾</button>
                             </div>
-                        ))}
-                    </div>
+                        </div>
+                    ))}
                 </div>
             );
         };

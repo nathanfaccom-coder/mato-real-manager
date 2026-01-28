@@ -987,7 +987,8 @@ return (
                             onWithdraw={withdrawFunds}
                         />
                     )}
-                    {modal.type === 'VIEW_SQUAD' && (
+                    {/* ... final do seu bloco de modais (VIEW_SQUAD) */}
+            {modal.type === 'VIEW_SQUAD' && (
                 <TeamDashboard 
                     team={modal.team} 
                     players={players.filter(p => p.teamId === modal.team.id)} 
@@ -996,12 +997,12 @@ return (
                     onAdd={() => setModal({ type: 'PLAYER', data: { teamId: modal.team.id } })}
                 />
             )}
-        </div> // Fecha a modal-content
-    </div> // Fecha a modal-overlay
+        </div> {/* Fecha modal-content */}
+    </div> {/* Fecha modal-overlay */}
 )}
-        </div> // FECHA A DIV PRINCIPAL DO APP (ADICIONE ESTA)
-    ); // FECHA O RETURN (ADICIONE ESTA)
-}; // FECHA A FUNCTION APP (ADICIONE ESTA - IMPORTANTE!)
+        </div> {/* Fecha container principal */}
+    ); // Fecha o return do App
+}; // FECHA A FUNCTION APP DEFINITIVAMENTE
         
 
      // ============================================================

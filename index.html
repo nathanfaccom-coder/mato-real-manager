@@ -1360,34 +1360,96 @@
         };
 
         const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) => {
-            const [view, setView] = useState('MENU'); const [serie, setSerie] = useState('A'); const [selT, setSelT] = useState(null); const [filt, setFilt] = useState('VENDA');
-            if(view==='MENU') return <div><h3>Mercado {open?'🟢':'🔴'}</h3><div style={{display:'flex', gap:10}}><div className="card" style={{flex:1, textAlign:'center', cursor:'pointer', border:'1px solid var(--primary)'}} onClick={()=>{setFilt('VENDA'); setView('GLOBAL');}}>🛒 VENDA</div><div className="card" style={{flex:1, textAlign:'center', cursor:'pointer', border:'1px solid var(--secondary)'}} onClick={()=>{setFilt('EMPRESTIMO'); setView('GLOBAL');}}>🔄 EMP</div></div><h4>Séries</h4><div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>{SERIES.map(s=><div key={s} className="card" style={{textAlign:'center', cursor:'pointer'}} onClick={()=>{setSerie(s); setView('LIST');}}><b>Série {s}</b></div>)}</div></div>;
-            let list = []; if(view==='GLOBAL') list = players.filter(p=>p.status===filt && p.teamId!==me).sort((a,b)=>b.overall-a.overall); else if(view==='TEAM') list = players.filter(p=>p.teamId===selT.id).sort((a,b)=>b.overall-a.overall);
-            if(view==='LIST') return <div><button className="btn" onClick={()=>setView('MENU')}>Voltar</button><h3>Clubes Série {serie}</h3>{teams.filter(t=>t.serie===serie && t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>{setSelT(t); setView('TEAM');}} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo?<img src={t.logo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/>:<div style={{width:30}}></div>}<b>{t.name}</b></div>)}</div>;
+            const [view, setView] = React.useState('MENU'); 
+            const [serie, setSerie] = React.useState('A'); 
+            const [selT, setSelT] = React.useState(null); 
+            const [filt, setFilt] = React.useState('VENDA');
+
+            // --- TELA INICIAL DO MERCADO (MENU) ---
+            if(view==='MENU') return (
+                <div>
+                    <h3>Mercado {open ? '🟢' : '🔴'}</h3>
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:15}}>
+                        <div className="card" style={{textAlign:'center', cursor:'pointer', border:'1px solid var(--primary)', margin:0}} onClick={()=>{setFilt('VENDA'); setView('GLOBAL');}}>🛒 LISTA TRF</div>
+                        <div className="card" style={{textAlign:'center', cursor:'pointer', border:'1px solid var(--secondary)', margin:0}} onClick={()=>{setFilt('EMPRESTIMO'); setView('GLOBAL');}}>🔄 EMPRÉST.</div>
+                        <div className="card" style={{textAlign:'center', cursor:'pointer', border:'2px solid var(--primary)', background:'rgba(0,230,118,0.1)', gridColumn:'span 2', margin:0}} onClick={()=>{setFilt('FREE'); setView('GLOBAL');}}>🆓 PASSES LIVRES</div>
+                    </div>
+                    <h4>Séries</h4>
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                        {SERIES.map(s=><div key={s} className="card" style={{textAlign:'center', cursor:'pointer'}} onClick={()=>{setSerie(s); setView('LIST');}}><b>Série {s}</b></div>)}
+                    </div>
+                </div>
+            );
+
+            // --- LÓGICA DE FILTRAGEM ---
+            let list = []; 
+            if(view==='GLOBAL') {
+                if(filt === 'FREE') {
+                    list = players.filter(p => p.teamId === 'FREE').sort((a,b)=>b.overall-a.overall);
+                } else {
+                    list = players.filter(p => p.status === filt && p.teamId !== me && p.teamId !== 'FREE').sort((a,b)=>b.overall-a.overall);
+                }
+            } else if(view==='TEAM') {
+                list = players.filter(p => p.teamId === selT.id).sort((a,b)=>b.overall-a.overall);
+            }
+
+            // --- TELA DE LISTA DE CLUBES POR SÉRIE ---
+            if(view==='LIST') return (
+                <div>
+                    <button className="btn" onClick={()=>setView('MENU')}>Voltar</button>
+                    <h3>Clubes Série {serie}</h3>
+                    {teams.filter(t=>t.serie===serie && t.status!=='PENDING').map(t=>(
+                        <div key={t.id} className="card" onClick={()=>{setSelT(t); setView('TEAM');}} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>
+                            {t.logo ? <img src={t.logo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/> : <div style={{width:30}}></div>}
+                            <b>{t.name}</b>
+                        </div>
+                    ))}
+                </div>
+            );
             
+            // --- TELA DE EXIBIÇÃO DOS JOGADORES (RESULTADO) ---
             return (
                 <div>
-                    <button className="btn" onClick={()=>setView('MENU')}>Voltar</button><h3>{view==='GLOBAL'?filt:selT.name}</h3>
+                    <button className="btn" onClick={()=>setView('MENU')}>Voltar</button>
+                    <h3>{view==='GLOBAL' ? (filt === 'FREE' ? 'Passes Livres' : filt) : selT.name}</h3>
+                    {list.length === 0 && <p style={{textAlign:'center', color:'#666', marginTop:20}}>Nenhum jogador encontrado nesta categoria.</p>}
                     {list.map(p => (
                         <div key={p.id} className="card">
-                            <div style={{display:'flex', justifyContent:'space-between'}}><div><span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span>{p.name} {p.rating>0 && <span className="rating-badge">★ {p.rating}</span>}</div><span className="player-ov">{p.overall}</span></div>
-                            <div style={{fontSize:11, color:'#aaa', marginTop:5}}>{view==='GLOBAL' && <div>Time: {teams.find(t=>t.id===p.teamId)?.name}</div>}<div>Val: {fmt(p.value)} | Con: {p.contract}</div></div>
-                            <div className="stats-grid"><div className="stat-item"><span className="stat-lbl">⚽</span><span className="stat-val">{p.stats?.goals||0}</span></div><div className="stat-item"><span className="stat-lbl">👟</span><span className="stat-val">{p.stats?.assists||0}</span></div><div className="stat-item"><span className="stat-lbl">🛡️</span><span className="stat-val">{p.stats?.tackles||0}</span></div><div className="stat-item"><span className="stat-lbl">🧤</span><span className="stat-val">{p.stats?.saves||0}</span></div><div className="stat-item"><span className="stat-lbl">🟨</span><span className="stat-val">{p.stats?.yellows||0}</span></div><div className="stat-item"><span className="stat-lbl">🟥</span><span className="stat-val">{p.stats?.reds||0}</span></div></div>
+                            <div style={{display:'flex', justifyContent:'space-between'}}>
+                                <div>
+                                    <span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span>
+                                    {p.name} {p.rating>0 && <span className="rating-badge">★ {p.rating}</span>}
+                                </div>
+                                <span className="player-ov">{p.overall}</span>
+                            </div>
+                            <div style={{fontSize:11, color:'#aaa', marginTop:5}}>
+                                {p.teamId !== 'FREE' ? <div>Time: {teams.find(t=>t.id===p.teamId)?.name}</div> : <div style={{color:'var(--primary)'}}>Livre no Mercado</div>}
+                                <div>Val: {fmt(p.value)} | Con: {p.contract} {p.contract === 0 ? '(Encerrado)' : 'anos'}</div>
+                            </div>
+                            <div className="stats-grid">
+                                <div className="stat-item"><span className="stat-lbl">⚽</span><span className="stat-val">{p.stats?.goals||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">👟</span><span className="stat-val">{p.stats?.assists||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🛡️</span><span className="stat-val">{p.stats?.tackles||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🧤</span><span className="stat-val">{p.stats?.saves||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🟨</span><span className="stat-val">{p.stats?.yellows||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🟥</span><span className="stat-val">{p.stats?.reds||0}</span></div>
+                            </div>
 
-{!isVis && (
-   <div style={{marginTop:5, display:'flex', gap:5}}>
-    {(open || p.status==='EMPRESTIMO') && p.status!=='INTRANSFERIVEL' ? 
-        <button className="btn btn-purple" style={{flex:1}} onClick={()=>onNeg(p)}>NEGOCIAR</button> : 
-        <button className="btn btn-ghost" style={{flex:1}} disabled>BLOQUEADO</button>
-    }
-    {parseFloat(p.clause) > 0 && (
-        <button className="btn btn-gold" style={{width:'auto'}} onClick={()=>onPayClause(p)}>MULTA</button>
-    )}
-    {parseInt(p.contract) === 1 && !p.preContract && (
-        <button className="btn btn-blue" style={{width:'auto'}} onClick={()=>onPre(p)}>PRÉ</button>
-    )}
-</div>
-)}                        </div>
+                            {!isVis && (
+                                <div style={{marginTop:5, display:'flex', gap:5}}>
+                                    {(open || p.status==='EMPRESTIMO' || p.teamId === 'FREE') && p.status!=='INTRANSFERIVEL' ? 
+                                        <button className="btn btn-purple" style={{flex:1}} onClick={()=>onNeg(p)}>NEGOCIAR</button> : 
+                                        <button className="btn btn-ghost" style={{flex:1}} disabled>BLOQUEADO</button>
+                                    }
+                                    {parseFloat(p.clause) > 0 && p.teamId !== 'FREE' && (
+                                        <button className="btn btn-gold" style={{width:'auto'}} onClick={()=>onPayClause(p)}>MULTA</button>
+                                    )}
+                                    {parseInt(p.contract) === 1 && !p.preContract && p.teamId !== 'FREE' && (
+                                        <button className="btn btn-blue" style={{width:'auto'}} onClick={()=>onPre(p)}>PRÉ</button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     ))}
                 </div>
             );

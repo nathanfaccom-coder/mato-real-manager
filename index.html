@@ -660,7 +660,34 @@ const savePlayer = async (d) => {
         alert("Erro ao salvar! Verifique se digitou apenas números nos campos de valor.");
     }
 };
+// Função para abrir o modal de contraproposta
+const handleCounterOffer = (offer) => {
+    setModal({ 
+        type: 'OFFER', 
+        data: { 
+            ...offer, 
+            isCounter: true, // Identifica que não é uma oferta do zero
+            originalOfferId: offer.id, // Referência para desativar a oferta antiga depois
+            
+            // INVERSÃO DE PAPÉIS:
+            // O targetId agora é quem enviou a oferta original (buyerId)
+            targetId: offer.buyerId, 
+            playerName: offer.playerName,
+            playerId: offer.playerId,
+            
+            // Dados de quem está contrapropondo (você)
+            buyerId: user.data.id,
+            buyerName: user.data.name,
+            
+            // Sugestão de valores iniciais baseados na oferta recebida
+            value: offer.value,
+            contract: offer.contract
+        } 
+    });
+};
 
+
+    
 // --- ATUALIZAR ESTATÍSTICAS ---
 const updateStats = async (pid, newStats) => { 
     await db.collection('players').doc(pid).update({ stats: newStats }); 
@@ -1003,7 +1030,16 @@ return (
                 {screen === 'SHOPPING' && <ShoppingScreen products={products} companies={companies} onBuy={buyProduct} />}
                 {screen === 'RANKING' && <Ranking teams={teams} players={players} />}
                 {screen === 'NEWS' && <div><h3>Notícias</h3>{news.slice(0,20).map(n=><div key={n.id} className={`news-card news-${n.type}`}>{n.text}</div>)}</div>}
-                {screen === 'OFFERS' && <OffersScreen user={user} offers={offers} teams={teams} onAccept={acceptOffer} onReject={rejectOffer} />}
+                {screen === 'OFFERS' && (
+    <OffersScreen 
+        user={user} 
+        offers={offers} 
+        teams={teams} 
+        onAccept={acceptOffer} 
+        onReject={rejectOffer} 
+        onCounter={handleCounterOffer} // Garante que o clique no botão chame a função acima
+    />
+)}
                 {screen === 'PLAYER_DASH' && <PlayerDashboard player={players.find(p=>p.id===user.data.id)||user.data} team={teams.find(t=>t.id===user.data.teamId)} onAction={handlePlayerActions} onUpdatePassword={(p)=>db.collection('players').doc(user.data.id).update({password:p})} />}
                 {screen === 'COMPANY_HOME' && <CompanyDashboard company={user.data} products={products.filter(p=>p.companyId===user.data.id)} sps={sps.filter(s=>s.companyId===user.data.id)} onSaveProd={saveProduct} onProcessSpons={processSponsorship} />}
             </div>
@@ -1086,7 +1122,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.9</div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.2</div>
             
             {/* ABAS DE NAVEGAÇÃO SUPERIOR */}
             <div className="login-tabs">

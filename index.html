@@ -278,29 +278,19 @@ useEffect(() => {
     return () => unsubs.forEach(u => u());
 }, []); // Executa uma vez no mount e mantém os ouvintes vivos
 
-// 3. MONITORAMENTO DO USUÁRIO LOGADO (Lógica de Perfil)
+// Listener de Ofertas Blindado - Garante recebimento em tempo real
 useEffect(() => {
     if (!user?.data?.id) return;
 
-    if (user.type === 'USER') {
-        const me = teams.find(t => t.id === user.data.id);
-        if (me && JSON.stringify(me) !== JSON.stringify(user.data)) {
-            setUser(prev => ({...prev, data: me}));
-        }
-    }
-    
-    if (user.type === 'COMPANY') {
-        const me = companies.find(c => c.id === user.data.id);
-        if (me) {
-            if (me.status === 'BLOCKED') { 
-                alert("🚫 Empresa Bloqueada/Falida."); 
-                window.location.reload(); 
-            } else if (JSON.stringify(me) !== JSON.stringify(user.data)) {
-                setUser(prev => ({...prev, data: me}));
-            }
-        }
-    }
-}, [teams, companies, user?.data?.id, user?.type]);
+    // Escuta todas as ofertas onde o usuário logado é o alvo
+    const unsub = db.collection('offers')
+        .onSnapshot(snap => {
+            const allOffers = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setOffers(allOffers);
+        }, err => console.error("Erro Firebase Offers:", err));
+
+    return () => unsub();
+}, [user?.data?.id]); // Recarrega apenas se o ID do usuário mudar
     
     // 4. FUNÇÕES DE SUPORTE
     const postNews = (text, type='normal') => db.collection('news').add({ text, type, date: Date.now() });
@@ -988,7 +978,7 @@ return (
                     {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:35, height:35, borderRadius:'50%'}} />}
                     <div>
                         <div style={{fontWeight:'900', fontSize:14}}>{user.data?.name || user.type}</div>
-                        <small style={{fontSize:9, color:'#666'}}>v1.91.9| Mato Real</small>
+                        <small style={{fontSize:9, color:'#666'}}>v1.92.2| Mato Real</small>
                     </div>
                 </div>
                 <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -1119,7 +1109,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.0</div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis |v1.92.2</div>
             
             {/* ABAS DE NAVEGAÇÃO SUPERIOR */}
             <div className="login-tabs">

@@ -988,7 +988,7 @@ return (
                 </div>
             )}
 
-            {/* --- NOVAS TELAS ADICIONADAS PARA O ADMIN --- */}
+           {/* --- NOVAS TELAS ADICIONADAS PARA O ADMIN --- */}
             {modal.type === 'SETTINGS' && (
                 <SettingsForm 
                     team={modal.team} 
@@ -1012,22 +1012,23 @@ return (
         </div>
     </div>
 )}
-}
 
 
 
         
 
-        // --- COMPONENTE: TELA DE LOGIN E CADASTRO ---
+     // ============================================================
+// COMPONENTE: TELA DE LOGIN E CADASTRO
+// ============================================================
 const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor }) => {
-    const [tab, setTab] = useState('LOGIN'); 
-    const [subTab, setSubTab] = useState('TEAM'); 
-    const [f, setF] = useState({n:'', b:'10000000', s:'A', p:''}); 
-    const [fc, setFC] = useState({n:'', owner:'', p:'', type:'COMERCIO'});
-    const [sel, setSel] = useState(null); 
-    const [selPaper, setSelPaper] = useState(null); 
-    const [selTeamForPlayer, setSelTeamForPlayer] = useState(null); 
-    const [lp, setLp] = useState('');
+    const [tab, setTab] = React.useState('LOGIN'); 
+    const [subTab, setSubTab] = React.useState('TEAM'); 
+    const [f, setF] = React.useState({n:'', b:'10000000', s:'A', p:''}); 
+    const [fc, setFC] = React.useState({n:'', owner:'', p:'', type:'COMERCIO'});
+    const [sel, setSel] = React.useState(null); 
+    const [selPaper, setSelPaper] = React.useState(null); 
+    const [selTeamForPlayer, setSelTeamForPlayer] = React.useState(null); 
+    const [lp, setLp] = React.useState('');
 
     const handleUpload = (e) => { 
         const file = e.target.files[0]; 
@@ -1036,7 +1037,6 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, 
         if(file) reader.readAsDataURL(file); 
     };
     
-    // Puxa as regras financeiras baseadas no porte da empresa selecionada
     const selectedTypeInfo = COMPANY_TYPES[fc.type] || {};
 
     return (
@@ -1053,104 +1053,123 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, 
             </div>
 
             {/* CONTEÚDO: LOGIN MULTI-USUÁRIO */}
-            {tab==='LOGIN' && <div>
-                <div style={{marginBottom:15, display:'flex', gap:10, justifyContent:'center'}}>
-                    <button className={`btn ${subTab==='TEAM'?'btn-green':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>setSubTab('TEAM')}>TIMES</button>
-                    <button className={`btn ${subTab==='PLAYER'?'btn-blue':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>{setSubTab('PLAYER'); setSelTeamForPlayer(null);}}>JOGADORES</button>
-                    <button className={`btn ${subTab==='COMPANY'?'btn-purple':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>setSubTab('COMPANY')}>EMPRESAS</button>
-                </div>
-
-                {/* Lista de Times Ativos */}
-                {subTab==='TEAM' && (teams||[]).filter(t=>t.status!=='PENDING').map(t=>(
-                    <div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>
-                        {t.logo ? <img src={t.logo} style={{width:40, height:40, borderRadius:'50%', objectFit:'cover'}}/> : <div style={{width:40, height:40, background:'#333', borderRadius:'50%'}}></div>}
-                        <div style={{textAlign:'left'}}><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div>
+            {tab==='LOGIN' && (
+                <div>
+                    <div style={{marginBottom:15, display:'flex', gap:10, justifyContent:'center'}}>
+                        <button className={`btn ${subTab==='TEAM'?'btn-green':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>setSubTab('TEAM')}>TIMES</button>
+                        <button className={`btn ${subTab==='PLAYER'?'btn-blue':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>{setSubTab('PLAYER'); setSelTeamForPlayer(null);}}>JOGADORES</button>
+                        <button className={`btn ${subTab==='COMPANY'?'btn-purple':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>setSubTab('COMPANY')}>EMPRESAS</button>
                     </div>
-                ))}
-                
-                {/* Seleção de Jogador por Time (Filtro) */}
-                {subTab==='PLAYER' && !selTeamForPlayer && <div>
-                    <p style={{color:'#aaa', fontSize:12}}>Selecione o seu clube para encontrar seu perfil:</p>
-                    {(teams||[]).filter(t=>t.status!=='PENDING').map(t=>(<div key={t.id} className="card" onClick={()=>setSelTeamForPlayer(t)} style={{cursor:'pointer'}}><b>{t.name}</b></div>))}
-                </div>}
 
-                {subTab==='PLAYER' && selTeamForPlayer && <div>
-                    <button className="btn btn-ghost" style={{marginBottom:10}} onClick={()=>setSelTeamForPlayer(null)}>⬅ VOLTAR PARA LISTA</button>
-                    {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).map(p => (
-                        <div key={p.id} className="card" onClick={()=>setSel({...p, type:'PLAYER'})} style={{cursor:'pointer', borderLeft:'4px solid var(--secondary)'}}>👟 <b>{p.name}</b></div>
+                    {subTab==='TEAM' && (teams||[]).filter(t=>t.status!=='PENDING').map(t=>(
+                        <div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>
+                            {t.logo ? <img src={t.logo} style={{width:40, height:40, borderRadius:'50%', objectFit:'cover'}}/> : <div style={{width:40, height:40, background:'#333', borderRadius:'50%'}}></div>}
+                            <div style={{textAlign:'left'}}><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div>
+                        </div>
                     ))}
-                </div>}
+                    
+                    {subTab==='PLAYER' && !selTeamForPlayer && (
+                        <div>
+                            <p style={{color:'#aaa', fontSize:12}}>Selecione o seu clube para encontrar seu perfil:</p>
+                            {(teams||[]).filter(t=>t.status!=='PENDING').map(t=>(<div key={t.id} className="card" onClick={()=>setSelTeamForPlayer(t)} style={{cursor:'pointer'}}><b>{t.name}</b></div>))}
+                        </div>
+                    )}
 
-                {/* Lista de Empresas Ativas */}
-                {subTab==='COMPANY' && (companies||[]).filter(c=>c.status!=='PENDING').map(c=><div key={c.id} className="card" onClick={()=>setSel({...c, type:'COMPANY'})} style={{cursor:'pointer', borderLeft:'4px solid var(--purple)'}}>🏢 <b>{c.name}</b></div>)}
-                
-                <div style={{marginTop:20}}>
-                    <button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button>
-                    <button className="btn btn-ghost" onClick={()=> {if(prompt("Senha ADM:")==='2503') onAdmin()}}>ADMINISTRATIVO</button>
+                    {subTab==='PLAYER' && selTeamForPlayer && (
+                        <div>
+                            <button className="btn btn-ghost" style={{marginBottom:10}} onClick={()=>setSelTeamForPlayer(null)}>⬅ VOLTAR PARA LISTA</button>
+                            {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).map(p => (
+                                <div key={p.id} className="card" onClick={()=>setSel({...p, type:'PLAYER'})} style={{cursor:'pointer', borderLeft:'4px solid var(--secondary)'}}>👟 <b>{p.name}</b></div>
+                            ))}
+                        </div>
+                    )}
+
+                    {subTab==='COMPANY' && (companies||[]).filter(c=>c.status!=='PENDING').map(c=>(
+                        <div key={c.id} className="card" onClick={()=>setSel({...c, type:'COMPANY'})} style={{cursor:'pointer', borderLeft:'4px solid var(--purple)'}}>🏢 <b>{c.name}</b></div>
+                    ))}
+                    
+                    <div style={{marginTop:20}}>
+                        <button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button>
+                        <button className="btn btn-ghost" onClick={()=> {if(prompt("Senha ADM:")==='2503') onAdmin()}}>ADMINISTRATIVO</button>
+                    </div>
                 </div>
-            </div>}
+            )}
 
             {/* CONTEÚDO: SOLICITAR CRIAÇÃO DE TIME */}
-            {tab==='CREATE' && <div>
-                <label style={{fontSize:11, color:'#888'}}>Escudo do Clube:</label>
-                <input type="file" className="input-field" onChange={handleUpload} />
-                <input className="input-field" placeholder="Nome do Clube" value={f.n} onChange={e=>setF({...f, n:e.target.value})} />
-                <select className="input-field" value={f.s} onChange={e=>setF({...f, s:e.target.value})}>
-                    {['A','B','C','D'].map(s=><option key={s} value={s}>Série {s}</option>)}
-                </select>
-                <input className="input-field" type="password" placeholder="Defina uma Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} />
-                <button className="btn btn-green" onClick={()=>onCreateTeam(f.n, f.b, f.s, f.p, f.l)}>SOLICITAR AFILIAÇÃO</button>
-            </div>}
+            {tab==='CREATE' && (
+                <div>
+                    <label style={{fontSize:11, color:'#888'}}>Escudo do Clube:</label>
+                    <input type="file" className="input-field" onChange={handleUpload} />
+                    <input className="input-field" placeholder="Nome do Clube" value={f.n} onChange={e=>setF({...f, n:e.target.value})} />
+                    <select className="input-field" value={f.s} onChange={e=>setF({...f, s:e.target.value})}>
+                        {['A','B','C','D'].map(s=><option key={s} value={s}>Série {s}</option>)}
+                    </select>
+                    <input className="input-field" type="password" placeholder="Defina uma Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} />
+                    <button className="btn btn-green" onClick={()=>onCreateTeam(f.n, f.b, f.s, f.p, f.l)}>SOLICITAR AFILIAÇÃO</button>
+                </div>
+            )}
 
             {/* CONTEÚDO: IMPRENSA (Jornal e Jornalistas) */}
-            {tab==='PRESS' && <div>
-                <div style={{display:'flex', gap:10, marginBottom:10}}>
-                    <button className="btn btn-ghost" onClick={()=>setSubTab('LOGIN_P')}>LOGIN</button>
-                    <button className="btn btn-ghost" onClick={()=>setSubTab('NEW_PAPER')}>NOVO JORNAL</button>
+            {tab==='PRESS' && (
+                <div>
+                    <div style={{display:'flex', gap:10, marginBottom:10}}>
+                        <button className="btn btn-ghost" onClick={()=>setSubTab('LOGIN_P')}>LOGIN</button>
+                        <button className="btn btn-ghost" onClick={()=>setSubTab('NEW_PAPER')}>NOVO JORNAL</button>
+                    </div>
+                    {subTab==='LOGIN_P' && !selPaper && (
+                        <div>{(papers||[]).filter(p=>p.status==='ACTIVE').map(p=><div key={p.id} className="card" onClick={()=>setSelPaper(p)}>📰 {p.name}</div>)}</div>
+                    )}
+                    {subTab==='LOGIN_P' && selPaper && (
+                        <div>
+                            <button className="btn btn-ghost" style={{marginBottom:10}} onClick={()=>setSelPaper(null)}>⬅ VOLTAR</button>
+                            <div className="card" onClick={()=>setSel({...selPaper, type:'PAPER'})} style={{border:'1px solid var(--primary)'}}>👑 {selPaper.ownerName} (Dono)</div>
+                            {(journalists||[]).filter(j=>j.newspaperId===selPaper.id && j.status==='ACTIVE').map(j=><div key={j.id} className="card" onClick={()=>setSel({...j, type:'JOURNALIST'})}>✒️ {j.name}</div>)}
+                        </div>
+                    )}
+                    {subTab==='NEW_PAPER' && (
+                        <div>
+                            <input className="input-field" placeholder="Nome do Veículo" id="pn" />
+                            <input className="input-field" placeholder="Nome do Proprietário" id="po" />
+                            <input className="input-field" type="password" placeholder="Senha" id="pp" />
+                            <button className="btn btn-green" onClick={()=>onCreatePaper(document.getElementById('pn').value, document.getElementById('pp').value, document.getElementById('po').value)}>CRIAR VEÍCULO</button>
+                        </div>
+                    )}
                 </div>
-                {subTab==='LOGIN_P' && !selPaper && <div>{(papers||[]).filter(p=>p.status==='ACTIVE').map(p=><div key={p.id} className="card" onClick={()=>setSelPaper(p)}>📰 {p.name}</div>)}</div>}
-                {subTab==='LOGIN_P' && selPaper && <div>
-                    <button className="btn btn-ghost" style={{marginBottom:10}} onClick={()=>setSelPaper(null)}>⬅ VOLTAR</button>
-                    <div className="card" onClick={()=>setSel({...selPaper, type:'PAPER'})} style={{border:'1px solid var(--primary)'}}>👑 {selPaper.ownerName} (Dono)</div>
-                    {(journalists||[]).filter(j=>j.newspaperId===selPaper.id && j.status==='ACTIVE').map(j=><div key={j.id} className="card" onClick={()=>setSel({...j, type:'JOURNALIST'})}>✒️ {j.name}</div>)}
-                </div>}
-                {subTab==='NEW_PAPER' && <div>
-                    <input className="input-field" placeholder="Nome do Veículo" id="pn" />
-                    <input className="input-field" placeholder="Nome do Proprietário" id="po" />
-                    <input className="input-field" type="password" placeholder="Senha" id="pp" />
-                    <button className="btn btn-green" onClick={()=>onCreatePaper(document.getElementById('pn').value, document.getElementById('pp').value, document.getElementById('po').value)}>CRIAR VEÍCULO</button>
-                </div>}
-            </div>}
+            )}
 
             {/* CONTEÚDO: SOLICITAR ABERTURA DE EMPRESA */}
-            {tab==='COMPANY' && <div>
-                <input className="input-field" placeholder="Nome Fantasia" value={fc.n} onChange={e=>setFC({...fc, n:e.target.value})} />
-                <input className="input-field" placeholder="Nome do Sócio/Dono" value={fc.owner} onChange={e=>setFC({...fc, owner:e.target.value})} />
-                <select className="input-field" value={fc.type} onChange={e=>setFC({...fc, type:e.target.value})}>
-                    <option value="COMERCIO">Comércio Local</option>
-                    <option value="MEDIA">Média Empresa</option>
-                    <option value="GRANDE">Grande Empresa</option>
-                </select>
-                <div className="card" style={{textAlign:'left', background:'rgba(0,0,0,0.2)'}}>
-                    <div style={{display:'flex', justifyContent:'space-between', fontSize:12}}>
-                        <span>💰 Capital: {fmt(selectedTypeInfo.start)}</span>
-                        <span>💸 Imposto: {fmt(selectedTypeInfo.tax)}</span>
+            {tab==='COMPANY' && (
+                <div>
+                    <input className="input-field" placeholder="Nome Fantasia" value={fc.n} onChange={e=>setFC({...fc, n:e.target.value})} />
+                    <input className="input-field" placeholder="Nome do Sócio/Dono" value={fc.owner} onChange={e=>setFC({...fc, owner:e.target.value})} />
+                    <select className="input-field" value={fc.type} onChange={e=>setFC({...fc, type:e.target.value})}>
+                        <option value="COMERCIO">Comércio Local</option>
+                        <option value="MEDIA">Média Empresa</option>
+                        <option value="GRANDE">Grande Empresa</option>
+                    </select>
+                    <div className="card" style={{textAlign:'left', background:'rgba(0,0,0,0.2)'}}>
+                        <div style={{display:'flex', justifyContent:'space-between', fontSize:12}}>
+                            <span>💰 Capital: {fmt(selectedTypeInfo.start)}</span>
+                            <span>💸 Imposto: {fmt(selectedTypeInfo.tax)}</span>
+                        </div>
+                        <p style={{fontSize:10, color:'#888', marginTop:5}}>"{selectedTypeInfo.desc}"</p>
                     </div>
-                    <p style={{fontSize:10, color:'#888', marginTop:5}}>"{selectedTypeInfo.desc}"</p>
+                    <input className="input-field" type="password" placeholder="Senha de Acesso" value={fc.p} onChange={e=>setFC({...fc, p:e.target.value})} />
+                    <button className="btn btn-purple" onClick={()=>onCreateCompany(fc)}>ABRIR EMPRESA</button>
                 </div>
-                <input className="input-field" type="password" placeholder="Senha de Acesso" value={fc.p} onChange={e=>setFC({...fc, p:e.target.value})} />
-                <button className="btn btn-purple" onClick={()=>onCreateCompany(fc)}>ABRIR EMPRESA</button>
-            </div>}
+            )}
             
             {/* MODAL DE SEGURANÇA (Senha) */}
             {sel && (
                 <div className="modal-overlay">
                     <div className="modal-content">
-                        <h3 style={{margin:0}}>{sel.name}</h3>
-                        <p style={{fontSize:11, color:'#666', marginBottom:15}}>Digite sua senha de acesso</p>
-                        <input className="input-field" type="password" placeholder="Senha" value={lp} onChange={e=>setLp(e.target.value)} />
-                        <button className="btn btn-green" onClick={()=>onLogin(sel.id, lp, sel.type)}>CONECTAR</button>
-                        <button className="btn btn-red" onClick={()=>{setSel(null); setLp('');}}>CANCELAR</button>
+                        <h3 style={{margin:0, color: 'var(--primary)'}}>{sel.name}</h3>
+                        <p style={{fontSize:11, color:'#aaa', marginBottom:15}}>Digite sua senha de acesso</p>
+                        <input className="input-field" type="password" placeholder="Senha" value={lp} onChange={e=>setLp(e.target.value)} autoFocus />
+                        <div style={{display: 'flex', gap: 10}}>
+                            <button className="btn btn-green" style={{flex: 2}} onClick={()=>onLogin(sel.id, lp, sel.type)}>CONECTAR</button>
+                            <button className="btn btn-red" style={{flex: 1}} onClick={()=>{setSel(null); setLp('');}}>SAIR</button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -1158,6 +1177,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, 
     );
 };
 // --- FIM DO COMPONENTE LOGINSCREEN ---
+        
         
         // --- COMPONENTE: PAINEL DE VISITANTE (RESUMO PÚBLICO) ---
 const VisitorDashboard = ({ players, teams }) => {

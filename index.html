@@ -2284,11 +2284,14 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction }) =>
             
        // --- COMPONENTE: CAIXA DE ENTRADA DE NEGOCIAÇÕES ---
 const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) => {
-    // Filtra propostas destinadas ao usuário atual (Time ou Jogador)
-    // o.targetId refere-se ao ID de quem deve responder à oferta
-    const myOffers = (offers || []).filter(o => 
-        (o.targetId === user.data.id || o.recipientId === user.data.id) && o.status === 'PENDING'
-    );
+    // FILTRO SÊNIOR: Garante que a oferta apareça apenas para quem deve responder no momento
+    const myOffers = (offers || []).filter(o => {
+        // A proposta só aparece se estiver PENDENTE e se o usuário logado for o alvo atual
+        const isTarget = o.targetId === user.data.id || o.recipientId === user.data.id;
+        const isPending = o.status === 'PENDING';
+        
+        return isTarget && isPending;
+    });
 
     return (
         <div className="offers-container">
@@ -2310,7 +2313,11 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         <div>
                             <b style={{ color: 'var(--primary)', fontSize: 18 }}>{o.playerName}</b>
                             <small style={{ display: 'block', color: '#aaa', marginTop: 2 }}>
-                                Proposta de: <b>{o.buyerName || "Interessado"}</b>
+                                {o.buyerId === user.data.id ? (
+                                    <span>Contraproposta recebida de: <b>{o.sellerId}</b></span>
+                                ) : (
+                                    <span>Proposta de: <b>{o.buyerName || "Interessado"}</b></span>
+                                )}
                             </small>
                         </div>
                         <span style={{ 
@@ -2340,7 +2347,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         color: '#eee',
                         fontFamily: 'monospace'
                     }}>
-                        {o.description || `Valor: ${fmt(o.value)}\nContrato: ${o.contract} anos`}
+                        {o.description || `Valor: ${fmt(o.value)}\nContrato: ${o.offerContract} anos`}
                     </div>
 
                     {/* BOTÕES DE DECISÃO */}

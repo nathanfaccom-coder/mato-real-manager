@@ -696,7 +696,7 @@ const updateStats = async (pid, newStats) => {
 };
 // --- FIM DO BLOCO DE JOGADORES ---
 
-          // ============================================================
+         // ============================================================
 // SISTEMA DE NEGOCIAÇÃO: OFERTAS, ACEITES E RECUSAS
 // ============================================================
 
@@ -707,32 +707,32 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
         const v = parseFloat(value) || 0;
         const years = parseInt(con) || 1;
         
-        // Identificação resiliente do Jogador
+        // Identificação do Jogador
         const pId = target?.id || old?.playerId;
         const pName = target?.name || old?.playerName || "Jogador";
 
         if (!pId) throw new Error("ID do jogador ausente");
 
-        // --- LÓGICA DE ROTEAMENTO DE MENSAGEM (O CORAÇÃO DO PROBLEMA) ---
-        // Se for uma proposta NOVA: o alvo é o time atual do jogador (target.teamId).
-        // Se for uma CONTRAPROPOSTA: o alvo deve ser quem enviou a oferta que você está respondendo.
+        // --- LÓGICA DE DESTINATÁRIO SÊNIOR ---
+        // Se for NOVA: Vai para o dono do jogador (target.teamId).
+        // Se for CONTRA: Vai para quem enviou a oferta que estou respondendo.
         let recipientId = target?.teamId || old?.sellerId || 'FREE';
         
         if (old?.id) {
-            // INVERSÃO SÊNIOR: Se eu estou respondendo a uma oferta, o destinatário 
-            // é SEMPRE o lado oposto ao meu ID atual.
+            // Se eu sou o dono do jogador respondendo a uma oferta:
+            // O destinatário TEM que ser o 'buyerId' da oferta antiga.
             recipientId = (user.data.id === old.buyerId) ? (old.sellerId || 'FREE') : old.buyerId;
         }
 
         const payload = {
             playerId: pId,
             playerName: pName,
-            // Mantém os IDs originais de quem quer comprar e quem é o dono
+            // Mantém a estrutura original da negociação
             buyerId: old?.buyerId || user.data.id,
             buyerName: old?.buyerName || user.data.name,
             sellerId: target?.teamId || old?.sellerId || 'FREE',
             
-            // Define quem verá a oferta na "Caixa de Entrada"
+            // Campos de visibilidade na Caixa de Entrada
             targetId: recipientId, 
             recipientId: recipientId,
             
@@ -742,13 +742,12 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
             offerContract: years,
             date: Date.now(),
             description: `Taxa: ${fmt(v)}\nContrato: ${years} anos`,
-            // Preserva metadados (salários, parcelas, etc)
             meta: meta || { installments: 1, newSalary: 0, role: 'RESERVA' }
         };
 
         const batch = db.batch();
         
-        // Mantém o mecanismo de limpeza: Deleta a oferta anterior se for renegociação
+        // Garante que a oferta antiga seja deletada antes da nova entrar
         if (old?.id) {
             batch.delete(db.collection('offers').doc(old.id));
         }
@@ -762,15 +761,15 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
         postNews(`${msgHead}\nO **${user.data.name}** enviou termos por **${pName}**!`, 'transfer');
         
         setModal(null);
-        alert("Proposta enviada com sucesso!");
+        alert("Proposta enviada!");
 
     } catch (err) {
-        console.error("ERRO CRÍTICO NO ENVIO:", err);
+        console.error("ERRO NO ENVIO:", err);
         alert("Erro técnico: " + err.message);
     }
 };
 
-// 2. ACEITAR OFERTA (Mantendo mecanismos de saldo, histórico e dívidas)
+// 2. ACEITAR OFERTA
 const acceptOffer = async (o) => {
     try {
         const buy = teams.find(t => t.id === o.buyerId);
@@ -786,13 +785,11 @@ const acceptOffer = async (o) => {
 
         const b = db.batch();
         
-        // Preserva mecanismo financeiro para clubes e agentes livres
         if (sel) { 
             b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - valorEntrada });
             b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorEntrada });
         }
 
-        // Preserva mecanismo de Histórico e Contrato
         b.update(db.collection('players').doc(p.id), {
             teamId: buy.id,
             status: 'NAO_A_VENDA',
@@ -819,7 +816,7 @@ const acceptOffer = async (o) => {
     }
 };
 
-// 3. RECUSAR OFERTA (Limpeza simples de documento)
+// 3. RECUSAR OFERTA
 const rejectOffer = async (o) => {
     try {
         if(!confirm("Recusar proposta por " + o.playerName + "?")) return;
@@ -828,8 +825,6 @@ const rejectOffer = async (o) => {
         alert("Recusada.");
     } catch (e) { console.error(e); }
 };
-
-// --- FIM DO BLOCO DE NEGOCIAÇÃO ---
     
     
       // --- INÍCIO DO BLOCO: GESTÃO DE PERFORMANCE E TEMPO ---
@@ -1113,7 +1108,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.7</div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.8</div>
             
             {/* ABAS DE NAVEGAÇÃO SUPERIOR */}
             <div className="login-tabs">

@@ -814,20 +814,6 @@ const rejectOffer = async (o) => {
     } catch (e) { console.error(e); }
 };
 
-// 4. ABRIR MODAL DE CONTRAOFERTA (Corrige o botão que não funcionava)
-const handleCounterOffer = (offer) => {
-    setModal({ 
-        type: 'OFFER', 
-        data: { 
-            ...offer, 
-            isCounter: true, 
-            originalOfferId: offer.id,
-            targetId: offer.buyerId, 
-            buyerId: user.data.id,
-            buyerName: user.data.name
-        } 
-    });
-};
 
 // --- FIM DO BLOCO DE NEGOCIAÇÃO ---
 

@@ -703,63 +703,76 @@ const updateStats = async (pid, newStats) => {
 // 1. ENVIAR OU CONTRAPOR OFERTA
 const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
     try {
+        // 1. Validação de Segurança
+        if (!user || !user.data) return alert("Erro: Usuário não autenticado.");
+        
+        const playerId = target?.id || old?.playerId;
+        const playerName = target?.name || old?.playerName;
+        
+        if (!playerId) {
+            console.error("Dados do alvo:", target, old);
+            return alert("Erro: ID do jogador não encontrado.");
+        }
+
         const v = parseFloat(value) || 0;
         const contractYears = parseInt(con) || 1;
-        const actingTeamName = user.data.name;
-        const targetPlayerName = target.name || old?.playerName;
-
-        // Geração da descrição do card
+        
+        // 2. Montagem dos Detalhes
         let details = `💰 Taxa: ${fmt(v)}\n`;
-        if (meta.installments > 1) details += `📅 Parcelamento: ${meta.installments}x de ${fmt(v / meta.installments)}\n`;
-        if (meta.sellOn > 0) details += `📈 Revenda: ${meta.sellOn}%\n`;
+        if (meta?.installments > 1) details += `📅 Parcelamento: ${meta.installments}x de ${fmt(v / meta.installments)}\n`;
         details += `📝 Contrato: ${contractYears} anos\n`;
-        details += `💵 Salário Sugerido: ${fmt(meta.newSalary)}/sem\n`;
-        details += `👔 Papel: ${meta.role || 'ROTACAO'}`;
+        details += `💵 Salário: ${fmt(meta?.newSalary || 0)}/sem`;
 
-        // Lógica de Destinatário: Define para quem a proposta deve aparecer
-        let recipientId = target.teamId || 'FREE'; 
+        // 3. Lógica de Destinatário (Quem recebe a oferta na caixa)
+        let recipientId = target?.teamId || 'FREE';
         if (old && old.id) {
-            // Se for contraproposta, inverte: quem mandou a antiga agora recebe a nova
+            // Se for contraproposta, inverte o fluxo
             recipientId = (user.data.id === old.buyerId) ? old.sellerId : old.buyerId;
         }
 
-        const pl = {
-            playerId: target.id || old?.playerId,
-            playerName: targetPlayerName,
+        const payload = {
+            playerId: playerId,
+            playerName: playerName,
             buyerId: old?.buyerId || user.data.id,
-            buyerName: old?.buyerName || actingTeamName,
-            sellerId: target.teamId || old?.sellerId || 'FREE',
+            buyerName: old?.buyerName || user.data.name,
+            sellerId: target?.teamId || old?.sellerId || 'FREE',
+            targetId: recipientId, // Campo crucial para a OffersScreen
             recipientId: recipientId,
-            targetId: recipientId, // Campo espelho para a Caixa de Entrada
             status: 'PENDING',
-            type: type,
+            type: type || 'NEGOCIAÇÃO',
             value: v,
             offerContract: contractYears,
             description: details,
             meta: {
                 ...meta,
-                newSalary: parseFloat(meta.newSalary) || 0,
-                signingBonus: parseFloat(meta.signingBonus) || 0,
-                role: meta.role || 'ROTACAO',
-                installments: parseInt(meta.installments) || 1,
-                sellOn: parseInt(meta.sellOn) || 0
+                newSalary: parseFloat(meta?.newSalary) || 0,
+                installments: parseInt(meta?.installments) || 1
             },
             date: Date.now()
         };
 
-        const b = db.batch();
-        if (old && old.id) b.delete(db.collection('offers').doc(old.id)); // Limpa a anterior
-        b.set(db.collection('offers').doc(), pl);
-        await b.commit();
+        // 4. Operação no Banco
+        const batch = db.batch();
+        
+        // Se houver uma oferta antiga sendo renegociada, deleta ela
+        if (old && old.id) {
+            batch.delete(db.collection('offers').doc(old.id));
+        }
+        
+        const newRef = db.collection('offers').doc();
+        batch.set(newRef, payload);
+        
+        await batch.commit();
 
         const msgHead = (old && old.id) ? "🔄 CONTRAPROPOSTA" : "💼 NOVA OFERTA";
-        postNews(`${msgHead}\nO **${actingTeamName}** enviou termos por **${targetPlayerName}**!\n\n${details}`, 'transfer');
+        postNews(`${msgHead}\nO **${user.data.name}** enviou termos por **${playerName}**!`, 'transfer');
         
-        setModal(null); 
-        alert("Proposta enviada!");
-    } catch (e) {
-        console.error(e);
-        alert("Erro ao enviar proposta.");
+        setModal(null);
+        alert("Proposta enviada com sucesso!");
+
+    } catch (error) {
+        console.error("Erro detalhado no envio:", error);
+        alert("Erro técnico ao enviar proposta. Verifique o console (F12).");
     }
 };
 
@@ -1101,7 +1114,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.4</div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.5</div>
             
             {/* ABAS DE NAVEGAÇÃO SUPERIOR */}
             <div className="login-tabs">

@@ -696,7 +696,7 @@ const updateStats = async (pid, newStats) => {
 };
 // --- FIM DO BLOCO DE JOGADORES ---
 
-           // ============================================================
+          // ============================================================
 // SISTEMA DE NEGOCIAÇÃO: OFERTAS, ACEITES E RECUSAS
 // ============================================================
 
@@ -736,14 +736,15 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
 
         const batch = db.batch();
         
-        // Deleta a oferta antiga se for uma contraproposta
+        // Se for contraproposta, deletamos a anterior
         if (old?.id) {
             batch.delete(db.collection('offers').doc(old.id));
         }
         
-        const newDoc = db.collection('offers').doc();
-        batch.set(newDoc, payload);
+        const newRef = db.collection('offers').doc();
+        batch.set(newRef, payload);
         
+        // O await agora funciona porque está dentro de uma função async unificada
         await batch.commit(); 
 
         const msgHead = (old && old.id) ? "🔄 CONTRAPROPOSTA" : "💼 NOVA OFERTA";
@@ -758,7 +759,7 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
     }
 };
 
-// 2. ACEITAR OFERTA (Transferência e Pagamento)
+// 2. ACEITAR OFERTA
 const acceptOffer = async (o) => {
     try {
         const buy = teams.find(t => t.id === o.buyerId);
@@ -814,9 +815,6 @@ const rejectOffer = async (o) => {
         alert("Recusada.");
     } catch (e) { console.error(e); }
 };
-
-// --- FIM DO BLOCO DE NEGOCIAÇÃO ---
-
     
     
       // --- INÍCIO DO BLOCO: GESTÃO DE PERFORMANCE E TEMPO ---

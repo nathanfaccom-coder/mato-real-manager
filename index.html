@@ -917,105 +917,95 @@ if(!user) return (
 );
 
 return (
-    <div className="main-app">
-        {/* HEADER */}
-        <div className="header">
-            <div style={{display:'flex', alignItems:'center', gap:10}}>
-                {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:35, height:35, borderRadius:'50%'}} />}
-                <div>
-                    <div style={{fontWeight:'900', fontSize:14}}>{user.data?.name || user.type}</div>
-                    <small style={{fontSize:9, color:'#666'}}>v1.90.6 | Mato Real</small>
+        <div className="main-app">
+            {/* HEADER */}
+            <div className="header">
+                <div style={{display:'flex', alignItems:'center', gap:10}}>
+                    {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:35, height:35, borderRadius:'50%'}} />}
+                    <div>
+                        <div style={{fontWeight:'900', fontSize:14}}>{user.data?.name || user.type}</div>
+                        <small style={{fontSize:9, color:'#666'}}>v1.90.6 | Mato Real</small>
+                    </div>
+                </div>
+                <div style={{display:'flex', gap:15, alignItems:'center'}}>
+                    {(user.type==='USER' || user.type==='COMPANY') && <b style={{color:'var(--primary)'}}>{fmt(user.data.balance)}</b>}
+                    <i className="fas fa-sign-out-alt" onClick={()=>window.location.reload()}></i>
                 </div>
             </div>
-            <div style={{display:'flex', gap:15, alignItems:'center'}}>
-                {(user.type==='USER' || user.type==='COMPANY') && <b style={{color:'var(--primary)'}}>{fmt(user.data.balance)}</b>}
-                <i className="fas fa-sign-out-alt" onClick={()=>window.location.reload()}></i>
+
+            {/* TELAS PRINCIPAIS */}
+            <div className="container">
+                {screen === 'HOME' && user.type === 'ADMIN' && (
+                    <AdminPanel 
+                        teams={teams} papers={papers} journalists={journalists} companies={companies} 
+                        reqs={reqs} config={conf} onAct={adminAction} onPost={postNews} 
+                        onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam}
+                        onConfig={(t) => setModal({ type: 'SETTINGS', team: t })} 
+                        onEditT={(t) => setModal({ type: 'VIEW_SQUAD', team: t })} 
+                    />
+                )}
+                {screen === 'HOME' && user.type === 'USER' && <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />}
+                {screen === 'PRESS_DASH' && <div className="card"><h3>Imprensa</h3><button className="btn btn-blue" onClick={()=>setModal({type:'POST_NEWS'})}>NOTÍCIA</button><button className="btn btn-purple" onClick={()=>setModal({type:'MATCH_PERFORMANCE'})}>SÚMULA</button></div>}
+                {screen === 'MARKET' && <Market me={user.data?.id} teams={teams} players={players} open={conf.marketOpen} onNeg={(p)=>setModal({type:'OFFER', data:p})} />}
+                {screen === 'SHOPPING' && <ShoppingScreen products={products} companies={companies} onBuy={buyProduct} />}
+                {screen === 'RANKING' && <Ranking teams={teams} players={players} />}
+                {screen === 'NEWS' && <div><h3>Notícias</h3>{news.slice(0,20).map(n=><div key={n.id} className={`news-card news-${n.type}`}>{n.text}</div>)}</div>}
+                {screen === 'OFFERS' && <OffersScreen user={user} offers={offers} teams={teams} onAccept={acceptOffer} onReject={rejectOffer} />}
+                {screen === 'PLAYER_DASH' && <PlayerDashboard player={players.find(p=>p.id===user.data.id)||user.data} team={teams.find(t=>t.id===user.data.teamId)} onAction={handlePlayerActions} onUpdatePassword={(p)=>db.collection('players').doc(user.data.id).update({password:p})} />}
+                {screen === 'COMPANY_HOME' && <CompanyDashboard company={user.data} products={products.filter(p=>p.companyId===user.data.id)} sps={sps.filter(s=>s.companyId===user.data.id)} onSaveProd={saveProduct} onProcessSpons={processSponsorship} />}
             </div>
-        </div>
 
-        {/* TELAS PRINCIPAIS */}
-        <div className="container">
-            {screen === 'HOME' && user.type === 'ADMIN' && (
-                <AdminPanel 
-                    teams={teams} papers={papers} journalists={journalists} companies={companies} 
-                    reqs={reqs} config={conf} onAct={adminAction} onPost={postNews} 
-                    onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam}
-                    onConfig={(t) => setModal({ type: 'SETTINGS', team: t })} 
-                    onEditT={(t) => setModal({ type: 'VIEW_SQUAD', team: t })} 
-                />
-            )}
-            {screen === 'HOME' && user.type === 'USER' && <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />}
-            {screen === 'PRESS_DASH' && <div className="card"><h3>Imprensa</h3><button className="btn btn-blue" onClick={()=>setModal({type:'POST_NEWS'})}>NOTÍCIA</button><button className="btn btn-purple" onClick={()=>setModal({type:'MATCH_PERFORMANCE'})}>SÚMULA</button></div>}
-            {screen === 'MARKET' && <Market me={user.data?.id} teams={teams} players={players} open={conf.marketOpen} onNeg={(p)=>setModal({type:'OFFER', data:p})} />}
-            {screen === 'SHOPPING' && <ShoppingScreen products={products} companies={companies} onBuy={buyProduct} />}
-            {screen === 'RANKING' && <Ranking teams={teams} players={players} />}
-            {screen === 'NEWS' && <div><h3>Notícias</h3>{news.slice(0,20).map(n=><div key={n.id} className={`news-card news-${n.type}`}>{n.text}</div>)}</div>}
-            {screen === 'OFFERS' && <OffersScreen user={user} offers={offers} teams={teams} onAccept={acceptOffer} onReject={rejectOffer} />}
-            {screen === 'PLAYER_DASH' && <PlayerDashboard player={players.find(p=>p.id===user.data.id)||user.data} team={teams.find(t=>t.id===user.data.teamId)} onAction={handlePlayerActions} onUpdatePassword={(p)=>db.collection('players').doc(user.data.id).update({password:p})} />}
-            {screen === 'COMPANY_HOME' && <CompanyDashboard company={user.data} products={products.filter(p=>p.companyId===user.data.id)} sps={sps.filter(s=>s.companyId===user.data.id)} onSaveProd={saveProduct} onProcessSpons={processSponsorship} />}
-        </div>
+            {/* NAVEGAÇÃO INFERIOR */}
+            <div className="bottom-nav">
+                <div className={`nav-item ${['HOME','PLAYER_DASH','COMPANY_HOME'].includes(screen)?'active':''}`} onClick={()=>user.type==='PLAYER'?setScreen('PLAYER_DASH'):user.type==='COMPANY'?setScreen('COMPANY_HOME'):setScreen('HOME')}><i className="fas fa-home"></i>INÍCIO</div>
+                {user.type!=='COMPANY' && <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>}
+                <div className={`nav-item ${screen==='SHOPPING'?'active':''}`} onClick={()=>setScreen('SHOPPING')}><i className="fas fa-shopping-bag"></i>SHOP</div>
+                <div className={`nav-item ${screen==='RANKING'?'active':''}`} onClick={()=>setScreen('RANKING')}><i className="fas fa-trophy"></i>RANK</div>
+                <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={()=>setScreen('NEWS')}><i className="fas fa-newspaper"></i>NEWS</div>
+            </div>
 
-        {/* NAVEGAÇÃO INFERIOR */}
-        <div className="bottom-nav">
-            <div className={`nav-item ${['HOME','PLAYER_DASH','COMPANY_HOME'].includes(screen)?'active':''}`} onClick={()=>user.type==='PLAYER'?setScreen('PLAYER_DASH'):user.type==='COMPANY'?setScreen('COMPANY_HOME'):setScreen('HOME')}><i className="fas fa-home"></i>INÍCIO</div>
-            {user.type!=='COMPANY' && <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>}
-            <div className={`nav-item ${screen==='SHOPPING'?'active':''}`} onClick={()=>setScreen('SHOPPING')}><i className="fas fa-shopping-bag"></i>SHOP</div>
-            <div className={`nav-item ${screen==='RANKING'?'active':''}`} onClick={()=>setScreen('RANKING')}><i className="fas fa-trophy"></i>RANK</div>
-            <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={()=>setScreen('NEWS')}><i className="fas fa-newspaper"></i>NEWS</div>
+            {/* MODAIS GLOBAIS */}
+            {modal && (
+                <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setModal(null)}>
+                    <div className="modal-content">
+                        {modal.type === 'PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} teams={teams} isAdmin={user.type === 'ADMIN'} />}
+                        {modal.type === 'OFFER' && <OfferForm target={modal.data} onSend={sendOffer} />}
+                        {modal.type === 'MATCH_PERFORMANCE' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} />}
+                        {modal.type === 'POST_NEWS' && (
+                            <div>
+                                <input className="input-field" id="news-in" placeholder="Título da Notícia" />
+                                <button className="btn btn-blue" onClick={() => { postNews(document.getElementById('news-in').value, 'press'); setModal(null); }}>POSTAR</button>
+                            </div>
+                        )}
+                        {modal.type === 'SETTINGS' && (
+                            <SettingsForm 
+                                team={modal.team} 
+                                isAdmin={user.type === 'ADMIN'} 
+                                onUp={(updatedData) => { updateTeam(modal.team.id, updatedData); setModal(null); }} 
+                                onUpgrade={() => upgradeStadium(modal.team)}
+                                onReq={requestFunds}
+                                onWithdraw={withdrawFunds}
+                            />
+                        )}
+                        {modal.type === 'VIEW_SQUAD' && (
+                            <TeamDashboard 
+                                team={modal.team} 
+                                players={players.filter(p => p.teamId === modal.team.id)} 
+                                isVisitor={user.type === 'ADMIN' ? false : true} 
+                                onEdit={(p) => setModal({ type: 'PLAYER', data: p })}
+                                onAdd={() => setModal({ type: 'PLAYER', data: { teamId: modal.team.id } })}
+                            />
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
+    );
+};
 
-        {/* MODAIS GLOBAIS */}
-        {modal && (
-            <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setModal(null)}>
-                <div className="modal-content">
-                    {modal.type === 'PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} teams={teams} isAdmin={user.type === 'ADMIN'} />}
-                    {modal.type === 'OFFER' && <OfferForm target={modal.data} onSend={sendOffer} />}
-                    {modal.type === 'MATCH_PERFORMANCE' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} />}
-                    {modal.type === 'POST_NEWS' && (
-                        <div>
-                            <input className="input-field" id="news-in" placeholder="Título da Notícia" />
-                            <button className="btn btn-blue" onClick={() => { postNews(document.getElementById('news-in').value, 'press'); setModal(null); }}>POSTAR</button>
-                        </div>
-                    )}
-                   {/* --- NOVAS TELAS ADICIONADAS PARA O ADMIN --- */}
-            {modal.type === 'SETTINGS' && (
-                <SettingsForm 
-                    team={modal.team} 
-                    isAdmin={user.type === 'ADMIN'} 
-                    onUp={(updatedData) => { updateTeam(modal.team.id, updatedData); setModal(null); }} 
-                    onUpgrade={() => upgradeStadium(modal.team)}
-                    onReq={requestFunds}
-                    onWithdraw={withdrawFunds}
-                />
-            )}
-            
-            {/* --- NOVAS TELAS ADICIONADAS PARA O ADMIN --- */}
-            {modal.type === 'SETTINGS' && (
-                <SettingsForm 
-                    team={modal.team} 
-                    isAdmin={user.type === 'ADMIN'} 
-                    onUp={(updatedData) => { updateTeam(modal.team.id, updatedData); setModal(null); }} 
-                    onUpgrade={() => upgradeStadium(modal.team)}
-                    onReq={requestFunds}
-                    onWithdraw={withdrawFunds}
-                />
-            )}
-            
-            {modal.type === 'VIEW_SQUAD' && (
-                <TeamDashboard 
-                    team={modal.team} 
-                    players={players.filter(p => p.teamId === modal.team.id)} 
-                    isVisitor={user.type === 'ADMIN' ? false : true} 
-                    onEdit={(p) => setModal({ type: 'PLAYER', data: p })}
-                    onAdd={() => setModal({ type: 'PLAYER', data: { teamId: modal.team.id } })}
-                />
-            )}
-        </div> {/* Fecha modal-content */}
-    </div> {/* Fecha modal-overlay */}
-)} {/* <--- O FECHAMENTO DO MODAL DEVE FICAR AQUI, DEPOIS DAS DIVS */}
-        </div> {/* Fecha container principal */}
-    ); // Fecha o return do App
-}; // Fecha a function App
+
+
+        
         
 
      // ============================================================

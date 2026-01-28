@@ -1412,7 +1412,7 @@
                 <div>
                     <button className="btn" onClick={()=>setView('MENU')}>Voltar</button>
                     <h3>{view==='GLOBAL' ? (filt === 'FREE' ? 'Passes Livres' : filt) : selT.name}</h3>
-                    {list.length === 0 && <p style={{textAlign:'center', color:'#666', marginTop:20}}>Nenhum jogador encontrado nesta categoria.</p>}
+                    {list.length === 0 && <p style={{textAlign:'center', color:'#666', marginTop:20}}>Nenhum jogador encontrado.</p>}
                     {list.map(p => (
                         <div key={p.id} className="card">
                             <div style={{display:'flex', justifyContent:'space-between'}}>
@@ -1424,7 +1424,7 @@
                             </div>
                             <div style={{fontSize:11, color:'#aaa', marginTop:5}}>
                                 {p.teamId !== 'FREE' ? <div>Time: {teams.find(t=>t.id===p.teamId)?.name}</div> : <div style={{color:'var(--primary)'}}>Livre no Mercado</div>}
-                                <div>Val: {fmt(p.value)} | Con: {p.contract} {p.contract === 0 ? '(Encerrado)' : 'anos'}</div>
+                                <div>Val: {fmt(p.value)} | Con: {p.contract} anos</div>
                             </div>
                             <div className="stats-grid">
                                 <div className="stat-item"><span className="stat-lbl">⚽</span><span className="stat-val">{p.stats?.goals||0}</span></div>
@@ -1441,12 +1441,6 @@
                                         <button className="btn btn-purple" style={{flex:1}} onClick={()=>onNeg(p)}>NEGOCIAR</button> : 
                                         <button className="btn btn-ghost" style={{flex:1}} disabled>BLOQUEADO</button>
                                     }
-                                    {parseFloat(p.clause) > 0 && p.teamId !== 'FREE' && (
-                                        <button className="btn btn-gold" style={{width:'auto'}} onClick={()=>onPayClause(p)}>MULTA</button>
-                                    )}
-                                    {parseInt(p.contract) === 1 && !p.preContract && p.teamId !== 'FREE' && (
-                                        <button className="btn btn-blue" style={{width:'auto'}} onClick={()=>onPre(p)}>PRÉ</button>
-                                    )}
                                 </div>
                             )}
                         </div>

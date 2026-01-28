@@ -248,49 +248,60 @@ function App() {
     const [adminTeam, setAdminTeam] = useState(null); 
     const [sales, setSales] = useState([]);
 
-    // 2. SINCRONIZAÇÃO COM O BANCO DE DADOS (Firebase)
-    useEffect(() => {
-        const unsubs = [
-            db.collection('teams').onSnapshot(s => setTeams(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('players').onSnapshot(s => setPlayers(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('config').doc('system').onSnapshot(s => setConf(s.exists ? s.data() : {marketOpen:true})),
-            db.collection('financeRequests').onSnapshot(s => setReqs(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('newspapers').onSnapshot(s => setPapers(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('journalists').onSnapshot(s => setJournalists(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('companies').onSnapshot(s => setCompanies(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('products').onSnapshot(s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('sponsorships').onSnapshot(s => setSps(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('sales').orderBy('date', 'desc').limit(50).onSnapshot(s => setSales(s.docs.map(d => d.data()))),
-            db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => { 
-                const list = s.docs.map(d => ({id:d.id, ...d.data()})); 
-                setNews(list); 
-                const lastRead = localStorage.getItem('lastRead'); 
-                if (list.length && (!lastRead || list[0].date > parseInt(lastRead))) setNewNews(true); 
-                setLoading(false); 
-            })
-        ];
-        return () => unsubs.forEach(u => u());
-    }, []);
-
-    // 3. MONITORAMENTO DO USUÁRIO LOGADO
-    useEffect(() => {
-        if (user?.type === 'USER') {
-            const me = teams.find(t => t.id === user.data.id);
-            if (me) setUser(prev => ({...prev, data: me}));
-            return db.collection('offers').onSnapshot(s => {
-                setOffers(s.docs.map(d => ({id:d.id, ...d.data()})));
-            });
-        }
+  // 2. SINCRONIZAÇÃO COM O BANCO DE DADOS (Firebase)
+useEffect(() => {
+    const unsubs = [
+        db.collection('teams').onSnapshot(s => setTeams(s.docs.map(d => ({id:d.id, ...d.data()})))),
+        db.collection('players').onSnapshot(s => setPlayers(s.docs.map(d => ({id:d.id, ...d.data()})))),
+        db.collection('config').doc('system').onSnapshot(s => setConf(s.exists ? s.data() : {marketOpen:true})),
+        db.collection('financeRequests').onSnapshot(s => setReqs(s.docs.map(d => ({id:d.id, ...d.data()})))),
+        db.collection('newspapers').onSnapshot(s => setPapers(s.docs.map(d => ({id:d.id, ...d.data()})))),
+        db.collection('journalists').onSnapshot(s => setJournalists(s.docs.map(d => ({id:d.id, ...d.data()})))),
+        db.collection('companies').onSnapshot(s => setCompanies(s.docs.map(d => ({id:d.id, ...d.data()})))),
+        db.collection('products').onSnapshot(s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()})))),
+        db.collection('sponsorships').onSnapshot(s => setSps(s.docs.map(d => ({id:d.id, ...d.data()})))),
+        db.collection('sales').orderBy('date', 'desc').limit(50).onSnapshot(s => setSales(s.docs.map(d => d.data()))),
         
-        if (user?.type === 'COMPANY') {
-            const me = companies.find(c => c.id === user.data.id);
-            if (me) {
-                if (me.status === 'BLOCKED') { alert("🚫 Empresa Bloqueada/Falida."); window.location.reload(); }
-                else setUser(prev => ({...prev, data: me}));
+        // Listener Global de Ofertas: Essencial para receber contrapropostas em tempo real
+        db.collection('offers').onSnapshot(s => {
+            setOffers(s.docs.map(d => ({id:d.id, ...d.data()})));
+        }),
+
+        db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => { 
+            const list = s.docs.map(d => ({id:d.id, ...d.data()})); 
+            setNews(list); 
+            const lastRead = localStorage.getItem('lastRead'); 
+            if (list.length && (!lastRead || list[0].date > parseInt(lastRead))) setNewNews(true); 
+            setLoading(false); 
+        })
+    ];
+    return () => unsubs.forEach(u => u());
+}, []); // Executa uma vez no mount e mantém os ouvintes vivos
+
+// 3. MONITORAMENTO DO USUÁRIO LOGADO (Lógica de Perfil)
+useEffect(() => {
+    if (!user?.data?.id) return;
+
+    if (user.type === 'USER') {
+        const me = teams.find(t => t.id === user.data.id);
+        if (me && JSON.stringify(me) !== JSON.stringify(user.data)) {
+            setUser(prev => ({...prev, data: me}));
+        }
+    }
+    
+    if (user.type === 'COMPANY') {
+        const me = companies.find(c => c.id === user.data.id);
+        if (me) {
+            if (me.status === 'BLOCKED') { 
+                alert("🚫 Empresa Bloqueada/Falida."); 
+                window.location.reload(); 
+            } else if (JSON.stringify(me) !== JSON.stringify(user.data)) {
+                setUser(prev => ({...prev, data: me}));
             }
         }
-    }, [teams, companies, user?.data?.id]);
-
+    }
+}, [teams, companies, user?.data?.id, user?.type]);
+    
     // 4. FUNÇÕES DE SUPORTE
     const postNews = (text, type='normal') => db.collection('news').add({ text, type, date: Date.now() });
 
@@ -1108,7 +1119,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.9</div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.0</div>
             
             {/* ABAS DE NAVEGAÇÃO SUPERIOR */}
             <div className="login-tabs">

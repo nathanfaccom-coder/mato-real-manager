@@ -571,6 +571,45 @@ const withdrawMoney = async (amount, reason) => {
     setModal(null); 
 };
 
+    // 7. Injetar Verba (Conecta com o botão de Configuração)
+const requestFunds = async (teamId, amount) => {
+    // Reutiliza a sua função updateBalance para facilitar
+    const team = teams.find(t => t.id === teamId);
+    const newTotal = (team.balance || 0) + parseFloat(amount);
+    await updateBalance(teamId, newTotal);
+    postNews(`💰 **INJEÇÃO DE CAPITAL**\nO Federação injetou verbas no **${team.name}**.`, 'money-plus');
+};
+
+// 8. Retirar Verba (Conecta com o botão de Configuração)
+const withdrawFunds = async (teamId, amount) => {
+    const team = teams.find(t => t.id === teamId);
+    const val = parseFloat(amount);
+    if(team.balance < val) return alert("Saldo insuficiente no clube!");
+    const newTotal = team.balance - val;
+    await updateBalance(teamId, newTotal);
+    postNews(`💸 **VERBA RECOLHIDA**\nRecolhimento de ${fmt(val)} do **${team.name}**.`, 'money-minus');
+};
+
+// 9. Expandir Estádio
+const upgradeStadium = async (team) => {
+    const currentLevel = team.stadiumLevel || 1;
+    const nextLevel = currentLevel + 1;
+    const cost = nextLevel * 2000000; // Custo base por nível
+
+    if(team.balance < cost) return alert(`Saldo insuficiente! Expansão custa ${fmt(cost)}`);
+    
+    if(confirm(`Confirmar expansão para Nível ${nextLevel} por ${fmt(cost)}?`)) {
+        const batch = db.batch();
+        batch.update(db.collection('teams').doc(team.id), {
+            stadiumLevel: nextLevel,
+            balance: team.balance - cost
+        });
+        await batch.commit();
+        postNews(`🏗️ **REFORMAS**\nO **${team.name}** anunciou a expansão do seu estádio para o Nível ${nextLevel}!`, 'infra');
+        alert("Obra iniciada!");
+        setModal(null);
+    }
+};
 // --- FIM DO BLOCO DE GESTÃO ADMINISTRATIVA ---
     
            // --- FUNÇÃO DE SALVAR JOGADOR (CORRIGIDA) ---

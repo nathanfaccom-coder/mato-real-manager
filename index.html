@@ -698,15 +698,15 @@ const updateStats = async (pid, newStats) => {
 
             // --- SISTEMA DE NEGOCIAÇÃO CLÁSSICO (CLUBE x CLUBE) ---
 
-// 1. ENVIAR OU CONTRAPOR OFERTA
+// 1. ENVIAR OU CONTRAPOR OFERTA (CORRIGIDO)
 const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
     try {
         const v = parseFloat(value) || 0;
         const contractYears = parseInt(con) || 1;
         const actingTeamName = user.data.name;
-        const targetPlayerName = target.name;
+        const targetPlayerName = target.name || old?.playerName;
 
-        // Geração da descrição que aparece no card de proposta
+        // Geração da descrição do card
         let details = `💰 Taxa: ${fmt(v)}\n`;
         if (meta.installments > 1) details += `📅 Parcelamento: ${meta.installments}x de ${fmt(v / meta.installments)}\n`;
         if (meta.sellOn > 0) details += `📈 Revenda: ${meta.sellOn}%\n`;
@@ -714,19 +714,25 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
         details += `💵 Salário Sugerido: ${fmt(meta.newSalary)}/sem\n`;
         details += `👔 Papel: ${meta.role || 'ROTACAO'}`;
 
-        // Lógica de Destinatário (Quem deve ver a oferta agora?)
-        let recipientId = target.teamId; 
+        // LÓGICA DE DESTINATÁRIO CORRIGIDA
+        // Se for contraproposta, envia para quem mandou a anterior. 
+        // Se for nova, envia para o time dono (teamId) ou para o próprio jogador (se for livre).
+        let recipientId = target.teamId || 'FREE'; 
+        
         if (old && old.id) {
+            // Se eu sou o comprador original, mando para o vendedor. Se sou o vendedor, mando para o comprador.
             recipientId = (user.data.id === old.buyerId) ? old.sellerId : old.buyerId;
         }
 
         const pl = {
-            playerId: target.id,
+            playerId: target.id || old?.playerId,
             playerName: targetPlayerName,
             buyerId: old?.buyerId || user.data.id,
             buyerName: old?.buyerName || actingTeamName,
             sellerId: target.teamId || old?.sellerId || 'FREE',
-            recipientId: recipientId,
+            recipientId: recipientId, // DESTINATÁRIO FINAL
+            targetId: recipientId,    // Campo de espelho para garantir visibilidade na caixa
+            status: 'PENDING',
             type: type,
             value: v,
             offerContract: contractYears,
@@ -743,64 +749,69 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
         };
 
         const b = db.batch();
+        // Se for contraproposta, deletamos a anterior para evitar duplicidade
         if (old && old.id) b.delete(db.collection('offers').doc(old.id));
-        b.set(db.collection('offers').doc(), pl);
+        
+        const newOfferRef = db.collection('offers').doc();
+        b.set(newOfferRef, pl);
         await b.commit();
 
         const msgHead = (old && old.id) ? "🔄 CONTRAPROPOSTA" : "💼 NOVA OFERTA";
         postNews(`${msgHead}\nO **${actingTeamName}** enviou termos por **${targetPlayerName}**!\n\n${details}`, 'transfer');
         
         setModal(null); 
-        alert("Proposta enviada!");
+        alert("Proposta enviada com sucesso!");
     } catch (e) {
         console.error(e);
         alert("Erro técnico ao enviar proposta.");
     }
 };
 
-// 2. ACEITAR OFERTA (Executa a transferência e move o dinheiro)
+// 2. ACEITAR OFERTA
 const acceptOffer = async (o) => {
     try {
         const buy = teams.find(t => t.id === o.buyerId);
         const sel = teams.find(t => t.id === o.sellerId);
         const p = players.find(x => x.id === o.playerId);
         
-        if (!buy || !sel || !p) return alert("Erro: Dados incompletos.");
+        if (!buy || !p) return alert("Erro: Comprador ou Jogador não encontrados.");
         
         const valorEntrada = o.meta?.installments > 1 ? (o.value / o.meta.installments) : o.value;
         if (buy.balance < valorEntrada) return alert("O comprador não tem saldo para a entrada!");
 
-        if (!confirm(`Confirmar venda de ${p.name} por ${fmt(o.value)}?`)) return;
+        if (!confirm(`Confirmar transferência de ${p.name} por ${fmt(o.value)}?`)) return;
 
         const b = db.batch();
         
-        // Fluxo Financeiro
-        if (o.meta?.installments > 1) {
+        // Pagamento (Se houver vendedor)
+        if (sel) {
             b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - valorEntrada });
             b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorEntrada });
             
-            // Cria registro de dívida parcelada
-            const debtRef = db.collection('debts').doc();
-            b.set(debtRef, {
-                buyerId: buy.id, buyerName: buy.name,
-                sellerId: sel.id, sellerName: sel.name,
-                playerName: p.name, installmentVal: valorEntrada,
-                weeksRemaining: parseInt(o.meta.installments) - 1, date: Date.now()
-            });
+            if (o.meta?.installments > 1) {
+                const debtRef = db.collection('debts').doc();
+                b.set(debtRef, {
+                    buyerId: buy.id, buyerName: buy.name,
+                    sellerId: sel.id, sellerName: sel.name,
+                    playerName: p.name, installmentVal: valorEntrada,
+                    weeksRemaining: parseInt(o.meta.installments) - 1, date: Date.now()
+                });
+            }
         } else {
-            b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - o.value });
-            b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + o.value });
+            // Se o jogador era FREE, apenas retira o bônus de assinatura do comprador
+            const bonus = o.meta?.signingBonus || 0;
+            b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - bonus });
         }
 
         // Atualização do Jogador
-        const historyEntry = { date: Date.now(), from: sel.name, to: buy.name, type: o.type, value: o.value };
+        const historyEntry = { date: Date.now(), from: sel ? sel.name : 'LIVRE', to: buy.name, type: o.type, value: o.value };
         b.update(db.collection('players').doc(p.id), {
             teamId: buy.id,
             status: 'NAO_A_VENDA',
             contract: parseInt(o.offerContract) || 1,
             salary: parseFloat(o.meta?.newSalary) || p.salary,
             role: o.meta?.role || 'ROTACAO',
-            sellOnDetails: o.meta?.sellOn > 0 ? { percentage: o.meta.sellOn, beneficiary: sel.id } : null,
+            sellOnDetails: o.meta?.sellOn > 0 && sel ? { percentage: o.meta.sellOn, beneficiary: sel.id } : null,
             history: firebase.firestore.FieldValue.arrayUnion(historyEntry)
         });
 
@@ -814,32 +825,6 @@ const acceptOffer = async (o) => {
         alert("Erro ao aceitar proposta.");
     }
 };
-
-// 3. RECUSAR OFERTA
-const rejectOffer = async (o) => {
-    if(!confirm("Encerrar negociação?")) return;
-    await db.collection('offers').doc(o.id).delete();
-    postNews(`❌ **SEM ACORDO**\nAs conversas por **${o.playerName}** foram encerradas.`, 'transfer');
-};
-
-// 4. RENOVAÇÃO DE CONTRATO (Clube x seu próprio Jogador)
-const renewContract = async (p) => {
-    const cost = (parseFloat(p.value) || 1000000) * 0.10; 
-    if(user.data.balance < cost) return alert(`Sem saldo para luvas (Custo: ${fmt(cost)})`);
-    if(!confirm(`Renovar com ${p.name}?\nCusto: ${fmt(cost)}`)) return;
-    
-    const b = db.batch();
-    b.update(db.collection('teams').doc(user.data.id), {balance: firebase.firestore.FieldValue.increment(-cost)});
-    b.update(db.collection('players').doc(p.id), {
-        contract: (parseInt(p.contract)||0) + 1,
-        balance: firebase.firestore.FieldValue.increment(cost)
-    });
-    await b.commit();
-    
-    postNews(`📝 **RENOVAÇÃO**\n**${p.name}** renovou com o **${user.data.name}**.`, 'transfer');
-    setModal(null);
-};
-// --- FIM DO SISTEMA DE NEGOCIAÇÃO ---
     
       // --- INÍCIO DO BLOCO: GESTÃO DE PERFORMANCE E TEMPO ---
 
@@ -1122,7 +1107,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.2</div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.3</div>
             
             {/* ABAS DE NAVEGAÇÃO SUPERIOR */}
             <div className="login-tabs">

@@ -924,7 +924,7 @@ return (
                 {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:35, height:35, borderRadius:'50%'}} />}
                 <div>
                     <div style={{fontWeight:'900', fontSize:14}}>{user.data?.name || user.type}</div>
-                    <small style={{fontSize:9, color:'#666'}}>v1.90.5 | Mato Real</small>
+                    <small style={{fontSize:9, color:'#666'}}>v1.90.6 | Mato Real</small>
                 </div>
             </div>
             <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -935,7 +935,24 @@ return (
 
         {/* TELAS PRINCIPAIS */}
         <div className="container">
-            {screen === 'HOME' && user.type === 'ADMIN' && <AdminPanel teams={teams} papers={papers} journalists={journalists} companies={companies} reqs={reqs} config={conf} onAct={adminAction} onPost={postNews} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam} />}
+            {screen === 'HOME' && user.type === 'ADMIN' && (
+    <AdminPanel 
+        teams={teams} 
+        papers={papers} 
+        journalists={journalists} 
+        companies={companies} 
+        reqs={reqs} 
+        config={conf} 
+        onAct={adminAction} 
+        onPost={postNews} 
+        onApproveTeam={approveTeam} 
+        onUpdateBal={updateBalance} 
+        onDeleteTeam={deleteTeam}
+        // --- ADICIONE ESTAS DUAS LINHAS ABAIXO ---
+        onConfig={(t) => setModal({ type: 'SETTINGS', team: t })} 
+        onEditT={(t) => setModal({ type: 'VIEW_SQUAD', team: t })} 
+    />
+)}
             {screen === 'HOME' && user.type === 'USER' && <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />}
             {screen === 'PRESS_DASH' && <div className="card"><h3>Imprensa</h3><button className="btn btn-blue" onClick={()=>setModal({type:'POST_NEWS'})}>NOTÍCIA</button><button className="btn btn-purple" onClick={()=>setModal({type:'MATCH_PERFORMANCE'})}>SÚMULA</button></div>}
             {screen === 'MARKET' && <Market me={user.data?.id} teams={teams} players={players} open={conf.marketOpen} onNeg={(p)=>setModal({type:'OFFER', data:p})} />}
@@ -957,18 +974,49 @@ return (
         </div>
 
         {/* MODAIS GLOBAIS */}
-        {modal && <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget && setModal(null)}>
-            <div className="modal-content">
-                {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} teams={teams} isAdmin={user.type==='ADMIN'} />}
-                {modal.type==='OFFER' && <OfferForm target={modal.data} onSend={sendOffer} />}
-                {modal.type==='MATCH_PERFORMANCE' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} />}
-                {modal.type==='POST_NEWS' && <div><input className="input-field" id="news-in" /><button className="btn btn-blue" onClick={()=>{postNews(document.getElementById('news-in').value, 'press'); setModal(null);}}>POSTAR</button></div>}
-            </div>
-        </div>}
+{modal && (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setModal(null)}>
+        <div className="modal-content">
+            {/* Telas já existentes */}
+            {modal.type === 'PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} teams={teams} isAdmin={user.type === 'ADMIN'} />}
+            {modal.type === 'OFFER' && <OfferForm target={modal.data} onSend={sendOffer} />}
+            {modal.type === 'MATCH_PERFORMANCE' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} />}
+            {modal.type === 'POST_NEWS' && (
+                <div>
+                    <input className="input-field" id="news-in" placeholder="Título da Notícia" />
+                    <button className="btn btn-blue" onClick={() => { postNews(document.getElementById('news-in').value, 'press'); setModal(null); }}>POSTAR</button>
+                </div>
+            )}
+
+            {/* --- NOVAS TELAS ADICIONADAS PARA O ADMIN --- */}
+            {modal.type === 'SETTINGS' && (
+                <SettingsForm 
+                    team={modal.team} 
+                    isAdmin={user.type === 'ADMIN'} 
+                    onUp={(updatedData) => { updateTeam(modal.team.id, updatedData); setModal(null); }} 
+                    onUpgrade={() => upgradeStadium(modal.team)}
+                    onReq={requestFunds}
+                    onWithdraw={withdrawFunds}
+                />
+            )}
+            
+            {modal.type === 'VIEW_SQUAD' && (
+                <TeamDashboard 
+                    team={modal.team} 
+                    players={players.filter(p => p.teamId === modal.team.id)} 
+                    isVisitor={user.type === 'ADMIN' ? false : true} 
+                    onEdit={(p) => setModal({ type: 'PLAYER', data: p })}
+                    onAdd={() => setModal({ type: 'PLAYER', data: { teamId: modal.team.id } })}
+                />
+            )}
+        </div>
     </div>
-);
+)}
 }
-// --- FIM DA FUNÇÃO APP ---
+
+
+
+        
 
         // --- COMPONENTE: TELA DE LOGIN E CADASTRO ---
 const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor }) => {
@@ -994,7 +1042,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.5</div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.6</div>
             
             {/* ABAS DE NAVEGAÇÃO SUPERIOR */}
             <div className="login-tabs">

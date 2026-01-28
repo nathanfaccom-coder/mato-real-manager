@@ -958,15 +958,29 @@ if(!user) return (
 return (
         <div className="main-app">
             {/* HEADER */}
+           {/* HEADER ATUALIZADO COM SINO DE NOTIFICAÇÕES */}
             <div className="header">
                 <div style={{display:'flex', alignItems:'center', gap:10}}>
                     {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:35, height:35, borderRadius:'50%'}} />}
                     <div>
                         <div style={{fontWeight:'900', fontSize:14}}>{user.data?.name || user.type}</div>
-                        <small style={{fontSize:9, color:'#666'}}>v1.90.8 | Mato Real</small>
+                        <small style={{fontSize:9, color:'#666'}}>v1.90.9 | Mato Real</small>
                     </div>
                 </div>
                 <div style={{display:'flex', gap:15, alignItems:'center'}}>
+                    {/* SINO DE NOTIFICAÇÕES */}
+                    {(user.type === 'USER' || user.type === 'PLAYER') && (
+                        <div style={{position: 'relative', cursor: 'pointer'}} onClick={() => setScreen('OFFERS')}>
+                            <i className="fas fa-bell" style={{
+                                fontSize: 18, 
+                                color: offers.filter(o => o.targetId === user.data.id && o.status === 'PENDING').length > 0 ? 'var(--primary)' : 'white'
+                            }}></i>
+                            {offers.filter(o => o.targetId === user.data.id && o.status === 'PENDING').length > 0 && (
+                                <span className="notification-badge"></span>
+                            )}
+                        </div>
+                    )}
+
                     {(user.type==='USER' || user.type==='COMPANY') && <b style={{color:'var(--primary)'}}>{fmt(user.data.balance)}</b>}
                     <i className="fas fa-sign-out-alt" onClick={()=>window.location.reload()}></i>
                 </div>
@@ -1072,7 +1086,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.8</div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.9</div>
             
             {/* ABAS DE NAVEGAÇÃO SUPERIOR */}
             <div className="login-tabs">

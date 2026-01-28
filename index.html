@@ -696,11 +696,10 @@ const updateStats = async (pid, newStats) => {
 };
 // --- FIM DO BLOCO DE JOGADORES ---
 
-            // ============================================================
+           // ============================================================
 // SISTEMA DE NEGOCIAÇÃO: OFERTAS, ACEITES E RECUSAS
 // ============================================================
 
-// O "async" antes dos parênteses é OBRIGATÓRIO para usar o "await" lá embaixo
 const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
     try {
         if (!user?.data?.id) throw new Error("Usuário não autenticado");
@@ -712,6 +711,7 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
 
         if (!pId) throw new Error("ID do jogador ausente");
 
+        // Lógica de Destinatário
         let recipientId = target?.teamId || old?.sellerId || 'FREE';
         if (old?.id) {
             recipientId = (user.data.id === old.buyerId) ? (old.sellerId || 'FREE') : old.buyerId;
@@ -735,44 +735,26 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
         };
 
         const batch = db.batch();
-        if (old?.id) batch.delete(db.collection('offers').doc(old.id));
+        
+        // Deleta a oferta antiga se for uma contraproposta
+        if (old?.id) {
+            batch.delete(db.collection('offers').doc(old.id));
+        }
         
         const newDoc = db.collection('offers').doc();
         batch.set(newDoc, payload);
         
-        // Agora o await funcionará porque a função é async
         await batch.commit(); 
-        
-        setModal(null);
-        alert("Proposta enviada!");
-
-    } catch (err) {
-        console.error("ERRO NO ENVIO:", err);
-        alert("Erro técnico: " + err.message);
-    }
-};
-        // 4. Operação no Banco
-        const batch = db.batch();
-        
-        // Se houver uma oferta antiga sendo renegociada, deleta ela
-        if (old && old.id) {
-            batch.delete(db.collection('offers').doc(old.id));
-        }
-        
-        const newRef = db.collection('offers').doc();
-        batch.set(newRef, payload);
-        
-        await batch.commit();
 
         const msgHead = (old && old.id) ? "🔄 CONTRAPROPOSTA" : "💼 NOVA OFERTA";
-        postNews(`${msgHead}\nO **${user.data.name}** enviou termos por **${playerName}**!`, 'transfer');
+        postNews(`${msgHead}\nO **${user.data.name}** enviou termos por **${pName}**!`, 'transfer');
         
         setModal(null);
         alert("Proposta enviada com sucesso!");
 
-    } catch (error) {
-        console.error("Erro detalhado no envio:", error);
-        alert("Erro técnico ao enviar proposta. Verifique o console (F12).");
+    } catch (err) {
+        console.error("ERRO NO ENVIO:", err);
+        alert("Erro técnico: " + err.message);
     }
 };
 
@@ -792,7 +774,7 @@ const acceptOffer = async (o) => {
 
         const b = db.batch();
         
-        if (sel) { // Pagamento ao vendedor se o jogador não for livre
+        if (sel) { 
             b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - valorEntrada });
             b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorEntrada });
         }
@@ -803,7 +785,13 @@ const acceptOffer = async (o) => {
             contract: parseInt(o.offerContract) || 1,
             salary: parseFloat(o.meta?.newSalary) || p.salary,
             role: o.meta?.role || 'ROTACAO',
-            history: firebase.firestore.FieldValue.arrayUnion({ date: Date.now(), from: sel?.name || 'LIVRE', to: buy.name, type: o.type, value: o.value })
+            history: firebase.firestore.FieldValue.arrayUnion({ 
+                date: Date.now(), 
+                from: sel?.name || 'LIVRE', 
+                to: buy.name, 
+                type: o.type, 
+                value: o.value 
+            })
         });
 
         b.delete(db.collection('offers').doc(o.id));
@@ -827,9 +815,7 @@ const rejectOffer = async (o) => {
     } catch (e) { console.error(e); }
 };
 
-
 // --- FIM DO BLOCO DE NEGOCIAÇÃO ---
-
 
     
     

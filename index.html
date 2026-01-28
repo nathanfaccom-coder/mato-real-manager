@@ -706,20 +706,23 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
         
         const v = parseFloat(value) || 0;
         const years = parseInt(con) || 1;
-        const pId = target?.id || old?.playerId;
-        const pName = target?.name || old?.playerName;
+
+        // CORREÇÃO DO ERRO: Busca o ID e Nome com prioridade para o que estiver disponível
+        const pId = target?.id || old?.playerId || "";
+        const pName = target?.name || old?.playerName || "Jogador Desconhecido";
 
         if (!pId) throw new Error("ID do jogador ausente");
 
-        // Lógica de Destinatário
+        // Lógica de Destinatário (Quem recebe a oferta)
         let recipientId = target?.teamId || old?.sellerId || 'FREE';
         if (old?.id) {
+            // Se for contraproposta, inverte: quem era comprador vira alvo e vice-versa
             recipientId = (user.data.id === old.buyerId) ? (old.sellerId || 'FREE') : old.buyerId;
         }
 
         const payload = {
             playerId: pId,
-            playerName: pName,
+            playerName: pName, // Garantido que não será undefined
             buyerId: old?.buyerId || user.data.id,
             buyerName: old?.buyerName || user.data.name,
             sellerId: target?.teamId || old?.sellerId || 'FREE',
@@ -731,12 +734,13 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
             offerContract: years,
             date: Date.now(),
             description: `Taxa: ${fmt(v)}\nContrato: ${years} anos`,
+            // Garante que meta não seja undefined
             meta: meta || { installments: 1, newSalary: 0, role: 'RESERVA' }
         };
 
         const batch = db.batch();
         
-        // Se for contraproposta, deletamos a anterior
+        // Se houver uma oferta antiga sendo renegociada, deleta ela
         if (old?.id) {
             batch.delete(db.collection('offers').doc(old.id));
         }
@@ -744,7 +748,6 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
         const newRef = db.collection('offers').doc();
         batch.set(newRef, payload);
         
-        // O await agora funciona porque está dentro de uma função async unificada
         await batch.commit(); 
 
         const msgHead = (old && old.id) ? "🔄 CONTRAPROPOSTA" : "💼 NOVA OFERTA";
@@ -758,7 +761,6 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
         alert("Erro técnico: " + err.message);
     }
 };
-
 // 2. ACEITAR OFERTA
 const acceptOffer = async (o) => {
     try {

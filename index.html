@@ -346,33 +346,7 @@ function App() {
             }); 
             setScreen('HOME'); 
         };
-
-
-        // 3. Criação de Jornal
-        const createNewspaper = async (name, pass, owner) => { 
-            await db.collection('newspapers').add({ 
-                name, password: pass, ownerName: owner, status: 'PENDING' 
-            }); 
-            alert("Jornal criado! Aguarde Federação."); 
-        };
-
-        // 4. Cadastro de Jornalista
-        const createJournalist = async (name, pass, paperId) => { 
-            await db.collection('journalists').add({ 
-                name, password: pass, newspaperId: paperId, status: 'PENDING' 
-            }); 
-            alert("Conta criada! Aguarde seu Chefe."); 
-        };
-
-        // 5. Criação de Empresa
-        const createCompany = async (f) => {
-            if(!f.n || !f.p) return alert("Preencha tudo!");
-            await db.collection('companies').add({ 
-                name: f.n, owner: f.owner, password: f.p, companyType: f.type, balance: COMPANY_TYPES[f.type].start, status: 'PENDING' 
-            });
-            alert("Solicitação enviada! Aguarde a Federação.");
-        };
-        // --- FIM DAS FUNÇÕES DE CRIAÇÃO ---   
+       
     // --- FUNÇÃO: CRIAR TIME ---
         const createTeam = async (name, bal, serie, pass, logo) => { 
             // Verifica se o nome já existe (independente de maiúsculas/minúsculas)

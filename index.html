@@ -977,17 +977,30 @@ return (
                             <button className="btn btn-blue" onClick={() => { postNews(document.getElementById('news-in').value, 'press'); setModal(null); }}>POSTAR</button>
                         </div>
                     )}
-                    {modal.type === 'SETTINGS' && (
-                        <SettingsForm 
-                            team={modal.team} 
-                            isAdmin={user.type === 'ADMIN'} 
-                            onUp={(updatedData) => { updateTeam(modal.team.id, updatedData); setModal(null); }} 
-                            onUpgrade={() => upgradeStadium(modal.team)}
-                            onReq={requestFunds}
-                            onWithdraw={withdrawFunds}
-                        />
-                    )}
-                    {/* ... final do seu bloco de modais (VIEW_SQUAD) */}
+                   {/* --- NOVAS TELAS ADICIONADAS PARA O ADMIN --- */}
+            {modal.type === 'SETTINGS' && (
+                <SettingsForm 
+                    team={modal.team} 
+                    isAdmin={user.type === 'ADMIN'} 
+                    onUp={(updatedData) => { updateTeam(modal.team.id, updatedData); setModal(null); }} 
+                    onUpgrade={() => upgradeStadium(modal.team)}
+                    onReq={requestFunds}
+                    onWithdraw={withdrawFunds}
+                />
+            )}
+            
+            {/* --- NOVAS TELAS ADICIONADAS PARA O ADMIN --- */}
+            {modal.type === 'SETTINGS' && (
+                <SettingsForm 
+                    team={modal.team} 
+                    isAdmin={user.type === 'ADMIN'} 
+                    onUp={(updatedData) => { updateTeam(modal.team.id, updatedData); setModal(null); }} 
+                    onUpgrade={() => upgradeStadium(modal.team)}
+                    onReq={requestFunds}
+                    onWithdraw={withdrawFunds}
+                />
+            )}
+            
             {modal.type === 'VIEW_SQUAD' && (
                 <TeamDashboard 
                     team={modal.team} 
@@ -999,10 +1012,10 @@ return (
             )}
         </div> {/* Fecha modal-content */}
     </div> {/* Fecha modal-overlay */}
-)}
+)} {/* <--- O FECHAMENTO DO MODAL DEVE FICAR AQUI, DEPOIS DAS DIVS */}
         </div> {/* Fecha container principal */}
     ); // Fecha o return do App
-}; // FECHA A FUNCTION APP DEFINITIVAMENTE
+}; // Fecha a function App
         
 
      // ============================================================

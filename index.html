@@ -703,54 +703,57 @@ const updateStats = async (pid, newStats) => {
 // 1. ENVIAR OU CONTRAPOR OFERTA
 const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
     try {
-        // 1. Validação de Segurança
-        if (!user || !user.data) return alert("Erro: Usuário não autenticado.");
-        
-        const playerId = target?.id || old?.playerId;
-        const playerName = target?.name || old?.playerName;
-        
-        if (!playerId) {
-            console.error("Dados do alvo:", target, old);
-            return alert("Erro: ID do jogador não encontrado.");
-        }
+        // Log para depuração (Abra o F12 para ver se algo está vindo undefined)
+        console.log("Dados Recebidos:", { target, value, con, meta, old });
 
+        if (!user?.data?.id) throw new Error("Usuário não autenticado");
+        
         const v = parseFloat(value) || 0;
-        const contractYears = parseInt(con) || 1;
-        
-        // 2. Montagem dos Detalhes
-        let details = `💰 Taxa: ${fmt(v)}\n`;
-        if (meta?.installments > 1) details += `📅 Parcelamento: ${meta.installments}x de ${fmt(v / meta.installments)}\n`;
-        details += `📝 Contrato: ${contractYears} anos\n`;
-        details += `💵 Salário: ${fmt(meta?.newSalary || 0)}/sem`;
+        const years = parseInt(con) || 1;
+        const pId = target?.id || old?.playerId;
+        const pName = target?.name || old?.playerName;
 
-        // 3. Lógica de Destinatário (Quem recebe a oferta na caixa)
-        let recipientId = target?.teamId || 'FREE';
-        if (old && old.id) {
-            // Se for contraproposta, inverte o fluxo
-            recipientId = (user.data.id === old.buyerId) ? old.sellerId : old.buyerId;
+        if (!pId) throw new Error("ID do jogador ausente");
+
+        // Lógica de Destinatário (Quem recebe a oferta)
+        let recipientId = target?.teamId || old?.sellerId || 'FREE';
+        if (old?.id) {
+            // Se for contraproposta, inverte: quem era comprador vira alvo e vice-versa
+            recipientId = (user.data.id === old.buyerId) ? (old.sellerId || 'FREE') : old.buyerId;
         }
 
         const payload = {
-            playerId: playerId,
-            playerName: playerName,
+            playerId: pId,
+            playerName: pName,
             buyerId: old?.buyerId || user.data.id,
             buyerName: old?.buyerName || user.data.name,
             sellerId: target?.teamId || old?.sellerId || 'FREE',
-            targetId: recipientId, // Campo crucial para a OffersScreen
+            targetId: recipientId, 
             recipientId: recipientId,
             status: 'PENDING',
-            type: type || 'NEGOCIAÇÃO',
+            type: type || 'TRANSFERÊNCIA',
             value: v,
-            offerContract: contractYears,
-            description: details,
-            meta: {
-                ...meta,
-                newSalary: parseFloat(meta?.newSalary) || 0,
-                installments: parseInt(meta?.installments) || 1
-            },
-            date: Date.now()
+            offerContract: years,
+            date: Date.now(),
+            description: `Taxa: ${fmt(v)}\nContrato: ${years} anos`,
+            meta: meta || { installments: 1, newSalary: 0, role: 'RESERVA' }
         };
 
+        const batch = db.batch();
+        if (old?.id) batch.delete(db.collection('offers').doc(old.id)); // Remove a anterior
+        
+        const newDoc = db.collection('offers').doc();
+        batch.set(newDoc, payload);
+        
+        await batch.commit();
+        setModal(null);
+        alert("Proposta enviada!");
+
+    } catch (err) {
+        console.error("ERRO NO ENVIO:", err);
+        alert("Erro técnico: " + err.message);
+    }
+};
         // 4. Operação no Banco
         const batch = db.batch();
         
@@ -1114,7 +1117,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.5</div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.6</div>
             
             {/* ABAS DE NAVEGAÇÃO SUPERIOR */}
             <div className="login-tabs">

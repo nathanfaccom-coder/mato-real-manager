@@ -698,46 +698,44 @@ const updateStats = async (pid, newStats) => {
 // --- FIM DO BLOCO DE JOGADORES ---
 
          // ============================================================
-// SISTEMA DE NEGOCIAÇÃO: RESTAURAÇÃO INTEGRAL
+// SISTEMA DE NEGOCIAÇÃO: CORREÇÃO DE CAMPOS E ROTEAMENTO
 // ============================================================
 
 const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
     try {
-        if (!user?.data?.id) throw new Error("Usuário deslogado.");
+        if (!user?.data?.id) throw new Error("Usuário não autenticado.");
 
-        // Mantém as variáveis originais que sempre funcionaram
         const v = parseFloat(value) || 0;
         const years = parseInt(con) || 1;
+        
+        // --- PROTEÇÃO ANTI-UNDEFINED (Onde estava o erro) ---
+        // Se target (clique no mercado) for nulo, busca no old (card da caixa)
         const pId = target?.id || old?.playerId;
-        const pName = target?.name || old?.playerName;
+        const pName = target?.name || old?.playerName || "Jogador Desconhecido";
+
+        if (!pId) throw new Error("ID do jogador não encontrado na transação.");
 
         // --- LÓGICA DE RETORNO (PING-PONG) ---
-        // Se 'old' existe, estamos em uma contraproposta.
-        // O destinatário deve ser quem enviou a oferta que você recebeu.
-        let recipientId;
+        let destinationId;
         if (old && old.id) {
-            // Se eu sou o buyerId da oferta antiga, mando para o sellerId.
-            // Se eu sou o sellerId da oferta antiga, mando para o buyerId.
-            recipientId = (user.data.id === old.buyerId) ? old.sellerId : old.buyerId;
+            // Inversão: Se eu sou o buyer antigo, mando pro seller. Se sou o seller, mando pro buyer.
+            destinationId = (String(user.data.id) === String(old.buyerId)) 
+                ? (old.sellerId || 'FREE') 
+                : old.buyerId;
         } else {
-            // Proposta nova: vai para o dono do jogador
-            recipientId = target.teamId || 'FREE';
+            destinationId = target?.teamId || 'FREE';
         }
 
         const payload = {
-            playerId: pId,
-            playerName: pName,
-            // Preservação de Identidade: Não muda quem é o comprador e vendedor original
-            buyerId: old?.buyerId || user.data.id,
-            buyerName: old?.buyerName || user.data.name,
-            sellerId: target?.teamId || old?.sellerId || 'FREE',
-            
-            // Roteamento
-            targetId: recipientId, 
-            recipientId: recipientId,
-            
+            playerId: String(pId),
+            playerName: String(pName), // Garante queplayerName seja String
+            buyerId: String(old?.buyerId || user.data.id),
+            buyerName: String(old?.buyerName || user.data.name),
+            sellerId: String(target?.teamId || old?.sellerId || 'FREE'),
+            targetId: String(destinationId), 
+            recipientId: String(destinationId),
             status: 'PENDING',
-            type: type || 'NEGOCIAÇÃO',
+            type: type || 'TRANSFERÊNCIA',
             value: v,
             offerContract: years,
             date: Date.now(),
@@ -749,28 +747,28 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
         if (old && old.id) batch.delete(db.collection('offers').doc(old.id));
         
         const newRef = db.collection('offers').doc();
-        batch.set(newRef, payload);
+        batch.set(newRef, payload); // Agora playerName nunca será undefined
         
         await batch.commit(); 
         setModal(null);
-        alert("Proposta devolvida com sucesso!");
+        alert(`Proposta enviada para o ID: ${destinationId}`);
 
     } catch (err) {
-        console.error("Erro no Envio:", err);
+        console.error("ERRO CRÍTICO NO ENVIO:", err);
         alert("Erro ao enviar: " + err.message);
     }
 };
 
 const acceptOffer = async (o) => {
     try {
-        const buy = teams.find(t => t.id === o.buyerId);
-        const sel = teams.find(t => t.id === o.sellerId);
-        const p = players.find(x => x.id === o.playerId);
+        const buy = teams.find(t => String(t.id) === String(o.buyerId));
+        const sel = teams.find(t => String(t.id) === String(o.sellerId));
+        const p = players.find(x => String(x.id) === String(o.playerId));
         
-        if (!buy || !p) return alert("Erro nos dados da transferência.");
+        if (!buy || !p) return alert("Erro: Comprador ou Jogador não encontrados.");
         
         const entrada = o.meta?.installments > 1 ? (o.value / o.meta.installments) : o.value;
-        if (buy.balance < entrada) return alert("Comprador sem saldo para entrada.");
+        if (buy.balance < entrada) return alert("Comprador sem saldo suficiente.");
 
         if (!confirm(`Confirmar venda de ${p.name}?`)) return;
 
@@ -792,16 +790,17 @@ const acceptOffer = async (o) => {
 
         b.delete(db.collection('offers').doc(o.id));
         await b.commit();
-        postNews(`🤝 **FECHADO**: ${p.name} no ${buy.name}!`, 'transfer');
+        postNews(`🤝 **NEGÓCIO FECHADO**: ${p.name} no ${buy.name}!`, 'transfer');
         alert("Sucesso!");
     } catch (e) { alert("Erro ao aceitar."); }
 };
 
 const rejectOffer = async (o) => {
-    if(confirm("Recusar proposta?")) {
+    try {
+        if(!confirm("Recusar proposta?")) return;
         await db.collection('offers').doc(o.id).delete();
-        alert("Recusada.");
-    }
+        alert("Proposta removida.");
+    } catch (e) { console.error(e); }
 };
     
     

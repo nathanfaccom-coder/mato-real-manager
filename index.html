@@ -706,41 +706,49 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
         
         const v = parseFloat(value) || 0;
         const years = parseInt(con) || 1;
-
-        // CORREÇÃO DO ERRO: Busca o ID e Nome com prioridade para o que estiver disponível
-        const pId = target?.id || old?.playerId || "";
-        const pName = target?.name || old?.playerName || "Jogador Desconhecido";
+        
+        // Identificação resiliente do Jogador
+        const pId = target?.id || old?.playerId;
+        const pName = target?.name || old?.playerName || "Jogador";
 
         if (!pId) throw new Error("ID do jogador ausente");
 
-        // Lógica de Destinatário (Quem recebe a oferta)
+        // --- LÓGICA DE ROTEAMENTO DE MENSAGEM (O CORAÇÃO DO PROBLEMA) ---
+        // Se for uma proposta NOVA: o alvo é o time atual do jogador (target.teamId).
+        // Se for uma CONTRAPROPOSTA: o alvo deve ser quem enviou a oferta que você está respondendo.
         let recipientId = target?.teamId || old?.sellerId || 'FREE';
+        
         if (old?.id) {
-            // Se for contraproposta, inverte: quem era comprador vira alvo e vice-versa
+            // INVERSÃO SÊNIOR: Se eu estou respondendo a uma oferta, o destinatário 
+            // é SEMPRE o lado oposto ao meu ID atual.
             recipientId = (user.data.id === old.buyerId) ? (old.sellerId || 'FREE') : old.buyerId;
         }
 
         const payload = {
             playerId: pId,
-            playerName: pName, // Garantido que não será undefined
+            playerName: pName,
+            // Mantém os IDs originais de quem quer comprar e quem é o dono
             buyerId: old?.buyerId || user.data.id,
             buyerName: old?.buyerName || user.data.name,
             sellerId: target?.teamId || old?.sellerId || 'FREE',
+            
+            // Define quem verá a oferta na "Caixa de Entrada"
             targetId: recipientId, 
             recipientId: recipientId,
+            
             status: 'PENDING',
             type: type || 'TRANSFERÊNCIA',
             value: v,
             offerContract: years,
             date: Date.now(),
             description: `Taxa: ${fmt(v)}\nContrato: ${years} anos`,
-            // Garante que meta não seja undefined
+            // Preserva metadados (salários, parcelas, etc)
             meta: meta || { installments: 1, newSalary: 0, role: 'RESERVA' }
         };
 
         const batch = db.batch();
         
-        // Se houver uma oferta antiga sendo renegociada, deleta ela
+        // Mantém o mecanismo de limpeza: Deleta a oferta anterior se for renegociação
         if (old?.id) {
             batch.delete(db.collection('offers').doc(old.id));
         }
@@ -757,11 +765,12 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
         alert("Proposta enviada com sucesso!");
 
     } catch (err) {
-        console.error("ERRO NO ENVIO:", err);
+        console.error("ERRO CRÍTICO NO ENVIO:", err);
         alert("Erro técnico: " + err.message);
     }
 };
-// 2. ACEITAR OFERTA
+
+// 2. ACEITAR OFERTA (Mantendo mecanismos de saldo, histórico e dívidas)
 const acceptOffer = async (o) => {
     try {
         const buy = teams.find(t => t.id === o.buyerId);
@@ -777,11 +786,13 @@ const acceptOffer = async (o) => {
 
         const b = db.batch();
         
+        // Preserva mecanismo financeiro para clubes e agentes livres
         if (sel) { 
             b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - valorEntrada });
             b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorEntrada });
         }
 
+        // Preserva mecanismo de Histórico e Contrato
         b.update(db.collection('players').doc(p.id), {
             teamId: buy.id,
             status: 'NAO_A_VENDA',
@@ -808,7 +819,7 @@ const acceptOffer = async (o) => {
     }
 };
 
-// 3. RECUSAR OFERTA
+// 3. RECUSAR OFERTA (Limpeza simples de documento)
 const rejectOffer = async (o) => {
     try {
         if(!confirm("Recusar proposta por " + o.playerName + "?")) return;
@@ -817,6 +828,8 @@ const rejectOffer = async (o) => {
         alert("Recusada.");
     } catch (e) { console.error(e); }
 };
+
+// --- FIM DO BLOCO DE NEGOCIAÇÃO ---
     
     
       // --- INÍCIO DO BLOCO: GESTÃO DE PERFORMANCE E TEMPO ---
@@ -969,7 +982,7 @@ return (
                     {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:35, height:35, borderRadius:'50%'}} />}
                     <div>
                         <div style={{fontWeight:'900', fontSize:14}}>{user.data?.name || user.type}</div>
-                        <small style={{fontSize:9, color:'#666'}}>v1.91.4| Mato Real</small>
+                        <small style={{fontSize:9, color:'#666'}}>v1.91.5| Mato Real</small>
                     </div>
                 </div>
                 <div style={{display:'flex', gap:15, alignItems:'center'}}>

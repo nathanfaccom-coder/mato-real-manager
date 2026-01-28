@@ -698,47 +698,46 @@ const updateStats = async (pid, newStats) => {
 // --- FIM DO BLOCO DE JOGADORES ---
 
          // ============================================================
-// SISTEMA DE NEGOCIAÇÃO: OFERTAS, ACEITES E RECUSAS
+// SISTEMA DE NEGOCIAÇÃO: RESTAURAÇÃO INTEGRAL
 // ============================================================
 
 const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
     try {
-        if (!user?.data?.id) throw new Error("Usuário não autenticado");
-        
+        if (!user?.data?.id) throw new Error("Usuário deslogado.");
+
+        // Mantém as variáveis originais que sempre funcionaram
         const v = parseFloat(value) || 0;
         const years = parseInt(con) || 1;
-        
-        // Identificação do Jogador
         const pId = target?.id || old?.playerId;
-        const pName = target?.name || old?.playerName || "Jogador";
+        const pName = target?.name || old?.playerName;
 
-        if (!pId) throw new Error("ID do jogador ausente");
-
-        // --- LÓGICA DE DESTINATÁRIO SÊNIOR ---
-        // Se for NOVA: Vai para o dono do jogador (target.teamId).
-        // Se for CONTRA: Vai para quem enviou a oferta que estou respondendo.
-        let recipientId = target?.teamId || old?.sellerId || 'FREE';
-        
-        if (old?.id) {
-            // Se eu sou o dono do jogador respondendo a uma oferta:
-            // O destinatário TEM que ser o 'buyerId' da oferta antiga.
-            recipientId = (user.data.id === old.buyerId) ? (old.sellerId || 'FREE') : old.buyerId;
+        // --- LÓGICA DE RETORNO (PING-PONG) ---
+        // Se 'old' existe, estamos em uma contraproposta.
+        // O destinatário deve ser quem enviou a oferta que você recebeu.
+        let recipientId;
+        if (old && old.id) {
+            // Se eu sou o buyerId da oferta antiga, mando para o sellerId.
+            // Se eu sou o sellerId da oferta antiga, mando para o buyerId.
+            recipientId = (user.data.id === old.buyerId) ? old.sellerId : old.buyerId;
+        } else {
+            // Proposta nova: vai para o dono do jogador
+            recipientId = target.teamId || 'FREE';
         }
 
         const payload = {
             playerId: pId,
             playerName: pName,
-            // Mantém a estrutura original da negociação
+            // Preservação de Identidade: Não muda quem é o comprador e vendedor original
             buyerId: old?.buyerId || user.data.id,
             buyerName: old?.buyerName || user.data.name,
             sellerId: target?.teamId || old?.sellerId || 'FREE',
             
-            // Campos de visibilidade na Caixa de Entrada
+            // Roteamento
             targetId: recipientId, 
             recipientId: recipientId,
             
             status: 'PENDING',
-            type: type || 'TRANSFERÊNCIA',
+            type: type || 'NEGOCIAÇÃO',
             value: v,
             offerContract: years,
             date: Date.now(),
@@ -747,48 +746,38 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
         };
 
         const batch = db.batch();
-        
-        // Garante que a oferta antiga seja deletada antes da nova entrar
-        if (old?.id) {
-            batch.delete(db.collection('offers').doc(old.id));
-        }
+        if (old && old.id) batch.delete(db.collection('offers').doc(old.id));
         
         const newRef = db.collection('offers').doc();
         batch.set(newRef, payload);
         
         await batch.commit(); 
-
-        const msgHead = (old && old.id) ? "🔄 CONTRAPROPOSTA" : "💼 NOVA OFERTA";
-        postNews(`${msgHead}\nO **${user.data.name}** enviou termos por **${pName}**!`, 'transfer');
-        
         setModal(null);
-        alert("Proposta enviada!");
+        alert("Proposta devolvida com sucesso!");
 
     } catch (err) {
-        console.error("ERRO NO ENVIO:", err);
-        alert("Erro técnico: " + err.message);
+        console.error("Erro no Envio:", err);
+        alert("Erro ao enviar: " + err.message);
     }
 };
 
-// 2. ACEITAR OFERTA
 const acceptOffer = async (o) => {
     try {
         const buy = teams.find(t => t.id === o.buyerId);
         const sel = teams.find(t => t.id === o.sellerId);
         const p = players.find(x => x.id === o.playerId);
         
-        if (!buy || !p) return alert("Erro: Comprador ou Jogador não encontrados.");
+        if (!buy || !p) return alert("Erro nos dados da transferência.");
         
-        const valorEntrada = o.meta?.installments > 1 ? (o.value / o.meta.installments) : o.value;
-        if (buy.balance < valorEntrada) return alert("O comprador não tem saldo para a entrada!");
+        const entrada = o.meta?.installments > 1 ? (o.value / o.meta.installments) : o.value;
+        if (buy.balance < entrada) return alert("Comprador sem saldo para entrada.");
 
-        if (!confirm(`Confirmar transferência de ${p.name} por ${fmt(o.value)}?`)) return;
+        if (!confirm(`Confirmar venda de ${p.name}?`)) return;
 
         const b = db.batch();
-        
-        if (sel) { 
-            b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - valorEntrada });
-            b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorEntrada });
+        if (sel) {
+            b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - entrada });
+            b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + entrada });
         }
 
         b.update(db.collection('players').doc(p.id), {
@@ -796,35 +785,23 @@ const acceptOffer = async (o) => {
             status: 'NAO_A_VENDA',
             contract: parseInt(o.offerContract) || 1,
             salary: parseFloat(o.meta?.newSalary) || p.salary,
-            role: o.meta?.role || 'ROTACAO',
             history: firebase.firestore.FieldValue.arrayUnion({ 
-                date: Date.now(), 
-                from: sel?.name || 'LIVRE', 
-                to: buy.name, 
-                type: o.type, 
-                value: o.value 
+                date: Date.now(), from: sel?.name || 'LIVRE', to: buy.name, value: o.value 
             })
         });
 
         b.delete(db.collection('offers').doc(o.id));
         await b.commit();
-        
-        postNews(`🤝 **NEGÓCIO FECHADO**\nO **${buy.name}** contratou **${p.name}**!`, 'transfer');
-        alert("Transferência concluída!");
-    } catch (e) {
-        console.error(e);
-        alert("Erro ao aceitar.");
-    }
+        postNews(`🤝 **FECHADO**: ${p.name} no ${buy.name}!`, 'transfer');
+        alert("Sucesso!");
+    } catch (e) { alert("Erro ao aceitar."); }
 };
 
-// 3. RECUSAR OFERTA
 const rejectOffer = async (o) => {
-    try {
-        if(!confirm("Recusar proposta por " + o.playerName + "?")) return;
+    if(confirm("Recusar proposta?")) {
         await db.collection('offers').doc(o.id).delete();
-        postNews(`❌ **SEM ACORDO**\nAs conversas por **${o.playerName}** foram encerradas.`, 'transfer');
         alert("Recusada.");
-    } catch (e) { console.error(e); }
+    }
 };
     
     
@@ -978,7 +955,7 @@ return (
                     {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:35, height:35, borderRadius:'50%'}} />}
                     <div>
                         <div style={{fontWeight:'900', fontSize:14}}>{user.data?.name || user.type}</div>
-                        <small style={{fontSize:9, color:'#666'}}>v1.92.2| Mato Real</small>
+                        <small style={{fontSize:9, color:'#666'}}>v1.92.3| Mato Real</small>
                     </div>
                 </div>
                 <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -1109,7 +1086,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis |v1.92.2</div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis |v1.92.3</div>
             
             {/* ABAS DE NAVEGAÇÃO SUPERIOR */}
             <div className="login-tabs">

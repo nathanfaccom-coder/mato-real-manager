@@ -2063,30 +2063,49 @@ const AdminPanel = ({ onUpdateCompBal, teams, papers, journalists, companies, re
 // 2. COMPONENTE: CONFIGURAÇÕES DO CLUBE (SETTINGSFORM)
 // ============================================================
 const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => {
-    const [form, setF] = useState({name: team.name, logo: team.logo, balance: team.balance, serie: team.serie});
-    
-    useEffect(() => { 
-        setF({name: team.name, logo: team.logo, balance: team.balance, serie: team.serie}); 
-    }, [team]);
+    // 1. Inicializa o formulário com os dados atuais do time
+    const [form, setF] = React.useState({
+        name: team.name || '',
+        logo: team.logo || '',
+        balance: team.balance || 0,
+        serie: team.serie || 'A',
+        stadiumLevel: team.stadiumLevel || 1
+    });
 
-   return (
+    return (
         <div style={{textAlign:'center'}}>
             <h3 style={{margin:0, marginBottom:15}}>Configurar {team.name}</h3>
 
             <label style={{fontSize:11, color:'#888', display:'block', textAlign:'left'}}>Nome do Clube</label>
-            <input className="input-field" value={form.name} onChange={e=>setF({...form, name:e.target.value})} />
+            <input 
+                className="input-field" 
+                value={form.name} 
+                onChange={e => setF({...form, name: e.target.value})} 
+            />
             
             <label style={{fontSize:11, color:'#888', display:'block', textAlign:'left'}}>URL do Escudo</label>
-            <input className="input-field" value={form.logo} onChange={e=>setF({...form, logo:e.target.value})} />
+            <input 
+                className="input-field" 
+                value={form.logo} 
+                onChange={e => setF({...form, logo: e.target.value})} 
+            />
             
             {isAdmin && (
                 <>
                     <label style={{fontSize:11, color:'#888', display:'block', textAlign:'left'}}>Saldo (ADM)</label>
-                    <input className="input-field" type="number" value={form.balance} onChange={e=>setF({...form, balance:parseFloat(e.target.value)})} />
+                    <input 
+                        className="input-field" 
+                        type="number" 
+                        value={form.balance} 
+                        onChange={e => setF({...form, balance: parseFloat(e.target.value) || 0})} 
+                    />
                     
-                    {/* --- CAMPO ADICIONADO: SELEÇÃO DE SÉRIE --- */}
                     <label style={{fontSize:11, color:'#888', display:'block', textAlign:'left'}}>Divisão / Série</label>
-                    <select className="input-field" value={form.serie || 'A'} onChange={e=>setF({...form, serie: e.target.value})}>
+                    <select 
+                        className="input-field" 
+                        value={form.serie} 
+                        onChange={e => setF({...form, serie: e.target.value})}
+                    >
                         <option value="A">Série A</option>
                         <option value="B">Série B</option>
                         <option value="C">Série C</option>
@@ -2095,20 +2114,37 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
                 </>
             )}
 
-            <button className="btn btn-blue" onClick={()=>onUp(form)} style={{marginTop:15}}>SALVAR ALTERAÇÕES</button>
+            {/* O BOTÃO SALVAR AGORA ENVIA O OBJETO FORM COMPLETO */}
+            <button 
+                className="btn btn-blue" 
+                onClick={() => {
+                    console.log("Salvando dados:", form); // Para você testar no F12
+                    onUp(form);
+                }} 
+                style={{marginTop:15}}
+            >
+                SALVAR ALTERAÇÕES
+            </button>
             
             <hr style={{borderColor:'#444', margin: '15px 0'}}/>
             
-            <p style={{margin:0, fontSize:14}}>🏟️ Estádio Nível {team.stadiumLevel||1}</p>
+            <p style={{margin:0, fontSize:14}}>🏟️ Estádio Nível {form.stadiumLevel}</p>
             <button className="btn btn-purple" onClick={onUpgrade} style={{marginTop:10}}>
-                EVOLUIR (₣ {fmt(COSTS[team.stadiumLevel]||0).replace('₣ ','')})
+                EVOLUIR (₣ {((form.stadiumLevel || 1) + 1) * 2000000})
             </button>
             
             <hr style={{borderColor:'#444', margin: '15px 0'}}/>
             
             <div style={{display:'flex', flexDirection:'column', gap:10}}>
-                <button className="btn btn-green" onClick={()=>{const v=prompt("Valor:"); const m=prompt("Motivo:"); if(v) onReq('INJECTION', v, m)}}>PEDIR INJEÇÃO</button>
-                <button className="btn btn-red" onClick={()=>{const v=prompt("Valor a retirar:"); if(v){ const m=prompt("Motivo:"); if(m) onWithdraw(v, m); }}}>RETIRAR DINHEIRO</button>
+                <button className="btn btn-green" onClick={() => {
+                    const v = prompt("Valor:"); 
+                    if(v) onReq(team.id, v);
+                }}>PEDIR INJEÇÃO</button>
+                
+                <button className="btn btn-red" onClick={() => {
+                    const v = prompt("Valor a retirar:"); 
+                    if(v) onWithdraw(team.id, v);
+                }}>RETIRAR DINHEIRO</button>
             </div>
         </div>
     );

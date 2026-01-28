@@ -1857,37 +1857,28 @@ const Ranking = ({ teams, players }) => {
 // --- COMPONENTES QUE FALTAVAM (Súmula e Tabela) ---
 
         const MatchPerformanceForm = ({ players, teams, onSaveStats }) => {
-            const [selP, setSelP] = useState(null);
-            const [match, setMatch] = useState({ goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0, rating:'', result:'NENHUM' }); 
-            const [search, setSearch] = useState('');
+            const [selP, setSelP] = React.useState(null);
+            const [match, setMatch] = React.useState({ goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0, rating:'', result:'NENHUM' }); 
+            const [search, setSearch] = React.useState('');
 
-            // Calcula XP (INTERNO - O JORNALISTA NÃO VÊ MAIS)
             const calcMatchXP = () => {
                 let xp = 0;
-                // Usa regras padrão se não existirem
-                const R = (typeof XP_RULES !== 'undefined') ? XP_RULES : { GOAL: 150, ASSIST: 120, TACKLE: 80, SAVE: 100, WIN: 300, DRAW: 100, LOSS: -100, YELLOW: -50, RED: -200, RATING_MULT: 50 };
-                
+                const R = { GOAL: 150, ASSIST: 120, TACKLE: 80, SAVE: 100, WIN: 300, DRAW: 100, LOSS: -100, YELLOW: -50, RED: -200, RATING_MULT: 50 };
                 xp += (match.goals || 0) * R.GOAL;
                 xp += (match.assists || 0) * R.ASSIST;
                 xp += (match.tackles || 0) * R.TACKLE;
                 xp += (match.saves || 0) * R.SAVE;
                 xp += (match.yellows || 0) * R.YELLOW;
                 xp += (match.reds || 0) * R.RED;
-                
                 if (match.result === 'VITORIA') xp += R.WIN;
                 if (match.result === 'EMPATE') xp += R.DRAW;
                 if (match.result === 'DERROTA') xp += R.LOSS;
-                
-                // IMPORTANTE: Usa a nota do ADMIN (selP.rating) para o cálculo oficial do XP
-                // Se o admin não deu nota ainda, usa 0 (ou seja, só ganha XP de scout por enquanto)
-                xp += (parseFloat(selP.rating) || 0) * R.RATING_MULT;
-                
+                xp += (parseFloat(selP?.rating) || 0) * R.RATING_MULT;
                 return parseInt(xp);
             };
 
             const filtered = players.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
 
-            // TELA 1: Preenchendo a Súmula (Quando selecionou um jogador)
             if (selP) return (
                 <div>
                     <h3 style={{color:'var(--primary)'}}>Súmula: {selP.name}</h3>
@@ -1901,19 +1892,8 @@ const Ranking = ({ teams, players }) => {
                             <div><label>🟥 Vermelho</label><input className="input-field" type="number" value={match.reds} onChange={e=>setMatch({...match, reds:parseInt(e.target.value)})} /></div>
                         </div>
                         <hr style={{borderColor:'#444'}}/>
-                        
-                        {/* TRAVA DE SEGURANÇA NA NOTA (MÁXIMO 10) */}
                         <label>⭐ Nota da Atuação (Jornalista)</label>
-                        <input className="input-field" type="number" step="0.1" min="0" max="10" placeholder="0.0 a 10.0" 
-                            value={match.rating} 
-                            onChange={e=> {
-                                let v = parseFloat(e.target.value);
-                                if(v > 10) v = 10; // Trava em 10 se passar
-                                if(v < 0) v = 0;
-                                setMatch({...match, rating: v})
-                            }} 
-                        />
-                        
+                        <input className="input-field" type="number" step="0.1" min="0" max="10" value={match.rating} onChange={e=>setMatch({...match, rating: parseFloat(e.target.value)})} />
                         <label>🚩 Resultado do Time</label>
                         <select className="input-field" value={match.result} onChange={e=>setMatch({...match, result:e.target.value})}>
                             <option value="NENHUM">-- Neutro --</option>
@@ -1921,8 +1901,6 @@ const Ranking = ({ teams, players }) => {
                             <option value="EMPATE">Empate</option>
                             <option value="DERROTA">Derrota</option>
                         </select>
-                        
-                        {/* AQUI NÃO MOSTRAMOS MAIS O XP PREVISTO (SEGREDO) */}
                     </div>
                     <div style={{display:'flex', gap:10}}>
                         <button className="btn btn-green" onClick={()=>onSaveStats(selP, match, calcMatchXP())}>LANÇAR NA SÚMULA</button>
@@ -1931,7 +1909,6 @@ const Ranking = ({ teams, players }) => {
                 </div>
             );
 
-            // TELA 2: Buscando Jogador (Retorno Principal)
             return (
                 <div>
                     <h3>Lançar Desempenho</h3>
@@ -1955,11 +1932,11 @@ const Ranking = ({ teams, players }) => {
                         {teams.filter(t=>t.status!=='PENDING').map(t => (
                             <div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                                 <div style={{width:'30%'}}><b>{t.name}</b></div>
-                                <div style={{display:'flex', gap:5}}>
+                                <div style={{display:'flex', gap:5, alignItems:'flex-end'}}>
                                     <div style={{textAlign:'center'}}><small>V</small><input className="input-field" type="number" style={{width:40, padding:5, marginBottom:0}} defaultValue={t.stats?.wins||0} id={`w-${t.id}`} /></div>
                                     <div style={{textAlign:'center'}}><small>E</small><input className="input-field" type="number" style={{width:40, padding:5, marginBottom:0}} defaultValue={t.stats?.draws||0} id={`d-${t.id}`} /></div>
                                     <div style={{textAlign:'center'}}><small>D</small><input className="input-field" type="number" style={{width:40, padding:5, marginBottom:0}} defaultValue={t.stats?.losses||0} id={`l-${t.id}`} /></div>
-                                    <button className="btn btn-green" style={{width:'auto', height:35, marginTop:18}} onClick={()=>{
+                                    <button className="btn btn-green" style={{width:'auto', height:35, marginBottom:0}} onClick={()=>{
                                         const w = parseInt(document.getElementById(`w-${t.id}`).value)||0;
                                         const d = parseInt(document.getElementById(`d-${t.id}`).value)||0;
                                         const l = parseInt(document.getElementById(`l-${t.id}`).value)||0;

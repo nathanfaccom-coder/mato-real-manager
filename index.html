@@ -1740,9 +1740,9 @@
                 </div>
             );
         };
+
+            
         const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) => {
-            // 🎯 FILTRO CRUCIAL: Mostra apenas ofertas onde EU sou o destinatário
-            // Se recipientId não existir (ofertas antigas), mostra para o dono (sellerId)
             const myOffers = offers.filter(o => 
                 o.recipientId === user.data.id || (!o.recipientId && o.sellerId === user.data.id)
             );
@@ -1751,7 +1751,6 @@
                 <div>
                     <h3>Caixa de Entrada ({myOffers.length})</h3>
                     {myOffers.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Nenhuma proposta aguardando sua resposta.</p>}
-                    
                     {myOffers.map(o => (
                         <div key={o.id} className="card" style={{borderLeft:'4px solid gold'}}>
                             <div style={{display:'flex', justifyContent:'space-between'}}>
@@ -1759,11 +1758,9 @@
                                 <span style={{fontSize:10, color:'gold', fontWeight:'bold'}}>{o.type}</span>
                             </div>
                             <small style={{display:'block', marginBottom:10}}>De: <b>{o.buyerName}</b></small>
-                            
                             <div style={{background:'#222', padding:10, borderRadius:8, whiteSpace:'pre-wrap', fontSize:12, border:'1px solid #333', lineHeight:'1.4'}}>
                                 {o.description}
                             </div>
-
                             <div style={{display:'flex', gap:5, marginTop:12}}>
                                 <button className="btn btn-green" style={{flex:1}} onClick={()=>onAccept(o)}>ACEITAR</button>
                                 <button className="btn btn-blue" style={{flex:1}} onClick={()=>onCounter(o)}>CONTRA</button>
@@ -1775,9 +1772,7 @@
             );
         };
 
-
-        
-const Ranking = ({ teams, players }) => {
+        const Ranking = ({ teams, players }) => {
             const [view, setView] = React.useState('TEAMS');
             const validPlayers = players.filter(p => p.teamId && p.teamId !== 'FREE' && p.name);
 

@@ -964,7 +964,7 @@ return (
                     {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:35, height:35, borderRadius:'50%'}} />}
                     <div>
                         <div style={{fontWeight:'900', fontSize:14}}>{user.data?.name || user.type}</div>
-                        <small style={{fontSize:9, color:'#666'}}>v1.90.9 | Mato Real</small>
+                        <small style={{fontSize:9, color:'#666'}}>v1.91.0| Mato Real</small>
                     </div>
                 </div>
                 <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -2260,16 +2260,17 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction }) =>
 // --- FIM DOS COMPONENTES ---
 
             
-        // --- COMPONENTE: CAIXA DE ENTRADA DE NEGOCIAÇÕES ---
+       // --- COMPONENTE: CAIXA DE ENTRADA DE NEGOCIAÇÕES ---
 const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) => {
-    // Filtra propostas destinadas ao usuário atual ou onde ele é o vendedor original
-    const myOffers = offers.filter(o => 
-        o.recipientId === user.data.id || (!o.recipientId && o.sellerId === user.data.id)
+    // Filtra propostas destinadas ao usuário atual (Time ou Jogador)
+    // o.targetId refere-se ao ID de quem deve responder à oferta
+    const myOffers = (offers || []).filter(o => 
+        (o.targetId === user.data.id || o.recipientId === user.data.id) && o.status === 'PENDING'
     );
 
     return (
-        <div>
-            <h3 style={{ borderLeft: '4px solid var(--primary)', paddingLeft: 10 }}>
+        <div className="offers-container">
+            <h3 style={{ borderLeft: '4px solid var(--primary)', paddingLeft: 10, marginBottom: 20 }}>
                 Caixa de Entrada ({myOffers.length})
             </h3>
             
@@ -2281,13 +2282,13 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
             )}
 
             {myOffers.map(o => (
-                <div key={o.id} className="card" style={{ borderLeft: '4px solid gold', position: 'relative' }}>
+                <div key={o.id} className="card" style={{ borderLeft: '4px solid gold', position: 'relative', marginBottom: 15 }}>
                     {/* CABEÇALHO DA OFERTA */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
                             <b style={{ color: 'var(--primary)', fontSize: 18 }}>{o.playerName}</b>
                             <small style={{ display: 'block', color: '#aaa', marginTop: 2 }}>
-                                Proposta de: <b>{o.buyerName}</b>
+                                Proposta de: <b>{o.buyerName || "Interessado"}</b>
                             </small>
                         </div>
                         <span style={{ 
@@ -2297,13 +2298,14 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                             padding: '3px 8px', 
                             borderRadius: 4, 
                             fontWeight: 'bold',
-                            border: '1px solid gold'
+                            border: '1px solid gold',
+                            textTransform: 'uppercase'
                         }}>
-                            {o.type}
+                            {o.type || 'NEGOCIAÇÃO'}
                         </span>
                     </div>
 
-                    {/* DETALHES TÉCNICOS (Onde aparece o parcelamento, etc) */}
+                    {/* DETALHES TÉCNICOS */}
                     <div style={{ 
                         background: '#1a1a1a', 
                         padding: '12px', 
@@ -2313,16 +2315,17 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         border: '1px solid #333', 
                         lineHeight: '1.5',
                         marginTop: 12,
-                        color: '#eee'
+                        color: '#eee',
+                        fontFamily: 'monospace'
                     }}>
-                        {o.description}
+                        {o.description || `Valor: ${fmt(o.value)}\nContrato: ${o.contract} anos`}
                     </div>
 
                     {/* BOTÕES DE DECISÃO */}
-                    <div style={{ display: 'flex', gap: 5, marginTop: 15 }}>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 15 }}>
                         <button 
                             className="btn btn-green" 
-                            style={{ flex: 1, fontWeight: 'bold' }} 
+                            style={{ flex: 1, fontWeight: 'bold', fontSize: 11 }} 
                             onClick={() => onAccept(o)}
                         >
                             ACEITAR
@@ -2330,7 +2333,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         
                         <button 
                             className="btn btn-blue" 
-                            style={{ flex: 1, fontWeight: 'bold' }} 
+                            style={{ flex: 1, fontWeight: 'bold', fontSize: 11 }} 
                             onClick={() => onCounter(o)}
                         >
                             CONTRA
@@ -2338,7 +2341,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         
                         <button 
                             className="btn btn-red" 
-                            style={{ flex: 1, fontWeight: 'bold' }} 
+                            style={{ flex: 1, fontWeight: 'bold', fontSize: 11 }} 
                             onClick={() => onReject(o)}
                         >
                             RECUSAR
@@ -2346,9 +2349,9 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                     </div>
                     
                     {/* TIMESTAMP */}
-                    <div style={{ textAlign: 'right', marginTop: 8 }}>
+                    <div style={{ textAlign: 'right', marginTop: 10 }}>
                         <small style={{ fontSize: 9, color: '#555' }}>
-                            Recebida em: {new Date(o.date).toLocaleString()}
+                            Recebida em: {o.date ? new Date(o.date).toLocaleString() : 'Data indisponível'}
                         </small>
                     </div>
                 </div>
@@ -2356,8 +2359,8 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
         </div>
     );
 };
-// --- FIM DO COMPONENTE OFFERSSCREEN ---
 
+        
         // --- COMPONENTE: RANKING DE CLUBES E ATLETAS ---
 const Ranking = ({ teams, players }) => {
     const [view, setView] = React.useState('TEAMS');

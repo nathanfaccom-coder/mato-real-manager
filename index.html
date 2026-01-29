@@ -1513,267 +1513,200 @@ const adminAction = async (act, data) => {
     }
 
     // ==================================================
-    // VIRADA DE TEMPORADA
-    // ==================================================
-    if (act === 'SEASON') {
+// COMPONENTE PRINCIPAL DO JOGO
+// ==================================================
+function App() {
 
-        if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos")) return;
+    /* ===================== STATES ===================== */
+    const [loading, setLoading] = React.useState(false);
+    const [user, setUser] = React.useState(null);
+    const [screen, setScreen] = React.useState('HOME');
+    const [modal, setModal] = React.useState(null);
 
-        setLoading(true);
-        const b = db.batch();
+    /* ===================== DADOS ===================== */
+    const players = [];
+    const teams = [];
+    const papers = [];
+    const journalists = [];
+    const companies = [];
+    const offers = [];
+    const news = [];
+    const reqs = [];
+    const conf = {};
 
-        players.forEach(p => {
+    /* ===================== FUNÇÃO ADMIN ===================== */
+    const adminAction = async (act, data) => {
 
-            let u = {};
-
-            const currentLvl = p.overall || 45;
-            const currentXP = p.xp || 0;
-
-            const res = calcNewLevel(currentLvl, currentXP, 0);
-
-            if (res.lvl !== currentLvl) {
-                u.overall = res.lvl;
-                u.xp = res.xp;
-            }
-
-            let nc = (p.contract || 0) - 1;
-            if (nc < 0) nc = 0;
-            u.contract = nc;
-
-            if ((p.contract <= 1 || p.contract === 0) && p.preContract) {
-                if (teams.some(t => t.id === p.preContract.teamId)) {
-                    u.teamId = p.preContract.teamId;
-                    u.contract = 1;
-                    u.status = 'NAO_A_VENDA';
-                    u.preContract = firebase.firestore.FieldValue.delete();
-                }
-            }
-
-            b.update(db.collection('players').doc(p.id), u);
-        });
-
-        try {
-            await b.commit();
-            alert("Temporada virada!");
-        } catch (e) {
-            alert("Erro: " + e.message);
+        // ==================================================
+        // CONTROLE DE MERCADO
+        // ==================================================
+        if (act === 'MARKET') {
+            await db.collection('config').doc('system').update({ marketOpen: data });
+            postNews(data ? "📢 JANELA ABERTA" : "🔒 JANELA FECHADA", 'infra');
+            return;
         }
 
-        setLoading(false);
-        postNews("🌞 **NOVA TEMPORADA**", 'season');
-        return;
+        // ==================================================
+        // VIRADA DE TEMPORADA
+        // ==================================================
+        if (act === 'SEASON') {
+
+            if (!confirm(
+                "⚠️ VIRAR TEMPORADA?\n\n" +
+                "1. Evoluir Níveis\n" +
+                "2. Envelhecer Contratos"
+            )) return;
+
+            setLoading(true);
+            const batch = db.batch();
+
+            players.forEach(p => {
+                let update = {};
+
+                const currentLvl = p.overall || 45;
+                const currentXP = p.xp || 0;
+
+                const res = calcNewLevel(currentLvl, currentXP, 0);
+
+                if (res.lvl !== currentLvl) {
+                    update.overall = res.lvl;
+                    update.xp = res.xp;
+                }
+
+                let newContract = (p.contract || 0) - 1;
+                if (newContract < 0) newContract = 0;
+                update.contract = newContract;
+
+                if ((p.contract <= 1) && p.preContract) {
+                    if (teams.some(t => t.id === p.preContract.teamId)) {
+                        update.teamId = p.preContract.teamId;
+                        update.contract = 1;
+                        update.status = 'NAO_A_VENDA';
+                        update.preContract = firebase.firestore.FieldValue.delete();
+                    }
+                }
+
+                batch.update(db.collection('players').doc(p.id), update);
+            });
+
+            try {
+                await batch.commit();
+                alert("🌞 Temporada virada com sucesso!");
+                postNews("🌞 **NOVA TEMPORADA**", 'season');
+            } catch (e) {
+                alert("Erro: " + e.message);
+            }
+
+            setLoading(false);
+            return;
+        }
+    };
+
+    /* ==================================================
+       RENDER PRINCIPAL
+    ================================================== */
+
+    // LOADING GLOBAL
+    if (loading) {
+        return (
+            <div style={{ display: 'grid', placeItems: 'center', height: '100vh' }}>
+                Carregando...
+            </div>
+        );
     }
-};
-/* ====================== FIM DA FUNÇÃO adminAction ====================== */
 
+    // LOGIN / VISITANTE
+    if (!user) {
+        return (
+            <LoginScreen
+                teams={teams}
+                players={players}
+                papers={papers}
+                journalists={journalists}
+                companies={companies}
+                onLogin={login}
+                onCreateTeam={createTeam}
+                onCreatePaper={createNewspaper}
+                onCreateJourno={createJournalist}
+                onCreateCompany={createCompany}
+                onAdmin={loginAdmin}
+                onVisitor={() => {
+                    setUser({ type: 'VISITOR' });
+                    setScreen('RANKING');
+                }}
+            />
+        );
+    }
 
-            /* ======================================================================
-   INÍCIO DO RENDER PRINCIPAL
-   Responsável por todas as telas, navegação e modais do sistema
-====================================================================== */
+    // ===================== APP =====================
+    return (
+        <div>
 
-            // LOADING GLOBAL
-            if (loading)
-                return (
-                    <div style={{ display: 'grid', placeItems: 'center', height: '100vh' }}>
-                        Carregando...
+            {/* ===================== HEADER ===================== */}
+            <div className="header">
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {user.type === 'USER' && user.data.logo && (
+                        <img
+                            src={user.data.logo}
+                            style={{
+                                width: 40,
+                                height: 40,
+                                borderRadius: '50%',
+                                border: '2px solid var(--primary)',
+                                objectFit: 'cover'
+                            }}
+                        />
+                    )}
+
+                    <div>
+                        <div style={{ fontWeight: 900 }}>
+                            {user.type === 'USER' ? user.data.name : user.type}
+                        </div>
+                        <div className="dev-credits">
+                            Desenvolvido por: Nathan Reis | v1.90.5
+                        </div>
                     </div>
-                );
+                </div>
 
-            // LOGIN / VISITOR
-            if (!user)
-                return (
-                    <LoginScreen
+                <div style={{ display: 'flex', gap: 15 }}>
+                    <i className="fas fa-sign-out-alt"
+                       onClick={() => window.location.reload()} />
+                </div>
+
+            </div>
+            {/* ===================== FIM HEADER ===================== */}
+
+
+            {/* ===================== CONTEÚDO ===================== */}
+            <div className="container">
+
+                {screen === 'HOME' && user.type === 'ADMIN' && (
+                    <AdminPanel
                         teams={teams}
-                        players={players}
                         papers={papers}
                         journalists={journalists}
                         companies={companies}
-                        onLogin={login}
-                        onCreateTeam={createTeam}
-                        onCreatePaper={createNewspaper}
-                        onCreateJourno={createJournalist}
-                        onCreateCompany={createCompany}
-                        onAdmin={loginAdmin}
-                        onVisitor={() => {
-                            setUser({ type: 'VISITOR' });
-                            setScreen('RANKING');
-                        }}
+                        reqs={reqs}
+                        config={conf}
+                        onAct={adminAction}
                     />
-                );
+                )}
 
-            // ===================== RENDER PRINCIPAL =====================
-            return (
-                <div>
+                {screen === 'RANKING' && (
+                    <Ranking teams={teams} players={players} />
+                )}
 
-                    {/* ===================== HEADER ===================== */}
-                    <div className="header">
+            </div>
+            {/* ===================== FIM CONTEÚDO ===================== */}
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            {user.type === 'USER' && user.data.logo && (
-                                <img
-                                    src={user.data.logo}
-                                    style={{
-                                        width: 40,
-                                        height: 40,
-                                        borderRadius: '50%',
-                                        border: '2px solid var(--primary)',
-                                        objectFit: 'cover'
-                                    }}
-                                />
-                            )}
+        </div>
+    );
+}
 
-                            <div>
-                                <div style={{ fontWeight: 900, fontSize: 16 }}>
-                                    {user.type === 'USER' ? user.data.name : user.data?.name || user.type}
-                                </div>
-                                <div className="dev-credits" style={{ textAlign: 'left', margin: 0 }}>
-                                    Desenvolvido por: Nathan Reis | v1.90.5
-                                </div>
-                            </div>
-                        </div>
+/* ===================== EXPORT ===================== */
+export default App;
 
-                        <div style={{ display: 'flex', gap: 15, alignItems: 'center' }}>
-                            {user.type === 'USER' && (
-                                <div onClick={() => setScreen('OFFERS')}>
-                                    <i
-                                        className="fas fa-bell"
-                                        style={{ color: offers.length ? 'var(--warning)' : '#555' }}
-                                    ></i>
-                                    {offers.length > 0 && (
-                                        <span
-                                            className="pulse"
-                                            style={{
-                                                position: 'absolute',
-                                                top: -5,
-                                                right: -5,
-                                                background: 'red',
-                                                borderRadius: '50%',
-                                                width: 8,
-                                                height: 8
-                                            }}
-                                        ></span>
-                                    )}
-                                </div>
-                            )}
-
-                            {(user.type === 'USER' || user.type === 'COMPANY') && (
-                                <div style={{ color: 'var(--primary)', fontWeight: 'bold' }}>
-                                    {fmt(user.data.balance)}
-                                </div>
-                            )}
-
-                            {user.type === 'USER' && (
-                                <i className="fas fa-cog" onClick={() => setModal({ type: 'SETTINGS', data: user.data })}></i>
-                            )}
-
-                            <i className="fas fa-sign-out-alt" onClick={() => window.location.reload()}></i>
-                        </div>
-
-                    </div>
-                    {/* ===================== FIM HEADER ===================== */}
-
-
-                    {/* ===================== CONTEÚDO ===================== */}
-                    <div className="container">
-
-                        {screen === 'HOME' && user.type === 'ADMIN' && (
-                            <AdminPanel
-                                teams={teams}
-                                papers={papers}
-                                journalists={journalists}
-                                companies={companies}
-                                reqs={reqs}
-                                config={conf}
-                                onAct={adminAction}
-                                onPost={(t, b, tp) => postNews(`📢 **${t}**\n${b}`, tp)}
-                                onEditT={(t) => { setAdminTeam(t); setScreen('ADMIN_TEAM'); }}
-                                onApproveTeam={approveTeam}
-                                onUpdateBal={updateBalance}
-                                onDeleteTeam={deleteTeam}
-                                onDeletePaper={deletePaper}
-                                onDeleteJourno={deleteJournalist}
-                                onApproveComp={async id => {
-                                    await db.collection('companies').doc(id).update({ status: 'ACTIVE' });
-                                    alert("Empresa Aprovada!");
-                                }}
-                                onDeleteComp={async id => {
-                                    if (confirm("Excluir Empresa?"))
-                                        await db.collection('companies').doc(id).delete();
-                                }}
-                                onUpdateCompBal={async (id, val) => {
-                                    await db.collection('companies').doc(id).update({ balance: parseFloat(val) });
-                                    alert("Saldo Alterado!");
-                                }}
-                            />
-                        )}
-
-                        {screen === 'HOME' && user.type === 'USER' && (
-                            <TeamDashboard
-                                team={user.data}
-                                players={players.filter(p => p.teamId === user.data.id)}
-                                isVisitor={false}
-                                onEdit={p => setModal({ type: 'PLAYER', data: p })}
-                                onAdd={() => setModal({ type: 'PLAYER' })}
-                            />
-                        )}
-
-                        {screen === 'HOME' && user.type === 'VISITOR' && (
-                            <VisitorDashboard players={players} teams={teams} />
-                        )}
-
-                        {screen === 'RANKING' && <Ranking teams={teams} players={players} />}
-
-                        {screen === 'NEWS' && (
-                            <div>
-                                <h3>Notícias</h3>
-                                {news.map(n => (
-                                    <div key={n.id} className={`news-card news-${n.type}`}>
-                                        {n.text}
-                                        <br />
-                                        <small style={{ color: '#666' }}>
-                                            {new Date(n.date).toLocaleString()}
-                                        </small>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                    </div>
-                    {/* ===================== FIM CONTEÚDO ===================== */}
-
-
-                    {/* ===================== MODAL ===================== */}
-                    {modal && (
-                        <div
-                            className="modal-overlay"
-                            onClick={(e) => e.target === e.currentTarget && setModal(null)}
-                        >
-                            <div className="modal-content">
-
-                                {modal.type === 'PLAYER' && (
-                                    <PlayerForm
-                                        initial={modal.data}
-                                        onSave={savePlayer}
-                                        onDelete={async id => {
-                                            await db.collection('players').doc(id).delete();
-                                            setModal(null);
-                                        }}
-                                        isAdmin={user.type === 'ADMIN'}
-                                        teams={teams}
-                                        onRenew={renewContract}
-                                        isOwner={user.type === 'USER' && modal.data?.teamId === user.data?.id}
-                                    />
-                                )}
-
-                            </div>
-                        </div>
-                    )}
-                    {/* ===================== FIM MODAL ===================== */}
-
-                </div>
-            );
-/* ===================== FIM DO RENDER PRINCIPAL ===================== */
 
 
 

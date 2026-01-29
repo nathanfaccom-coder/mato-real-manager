@@ -4090,12 +4090,17 @@ const MatchPerformanceForm = ({ players, teams, onSaveStats }) => {
 
         
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
+     <script type="text/babel">
 
-        root.render(<ErrorBoundary><App /></ErrorBoundary>);
+    const root = ReactDOM.createRoot(document.getElementById('root'));
 
-    </script>
+    root.render(
+        <ErrorBoundary>
+            <App />
+        </ErrorBoundary>
+    );
 
+</script>
 </body>
-
 </html>
+

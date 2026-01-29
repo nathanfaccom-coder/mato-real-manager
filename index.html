@@ -1446,10 +1446,7 @@ const adminAction = async (act, data) => {
     // ABRIR / FECHAR MERCADO
     // ==================================================
     if (act === 'MARKET') {
-
-        await db.collection('config').doc('system').update({
-            marketOpen: data
-        });
+        await db.collection('config').doc('system').update({ marketOpen: data });
 
         postNews(
             data ? "📢 JANELA DE TRANSFERÊNCIAS ABERTA" : "🔒 JANELA DE TRANSFERÊNCIAS FECHADA",
@@ -1457,25 +1454,23 @@ const adminAction = async (act, data) => {
         );
 
         alert(data ? "Mercado aberto!" : "Mercado fechado!");
+        return;
     }
 
     // ==================================================
     // TRANSFERÊNCIA COM IMPOSTO DE 3%
-    // data = { player, fromTeam, toTeam, price }
     // ==================================================
     if (act === 'TRANSFER_PLAYER') {
 
-        const { player, fromTeam, toTeam, price } = data;
+        const { player, fromTeam, toTeam, price, systemTreasury } = data;
 
         if (!player || !toTeam || !price)
             return alert("Dados inválidos para transferência.");
 
         const transferValue = parseFloat(price);
-
         if (isNaN(transferValue) || transferValue <= 0)
             return alert("Valor da transferência inválido.");
 
-        // Imposto de 3%
         const tax = transferValue * 0.03;
         const finalValue = transferValue - tax;
 
@@ -1486,28 +1481,24 @@ const adminAction = async (act, data) => {
         const toRef = db.collection('teams').doc(toTeam.id);
         const systemRef = db.collection('config').doc('system');
 
-        // Atualiza jogador
         b.update(playerRef, {
             teamId: toTeam.id,
             status: 'ATIVO',
             mood: '🙂'
         });
 
-        // Clube vendedor recebe valor com imposto descontado
         if (fromRef) {
             b.update(fromRef, {
                 money: (fromTeam.money || 0) + finalValue
             });
         }
 
-        // Clube comprador paga valor cheio
         b.update(toRef, {
             money: (toTeam.money || 0) - transferValue
         });
 
-        // Sistema recebe o imposto
         b.update(systemRef, {
-            treasury: (data.systemTreasury || 0) + tax
+            treasury: (systemTreasury || 0) + tax
         });
 
         await b.commit();
@@ -1518,61 +1509,61 @@ const adminAction = async (act, data) => {
         );
 
         alert("Transferência realizada com sucesso!");
+        return;
+    }
+
+    // ==================================================
+    // VIRADA DE TEMPORADA
+    // ==================================================
+    if (act === 'SEASON') {
+
+        if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos")) return;
+
+        setLoading(true);
+        const b = db.batch();
+
+        players.forEach(p => {
+
+            let u = {};
+
+            const currentLvl = p.overall || 45;
+            const currentXP = p.xp || 0;
+
+            const res = calcNewLevel(currentLvl, currentXP, 0);
+
+            if (res.lvl !== currentLvl) {
+                u.overall = res.lvl;
+                u.xp = res.xp;
+            }
+
+            let nc = (p.contract || 0) - 1;
+            if (nc < 0) nc = 0;
+            u.contract = nc;
+
+            if ((p.contract <= 1 || p.contract === 0) && p.preContract) {
+                if (teams.some(t => t.id === p.preContract.teamId)) {
+                    u.teamId = p.preContract.teamId;
+                    u.contract = 1;
+                    u.status = 'NAO_A_VENDA';
+                    u.preContract = firebase.firestore.FieldValue.delete();
+                }
+            }
+
+            b.update(db.collection('players').doc(p.id), u);
+        });
+
+        try {
+            await b.commit();
+            alert("Temporada virada!");
+        } catch (e) {
+            alert("Erro: " + e.message);
+        }
+
+        setLoading(false);
+        postNews("🌞 **NOVA TEMPORADA**", 'season');
+        return;
     }
 };
-// fim
-
-                
-
-                                // VIRADA DE TEMPORADA (Igual ao anterior)
-
-                if(act==='SEASON') { 
-                    if(!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos")) return; 
-
-                    setLoading(true); 
-                    const b = db.batch(); 
-
-                    players.forEach(p => { 
-                        let u = {}; 
-
-                        const currentLvl = p.overall || 45;
-                        const currentXP = p.xp || 0;
-
-                        const res = calcNewLevel(currentLvl, currentXP, 0); 
-
-                        if (res.lvl !== currentLvl) { 
-                            u.overall = res.lvl; 
-                            u.xp = res.xp; 
-                        }
-
-                        let nc = (p.contract || 0) - 1; 
-                        if (nc < 0) nc = 0; 
-                        u.contract = nc; 
-
-                        if ((p.contract <= 1 || p.contract === 0) && p.preContract) { 
-                            if (teams.some(t => t.id === p.preContract.teamId)) { 
-                                u.teamId = p.preContract.teamId; 
-                                u.contract = 1; 
-                                u.status = 'NAO_A_VENDA'; 
-                                u.preContract = firebase.firestore.FieldValue.delete(); 
-                            } 
-                        } 
-
-                        b.update(db.collection('players').doc(p.id), u); 
-                    }); 
-
-                    try { 
-                        await b.commit(); 
-                        alert("Temporada virada!"); 
-                    } catch (e) { 
-                        alert("Erro: " + e.message); 
-                    }
-
-                    setLoading(false); 
-                    postNews("🌞 **NOVA TEMPORADA**", 'season'); 
-                }
-
-            }; 
 /* ====================== FIM DA FUNÇÃO adminAction ====================== */
 
 

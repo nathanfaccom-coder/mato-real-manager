@@ -642,7 +642,7 @@
                 }
             };
             
-            // 3. Função Mestra do Admin (COM IMPOSTO DE 3% NOS JOGADORES)
+            // 3. Função Mestra do Admin (COM REGRA DE AGENTES LIVRES)
             const adminAction = async (act, data) => {
                 if(act==='MARKET') { 
                     db.collection('config').doc('system').update({marketOpen: data}); 
@@ -656,18 +656,13 @@
                     setLoading(true); 
                     const b = db.batch(); 
                     
-                    // 1. Jogadores: Salário (+) e Imposto de Fortuna (-)
                     players.forEach(p => { 
                         if(p.teamId) { 
                             if (teams.some(t => t.id === p.teamId)) {
                                 const currentBal = parseFloat(p.balance) || 0;
                                 const salary = parseFloat(p.salary) || 0;
-                                
-                                // CÁLCULO DO IMPOSTO DE 3% (NOVIDADE)
                                 const tax = currentBal * 0.03; 
                                 const finalBalance = (currentBal + salary) - tax;
-
-                                // XP (Acumula para a temporada)
                                 const xpTotal = (p.xp || 0) + (p.pendingXP || 0);
 
                                 b.update(db.collection('players').doc(p.id), { 
@@ -680,31 +675,26 @@
                         }
                     });
 
-                    // 2. Times: Pagam salários e Recebem Patrocínio
                     teams.forEach(t => { 
                         const currentBal = parseFloat(t.balance) || 0;
                         const wages = players.filter(p=>p.teamId===t.id).reduce((a,p)=>a+(parseFloat(p.salary)||0),0); 
                         const income = sps.filter(s => s.teamId === t.id && s.status === 'ACTIVE').reduce((a,s) => a + parseFloat(s.value), 0); 
-                        
                         b.update(db.collection('teams').doc(t.id), {
                             balance: currentBal + income - wages
                         }); 
                     });
 
-                    // 3. Empresas: Imposto Fixo (Correção aplicada)
                     companies.forEach(c => { 
                         if(c.status === 'ACTIVE') { 
                             const currentBal = parseFloat(c.balance) || 0;
                             const type = c.companyType || 'COMERCIO'; 
                             const tax = (COMPANY_TYPES[type] || {}).tax || 50000; 
-                            
                             b.update(db.collection('companies').doc(c.id), { 
                                 balance: currentBal - tax 
                             }); 
                         } 
                     });
                     
-                    // 4. Dívidas (Proteção contra times excluídos)
                     const ds = await db.collection('debts').get(); 
                     ds.docs.forEach(doc => { 
                         const d = doc.data(); 
@@ -716,7 +706,6 @@
                         } else if (d.weeksRemaining > 0) { 
                             b.update(db.collection('teams').doc(d.buyerId), {balance: firebase.firestore.FieldValue.increment(-d.installmentVal)}); 
                             b.update(db.collection('teams').doc(d.sellerId), {balance: firebase.firestore.FieldValue.increment(d.installmentVal)}); 
-                            
                             if (d.weeksRemaining - 1 === 0) { 
                                 b.delete(doc.ref); 
                                 postNews(`✅ **DÍVIDA QUITADA**\n${d.buyerName} terminou de pagar ${d.playerName}.`, 'money'); 
@@ -736,7 +725,7 @@
                     setLoading(false); 
                 }
                 
-               // VIRADA DE TEMPORADA (ATUALIZADA: AGENTES LIVRES)
+                // VIRADA DE TEMPORADA (ATUALIZADA: AGENTES LIVRES)
                 if(act==='SEASON') { 
                     if(!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos\n3. Mover jogadores sem contrato para Agentes Livres")) return; 
                     
@@ -745,8 +734,6 @@
                     
                     players.forEach(p => { 
                         let u = {}; 
-                        
-                        // 1. Evolução de Nível (XP)
                         const currentLvl = p.overall || 45;
                         const currentXP = p.xp || 0;
                         const res = calcNewLevel(currentLvl, currentXP, 0); 
@@ -755,23 +742,19 @@
                             u.xp = res.xp; 
                         }
 
-                        // 2. Envelhecimento do Contrato
                         let nc = (parseInt(p.contract) || 0) - 1; 
                         if (nc < 0) nc = 0;
                         u.contract = nc;
 
-                        // 3. Regra de Agentes Livres (Se o contrato acabou)
                         if (nc === 0) {
-                            // Se tiver pré-contrato assinado, vai para o novo time
                             if (p.preContract && teams.some(t => t.id === p.preContract.teamId)) {
                                 u.teamId = p.preContract.teamId;
-                                u.contract = 2; // Inicia com 2 anos no novo clube
+                                u.contract = 2; 
                                 u.status = 'NAO_A_VENDA';
                                 u.preContract = firebase.firestore.FieldValue.delete();
                             } else {
-                                // Se não tem pré-contrato, vira Agente Livre
                                 u.teamId = 'FREE';
-                                u.status = 'VENDA'; // Fica disponível para propostas
+                                u.status = 'VENDA'; 
                                 u.mood = '😐';
                             }
                         }
@@ -785,10 +768,10 @@
                     } catch (e) { 
                         alert("Erro: " + e.message); 
                     }
-                    
                     setLoading(false); 
                     postNews("🌞 **NOVA TEMPORADA**\nContratos foram reduzidos e jogadores sem vínculo agora são Agentes Livres!", 'season'); 
                 }
+            };
 
             // --- RENDER ---
             if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;

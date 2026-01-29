@@ -736,26 +736,59 @@
                     setLoading(false); 
                 }
                 
-                // VIRADA DE TEMPORADA (Igual ao anterior)
+               // VIRADA DE TEMPORADA (ATUALIZADA: AGENTES LIVRES)
                 if(act==='SEASON') { 
-                    if(!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos")) return; 
+                    if(!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos\n3. Mover jogadores sem contrato para Agentes Livres")) return; 
+                    
                     setLoading(true); 
                     const b = db.batch(); 
+                    
                     players.forEach(p => { 
-                        let u={}; 
+                        let u = {}; 
+                        
+                        // 1. Evolução de Nível (XP)
                         const currentLvl = p.overall || 45;
                         const currentXP = p.xp || 0;
                         const res = calcNewLevel(currentLvl, currentXP, 0); 
-                        if (res.lvl !== currentLvl) { u.overall = res.lvl; u.xp = res.xp; }
-                        let nc=(p.contract||0)-1; if(nc<0)nc=0; u.contract=nc; 
-                        if((p.contract<=1||p.contract===0)&&p.preContract){ if (teams.some(t => t.id === p.preContract.teamId)) { u.teamId=p.preContract.teamId; u.contract=1; u.status='NAO_A_VENDA'; u.preContract=firebase.firestore.FieldValue.delete(); } } 
+                        if (res.lvl !== currentLvl) { 
+                            u.overall = res.lvl; 
+                            u.xp = res.xp; 
+                        }
+
+                        // 2. Envelhecimento do Contrato
+                        let nc = (parseInt(p.contract) || 0) - 1; 
+                        if (nc < 0) nc = 0;
+                        u.contract = nc;
+
+                        // 3. Regra de Agentes Livres (Se o contrato acabou)
+                        if (nc === 0) {
+                            // Se tiver pré-contrato assinado, vai para o novo time
+                            if (p.preContract && teams.some(t => t.id === p.preContract.teamId)) {
+                                u.teamId = p.preContract.teamId;
+                                u.contract = 2; // Inicia com 2 anos no novo clube
+                                u.status = 'NAO_A_VENDA';
+                                u.preContract = firebase.firestore.FieldValue.delete();
+                            } else {
+                                // Se não tem pré-contrato, vira Agente Livre
+                                u.teamId = 'FREE';
+                                u.status = 'VENDA'; // Fica disponível para propostas
+                                u.mood = '😐';
+                            }
+                        }
+
                         b.update(db.collection('players').doc(p.id), u); 
                     }); 
-                    try { await b.commit(); alert("Temporada virada!"); } catch (e) { alert("Erro: "+e.message); }
+
+                    try { 
+                        await b.commit(); 
+                        alert("Temporada virada! Jogadores sem contrato agora são Agentes Livres."); 
+                    } catch (e) { 
+                        alert("Erro: " + e.message); 
+                    }
+                    
                     setLoading(false); 
-                    postNews("🌞 **NOVA TEMPORADA**", 'season'); 
+                    postNews("🌞 **NOVA TEMPORADA**\nContratos foram reduzidos e jogadores sem vínculo agora são Agentes Livres!", 'season'); 
                 }
-            };
 
             // --- RENDER ---
             if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
@@ -768,7 +801,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.90.5</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.90.6</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -991,7 +1024,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.5</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.6</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

@@ -784,45 +784,52 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.93.0</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.93.1</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
                            {/* NOVO SISTEMA DE NOTIFICAÇÃO E SALDO */}
-                            {/* ÍCONE DE NOTIFICAÇÃO (SINO) - VERSÃO CORRIGIDA */}
-                            {user.type==='USER' && (
-                                <div 
-                                    onClick={()=>setScreen('OFFERS')} 
-                                    style={{position:'relative', cursor:'pointer', padding:'5px', display:'flex', alignItems:'center'}}
-                                >
-                                    <i 
-                                        className="fas fa-bell" 
-                                        style={{
-                                            fontSize: '20px',
-                                            /* Só fica amarelo se a lista existir E tiver mais de 0 ofertas */
-                                            color: (offers && offers.length > 0) ? 'var(--warning)' : '#666',
-                                            transition: '0.3s'
-                                        }}
-                                    ></i>
-                                    
-                                    {/* Bolinha vermelha só aparece se houver ofertas maiores que zero */}
-                                    {offers && offers.length > 0 && (
-                                        <span 
-                                            className="pulse"
+                            {/* ÍCONE DE NOTIFICAÇÃO (SINO) - FILTRAGEM REAL DE STATUS */}
+                            {user.type==='USER' && (() => {
+                                // Criamos uma lista filtrada que considera apenas o que é PENDENTE
+                                const pendingOffers = (offers || []).filter(o => 
+                                    (o.recipientId === user.data.id || (!o.recipientId && o.sellerId === user.data.id)) && 
+                                    o.status === 'PENDING'
+                                );
+
+                                return (
+                                    <div 
+                                        onClick={()=>setScreen('OFFERS')} 
+                                        style={{position:'relative', cursor:'pointer', padding:'5px', display:'flex', alignItems:'center'}}
+                                    >
+                                        <i 
+                                            className="fas fa-bell" 
                                             style={{
-                                                position: 'absolute',
-                                                top: '2px',
-                                                right: '2px',
-                                                background: 'red',
-                                                borderRadius: '50%',
-                                                width: '10px',
-                                                height: '10px',
-                                                border: '2px solid var(--bg-card)'
+                                                fontSize: '20px',
+                                                /* O sino só fica amarelo se houver propostas com status PENDING */
+                                                color: pendingOffers.length > 0 ? 'var(--warning)' : '#666',
+                                                transition: '0.3s'
                                             }}
-                                        ></span>
-                                    )}
-                                </div>
-                            )}
+                                        ></i>
+                                        
+                                        {pendingOffers.length > 0 && (
+                                            <span 
+                                                className="pulse"
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: '2px',
+                                                    right: '2px',
+                                                    background: 'red',
+                                                    borderRadius: '50%',
+                                                    width: '10px',
+                                                    height: '10px',
+                                                    border: '2px solid var(--bg-card)'
+                                                }}
+                                            ></span>
+                                        )}
+                                    </div>
+                                );
+                            })()}
 
                             {(user.type==='USER' || user.type==='COMPANY') && (
                                 <div style={{color:'var(--primary)', fontWeight:'bold', marginLeft:10}}>
@@ -1050,7 +1057,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.0</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.1</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

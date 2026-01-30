@@ -790,7 +790,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.93.4</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.93.5</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -1063,7 +1063,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.4</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.5</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1082,16 +1082,43 @@
                         {subTab==='TEAM' && (teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}
                         
                         {subTab==='PLAYER' && !selTeamForPlayer && <div>
-                            <p style={{color:'#aaa'}}>Selecione o clube onde você joga:</p>
-                            {(teams||[]).filter(t=>t.status!=='PENDING').map(t=>(<div key={t.id} className="card" onClick={()=>setSelTeamForPlayer(t)} style={{cursor:'pointer'}}><b>{t.name}</b></div>))}
-                        </div>}
+    <p style={{color:'#aaa'}}>Selecione o clube onde você joga ou acesse como livre:</p>
+    
+    {/* BOTÃO PARA AGENTES LIVRES (FREE) */}
+    <div 
+        className="card" 
+        onClick={() => setSelTeamForPlayer({ id: 'FREE', name: 'Agentes Livres' })} 
+        style={{cursor:'pointer', border: '1px solid var(--warning)', background: 'rgba(255, 196, 0, 0.1)'}}
+    >
+        <b style={{color: 'var(--warning)'}}>🆓 BUSCAR MEU PERFIL (AGENTE LIVRE)</b>
+    </div>
 
-                        {subTab==='PLAYER' && selTeamForPlayer && <div>
-                            <button className="btn" style={{marginBottom:10, background:'#333'}} onClick={()=>setSelTeamForPlayer(null)}>⬅ VOLTAR PARA TIMES</button>
-                            <h4 style={{color:'var(--secondary)'}}>Elenco do {selTeamForPlayer.name}:</h4>
-                            {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).length === 0 && <p style={{color:'#666'}}>Nenhum jogador encontrado neste time.</p>}
-                            {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).map(p => (<div key={p.id} className="card" onClick={()=>setSel({...p, type:'PLAYER'})} style={{cursor:'pointer', borderLeft:'4px solid var(--secondary)'}}>👟 <b>{p.name}</b></div>))}
-                        </div>}
+    <hr style={{borderColor: '#333', margin: '15px 0'}} />
+
+    {(teams||[]).filter(t=>t.status!=='PENDING').map(t=>(
+        <div key={t.id} className="card" onClick={()=>setSelTeamForPlayer(t)} style={{cursor:'pointer'}}>
+            <b>{t.name}</b>
+        </div>
+    ))}
+</div>}
+
+{subTab==='PLAYER' && selTeamForPlayer && <div>
+    <button className="btn" style={{marginBottom:10, background:'#333'}} onClick={()=>setSelTeamForPlayer(null)}>
+        ⬅ VOLTAR
+    </button>
+    <h4 style={{color:'var(--secondary)'}}>Jogadores - {selTeamForPlayer.name}:</h4>
+    
+    {/* Lista os jogadores do time selecionado OU os Agentes Livres */}
+    {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).length === 0 && 
+        <p style={{color:'#666'}}>Nenhum jogador encontrado aqui.</p>
+    }
+    
+    {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).map(p => (
+        <div key={p.id} className="card" onClick={()=>setSel({...p, type:'PLAYER'})} style={{cursor:'pointer', borderLeft:'4px solid var(--secondary)'}}>
+            👟 <b>{p.name}</b>
+        </div>
+    ))}
+</div>}
 
                         {subTab==='COMPANY' && (companies||[]).filter(c=>c.status!=='PENDING').map(c=><div key={c.id} className="card" onClick={()=>setSel({...c, type:'COMPANY'})} style={{cursor:'pointer', borderLeft:'4px solid var(--purple)'}}>🏢 <b>{c.name}</b><br/><small>{(c.companyType)}</small></div>)}
                         

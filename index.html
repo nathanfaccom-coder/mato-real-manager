@@ -859,7 +859,7 @@ const resetDatabase = async () => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.93.8</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.93.9</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -1135,7 +1135,7 @@ color: (offers || []).filter(o => (o.recipientId === user.data.id || o.playerId 
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.8</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.9</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1894,7 +1894,10 @@ const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) 
         //fim
 
 const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) => {
-    // CORREÇÃO: O filtro agora olha se o seu ID de Jogador é o recebedor ou o alvo do contrato
+    // FILTRO BLINDADO: 
+    // 1. O recipientId precisa ser o seu ID (seja você clube ou jogador livre)
+    // 2. OU o playerId ser o seu ID (caso o clube tenha enviado pelo ID do jogador)
+    // 3. E o status precisa ser PENDING
     const myOffers = offers.filter(o => 
         (o.recipientId === user.data.id || o.playerId === user.data.id) && 
         o.status === 'PENDING'

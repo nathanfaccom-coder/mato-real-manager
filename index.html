@@ -780,274 +780,80 @@
             };
 
             // --- RENDER ---
-            if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
-            
-            if(!user) return <LoginScreen teams={teams} players={players} papers={papers} journalists={journalists} companies={companies} onLogin={login} onCreateTeam={createTeam} onCreatePaper={createNewspaper} onCreateJourno={createJournalist} onCreateCompany={createCompany} onAdmin={loginAdmin} onVisitor={()=>{setUser({type:'VISITOR'}); setScreen('RANKING');}} />;
+            // --- RENDERIZACAO PRINCIPAL CORRIGIDA (v1.93.5) ---
+if (loading) return <div style={{ display: 'grid', placeItems: 'center', height: '100vh' }}>Carregando...</div>;
 
-            return (
+if (!user) return <LoginScreen teams={teams} players={players} papers={papers} journalists={journalists} companies={companies} onLogin={login} onCreateTeam={createTeam} onCreatePaper={createNewspaper} onCreateJourno={createJournalist} onCreateCompany={createCompany} onAdmin={loginAdmin} onVisitor={() => { setUser({ type: 'VISITOR' }); setScreen('RANKING'); }} />;
+
+return (
+    <div>
+        {/* CABEÇALHO (HEADER) */}
+        <div className="header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {user.type === 'USER' && user.data.logo && <img src={user.data.logo} style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid var(--primary)', objectFit: 'cover' }} />}
                 <div>
-                    <div className="header">
-                        <div style={{display:'flex', alignItems:'center', gap:10}}>
-                            {/* LOGO: Só mostra se for USER (Time) e tiver logo. Jogador Livre não mostra logo de time aqui */}
-                            {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
-                            
-                            <div>
-                                <div style={{fontWeight:'900', fontSize:16}}>
-                                    {user.type==='USER' ? user.data.name : (user.data?.name || user.type)}
-                                </div>
-                                {/* SUBTÍTULO: Mostra se é Agente Livre ou o nome do desenvolvedor */}
-                                <div className="dev-credits" style={{textAlign:'left', margin:0, color: user.data?.teamId === 'FREE' ? 'var(--warning)' : '#888'}}>
-                                    {user.data?.teamId === 'FREE' ? '🏷️ Agente Livre (Sem Clube)' : `v1.93.5 | ${user.type}`}
-                                </div>
-                            </div>
-                        </div>
-                        <div style={{display:'flex', gap:15, alignItems:'center'}}>
-                     
-                           {/* ÍCONE DE NOTIFICAÇÃO (SINO) - FILTRAGEM SEGURA */}
-                            {user.type==='USER' && (
-                                <div 
-                                    onClick={()=>setScreen('OFFERS')} 
-                                    style={{position:'relative', cursor:'pointer', padding:'5px', display:'flex', alignItems:'center'}}
-                                >
-                                    <i 
-                                        className="fas fa-bell" 
-                                        style={{
-                                            fontSize: '20px',
-                                            color: (offers || []).filter(o => (o.recipientId === user.data.id || (!o.recipientId && o.sellerId === user.data.id)) && o.status === 'PENDING').length > 0 ? 'var(--warning)' : '#666',
-                                            transition: '0.3s'
-                                        }}
-                                    ></i>
-                                    
-                                    {(offers || []).filter(o => (o.recipientId === user.data.id || (!o.recipientId && o.sellerId === user.data.id)) && o.status === 'PENDING').length > 0 && (
-                                        <span 
-                                            className="pulse"
-                                            style={{
-                                                position: 'absolute',
-                                                top: '2px',
-                                                right: '2px',
-                                                background: 'red',
-                                                borderRadius: '50%',
-                                                width: '10px',
-                                                height: '10px',
-                                                border: '2px solid var(--bg-card)'
-                                            }}
-                                        ></span>
-                                    )}
-                                </div>
-                            )}
-
-                            {(user.type==='USER' || user.type==='COMPANY') && (
-                                <div style={{color:'var(--primary)', fontWeight:'bold', marginLeft:10}}>
-                                    {fmt(user.data.balance)}
-                                </div>
-                            )}
-
-                            {user.type==='USER' && (
-                                <i className="fas fa-cog" style={{cursor:'pointer', marginLeft:10}} onClick={()=>setModal({type:'SETTINGS', data:user.data})}></i>
-                            )}
-
-                            <i className="fas fa-sign-out-alt" style={{cursor:'pointer', marginLeft:10}} onClick={()=>window.location.reload()}></i>
-                        </div>
+                    <div style={{ fontWeight: '900', fontSize: 16 }}>
+                        {user.type === 'USER' ? user.data.name : (user.data?.name || user.type)}
                     </div>
-
-                    <div className="container">
-                        {screen === 'HOME' && user.type === 'ADMIN' && 
-                            <AdminPanel 
-                                teams={teams} 
-                                papers={papers} 
-                                journalists={journalists} 
-                                companies={companies} 
-                                reqs={reqs} 
-                                config={conf} 
-                                onAct={adminAction} 
-                                onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} 
-                                onApprove={async(r)=>{/*Fin logic*/}} 
-                                onReject={(id)=>db.collection('financeRequests').doc(id).delete()} 
-                                onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} 
-                                onApproveTeam={approveTeam} 
-                                onUpdateBal={updateBalance} 
-                                onDeleteTeam={deleteTeam} 
-                                onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} 
-                                onDeletePaper={deletePaper} 
-                                onDeleteJourno={deleteJournalist} 
-                                onRejectPaper={(id)=>db.collection('newspapers').doc(id).delete()} 
-                                onConfig={(t)=>setModal({type:'SETTINGS', data:t})} 
-                                
-                                onApproveComp={async(id)=>{await db.collection('companies').doc(id).update({status:'ACTIVE'}); alert("Empresa Aprovada!");}}
-                                onDeleteComp={async(id)=>{if(confirm("Excluir Empresa?")) await db.collection('companies').doc(id).delete();}}
-                                onUpdateCompBal={async(id, val)=>{ await db.collection('companies').doc(id).update({balance: parseFloat(val)}); alert("Saldo Alterado!"); }}
-                            />
-                        }
-                          
-                        {screen === 'HOME' && user.type === 'USER' && <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} />}
-                        {screen === 'HOME' && user.type === 'VISITOR' && <VisitorDashboard players={players} teams={teams} />}
-                        {screen === 'PRESS_DASH' && (user.type==='PRESS' || user.type==='PRESS_WORKER') && (
-                            <div>
-                                <h3>Painel de Imprensa ({user.data.name})</h3>
-                                <div className="card">
-                                    <button className="btn btn-blue" onClick={()=>setModal({type:'POST_NEWS'})}>ESCREVER NOTÍCIA</button>
-                                    <button className="btn btn-purple" onClick={()=>setModal({type:'MATCH_PERFORMANCE'})}>LANÇAR SÚMULA (XP)</button>
-                                    <button className="btn btn-gold" onClick={()=>setModal({type:'TEAM_TABLE'})}>EDITAR TABELA</button>
-                                </div>
-
-                                {user.type==='PRESS' && journalists.filter(j=>j.newspaperId===user.data.id && j.status==='PENDING').map(j=>(
-                                    <div key={j.id} className="card">
-                                        {j.name}
-                                        <button className="btn btn-green" onClick={()=>db.collection('journalists').doc(j.id).update({status:'ACTIVE'})}>APROVAR</button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}                      
-                        {screen === 'ADMIN_TEAM' && adminTeam && <div><button className="btn" style={{background:'#333', marginBottom:10}} onClick={()=>{setAdminTeam(null); setScreen('HOME');}}>⬅ VOLTAR</button><h3 style={{color:'var(--purple)'}}>Editando: {adminTeam.name}</h3><TeamDashboard team={adminTeam} players={players.filter(p=>p.teamId===adminTeam.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER'})} /></div>}
-                        {screen === 'MARKET' && (
-                            <Market 
-                                me={user.data?.id} 
-                                teams={teams} 
-                                players={players} 
-                                open={conf.marketOpen} 
-                                isVis={user.type === 'VISITOR'} 
-                                onNeg={(p) => setModal({ type: 'OFFER', data: p })} 
-                                onPayClause={async (p) => {
-                                    const buy = teams.find(t => t.id === user.data.id);
-                                    const sel = teams.find(t => t.id === p.teamId);
-                                    if (!buy || buy.balance < p.clause) return alert("Saldo insuficiente!");
-                                    if (!confirm(`Pagar multa de ${fmt(p.clause)} por ${p.name}?`)) return;
-
-                                    const b = db.batch();
-                                    b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - p.clause });
-                                    b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + p.clause });
-                                    b.update(db.collection('players').doc(p.id), {
-                                        teamId: buy.id,
-                                        status: 'NAO_A_VENDA',
-                                        contract: 3,
-                                        history: firebase.firestore.FieldValue.arrayUnion({ 
-                                            date: Date.now(), from: sel.name, to: buy.name, type: 'MULTA', value: p.clause 
-                                        })
-                                    });
-                                    await b.commit();
-                                    postNews(`🚨 **MULTA PAGA!**\nO **${buy.name}** pagou a multa de **${p.name}**!`, 'transfer');
-                                    alert("Contratado via multa!");
-                                }}
-                                onPre={async (p) => {
-                                    const buy = teams.find(t => t.id === user.data.id);
-                                    if (!confirm(`Assinar pré-contrato com ${p.name}?`)) return;
-                                    await db.collection('players').doc(p.id).update({
-                                        preContract: { teamId: buy.id, teamName: buy.name },
-                                        mood: '🤩'
-                                    });
-                                    postNews(`📝 **PRÉ-CONTRATO**\n**${p.name}** reforçará o **${buy.name}** na próxima temporada!`, 'transfer');
-                                    alert("Pré-contrato assinado!");
-                                }}
-                            />
-                        )}
-
-                        {screen === 'SHOPPING' && <ShoppingScreen products={products} companies={companies} userTeam={user.type==='USER' || user.type==='PLAYER'} onBuy={buyProduct} />}
-                        
-                        {screen === 'SPONSORSHIPS' && user.type === 'USER' && (
-                            <div>
-                                <h3>Buscar Patrocínio</h3>
-                                <p style={{fontSize:11, color:'#aaa'}}>Envie propostas semanais para as empresas.</p>
-                                {companies.filter(c=>c.status==='ACTIVE').map(c => (
-                                    <div key={c.id} className="card">
-                                        <b>{c.name}</b> <small>({(COMPANY_TYPES[c.companyType] || {}).label})</small>
-                                        <div style={{display:'flex', gap:5, marginTop:5}}>
-                                            <button className="btn btn-purple" onClick={()=>{const v=prompt("Valor Semanal pedido (₣):"); if(v) requestSponsorship(c.id, v);}}>PEDIR PATROCÍNIO</button>
-                                        </div>
-                                    </div>
-                                ))}
-                                
-                                <hr style={{borderColor:'#333'}}/>
-                                <h4>Meus Contratos</h4>
-                                {sps.filter(s=>s.teamId===user.data.id).length === 0 && <p style={{color:'#666'}}>Sem contratos.</p>}
-                                {sps.filter(s=>s.teamId===user.data.id).map(s => (
-                                    <div key={s.id} className="card" style={{borderLeft:`4px solid ${s.status==='ACTIVE'?'var(--primary)':'#666'}`}}>
-                                        <b>{s.companyName}</b><br/>
-                                        Valor: {fmt(s.value)}/sem <small>({s.status === 'PENDING' ? 'Aguardando' : 'Ativo'})</small>
-                                        {s.status==='ACTIVE' && <button className="btn btn-red" style={{width:'auto', marginTop:5}} onClick={()=>{if(confirm("Encerrar contrato de patrocínio?")) db.collection('sponsorships').doc(s.id).delete();}}>ENCERRAR</button>}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        {screen === 'RANKING' && <Ranking teams={teams} players={players} />}
-                        {screen === 'NEWS' && <div><h3>Notícias</h3>{news.map(n=><div key={n.id} className={`news-card news-${n.type}`}>{n.text}<br/><small style={{color:'#666'}}>{new Date(n.date).toLocaleString()}</small></div>)}</div>}
-                        {screen === 'OFFERS' && (
-                            <OffersScreen 
-                                user={user} 
-                                offers={offers} 
-                                teams={teams}
-                                onAccept={acceptOffer} 
-                                onReject={rejectOffer} 
-                                onCounter={(o) => setModal({
-                                    type: 'OFFER', 
-                                    data: { ...players.find(p => p.id === o.playerId), oldOffer: o }
-                                })} 
-                            />
-                        )}                        
-                        {(screen === 'COMPANY_DASH' || screen === 'COMPANY_HOME') && user.type === 'COMPANY' && 
-                            <CompanyDashboard 
-                                company={user.data} 
-                                products={products.filter(p => p.companyId === user.data.id)} 
-                                sps={sps.filter(s => s.companyId === user.data.id)}
-                                sales={sales || []} 
-                                teams={teams}
-                                onSaveProd={saveProduct} 
-                                onDeleteProd={async(id)=>{if(confirm("Excluir produto?")) await db.collection('products').doc(id).delete();}}
-                                onProcessSpons={processSponsorship} 
-                            />
-                        }
-                        {screen === 'PLAYER_DASH' && user.type === 'PLAYER' && 
-                            <PlayerDashboard 
-                                player={players.find(p=>p.id===user.data.id) || user.data} 
-                                team={teams.find(t=>t.id===user.data.teamId)} 
-                                sales={sales || []} 
-                                onAction={handlePlayerActions} 
-                                onUpdatePassword={async(newP)=>{ await db.collection('players').doc(user.data.id).update({password: newP}); alert("Senha alterada!"); }} 
-                            />
-                        }
+                    <div className="dev-credits" style={{ textAlign: 'left', margin: 0, color: user.data?.teamId === 'FREE' ? 'var(--warning)' : '#888' }}>
+                        {user.data?.teamId === 'FREE' ? '🏷️ Agente Livre (Sem Clube)' : `v1.93.5 | ${user.type}`}
                     </div>
-
-                    <div className="bottom-nav">
-                        <div 
-                            className={`nav-item ${['HOME','COMPANY_HOME','COMPANY_DASH','PLAYER_DASH'].includes(screen)?'active':''}`} 
-                            onClick={() => {
-                                if(user.type.includes('PRESS')) setScreen('PRESS_DASH');
-                                else if(user.type === 'COMPANY') setScreen('COMPANY_HOME');
-                                else if(user.type === 'PLAYER') setScreen('PLAYER_DASH'); 
-                                else setScreen('HOME');
-                            }}
-                        >
-                            <i className="fas fa-home"></i>INÍCIO
-                        </div>
-
-                        {user.type!=='COMPANY' && user.type!=='PLAYER' && <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>}
-                        {user.type!=='COMPANY' && <div className={`nav-item ${screen==='SHOPPING'?'active':''}`} onClick={()=>setScreen('SHOPPING')}><i className="fas fa-shopping-bag"></i>SHOP</div>}
-                        {user.type==='USER' && <div className={`nav-item ${screen==='SPONSORSHIPS'?'active':''}`} onClick={()=>setScreen('SPONSORSHIPS')}><i className="fas fa-handshake"></i>PATRO</div>}
-                        {user.type!=='COMPANY' && <div className={`nav-item ${screen==='RANKING'?'active':''}`} onClick={()=>setScreen('RANKING')}><i className="fas fa-trophy"></i>RANK</div>}
-                        <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={()=>{setScreen('NEWS'); setNewNews(false); localStorage.setItem('lastRead', Date.now());}}><i className="fas fa-newspaper"></i>NEWS</div>
-                    </div>
-
-                    {modal && <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget && setModal(null)}>
-                        <div className="modal-content">
-                            {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={async(id)=>{db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} onRenew={renewContract} isOwner={user.type==='USER' && modal.data?.teamId===user.data?.id} />}
-                            {modal.type==='OFFER' && (
-                                <OfferForm 
-                                    target={modal.data} 
-                                    myPlayers={players.filter(p => p.teamId === user.data.id)} 
-                                    onSend={sendOffer} 
-                                    setModal={setModal} 
-                                />
-                            )}
-                            {modal.type==='SETTINGS' && <SettingsForm team={modal.data || user.data} isAdmin={user.type==='ADMIN'} onUp={(d)=>{const tid=(modal.data?.id)||user.data.id; db.collection('teams').doc(tid).update(d); setModal(null);}} onUpgrade={()=>{/*Upgrade logic*/}} onReq={(t,a,d)=>{db.collection('financeRequests').add({teamId:user.data.id, teamName:user.data.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!");}} onWithdraw={withdrawMoney} />}
-                            {modal.type==='MATCH_PERFORMANCE' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} />}
-                            {modal.type==='TEAM_TABLE' && <TeamStandingsEditor teams={teams} onUpdateTeamStats={updateTeamStats} />}
-                            {modal.type==='POST_NEWS' && <div><h3>Nova Notícia</h3><input className="input-field" placeholder="Manchete / Texto" id="news-body" /><button className="btn btn-blue" onClick={()=>{postNews(`📰 **${user.data.name}:**\n${document.getElementById('news-body').value}`, 'press'); setModal(null);}}>PUBLICAR</button></div>}
-                            {modal.type==='STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
-                        </div>
-                    </div>}
                 </div>
-            );
+            </div>
+            
+            <div style={{ display: 'flex', gap: 15, alignItems: 'center' }}>
+                {/* SINO DE NOTIFICAÇÕES */}
+                {user.type === 'USER' && (
+                    <div onClick={() => setScreen('OFFERS')} style={{ position: 'relative', cursor: 'pointer', padding: '5px', display: 'flex', alignItems: 'center' }}>
+                        <i className="fas fa-bell" style={{ fontSize: '20px', color: (offers || []).filter(o => (o.recipientId === user.data.id || (!o.recipientId && o.sellerId === user.data.id)) && o.status === 'PENDING').length > 0 ? 'var(--warning)' : '#666' }}></i>
+                        {(offers || []).filter(o => (o.recipientId === user.data.id || (!o.recipientId && o.sellerId === user.data.id)) && o.status === 'PENDING').length > 0 && (
+                            <span className="pulse" style={{ position: 'absolute', top: '2px', right: '2px', background: 'red', borderRadius: '50%', width: '10px', height: '10px', border: '2px solid var(--bg-card)' }}></span>
+                        )}
+                    </div>
+                )}
 
-// FIM DO COMPONENTE APP
+                {(user.type === 'USER' || user.type === 'COMPANY') && (
+                    <div style={{ color: 'var(--primary)', fontWeight: 'bold', marginLeft: 10 }}>{fmt(user.data.balance)}</div>
+                )}
+
+                <i className="fas fa-sign-out-alt" style={{ cursor: 'pointer', marginLeft: 10 }} onClick={() => window.location.reload()}></i>
+            </div>
+        </div>
+
+        {/* TELAS PRINCIPAIS (CONTAINER) */}
+        <div className="container">
+            {screen === 'HOME' && user.type === 'ADMIN' && <AdminPanel teams={teams} papers={papers} journalists={journalists} companies={companies} reqs={reqs} config={conf} onAct={adminAction} onPost={(t, b, tp) => postNews(`📢 **${t}**\n${b}`, tp)} onEditT={(t) => { setAdminTeam(t); setScreen('ADMIN_TEAM'); }} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam} />}
+            {screen === 'HOME' && user.type === 'USER' && <TeamDashboard team={user.data} players={players.filter(p => p.teamId === user.data.id)} isVisitor={false} onEdit={(p) => setModal({ type: 'PLAYER', data: p })} onAdd={() => setModal({ type: 'PLAYER' })} />}
+            {screen === 'HOME' && user.type === 'VISITOR' && <VisitorDashboard players={players} teams={teams} />}
+            {screen === 'MARKET' && <Market me={user.data?.id} teams={teams} players={players} open={conf.marketOpen} isVis={user.type === 'VISITOR'} onNeg={(p) => setModal({ type: 'OFFER', data: p })} />}
+            {screen === 'RANKING' && <Ranking teams={teams} players={players} />}
+            {screen === 'NEWS' && <div><h3>Notícias</h3>{news.map(n => <div key={n.id} className={`news-card news-${n.type}`}>{n.text}</div>)}</div>}
+            {screen === 'OFFERS' && <OffersScreen user={user} offers={offers} teams={teams} onAccept={acceptOffer} onReject={rejectOffer} onCounter={(o) => setModal({ type: 'OFFER', data: { ...players.find(p => p.id === o.playerId), oldOffer: o } })} />}
+        </div>
+
+        {/* NAVEGAÇÃO INFERIOR */}
+        <div className="bottom-nav">
+            <div className={`nav-item ${screen === 'HOME' ? 'active' : ''}`} onClick={() => setScreen('HOME')}><i className="fas fa-home"></i>INÍCIO</div>
+            {user.type !== 'COMPANY' && <div className={`nav-item ${screen === 'MARKET' ? 'active' : ''}`} onClick={() => setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>}
+            <div className={`nav-item ${screen === 'RANKING' ? 'active' : ''}`} onClick={() => setScreen('RANKING')}><i className="fas fa-trophy"></i>RANK</div>
+            <div className={`nav-item ${screen === 'NEWS' ? 'active' : ''}`} onClick={() => setScreen('NEWS')}><i className="fas fa-newspaper"></i>NEWS</div>
+        </div>
+
+        {/* ÁREA DOS MODAIS */}
+        {modal && (
+            <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setModal(null)}>
+                <div className="modal-content">
+                    {modal.type === 'PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={async (id) => { db.collection('players').doc(id).delete(); setModal(null); }} isAdmin={user.type === 'ADMIN'} teams={teams} onRenew={renewContract} />}
+                    {modal.type === 'OFFER' && <OfferForm target={modal.data} myPlayers={players.filter(p => p.teamId === user.data.id)} onSend={sendOffer} setModal={setModal} />}
+                    {modal.type === 'SETTINGS' && <SettingsForm team={modal.data || user.data} isAdmin={user.type === 'ADMIN'} onUp={(d) => { const tid = (modal.data?.id) || user.data.id; db.collection('teams').doc(tid).update(d); setModal(null); }} />}
+                    {modal.type === 'POST_NEWS' && <div><h3>Nova Notícia</h3><input className="input-field" placeholder="Texto" id="news-body" /><button className="btn btn-blue" onClick={() => { postNews(`📰 **${user.data.name}:**\n${document.getElementById('news-body').value}`, 'press'); setModal(null); }}>PUBLICAR</button></div>}
+                </div>
+            </div>
+        )}
+    </div>
+);
+}; // <--- FIM DA FUNÇÃO APP (FECHAMENTO CORRETO)
+
 
 // --- COMPONENTS ---
         const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor }) => {

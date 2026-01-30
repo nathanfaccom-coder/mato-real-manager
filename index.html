@@ -781,16 +781,24 @@
 
             // --- RENDER ---
             if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
+            
             if(!user) return <LoginScreen teams={teams} players={players} papers={papers} journalists={journalists} companies={companies} onLogin={login} onCreateTeam={createTeam} onCreatePaper={createNewspaper} onCreateJourno={createJournalist} onCreateCompany={createCompany} onAdmin={loginAdmin} onVisitor={()=>{setUser({type:'VISITOR'}); setScreen('RANKING');}} />;
 
             return (
                 <div>
                     <div className="header">
                         <div style={{display:'flex', alignItems:'center', gap:10}}>
+                            {/* LOGO: Só mostra se for USER (Time) e tiver logo. Jogador Livre não mostra logo de time aqui */}
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
+                            
                             <div>
-                                <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.93.4</div>
+                                <div style={{fontWeight:'900', fontSize:16}}>
+                                    {user.type==='USER' ? user.data.name : (user.data?.name || user.type)}
+                                </div>
+                                {/* SUBTÍTULO: Mostra se é Agente Livre ou o nome do desenvolvedor */}
+                                <div className="dev-credits" style={{textAlign:'left', margin:0, color: user.data?.teamId === 'FREE' ? 'var(--warning)' : '#888'}}>
+                                    {user.data?.teamId === 'FREE' ? '🏷️ Agente Livre (Sem Clube)' : `v1.93.5 | ${user.type}`}
+                                </div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -805,13 +813,11 @@
                                         className="fas fa-bell" 
                                         style={{
                                             fontSize: '20px',
-                                            /* Filtra em tempo real: só fica amarelo se houver PENDING */
                                             color: (offers || []).filter(o => (o.recipientId === user.data.id || (!o.recipientId && o.sellerId === user.data.id)) && o.status === 'PENDING').length > 0 ? 'var(--warning)' : '#666',
                                             transition: '0.3s'
                                         }}
                                     ></i>
                                     
-                                    {/* Bolinha vermelha: mesma regra de filtro */}
                                     {(offers || []).filter(o => (o.recipientId === user.data.id || (!o.recipientId && o.sellerId === user.data.id)) && o.status === 'PENDING').length > 0 && (
                                         <span 
                                             className="pulse"
@@ -1023,14 +1029,14 @@
                     {modal && <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget && setModal(null)}>
                         <div className="modal-content">
                             {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={async(id)=>{db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} onRenew={renewContract} isOwner={user.type==='USER' && modal.data?.teamId===user.data?.id} />}
-                           {modal.type==='OFFER' && (
-    <OfferForm 
-        target={modal.data} 
-        myPlayers={players.filter(p => p.teamId === user.data.id)} 
-        onSend={sendOffer} 
-        setModal={setModal} 
-    />
-)}
+                            {modal.type==='OFFER' && (
+                                <OfferForm 
+                                    target={modal.data} 
+                                    myPlayers={players.filter(p => p.teamId === user.data.id)} 
+                                    onSend={sendOffer} 
+                                    setModal={setModal} 
+                                />
+                            )}
                             {modal.type==='SETTINGS' && <SettingsForm team={modal.data || user.data} isAdmin={user.type==='ADMIN'} onUp={(d)=>{const tid=(modal.data?.id)||user.data.id; db.collection('teams').doc(tid).update(d); setModal(null);}} onUpgrade={()=>{/*Upgrade logic*/}} onReq={(t,a,d)=>{db.collection('financeRequests').add({teamId:user.data.id, teamName:user.data.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!");}} onWithdraw={withdrawMoney} />}
                             {modal.type==='MATCH_PERFORMANCE' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} />}
                             {modal.type==='TEAM_TABLE' && <TeamStandingsEditor teams={teams} onUpdateTeamStats={updateTeamStats} />}
@@ -1040,7 +1046,6 @@
                     </div>}
                 </div>
             );
-        }
 
 // FIM DO COMPONENTE APP
 
@@ -1060,97 +1065,121 @@
             // Variável auxiliar para pegar os dados do tipo selecionado
             const selectedTypeInfo = COMPANY_TYPES[fc.type] || {};
 
-            return (
-                <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
-                    <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.4</div>
-                    
-                    <div className="login-tabs">
-                        <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
-                        <div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR TIME</div>
-                        <div className={`tab ${tab==='PRESS'?'active':''}`} onClick={()=>setTab('PRESS')}>IMPRENSA</div>
-                        <div className={`tab ${tab==='COMPANY'?'active':''}`} onClick={()=>setTab('COMPANY')}>EMPRESAS</div>
+        return (
+            <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
+                <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
+                <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.5</div>
+                
+                <div className="login-tabs">
+                    <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
+                    <div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR TIME</div>
+                    <div className={`tab ${tab==='PRESS'?'active':''}`} onClick={()=>setTab('PRESS')}>IMPRENSA</div>
+                    <div className={`tab ${tab==='COMPANY'?'active':''}`} onClick={()=>setTab('COMPANY')}>EMPRESAS</div>
+                </div>
+
+                {tab==='LOGIN' && <div>
+                    <div style={{marginBottom:15, display:'flex', gap:10, justifyContent:'center'}}>
+                        <button className={`btn ${subTab==='TEAM'?'btn-green':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>setSubTab('TEAM')}>TIMES</button>
+                        <button className={`btn ${subTab==='PLAYER'?'btn-blue':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>{setSubTab('PLAYER'); setSelTeamForPlayer(null);}}>JOGADORES</button>
+                        <button className={`btn ${subTab==='COMPANY'?'btn-purple':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>setSubTab('COMPANY')}>EMPRESAS</button>
                     </div>
 
-                    {tab==='LOGIN' && <div>
-                        <div style={{marginBottom:15, display:'flex', gap:10, justifyContent:'center'}}>
-                            <button className={`btn ${subTab==='TEAM'?'btn-green':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>setSubTab('TEAM')}>TIMES</button>
-                            <button className={`btn ${subTab==='PLAYER'?'btn-blue':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>{setSubTab('PLAYER'); setSelTeamForPlayer(null);}}>JOGADORES</button>
-                            <button className={`btn ${subTab==='COMPANY'?'btn-purple':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>setSubTab('COMPANY')}>EMPRESAS</button>
+                    {/* CONTEÚDO DA ABA TIMES */}
+                    {subTab==='TEAM' && (teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}
+                    
+                    {/* CONTEÚDO DA ABA JOGADORES - SELEÇÃO DE CLUBE */}
+                    {subTab==='PLAYER' && !selTeamForPlayer && <div>
+                        <p style={{color:'#aaa'}}>Selecione o clube onde você joga:</p>
+                        <div style={{maxHeight: '300px', overflowY: 'auto'}}>
+                            {(teams||[]).filter(t=>t.status!=='PENDING').map(t=>(
+                                <div key={t.id} className="card" onClick={()=>setSelTeamForPlayer(t)} style={{cursor:'pointer'}}>
+                                    <b>{t.name}</b>
+                                </div>
+                            ))}
+
+                            {/* BOTAO AGENTES LIVRES (SÓ APARECE NA ABA JOGADORES) */}
+                            <div 
+                                className="card" 
+                                style={{
+                                    textAlign: 'center', 
+                                    cursor: 'pointer', 
+                                    border: '1px solid var(--warning)', 
+                                    background: 'rgba(255, 193, 7, 0.05)',
+                                    marginTop: 10
+                                }} 
+                                onClick={() => setSelTeamForPlayer({ id: 'FREE', name: 'Agentes Livres' })}
+                            >
+                                <b style={{color: 'var(--warning)'}}>👤 AGENTES LIVRES (Sem Clube)</b>
+                            </div>
                         </div>
-
-                        {subTab==='TEAM' && (teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}
-                        
-                        {subTab==='PLAYER' && !selTeamForPlayer && <div>
-                            <p style={{color:'#aaa'}}>Selecione o clube onde você joga:</p>
-                            {(teams||[]).filter(t=>t.status!=='PENDING').map(t=>(<div key={t.id} className="card" onClick={()=>setSelTeamForPlayer(t)} style={{cursor:'pointer'}}><b>{t.name}</b></div>))}
-                        </div>}
-
-                        {subTab==='PLAYER' && selTeamForPlayer && <div>
-                            <button className="btn" style={{marginBottom:10, background:'#333'}} onClick={()=>setSelTeamForPlayer(null)}>⬅ VOLTAR PARA TIMES</button>
-                            <h4 style={{color:'var(--secondary)'}}>Elenco do {selTeamForPlayer.name}:</h4>
-                            {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).length === 0 && <p style={{color:'#666'}}>Nenhum jogador encontrado neste time.</p>}
-                            {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).map(p => (<div key={p.id} className="card" onClick={()=>setSel({...p, type:'PLAYER'})} style={{cursor:'pointer', borderLeft:'4px solid var(--secondary)'}}>👟 <b>{p.name}</b></div>))}
-                        </div>}
-
-                        {subTab==='COMPANY' && (companies||[]).filter(c=>c.status!=='PENDING').map(c=><div key={c.id} className="card" onClick={()=>setSel({...c, type:'COMPANY'})} style={{cursor:'pointer', borderLeft:'4px solid var(--purple)'}}>🏢 <b>{c.name}</b><br/><small>{(c.companyType)}</small></div>)}
-                        
-                        <div style={{marginTop:20}}><button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button><button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button></div>
                     </div>}
 
-                    {tab==='CREATE' && <div><input type="file" className="file-input" onChange={handleUpload} /><input className="input-field" placeholder="Nome" value={f.n} onChange={e=>setF({...f, n:e.target.value})} /><input className="input-field" type="number" placeholder="Saldo" value={f.b} onChange={e=>setF({...f, b:e.target.value})} /><select className="input-field" value={f.s} onChange={e=>setF({...f, s:e.target.value})}>{['A','B','C','D'].map(s=><option key={s} value={s}>Série {s}</option>)}</select><input className="input-field" type="number" placeholder="Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} /><button className="btn btn-green" onClick={()=>onCreateTeam(f.n, f.b, f.s, f.p, f.l)}>CRIAR</button></div>}
-                    
-                    {tab==='PRESS' && <div><div style={{display:'flex', gap:10, marginBottom:10}}><button className="btn btn-ghost" onClick={()=>setSubTab('LOGIN_P')}>LOGIN</button><button className="btn btn-ghost" onClick={()=>setSubTab('NEW_PAPER')}>CRIAR JORNAL</button><button className="btn btn-ghost" onClick={()=>setSubTab('NEW_JOURNO')}>SOU JORNALISTA</button></div>
-                        {subTab==='LOGIN_P' && !selPaper && <div><h4>Selecione o Jornal</h4>{(papers||[]).filter(p=>p.status==='ACTIVE').map(p=><div key={p.id} className="card" onClick={()=>setSelPaper(p)}>📰 {p.name}</div>)}</div>}
-                        {subTab==='LOGIN_P' && selPaper && <div><button className="btn" style={{marginBottom:10}} onClick={()=>setSelPaper(null)}>⬅ VOLTAR</button><h4>{selPaper.name} - Jornalistas</h4><div className="card" onClick={()=>setSel({...selPaper, type:'PAPER'})} style={{border:'1px solid var(--primary)'}}>👑 {selPaper.ownerName} (Dono)</div>{(journalists||[]).filter(j=>j.newspaperId===selPaper.id && j.status==='ACTIVE').map(j=><div key={j.id} className="card" onClick={()=>setSel({...j, type:'JOURNALIST'})}>✒️ {j.name}</div>)}</div>}
-                        {subTab==='NEW_PAPER' && <div><input className="input-field" placeholder="Nome do Jornal" id="pn" /><input className="input-field" placeholder="Seu Nome (Dono)" id="po" /><input className="input-field" type="number" placeholder="Senha" id="pp" /><button className="btn btn-green" onClick={()=>onCreatePaper(document.getElementById('pn').value, document.getElementById('pp').value, document.getElementById('po').value)}>SOLICITAR CRIAÇÃO</button></div>}
-                        {subTab==='NEW_JOURNO' && <div><input className="input-field" placeholder="Seu Nome" id="jn" /><select className="input-field" id="jp_id"><option value="">Selecione o Jornal</option>{(papers||[]).filter(p=>p.status==='ACTIVE').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><input className="input-field" type="number" placeholder="Senha" id="jp" /><button className="btn btn-green" onClick={()=>onCreateJourno(document.getElementById('jn').value, document.getElementById('jp').value, document.getElementById('jp_id').value)}>SOLICITAR EMPREGO</button></div>}</div>}
-                    
-                    {tab==='COMPANY' && <div>
-                        <h3 style={{color:'var(--purple)'}}>Abrir Empresa</h3>
-                        <input className="input-field" placeholder="Nome da Empresa" value={fc.n} onChange={e=>setFC({...fc, n:e.target.value})} />
-                        <input className="input-field" placeholder="Nome do Dono" value={fc.owner} onChange={e=>setFC({...fc, owner:e.target.value})} />
+                    {/* CONTEÚDO DA ABA JOGADORES - LISTA DE ELENCO / AGENTES LIVRES */}
+                    {subTab==='PLAYER' && selTeamForPlayer && <div>
+                        <button className="btn" style={{marginBottom:10, background:'#333'}} onClick={()=>setSelTeamForPlayer(null)}>⬅ VOLTAR PARA TIMES</button>
+                        <h4 style={{color:'var(--secondary)'}}>Selecione seu nome ({selTeamForPlayer.name}):</h4>
                         
-                        <label style={{textAlign:'left', display:'block', color:'#aaa', fontSize:12}}>Porte da Empresa</label>
-                        <select className="input-field" value={fc.type} onChange={e=>setFC({...fc, type:e.target.value})}>
-                            <option value="COMERCIO">Comércio Local</option>
-                            <option value="MEDIA">Média Empresa</option>
-                            <option value="GRANDE">Grande Empresa</option>
-                        </select>
-
-                        <div style={{background: 'rgba(255, 255, 255, 0.05)', padding: 10, borderRadius: 5, marginBottom: 10, textAlign: 'left', border: '1px solid #444'}}>
-                            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 5}}>
-                                <span>💰 Capital Inicial:</span>
-                                <span style={{color: 'var(--primary)', fontWeight: 'bold'}}>{fmt(selectedTypeInfo.start)}</span>
+                        {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).length === 0 && (
+                            <p style={{color:'#666', padding: 20}}>Nenhum jogador encontrado nesta categoria.</p>
+                        )}
+                        
+                        {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).map(p => (
+                            <div key={p.id} className="card" onClick={()=>setSel({...p, type:'PLAYER'})} style={{cursor:'pointer', borderLeft:'4px solid var(--secondary)'}}>
+                                👟 <b>{p.name}</b>
                             </div>
-                            <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                                <span>💸 Imposto Semanal:</span>
-                                <span style={{color: 'var(--danger)', fontWeight: 'bold'}}>{fmt(selectedTypeInfo.tax)}</span>
-                            </div>
-                            <p style={{fontSize: 11, color: '#888', marginTop: 8, fontStyle: 'italic', borderTop:'1px solid #333', paddingTop:5}}>
-                                "{selectedTypeInfo.desc}"
-                            </p>
-                        </div>
-
-                        <input className="input-field" type="number" placeholder="Senha de Acesso" value={fc.p} onChange={e=>setFC({...fc, p:e.target.value})} />
-                        <button className="btn btn-purple" onClick={()=>onCreateCompany(fc)}>SOLICITAR ABERTURA</button>
+                        ))}
                     </div>}
-                    
-                    {sel && <div className="modal-overlay"><div className="modal-content"><h3>{sel.name}</h3><input className="input-field" type="password" placeholder="Senha" value={lp} onChange={e=>setLp(e.target.value)} /><button className="btn btn-green" onClick={()=>onLogin(sel.id, lp, sel.type)}>ENTRAR</button><button className="btn" onClick={()=>setSel(null)}>CANCELAR</button></div></div>}
-                </div>
-            );
-        };
 
-        const VisitorDashboard = ({ players, teams }) => {
-            const topScorer = players.sort((a,b)=>(b.stats?.goals||0)-(a.stats?.goals||0))[0];
-            const topAssist = players.sort((a,b)=>(b.stats?.assists||0)-(a.stats?.assists||0))[0];
-            return (
-                <div>
-                    <div className="highlight-card"><h2 style={{margin:0, color:'var(--primary)'}}>Jornal do Dia</h2><small>Resumo da Temporada</small><div style={{marginTop:15, textAlign:'left'}}><div style={{marginBottom:10}}><span style={{color:'#aaa', fontSize:10, textTransform:'uppercase'}}>Artilheiro</span><div style={{fontWeight:'bold', fontSize:16}}>⚽ {topScorer?.name || 'Ninguém'} <span style={{color:'var(--primary)'}}>{topScorer?.stats?.goals||0} Gols</span></div></div><div><span style={{color:'#aaa', fontSize:10, textTransform:'uppercase'}}>Rei das Assistências</span><div style={{fontWeight:'bold', fontSize:16}}>👟 {topAssist?.name || 'Ninguém'} <span style={{color:'var(--secondary)'}}>{topAssist?.stats?.assists||0} Assis</span></div></div></div></div>
-                    <div style={{textAlign:'center', color:'#666'}}>Use o menu abaixo para navegar.</div>
-                </div>
-            );
-        };
+                    {/* CONTEÚDO DA ABA EMPRESAS */}
+                    {subTab==='COMPANY' && (companies||[]).filter(c=>c.status!=='PENDING').map(c=><div key={c.id} className="card" onClick={()=>setSel({...c, type:'COMPANY'})} style={{cursor:'pointer', borderLeft:'4px solid var(--purple)'}}>🏢 <b>{c.name}</b><br/><small>{(c.companyType)}</small></div>)}
+                    
+                    {/* BOTÕES GERAIS DE RODAPÉ (VISITANTE / ADMIN) */}
+                    <div style={{marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10}}>
+                        <button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button>
+                        <button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button>
+                    </div>
+                </div>}
+
+                {/* ABA CRIAR TIME */}
+                {tab==='CREATE' && <div><input type="file" className="file-input" onChange={handleUpload} /><input className="input-field" placeholder="Nome" value={f.n} onChange={e=>setF({...f, n:e.target.value})} /><input className="input-field" type="number" placeholder="Saldo" value={f.b} onChange={e=>setF({...f, b:e.target.value})} /><select className="input-field" value={f.s} onChange={e=>setF({...f, s:e.target.value})}>{['A','B','C','D'].map(s=><option key={s} value={s}>Série {s}</option>)}</select><input className="input-field" type="number" placeholder="Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} /><button className="btn btn-green" onClick={()=>onCreateTeam(f.n, f.b, f.s, f.p, f.l)}>CRIAR</button></div>}
+                
+                {/* ABA IMPRENSA */}
+                {tab==='PRESS' && <div><div style={{display:'flex', gap:10, marginBottom:10}}><button className="btn btn-ghost" onClick={()=>setSubTab('LOGIN_P')}>LOGIN</button><button className="btn btn-ghost" onClick={()=>setSubTab('NEW_PAPER')}>CRIAR JORNAL</button><button className="btn btn-ghost" onClick={()=>setSubTab('NEW_JOURNO')}>SOU JORNALISTA</button></div>
+                    {subTab==='LOGIN_P' && !selPaper && <div><h4>Selecione o Jornal</h4>{(papers||[]).filter(p=>p.status==='ACTIVE').map(p=><div key={p.id} className="card" onClick={()=>setSelPaper(p)}>📰 {p.name}</div>)}</div>}
+                    {subTab==='LOGIN_P' && selPaper && <div><button className="btn" style={{marginBottom:10}} onClick={()=>setSelPaper(null)}>⬅ VOLTAR</button><h4>{selPaper.name} - Jornalistas</h4><div className="card" onClick={()=>setSel({...selPaper, type:'PAPER'})} style={{border:'1px solid var(--primary)'}}>👑 {selPaper.ownerName} (Dono)</div>{(journalists||[]).filter(j=>j.newspaperId===selPaper.id && j.status==='ACTIVE').map(j=><div key={j.id} className="card" onClick={()=>setSel({...j, type:'JOURNALIST'})}>✒️ {j.name}</div>)}</div>}
+                    {subTab==='NEW_PAPER' && <div><input className="input-field" placeholder="Nome do Jornal" id="pn" /><input className="input-field" placeholder="Seu Nome (Dono)" id="po" /><input className="input-field" type="number" placeholder="Senha" id="pp" /><button className="btn btn-green" onClick={()=>onCreatePaper(document.getElementById('pn').value, document.getElementById('pp').value, document.getElementById('po').value)}>SOLICITAR CRIAÇÃO</button></div>}
+                    {subTab==='NEW_JOURNO' && <div><input className="input-field" placeholder="Seu Nome" id="jn" /><select className="input-field" id="jp_id"><option value="">Selecione o Jornal</option>{(papers||[]).filter(p=>p.status==='ACTIVE').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><input className="input-field" type="number" placeholder="Senha" id="jp" /><button className="btn btn-green" onClick={()=>onCreateJourno(document.getElementById('jn').value, document.getElementById('jp').value, document.getElementById('jp_id').value)}>SOLICITAR EMPREGO</button></div>}</div>}
+                
+                {/* ABA EMPRESA (Criação) */}
+                {tab==='COMPANY' && <div>
+                    <h3 style={{color:'var(--purple)'}}>Abrir Empresa</h3>
+                    <input className="input-field" placeholder="Nome da Empresa" value={fc.n} onChange={e=>setFC({...fc, n:e.target.value})} />
+                    <input className="input-field" placeholder="Nome do Dono" value={fc.owner} onChange={e=>setFC({...fc, owner:e.target.value})} />
+                    <label style={{textAlign:'left', display:'block', color:'#aaa', fontSize:12}}>Porte da Empresa</label>
+                    <select className="input-field" value={fc.type} onChange={e=>setFC({...fc, type:e.target.value})}>
+                        <option value="COMERCIO">Comércio Local</option>
+                        <option value="MEDIA">Média Empresa</option>
+                        <option value="GRANDE">Grande Empresa</option>
+                    </select>
+                    <div style={{background: 'rgba(255, 255, 255, 0.05)', padding: 10, borderRadius: 5, marginBottom: 10, textAlign: 'left', border: '1px solid #444'}}>
+                        <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 5}}>
+                            <span>💰 Capital Inicial:</span>
+                            <span style={{color: 'var(--primary)', fontWeight: 'bold'}}>{fmt(selectedTypeInfo.start)}</span>
+                        </div>
+                        <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                            <span>💸 Imposto Semanal:</span>
+                            <span style={{color: 'var(--danger)', fontWeight: 'bold'}}>{fmt(selectedTypeInfo.tax)}</span>
+                        </div>
+                        <p style={{fontSize: 11, color: '#888', marginTop: 8, fontStyle: 'italic', borderTop:'1px solid #333', paddingTop:5}}>"{selectedTypeInfo.desc}"</p>
+                    </div>
+                    <input className="input-field" type="number" placeholder="Senha de Acesso" value={fc.p} onChange={e=>setFC({...fc, p:e.target.value})} />
+                    <button className="btn btn-purple" onClick={()=>onCreateCompany(fc)}>SOLICITAR ABERTURA</button>
+                </div>}
+                
+                {/* MODAL DE LOGIN (SENHA) */}
+                {sel && <div className="modal-overlay"><div className="modal-content"><h3>{sel.name}</h3><input className="input-field" type="password" placeholder="Senha" value={lp} onChange={e=>setLp(e.target.value)} /><button className="btn btn-green" onClick={()=>onLogin(sel.id, lp, sel.type)}>ENTRAR</button><button className="btn" onClick={()=>setSel(null)}>CANCELAR</button></div></div>}
+            </div>
+        );
 
 // FIM DA LOGIN SCREEN E VISITOR DASHBOARD
 
@@ -1865,7 +1894,7 @@ const Ranking = ({ teams, players }) => {
                     <div key={p.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <b style={{ fontSize: 20, color: '#555', width: 30 }}>{i + 1}</b>
                         <div style={{ flex: 1 }}>
-                            <b>{p.name}</b> <small>({teams.find(t => t.id === p.teamId)?.name})</small>
+                            <b>{p.name}</b> <small>({p.teamId === 'FREE' ? 'Agente Livre' : (teams.find(t => t.id === p.teamId)?.name || 'Sem Clube')})</small>
                         </div>
                         <div style={{ fontWeight: 'bold', fontSize: 14, color: color }}>
                             {label} {isStat ? p.stats[sortKey] : (sortKey === 'salary' ? fmt(p[sortKey]) : p[sortKey])}

@@ -447,6 +447,7 @@
                     details += `👔 Papel: ${meta.role || 'ROTACAO'}`;
 
                    // --- VERSÃO CORRIGIDA E BLINDADA DO RECIPIENTID ---
+// --- DENTRO DA FUNÇÃO sendOffer, SUBSTITUA A PARTE DO RECIPIENTID POR ESTA ---
 let recipientId = target.teamId; 
 
 // Se for contraproposta, inverte quem recebe
@@ -454,8 +455,7 @@ if (old && old.id) {
     recipientId = (user.data.id === old.buyerId) ? old.sellerId : old.buyerId;
 }
 
-// Bloqueio extra: Se o alvo não tiver time ou for Agente Livre, 
-// o ID do recebedor PRECISA ser o ID do Jogador.
+// Bloqueio extra: Se for Agente Livre, o ID do recebedor PRECISA ser o ID do Jogador.
 if (target.teamId === 'FREE' || !target.teamId || target.teamId === '') {
     recipientId = target.id;
 }
@@ -500,73 +500,84 @@ if (target.teamId === 'FREE' || !target.teamId || target.teamId === '') {
             };
 
            const acceptOffer = async (o) => {
-    try {
-        const buy = teams.find(t => t.id === o.buyerId);
-        const p = players.find(x => x.id === o.playerId);
-        
-        // Verifica se é Agente Livre (não tem sellerId ou o sellerId é 'FREE')
-        const isFreeAgent = !o.sellerId || o.sellerId === 'FREE';
-        const sel = isFreeAgent ? null : teams.find(t => t.id === o.sellerId);
-        
-        if (!buy || !p) return alert("Erro: Dados incompletos.");
-        if (!isFreeAgent && !sel) return alert("Erro: Time vendedor não encontrado.");
-        
-        const valorEntrada = o.meta?.installments > 1 ? (o.value / o.meta.installments) : o.value;
-        if (buy.balance < valorEntrada) return alert("O comprador não tem saldo para fechar o negócio!");
+                try {
+                    const buy = teams.find(t => t.id === o.buyerId);
+                    const p = players.find(x => x.id === o.playerId);
+                    
+                    if (!buy || !p) return alert("Erro: Dados do comprador ou jogador não encontrados.");
 
-        if (!confirm(`Confirmar assinatura de ${p.name} por ${fmt(o.value)}?`)) return;
+                    // Identifica se é Agente Livre (não tem time vendedor)
+                    const isFreeAgent = !o.sellerId || o.sellerId === 'FREE';
+                    const sel = isFreeAgent ? null : teams.find(t => t.id === o.sellerId);
+                    
+                    // Validação de segurança para transferências entre clubes
+                    if (!isFreeAgent && !sel) return alert("Erro: Time vendedor não encontrado no sistema.");
+                    
+                    // Cálculo financeiro
+                    const valorEntrada = o.meta?.installments > 1 ? (o.value / o.meta.installments) : o.value;
+                    if (buy.balance < valorEntrada) return alert("O comprador não tem saldo para pagar a entrada/valor total!");
 
-        const b = db.batch();
-        
-        // 1. Cobrar do comprador
-        b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - valorEntrada });
+                    if (!confirm(`Confirmar a contratação de ${p.name} por ${fmt(o.value)}?`)) return;
 
-        // 2. Só paga o vendedor se ele existir (se não for Agente Livre)
-        if (sel) {
-            b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorEntrada });
-            
-            if (o.meta?.installments > 1) {
-                const debtRef = db.collection('debts').doc();
-                b.set(debtRef, {
-                    buyerId: buy.id, buyerName: buy.name,
-                    sellerId: sel.id, sellerName: sel.name,
-                    playerName: p.name, installmentVal: valorEntrada,
-                    weeksRemaining: parseInt(o.meta.installments) - 1, date: Date.now()
-                });
-            }
-        }
+                    const b = db.batch();
+                    
+                    // 1. Cobrança do Comprador
+                    b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - valorEntrada });
 
-        // 3. Gerar Histórico
-        const historyEntry = { 
-            date: Date.now(), 
-            from: isFreeAgent ? 'AGENTE LIVRE' : sel.name, 
-            to: buy.name, 
-            type: isFreeAgent ? 'ASSINATURA' : o.type, 
-            value: o.value 
-        };
-        
-        // 4. Atualizar o Jogador
-        b.update(db.collection('players').doc(p.id), {
-            teamId: buy.id,
-            status: 'NAO_A_VENDA',
-            contract: parseInt(o.offerContract) || 1,
-            salary: parseFloat(o.meta?.newSalary) || p.salary,
-            role: o.meta?.role || 'ROTACAO',
-            sellOnDetails: (!isFreeAgent && o.meta?.sellOn > 0) ? { percentage: o.meta.sellOn, beneficiary: sel.id } : null,
-            history: firebase.firestore.FieldValue.arrayUnion(historyEntry)
-        });
+                    // 2. Pagamento ao Vendedor (Pula se for Agente Livre)
+                    if (sel) {
+                        b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorEntrada });
+                        
+                        // Gerar parcelas se houver parcelamento
+                        if (o.meta?.installments > 1) {
+                            const debtRef = db.collection('debts').doc();
+                            b.set(debtRef, {
+                                buyerId: buy.id, buyerName: buy.name,
+                                sellerId: sel.id, sellerName: sel.name,
+                                playerName: p.name, installmentVal: valorEntrada,
+                                weeksRemaining: parseInt(o.meta.installments) - 1, 
+                                date: Date.now()
+                            });
+                        }
+                    }
 
-        // 5. Deletar a proposta aceita
-        b.delete(db.collection('offers').doc(o.id));
-        
-        await b.commit();
-        postNews(`🤝 **NOVA CONTRATAÇÃO**\nO **${buy.name}** anunciou a chegada de **${p.name}**!`, 'transfer');
-        alert("Contrato assinado com sucesso!");
-    } catch (e) {
-        console.error(e);
-        alert("Erro ao processar contrato.");
-    }
-};
+                    // 3. Configurar Histórico de Carreira
+                    const historyEntry = { 
+                        date: Date.now(), 
+                        from: isFreeAgent ? 'AGENTE LIVRE' : sel.name, 
+                        to: buy.name, 
+                        type: isFreeAgent ? 'ASSINATURA' : o.type, 
+                        value: o.value 
+                    };
+                    
+                    // 4. Efetivar Transferência do Jogador
+                    b.update(db.collection('players').doc(p.id), {
+                        teamId: buy.id,
+                        status: 'NAO_A_VENDA', 
+                        contract: parseInt(o.offerContract) || 1,
+                        salary: parseFloat(o.meta?.newSalary) || p.salary,
+                        role: o.meta?.role || 'ROTACAO',
+                        sellOnDetails: (!isFreeAgent && o.meta?.sellOn > 0) ? { percentage: o.meta.sellOn, beneficiary: sel.id } : null,
+                        history: firebase.firestore.FieldValue.arrayUnion(historyEntry)
+                    });
+
+                    // 5. Limpar a Proposta do Banco de Dados
+                    b.delete(db.collection('offers').doc(o.id));
+                    
+                    await b.commit();
+                    
+                    // Notícia automática na aba News
+                    const newsMsg = isFreeAgent 
+                        ? `✍️ **ASSINOU!**\nO Agente Livre **${p.name}** agora é jogador do **${buy.name}**!`
+                        : `🤝 **NEGÓCIO FECHADO**\nO **${buy.name}** fechou a contratação de **${p.name}** vindo do ${sel.name}!`;
+                    
+                    postNews(newsMsg, 'transfer');
+                    alert("Transferência concluída com sucesso!");
+                } catch (e) {
+                    console.error("Erro ao processar contrato:", e);
+                    alert("Erro técnico ao fechar negócio.");
+                }
+            };
 
            // --- SUBSTITUIR FUNÇÃO rejectOffer ---
 const rejectOffer = async (o) => {
@@ -848,7 +859,7 @@ const resetDatabase = async () => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.93.7</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.93.8</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -866,7 +877,8 @@ const resetDatabase = async () => {
                                         style={{
                                             fontSize: '20px',
                                             // Fica amarelo se houver proposta pendente para VOCÊ
-                                            color: (offers || []).filter(o => o.recipientId === user.data.id && o.status === 'PENDING').length > 0 ? 'var(--warning)' : '#666',
+                                           // --- NO CABEÇALHO, ONDE FICA O SINO (COR DO ÍCONE) ---
+color: (offers || []).filter(o => (o.recipientId === user.data.id || o.playerId === user.data.id) && o.status === 'PENDING').length > 0 ? 'var(--warning)' : '#666',
                                             transition: '0.3s'
                                         }}
                                     ></i>
@@ -1123,7 +1135,7 @@ const resetDatabase = async () => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.7</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.8</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1882,7 +1894,7 @@ const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) 
         //fim
 
 const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) => {
-    // FILTRO TOTAL: Busca propostas onde o recebedor (recipientId) OU o alvo (playerId) seja o usuário logado
+    // CORREÇÃO: O filtro agora olha se o seu ID de Jogador é o recebedor ou o alvo do contrato
     const myOffers = offers.filter(o => 
         (o.recipientId === user.data.id || o.playerId === user.data.id) && 
         o.status === 'PENDING'

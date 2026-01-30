@@ -452,6 +452,11 @@
                         recipientId = (user.data.id === old.buyerId) ? old.sellerId : old.buyerId;
                     }
 
+                    // Se for Agente Livre, o destinatário é o próprio jogador (ID dele)
+                    if (target.teamId === 'FREE') {
+                        recipientId = target.id;
+                    }
+
                     const pl = {
                         playerId: target.id,
                         playerName: targetPlayerName,
@@ -463,6 +468,7 @@
                         value: v,
                         offerContract: contractYears,
                         description: details,
+                        status: meta.status || 'PENDING', // <--- CORREÇÃO: Status agora vai para a raiz da proposta
                         meta: {
                             ...meta,
                             newSalary: parseFloat(meta.newSalary) || 0,
@@ -487,7 +493,7 @@
                     alert("Proposta enviada com sucesso!");
                 } catch (e) {
                     console.error("Erro no Firebase:", e);
-                    alert("Erro técnico: Verifique se os campos de preço e contrato contêm apenas números.");
+                    alert("Erro técnico ao gravar no banco de dados.");
                 }
             };
 
@@ -784,7 +790,7 @@
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.93.3</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.93.4</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -1057,7 +1063,7 @@
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.3</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.4</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1481,7 +1487,7 @@ const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) 
                 </div>
             );
         };
-
+//fim
         const OfferForm = ({ target, myPlayers, onSend, setModal }) => { // <--- Adicionado setModal aqui
             const old = target.oldOffer || {};
             const isCounter = !!old.id;

@@ -446,17 +446,19 @@
                     details += `💵 Salário Sugerido: ${fmt(meta.newSalary)}/sem\n`;
                     details += `👔 Papel: ${meta.role || 'ROTACAO'}`;
 
-                    let recipientId = target.teamId; 
-                    
-                    if (old && old.id) {
-                        recipientId = (user.data.id === old.buyerId) ? old.sellerId : old.buyerId;
-                    }
+                   // --- VERSÃO CORRIGIDA E BLINDADA DO RECIPIENTID ---
+let recipientId = target.teamId; 
 
-                    // Se for Agente Livre, o destinatário é o próprio jogador (ID dele)
-                    if (target.teamId === 'FREE') {
-                        recipientId = target.id;
-                    }
+// Se for contraproposta, inverte quem recebe
+if (old && old.id) {
+    recipientId = (user.data.id === old.buyerId) ? old.sellerId : old.buyerId;
+}
 
+// Bloqueio extra: Se o alvo não tiver time ou for Agente Livre, 
+// o ID do recebedor PRECISA ser o ID do Jogador.
+if (target.teamId === 'FREE' || !target.teamId || target.teamId === '') {
+    recipientId = target.id;
+}
                     const pl = {
                         playerId: target.id,
                         playerName: targetPlayerName,
@@ -497,79 +499,111 @@
                 }
             };
 
-            const acceptOffer = async (o) => {
-                try {
-                    const buy = teams.find(t => t.id === o.buyerId);
-                    const sel = teams.find(t => t.id === o.sellerId);
-                    const p = players.find(x => x.id === o.playerId);
-                    
-                    if (!buy || !sel || !p) return alert("Erro: Dados incompletos.");
-                    
-                    const valorEntrada = o.meta?.installments > 1 ? (o.value / o.meta.installments) : o.value;
-                    if (buy.balance < valorEntrada) return alert("O comprador não tem saldo para fechar o negócio!");
+           const acceptOffer = async (o) => {
+    try {
+        const buy = teams.find(t => t.id === o.buyerId);
+        const p = players.find(x => x.id === o.playerId);
+        
+        // Verifica se é Agente Livre (não tem sellerId ou o sellerId é 'FREE')
+        const isFreeAgent = !o.sellerId || o.sellerId === 'FREE';
+        const sel = isFreeAgent ? null : teams.find(t => t.id === o.sellerId);
+        
+        if (!buy || !p) return alert("Erro: Dados incompletos.");
+        if (!isFreeAgent && !sel) return alert("Erro: Time vendedor não encontrado.");
+        
+        const valorEntrada = o.meta?.installments > 1 ? (o.value / o.meta.installments) : o.value;
+        if (buy.balance < valorEntrada) return alert("O comprador não tem saldo para fechar o negócio!");
 
-                    if (!confirm(`Confirmar venda de ${p.name} por ${fmt(o.value)}?`)) return;
+        if (!confirm(`Confirmar assinatura de ${p.name} por ${fmt(o.value)}?`)) return;
 
-                    const b = db.batch();
-                    
-                    if (o.meta?.installments > 1) {
-                        b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - valorEntrada });
-                        b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorEntrada });
-                        
-                        db.collection('debts').add({
-                            buyerId: buy.id, buyerName: buy.name,
-                            sellerId: sel.id, sellerName: sel.name,
-                            playerName: p.name, installmentVal: valorEntrada,
-                            weeksRemaining: parseInt(o.meta.installments) - 1, date: Date.now()
-                        });
-                    } else {
-                        b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - o.value });
-                        b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + o.value });
-                    }
+        const b = db.batch();
+        
+        // 1. Cobrar do comprador
+        b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - valorEntrada });
 
-                    const historyEntry = { date: Date.now(), from: sel.name, to: buy.name, type: o.type, value: o.value };
-                    
-                    b.update(db.collection('players').doc(p.id), {
-                        teamId: buy.id,
-                        status: 'NAO_A_VENDA',
-                        contract: parseInt(o.offerContract) || 1,
-                        salary: parseFloat(o.meta?.newSalary) || p.salary,
-                        role: o.meta?.role || 'ROTACAO',
-                        sellOnDetails: o.meta?.sellOn > 0 ? { percentage: o.meta.sellOn, beneficiary: sel.id } : null,
-                        history: firebase.firestore.FieldValue.arrayUnion(historyEntry)
-                    });
-
-                    b.delete(db.collection('offers').doc(o.id));
-                    
-                    await b.commit();
-                    postNews(`🤝 **NEGÓCIO FECHADO**\nO **${buy.name}** fechou a contratação de **${p.name}**!`, 'transfer');
-                    alert("Transferência concluída!");
-                } catch (e) {
-                    console.error(e);
-                    alert("Erro ao aceitar proposta.");
-                }
-            };
-
-            const rejectOffer = async (o) => {
-                if(!confirm("Encerrar negociação?")) return;
-                await db.collection('offers').doc(o.id).delete();
-                postNews(`❌ **SEM ACORDO**\nAs conversas por **${o.playerName}** foram encerradas.`, 'transfer');
-            };
-
-            const renewContract = async (p) => {
-                const cost = (parseFloat(p.value) || 1000000) * 0.10; 
-                if(user.data.balance < cost) return alert(`Sem saldo para luvas (Custo: ${fmt(cost)})`);
-                if(!confirm(`Renovar com ${p.name}?\nCusto: ${fmt(cost)}`)) return;
-                const b = db.batch();
-                b.update(db.collection('teams').doc(user.data.id), {balance: firebase.firestore.FieldValue.increment(-cost)});
-                b.update(db.collection('players').doc(p.id), {
-                    contract: (parseInt(p.contract)||0) + 1,
-                    balance: firebase.firestore.FieldValue.increment(cost)
+        // 2. Só paga o vendedor se ele existir (se não for Agente Livre)
+        if (sel) {
+            b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorEntrada });
+            
+            if (o.meta?.installments > 1) {
+                const debtRef = db.collection('debts').doc();
+                b.set(debtRef, {
+                    buyerId: buy.id, buyerName: buy.name,
+                    sellerId: sel.id, sellerName: sel.name,
+                    playerName: p.name, installmentVal: valorEntrada,
+                    weeksRemaining: parseInt(o.meta.installments) - 1, date: Date.now()
                 });
-                await b.commit();
-                postNews(`📝 **RENOVAÇÃO**\n**${p.name}** renovou com o **${user.data.name}**.`, 'transfer');
-                setModal(null);
-            };
+            }
+        }
+
+        // 3. Gerar Histórico
+        const historyEntry = { 
+            date: Date.now(), 
+            from: isFreeAgent ? 'AGENTE LIVRE' : sel.name, 
+            to: buy.name, 
+            type: isFreeAgent ? 'ASSINATURA' : o.type, 
+            value: o.value 
+        };
+        
+        // 4. Atualizar o Jogador
+        b.update(db.collection('players').doc(p.id), {
+            teamId: buy.id,
+            status: 'NAO_A_VENDA',
+            contract: parseInt(o.offerContract) || 1,
+            salary: parseFloat(o.meta?.newSalary) || p.salary,
+            role: o.meta?.role || 'ROTACAO',
+            sellOnDetails: (!isFreeAgent && o.meta?.sellOn > 0) ? { percentage: o.meta.sellOn, beneficiary: sel.id } : null,
+            history: firebase.firestore.FieldValue.arrayUnion(historyEntry)
+        });
+
+        // 5. Deletar a proposta aceita
+        b.delete(db.collection('offers').doc(o.id));
+        
+        await b.commit();
+        postNews(`🤝 **NOVA CONTRATAÇÃO**\nO **${buy.name}** anunciou a chegada de **${p.name}**!`, 'transfer');
+        alert("Contrato assinado com sucesso!");
+    } catch (e) {
+        console.error(e);
+        alert("Erro ao processar contrato.");
+    }
+};
+
+           // --- SUBSTITUIR FUNÇÃO rejectOffer ---
+const rejectOffer = async (o) => {
+    if(!confirm("Encerrar negociação?")) return;
+    
+    await db.collection('offers').doc(o.id).delete();
+    
+    // Notícia mais genérica que serve para Clube ou Jogador Livre
+    postNews(`❌ **NEGOCIAÇÃO ENCERRADA**\nNão houve acordo nos termos por **${o.playerName}**.`, 'transfer');
+};
+            // --- SUBSTITUIR FUNÇÃO renewContract ---
+const renewContract = async (p) => {
+    if (!p.teamId || p.teamId === 'FREE') return alert("Jogadores livres não renovam, eles assinam novos contratos!");
+
+    const cost = (parseFloat(p.value) || 1000000) * 0.10; 
+    if(user.data.balance < cost) return alert(`Saldo insuficiente para luvas (Custo: ${fmt(cost)})`);
+    
+    if(!confirm(`Renovar com ${p.name}?\nCusto das Luvas: ${fmt(cost)} (Vai para o jogador)`)) return;
+
+    try {
+        const b = db.batch();
+        // Tira do time
+        b.update(db.collection('teams').doc(user.data.id), {balance: firebase.firestore.FieldValue.increment(-cost)});
+        // Dá ao jogador e aumenta o tempo de contrato
+        b.update(db.collection('players').doc(p.id), {
+            contract: (parseInt(p.contract)||0) + 1,
+            balance: firebase.firestore.FieldValue.increment(cost),
+            status: 'NAO_A_VENDA' // Protege o jogador após renovar
+        });
+
+        await b.commit();
+        postNews(`📝 **RENOVAÇÃO**\nO **${user.data.name}** garantiu a permanência de **${p.name}** por mais uma temporada!`, 'transfer');
+        setModal(null);
+    } catch (e) {
+        alert("Erro ao renovar: " + e.message);
+    }
+};
 
 // FIM DO SISTEMA DE NEGOCIAÇÃO E MERCADO
 
@@ -814,7 +848,7 @@ const resetDatabase = async () => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.93.6</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.93.7</div>
                             </div>
                         </div>
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
@@ -1089,7 +1123,7 @@ const resetDatabase = async () => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.6</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.7</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1848,9 +1882,9 @@ const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) 
         //fim
 
 const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) => {
-    // FILTRO SIMPLIFICADO: Busca propostas enviadas para o seu ID atual (Jogador ou Clube)
+    // FILTRO TOTAL: Busca propostas onde o recebedor (recipientId) OU o alvo (playerId) seja o usuário logado
     const myOffers = offers.filter(o => 
-        o.recipientId === user.data.id && 
+        (o.recipientId === user.data.id || o.playerId === user.data.id) && 
         o.status === 'PENDING'
     );
 

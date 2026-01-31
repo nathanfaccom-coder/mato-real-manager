@@ -436,35 +436,36 @@
 
 
             // --- SISTEMA DE NEGOCIAÇÃO E MERCADO (VERSÃO REALISTA 2.0) ---
-            const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
+           const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
                 try {
                     const v = parseFloat(value) || 0;
                     const contractYears = parseInt(con) || 1;
                     const actingTeamName = user.data.name;
                     const targetPlayerName = target.name;
+                    const finalSal = parseFloat(meta.newSalary) || 0;
+                    const role = meta.role || 'ROTACAO';
 
                     let details = `💰 Taxa: ${fmt(v)}\n`;
                     if (meta.installments > 1) details += `📅 Parcelamento: ${meta.installments}x de ${fmt(v / meta.installments)}\n`;
                     if (meta.sellOn > 0) details += `📈 Revenda: ${meta.sellOn}%\n`;
                     details += `📝 Contrato: ${contractYears} anos\n`;
-                    details += `💵 Salário Sugerido: ${fmt(meta.newSalary)}/sem\n`;
-                    details += `👔 Papel: ${meta.role || 'ROTACAO'}`;
+                    details += `💵 Salário Sugerido: ${fmt(finalSal)}/sem\n`;
+                    details += `👔 Papel: ${role}`;
 
-                    // --- LÓGICA DE DESTINATÁRIO INTELIGENTE (FIX) ---
+                    // --- LÓGICA DE DESTINATÁRIO INTELIGENTE ---
                     let recipientId = target.teamId; 
 
                     if (old && old.id) {
-                        // Se quem está logado é o COMPRADOR original (está devolvendo a proposta)
+                        // Se quem envia a contraproposta é o comprador original, manda para o vendedor (ou jogador se livre)
                         if (user.data.id === old.buyerId) {
-                            // Se o jogador é livre, devolve pro jogador. Se tem time, devolve pro time.
                             recipientId = (old.sellerId === 'FREE') ? old.playerId : old.sellerId;
                         } 
-                        // Se quem está logado NÃO é o comprador (é o Jogador ou o Time Vendedor)
+                        // Se quem envia NÃO é o comprador (é o jogador ou o vendedor), a proposta volta para o comprador
                         else {
                             recipientId = old.buyerId;
                         }
                     } else {
-                        // Proposta nova: Se Agente Livre, manda direto pro ID do jogador
+                        // Proposta nova para Agente Livre: manda direto para o ID do jogador
                         if (target.teamId === 'FREE' || !target.teamId || target.teamId === '') {
                             recipientId = target.id;
                         }
@@ -482,12 +483,13 @@
                         offerContract: contractYears,
                         description: details,
                         status: 'PENDING',
-                        sellerAccepted: old?.sellerAccepted || false, // Mantém o status de aceite se for apenas contra de contrato
+                        // Se houver alteração nos termos, o aceite do vendedor é resetado (exceto se o próprio vendedor estiver aceitando no momento)
+                        sellerAccepted: (user.type === 'USER' && user.data.id === (old?.sellerId || target.teamId)) ? true : false,
                         meta: {
                             ...meta,
-                            newSalary: parseFloat(meta.newSalary) || 0,
+                            newSalary: finalSal,
                             signingBonus: parseFloat(meta.signingBonus) || 0,
-                            role: meta.role || 'ROTACAO',
+                            role: role,
                             installments: parseInt(meta.installments) || 1,
                             sellOn: parseInt(meta.sellOn) || 0
                         },
@@ -504,7 +506,7 @@
                     postNews(`${msgHead}\n**${actingTeamName}** enviou novos termos por **${targetPlayerName}**!\n\n${details}`, 'transfer');
                     
                     setModal(null); 
-                    alert("Proposta enviada com sucesso!");
+                    alert("Proposta enviada com sucesso! Ela sumirá da sua lista até que respondam.");
                 } catch (e) {
                     console.error("Erro no Firebase:", e);
                     alert("Erro técnico ao gravar no banco de dados.");
@@ -1889,12 +1891,13 @@ const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) 
         //fim
 
 const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) => {
-    // FILTRO INFALÍVEL: 
-    // Busca por ID de recebedor, ID do jogador ou Nome exato.
-    const myOffers = offers.filter(o => {
-        const isTarget = o.recipientId === user.data.id || o.playerName === user.data.name || o.playerId === user.data.id;
-        return isTarget && o.status === 'PENDING';
-    });
+    // FILTRO ATUALIZADO: 
+    // Para a proposta sumir ao enviar uma contra, filtramos APENAS pelo recipientId.
+    // Assim, se o recipientId mudar para o Clube, ela desaparece da sua lista.
+    const myOffers = offers.filter(o => 
+        o.recipientId === user.data.id && 
+        o.status === 'PENDING'
+    );
 
     return (
         <div>
@@ -1908,7 +1911,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
             {myOffers.length === 0 && (
                 <div style={{marginTop: 30, textAlign:'center'}}>
                     <i className="fas fa-envelope-open" style={{fontSize: 40, color: '#333', marginBottom: 10}}></i>
-                    <p style={{color:'#666'}}>Nenhuma proposta encontrada para <b>{user.data.name}</b>.</p>
+                    <p style={{color:'#666'}}>Nenhuma proposta aguardando sua ação.</p>
                 </div>
             )}
             
@@ -1938,7 +1941,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         {o.description}
                     </div>
 
-                    <div style={{display:'flex', gap:5}}>
+                    <div style={{display:'flex', gap:5, marginTop:10}}>
                         <button className="btn btn-green" style={{flex:1}} onClick={()=>onAccept(o)}>ACEITAR</button>
                         <button className="btn btn-blue" style={{flex:1}} onClick={()=>onCounter(o)}>CONTRA</button>
                         <button className="btn btn-red" style={{flex:1}} onClick={()=>onReject(o)}>RECUSAR</button>

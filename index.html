@@ -531,37 +531,39 @@
                     const isFreeAgent = !o.sellerId || o.sellerId === 'FREE';
                     const sel = isFreeAgent ? null : teams.find(t => t.id === o.sellerId);
 
-                    // --- 1. SE QUEM ESTÁ ACEITANDO É O CLUBE VENDEDOR ---
+                    // --- PASSO 1: SE QUEM ESTÁ ACEITANDO É O CLUBE VENDEDOR ---
+                    // Se o usuário logado é o dono do time que possui o jogador
                     if (user.type === 'USER' && user.data.id === o.sellerId) {
-                        if (!confirm("Você aceita os valores da venda? A decisão final agora será do jogador.")) return;
+                        if (!confirm("Você aceita o valor da transferência? Agora o jogador decidirá sobre o contrato pessoal.")) return;
                         
+                        // IMPORTANTE: Aqui a gente NÃO finaliza. Apenas muda o "Dono" da proposta para o Jogador.
                         await db.collection('offers').doc(o.id).update({
-                            recipientId: o.playerId, // Passa a bola para o jogador decidir o contrato
-                            sellerAccepted: true,    // Carimba que o clube liberou a venda
+                            recipientId: o.playerId, // A proposta sai do sino do time e vai pro sino do jogador
+                            sellerAccepted: true,    // Marca que o time já deu o OK nos valores
                             status: 'PENDING'
                         });
                         
-                        postNews(`💰 **VALORES ACEITOS**\nO ${sel.name} aceitou a proposta por **${p.name}**. O jogador agora negocia termos pessoais com o ${buy.name}!`, 'transfer');
-                        alert("Valores aceitos! Agora o jogador precisa decidir se assina o contrato.");
-                        return;
+                        postNews(`💰 **TAXA ACEITA**\nO ${sel.name} aceitou a proposta por **${p.name}**. O negócio agora depende do acerto salarial com o jogador!`, 'transfer');
+                        alert("Valores aceitos! A proposta foi enviada para o jogador assinar.");
+                        return; // Interrompe aqui para não transferir o jogador ainda
                     }
 
-                    // --- 2. SE QUEM ESTÁ ACEITANDO É O JOGADOR (OU AGENTE LIVRE) ---
-                    if (!buy || !p) return alert("Erro: Dados do comprador ou jogador não encontrados.");
+                    // --- PASSO 2: SE QUEM ESTÁ ACEITANDO É O JOGADOR (OU AGENTE LIVRE) ---
+                    if (!buy || !p) return alert("Erro: Dados incompletos.");
                     
-                    // Bloqueio: Jogador de clube só assina se o clube dele já aceitou
+                    // Trava de segurança: Se o jogador tentar aceitar antes do clube liberar (e não for livre)
                     if (!isFreeAgent && !o.sellerAccepted) {
-                        return alert("Seu clube ainda não aceitou os valores desta transferência!");
+                        return alert("Seu clube ainda não aceitou os valores desta venda. Aguarde a liberação dele!");
                     }
 
                     const valorEntrada = o.meta?.installments > 1 ? (o.value / o.meta.installments) : o.value;
-                    if (buy.balance < valorEntrada) return alert("O comprador não tem saldo suficiente!");
+                    if (buy.balance < valorEntrada) return alert("O comprador não tem saldo suficiente para pagar a entrada/valor total!");
 
                     if (!confirm(`Deseja assinar o contrato com o ${buy.name} e finalizar a transferência?`)) return;
 
                     const b = db.batch();
                     
-                    // Processamento Financeiro
+                    // 1. Pagamentos Financeiros
                     b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - valorEntrada });
                     if (sel) {
                         b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorEntrada });
@@ -576,7 +578,7 @@
                         }
                     }
 
-                    // Efetivar Transferência no Jogador
+                    // 2. Transferência do Jogador
                     b.update(db.collection('players').doc(p.id), {
                         teamId: buy.id,
                         status: 'NAO_A_VENDA',
@@ -587,24 +589,24 @@
                             date: Date.now(), 
                             from: isFreeAgent ? 'AGENTE LIVRE' : sel.name, 
                             to: buy.name, 
-                            type: isFreeAgent ? 'ASSINATURA' : o.type, 
+                            type: o.type, 
                             value: o.value 
                         })
                     });
 
-                    // Limpa a proposta concluída
+                    // 3. Deleta a proposta do banco (Negócio Concluído)
                     b.delete(db.collection('offers').doc(o.id));
                     await b.commit();
                     
                     const newsMsg = isFreeAgent 
                         ? `✍️ **ASSINOU!**\nO Agente Livre **${p.name}** agora é jogador do **${buy.name}**!`
-                        : `🤝 **CONTRATAÇÃO CONFIRMADA**\n**${p.name}** aceitou os termos e assinou com o **${buy.name}**!`;
+                        : `🤝 **TRANSFERÊNCIA CONCLUÍDA**\n**${p.name}** aceitou os termos pessoais e assinou com o **${buy.name}**!`;
                     
                     postNews(newsMsg, 'transfer');
-                    alert("Contrato assinado e transferência concluída!");
+                    alert("Contrato assinado e transferência concluída com sucesso!");
                 } catch (e) {
                     console.error(e);
-                    alert("Erro técnico ao processar contrato.");
+                    alert("Erro técnico ao processar o aceite.");
                 }
             };
 
@@ -878,7 +880,7 @@ const resetDatabase = async () => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.94.1</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.94.2</div>
                             </div>
                         </div>
                         
@@ -1144,7 +1146,7 @@ const resetDatabase = async () => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.94.1</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.94.2</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

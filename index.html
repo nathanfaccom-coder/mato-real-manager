@@ -435,7 +435,7 @@
 // FIM DA GESTÃO ADMINISTRATIVA E SALVAR JOGADOR
 
 
-            // --- SISTEMA DE NEGOCIAÇÃO CLÁSSICO (CLUBE x CLUBE) ---
+            // --- SISTEMA DE NEGOCIAÇÃO E MERCADO (VERSÃO FINAL CORRIGIDA) ---
             const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
                 try {
                     const v = parseFloat(value) || 0;
@@ -450,19 +450,23 @@
                     details += `💵 Salário Sugerido: ${fmt(meta.newSalary)}/sem\n`;
                     details += `👔 Papel: ${meta.role || 'ROTACAO'}`;
 
-                   // --- VERSÃO CORRIGIDA E BLINDADA DO RECIPIENTID ---
-// --- DENTRO DA FUNÇÃO sendOffer, SUBSTITUA A PARTE DO RECIPIENTID POR ESTA ---
-let recipientId = target.teamId; 
+                    // --- LÓGICA DE DESTINATÁRIO INTELIGENTE ---
+                    let recipientId = target.teamId; 
 
-// Se for contraproposta, inverte quem recebe
-if (old && old.id) {
-    recipientId = (user.data.id === old.buyerId) ? old.sellerId : old.buyerId;
-}
+                    if (old && old.id) {
+                        // Se for CONTRAPROPOSTA: 
+                        // Se quem envia é o comprador original, manda para o vendedor.
+                        // Se quem envia NÃO é o comprador (é o jogador), manda de volta para o comprador.
+                        recipientId = (user.data.id === old.buyerId) 
+                            ? (old.sellerId === 'FREE' ? old.playerId : old.sellerId) 
+                            : old.buyerId;
+                    } else {
+                        // Se for proposta NOVA para Agente Livre:
+                        if (target.teamId === 'FREE' || !target.teamId || target.teamId === '') {
+                            recipientId = target.id;
+                        }
+                    }
 
-// Bloqueio extra: Se for Agente Livre, o ID do recebedor PRECISA ser o ID do Jogador.
-if (target.teamId === 'FREE' || !target.teamId || target.teamId === '') {
-    recipientId = target.id;
-}
                     const pl = {
                         playerId: target.id,
                         playerName: targetPlayerName,
@@ -474,7 +478,7 @@ if (target.teamId === 'FREE' || !target.teamId || target.teamId === '') {
                         value: v,
                         offerContract: contractYears,
                         description: details,
-                        status: meta.status || 'PENDING', // <--- CORREÇÃO: Status agora vai para a raiz da proposta
+                        status: 'PENDING',
                         meta: {
                             ...meta,
                             newSalary: parseFloat(meta.newSalary) || 0,
@@ -493,7 +497,7 @@ if (target.teamId === 'FREE' || !target.teamId || target.teamId === '') {
                     await b.commit();
 
                     const msgHead = (old && old.id) ? "🔄 CONTRAPROPOSTA" : "💼 NOVA OFERTA";
-                    postNews(`${msgHead}\nO **${actingTeamName}** enviou termos detalhados por **${targetPlayerName}**!\n\n${details}`, 'transfer');
+                    postNews(`${msgHead}\n**${actingTeamName}** enviou novos termos por **${targetPlayerName}**!\n\n${details}`, 'transfer');
                     
                     setModal(null); 
                     alert("Proposta enviada com sucesso!");
@@ -503,36 +507,28 @@ if (target.teamId === 'FREE' || !target.teamId || target.teamId === '') {
                 }
             };
 
-           const acceptOffer = async (o) => {
+            const acceptOffer = async (o) => {
                 try {
                     const buy = teams.find(t => t.id === o.buyerId);
                     const p = players.find(x => x.id === o.playerId);
                     
                     if (!buy || !p) return alert("Erro: Dados do comprador ou jogador não encontrados.");
 
-                    // Identifica se é Agente Livre (não tem time vendedor)
                     const isFreeAgent = !o.sellerId || o.sellerId === 'FREE';
                     const sel = isFreeAgent ? null : teams.find(t => t.id === o.sellerId);
                     
-                    // Validação de segurança para transferências entre clubes
-                    if (!isFreeAgent && !sel) return alert("Erro: Time vendedor não encontrado no sistema.");
+                    if (!isFreeAgent && !sel) return alert("Erro: Time vendedor não encontrado.");
                     
-                    // Cálculo financeiro
                     const valorEntrada = o.meta?.installments > 1 ? (o.value / o.meta.installments) : o.value;
-                    if (buy.balance < valorEntrada) return alert("O comprador não tem saldo para pagar a entrada/valor total!");
+                    if (buy.balance < valorEntrada) return alert("O comprador não tem saldo suficiente!");
 
                     if (!confirm(`Confirmar a contratação de ${p.name} por ${fmt(o.value)}?`)) return;
 
                     const b = db.batch();
-                    
-                    // 1. Cobrança do Comprador
                     b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - valorEntrada });
 
-                    // 2. Pagamento ao Vendedor (Pula se for Agente Livre)
                     if (sel) {
                         b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorEntrada });
-                        
-                        // Gerar parcelas se houver parcelamento
                         if (o.meta?.installments > 1) {
                             const debtRef = db.collection('debts').doc();
                             b.set(debtRef, {
@@ -545,7 +541,6 @@ if (target.teamId === 'FREE' || !target.teamId || target.teamId === '') {
                         }
                     }
 
-                    // 3. Configurar Histórico de Carreira
                     const historyEntry = { 
                         date: Date.now(), 
                         from: isFreeAgent ? 'AGENTE LIVRE' : sel.name, 
@@ -554,7 +549,6 @@ if (target.teamId === 'FREE' || !target.teamId || target.teamId === '') {
                         value: o.value 
                     };
                     
-                    // 4. Efetivar Transferência do Jogador
                     b.update(db.collection('players').doc(p.id), {
                         teamId: buy.id,
                         status: 'NAO_A_VENDA', 
@@ -565,12 +559,9 @@ if (target.teamId === 'FREE' || !target.teamId || target.teamId === '') {
                         history: firebase.firestore.FieldValue.arrayUnion(historyEntry)
                     });
 
-                    // 5. Limpar a Proposta do Banco de Dados
                     b.delete(db.collection('offers').doc(o.id));
-                    
                     await b.commit();
                     
-                    // Notícia automática na aba News
                     const newsMsg = isFreeAgent 
                         ? `✍️ **ASSINOU!**\nO Agente Livre **${p.name}** agora é jogador do **${buy.name}**!`
                         : `🤝 **NEGÓCIO FECHADO**\nO **${buy.name}** fechou a contratação de **${p.name}** vindo do ${sel.name}!`;
@@ -578,49 +569,39 @@ if (target.teamId === 'FREE' || !target.teamId || target.teamId === '') {
                     postNews(newsMsg, 'transfer');
                     alert("Transferência concluída com sucesso!");
                 } catch (e) {
-                    console.error("Erro ao processar contrato:", e);
+                    console.error(e);
                     alert("Erro técnico ao fechar negócio.");
                 }
             };
 
-           // --- SUBSTITUIR FUNÇÃO rejectOffer ---
-const rejectOffer = async (o) => {
-    if(!confirm("Encerrar negociação?")) return;
-    
-    await db.collection('offers').doc(o.id).delete();
-    
-    // Notícia mais genérica que serve para Clube ou Jogador Livre
-    postNews(`❌ **NEGOCIAÇÃO ENCERRADA**\nNão houve acordo nos termos por **${o.playerName}**.`, 'transfer');
-};
-            // --- SUBSTITUIR FUNÇÃO renewContract ---
-const renewContract = async (p) => {
-    if (!p.teamId || p.teamId === 'FREE') return alert("Jogadores livres não renovam, eles assinam novos contratos!");
+            const rejectOffer = async (o) => {
+                if(!confirm("Encerrar negociação?")) return;
+                await db.collection('offers').doc(o.id).delete();
+                postNews(`❌ **NEGOCIAÇÃO ENCERRADA**\nNão houve acordo nos termos por **${o.playerName}**.`, 'transfer');
+            };
 
-    const cost = (parseFloat(p.value) || 1000000) * 0.10; 
-    if(user.data.balance < cost) return alert(`Saldo insuficiente para luvas (Custo: ${fmt(cost)})`);
-    
-    if(!confirm(`Renovar com ${p.name}?\nCusto das Luvas: ${fmt(cost)} (Vai para o jogador)`)) return;
+            const renewContract = async (p) => {
+                if (!p.teamId || p.teamId === 'FREE') return alert("Jogadores livres não renovam, eles assinam novos contratos!");
+                const cost = (parseFloat(p.value) || 1000000) * 0.10; 
+                if(user.data.balance < cost) return alert(`Saldo insuficiente para luvas (Custo: ${fmt(cost)})`);
+                if(!confirm(`Renovar com ${p.name}?\nCusto: ${fmt(cost)} (Vai para o jogador)`)) return;
 
-    try {
-        const b = db.batch();
-        // Tira do time
-        b.update(db.collection('teams').doc(user.data.id), {balance: firebase.firestore.FieldValue.increment(-cost)});
-        // Dá ao jogador e aumenta o tempo de contrato
-        b.update(db.collection('players').doc(p.id), {
-            contract: (parseInt(p.contract)||0) + 1,
-            balance: firebase.firestore.FieldValue.increment(cost),
-            status: 'NAO_A_VENDA' // Protege o jogador após renovar
-        });
-
-        await b.commit();
-        postNews(`📝 **RENOVAÇÃO**\nO **${user.data.name}** garantiu a permanência de **${p.name}** por mais uma temporada!`, 'transfer');
-        setModal(null);
-    } catch (e) {
-        alert("Erro ao renovar: " + e.message);
-    }
-};
-
-// FIM DO SISTEMA DE NEGOCIAÇÃO E MERCADO
+                try {
+                    const b = db.batch();
+                    b.update(db.collection('teams').doc(user.data.id), {balance: firebase.firestore.FieldValue.increment(-cost)});
+                    b.update(db.collection('players').doc(p.id), {
+                        contract: (parseInt(p.contract)||0) + 1,
+                        balance: firebase.firestore.FieldValue.increment(cost),
+                        status: 'NAO_A_VENDA'
+                    });
+                    await b.commit();
+                    postNews(`📝 **RENOVAÇÃO**\nO **${user.data.name}** renovou com **${p.name}** por mais uma temporada!`, 'transfer');
+                    setModal(null);
+                } catch (e) {
+                    alert("Erro ao renovar: " + e.message);
+                }
+            };
+            //FIM
 
             // ... continuação do código anterior
 

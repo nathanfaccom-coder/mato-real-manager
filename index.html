@@ -457,7 +457,7 @@
 
 
         
-           // --- SISTEMA DE NEGOCIAÇÃO E MERCADO (VERSÃO REALISTA 3.0) ---
+           // --- SISTEMA DE NEGOCIAÇÃO E MERCADO (VERSÃO REALISTA 3.0 - REVISADA) ---
             const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
                 try {
                     const v = parseFloat(value) || 0;
@@ -474,11 +474,11 @@
                     details += `💵 Salário Sugerido: ${fmt(finalSal)}/sem\n`;
                     details += `👔 Papel: ${role}`;
 
-                    // --- LÓGICA DE DESTINATÁRIO INTELIGENTE CORRIGIDA ---
+                    // --- LÓGICA DE DESTINATÁRIO INTELIGENTE ---
                     let recipientId; 
 
                     if (old && old.id) {
-                        // Se for CONTRAPROPOSTA: Inverte quem recebe baseado em quem está logado
+                        // Se for CONTRAPROPOSTA:
                         if (user.data.id === old.buyerId) {
                             // Comprador devolvendo: vai para o vendedor (clube ou jogador livre)
                             recipientId = (old.sellerId === 'FREE' || !old.sellerId) ? old.playerId : old.sellerId;
@@ -507,8 +507,8 @@
                         offerContract: contractYears,
                         description: details,
                         status: 'PENDING',
-                        // O aceite do vendedor é resetado se o comprador mudar os valores
-                        sellerAccepted: (user.type === 'USER' && user.data.id === (old?.sellerId || target.teamId)) ? true : (old?.sellerAccepted || false),
+                        // O aceite do vendedor volta a ser FALSO se houver contraproposta de valores (v) ou se o jogador for quem manda
+                        sellerAccepted: (user.type === 'USER' && user.data.id === (old?.sellerId || target.teamId)) ? true : false,
                         meta: {
                             ...meta,
                             newSalary: finalSal,
@@ -544,13 +544,13 @@
                     const isFreeAgent = !o.sellerId || o.sellerId === 'FREE';
                     const sel = isFreeAgent ? null : teams.find(t => t.id === o.sellerId);
 
-                    // --- PASSO 1: SE QUEM ESTÁ ACEITANDO É O CLUBE VENDEDOR ---
+                    // --- PASSO 1: O CLUBE VENDEDOR ACEITA A TAXA ---
                     if (user.type === 'USER' && user.data.id === o.sellerId) {
-                        if (!confirm("Você aceita o valor da transferência? Agora o jogador decidirá sobre o contrato pessoal.")) return;
+                        if (!confirm("Você aceita o valor da transferência? O jogador decidirá o contrato agora.")) return;
                         
                         await db.collection('offers').doc(o.id).update({
-                            recipientId: o.playerId, // Manda a bola para o sino do jogador
-                            sellerAccepted: true,    // Carimba que o clube liberou
+                            recipientId: o.playerId, // Manda para o sino do jogador
+                            sellerAccepted: true,
                             status: 'PENDING'
                         });
                         
@@ -559,54 +559,60 @@
                         return;
                     }
 
-                    // --- PASSO 2: SE QUEM ESTÁ ACEITANDO É O JOGADOR ---
-                    if (!buy || !p) return alert("Erro: Dados incompletos.");
-                    
-                    if (!isFreeAgent && !o.sellerAccepted) {
-                        return alert("Seu clube ainda não aceitou os valores desta venda!");
-                    }
-
-                    const valorEntrada = o.meta?.installments > 1 ? (o.value / o.meta.installments) : o.value;
-                    if (buy.balance < valorEntrada) return alert("O comprador não tem saldo para pagar a entrada!");
-
-                    if (!confirm(`Deseja assinar o contrato com o ${buy.name} e finalizar a transferência?`)) return;
-
-                    const b = db.batch();
-                    b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - valorEntrada });
-
-                    if (sel) {
-                        b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorEntrada });
-                        if (o.meta?.installments > 1) {
-                            const debtRef = db.collection('debts').doc();
-                            b.set(debtRef, {
-                                buyerId: buy.id, buyerName: buy.name,
-                                sellerId: sel.id, sellerName: sel.name,
-                                playerName: p.name, installmentVal: valorEntrada,
-                                weeksRemaining: parseInt(o.meta.installments) - 1, date: Date.now()
-                            });
+                    // --- PASSO 2: O JOGADOR ACEITA O CONTRATO ---
+                    if (user.type === 'PLAYER' || isFreeAgent) {
+                        if (!buy || !p) return alert("Erro: Dados incompletos.");
+                        
+                        if (!isFreeAgent && !o.sellerAccepted) {
+                            return alert("Seu clube ainda não aceitou os valores desta venda!");
                         }
+
+                        const valorEntrada = o.meta?.installments > 1 ? (o.value / o.meta.installments) : o.value;
+                        if (buy.balance < valorEntrada) return alert("O comprador não tem saldo para pagar a entrada!");
+
+                        if (!confirm(`Deseja assinar o contrato com o ${buy.name} e finalizar a transferência?`)) return;
+
+                        const b = db.batch();
+                        
+                        // Pagamentos de transferência
+                        b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - valorEntrada });
+                        if (sel) {
+                            b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorEntrada });
+                            if (o.meta?.installments > 1) {
+                                const debtRef = db.collection('debts').doc();
+                                b.set(debtRef, {
+                                    buyerId: buy.id, buyerName: buy.name,
+                                    sellerId: sel.id, sellerName: sel.name,
+                                    playerName: p.name, installmentVal: valorEntrada,
+                                    weeksRemaining: parseInt(o.meta.installments) - 1, date: Date.now()
+                                });
+                            }
+                        }
+
+                        // Efetiva a mudança de time
+                        b.update(db.collection('players').doc(p.id), {
+                            teamId: buy.id,
+                            status: 'NAO_A_VENDA',
+                            contract: parseInt(o.offerContract) || 1,
+                            salary: parseFloat(o.meta?.newSalary) || p.salary,
+                            role: o.meta?.role || 'ROTACAO',
+                            history: firebase.firestore.FieldValue.arrayUnion({ 
+                                date: Date.now(), from: isFreeAgent ? 'AGENTE LIVRE' : sel.name, to: buy.name, type: o.type, value: o.value 
+                            })
+                        });
+
+                        b.delete(db.collection('offers').doc(o.id));
+                        await b.commit();
+                        
+                        const newsMsg = isFreeAgent 
+                            ? `✍️ **ASSINOU!**\nO Agente Livre **${p.name}** agora é jogador do **${buy.name}**!`
+                            : `🤝 **TRANSFERÊNCIA CONCLUÍDA**\n**${p.name}** aceitou os termos pessoais e assinou com o **${buy.name}**!`;
+                        
+                        postNews(newsMsg, 'transfer');
+                        alert("Contrato assinado e transferência concluída!");
+                    } else {
+                        alert("Ação não permitida para o seu tipo de usuário.");
                     }
-
-                    b.update(db.collection('players').doc(p.id), {
-                        teamId: buy.id,
-                        status: 'NAO_A_VENDA',
-                        contract: parseInt(o.offerContract) || 1,
-                        salary: parseFloat(o.meta?.newSalary) || p.salary,
-                        role: o.meta?.role || 'ROTACAO',
-                        history: firebase.firestore.FieldValue.arrayUnion({ 
-                            date: Date.now(), from: isFreeAgent ? 'AGENTE LIVRE' : sel.name, to: buy.name, type: o.type, value: o.value 
-                        })
-                    });
-
-                    b.delete(db.collection('offers').doc(o.id));
-                    await b.commit();
-                    
-                    const newsMsg = isFreeAgent 
-                        ? `✍️ **ASSINOU!**\nO Agente Livre **${p.name}** agora é jogador do **${buy.name}**!`
-                        : `🤝 **TRANSFERÊNCIA CONCLUÍDA**\n**${p.name}** aceitou os termos e assinou com o **${buy.name}**!`;
-                    
-                    postNews(newsMsg, 'transfer');
-                    alert("Contrato assinado e transferência concluída!");
                 } catch (e) {
                     console.error(e);
                     alert("Erro técnico ao processar o aceite.");
@@ -883,7 +889,7 @@ const resetDatabase = async () => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.94.4</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.94.5</div>
                             </div>
                         </div>
                         
@@ -1149,7 +1155,7 @@ const resetDatabase = async () => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.94.4</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.94.5</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1929,8 +1935,9 @@ const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) 
 
 const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) => {
     // FILTRO RIGOROSO: 
-    // Exibe apenas propostas onde o usuário logado é o DESTINATÁRIO (recipientId).
-    // Isso faz com que, ao enviar uma contraproposta, o ID mude e ela suma da lista.
+    // A proposta só aparece se o usuário logado for o destinatário atual (recipientId).
+    // Isso garante o fluxo: Comprador -> Vendedor -> Jogador.
+    // Ao enviar uma contraproposta, o recipientId muda e ela some automaticamente daqui.
     const myOffers = offers.filter(o => 
         o.recipientId === user.data.id && 
         o.status === 'PENDING'
@@ -1955,7 +1962,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
             {myOffers.map(o => (
                 <div key={o.id} className="card" style={{borderLeft:'4px solid gold', background: '#1e1e1e'}}>
                     
-                    {/* AVISO DE FLUXO REALISTA PARA O JOGADOR */}
+                    {/* AVISOS DE STATUS REALISTA PARA O JOGADOR */}
                     {o.sellerAccepted && user.type === 'PLAYER' && (
                         <div style={{background:'rgba(0,230,118,0.2)', color:'var(--primary)', padding:'6px', borderRadius:8, fontSize:10, marginBottom:10, textAlign:'center', fontWeight:'bold', border:'1px solid var(--primary)'}}>
                             ✅ O SEU CLUBE ACEITOU A VENDA. DEPENDE DE VOCÊ!

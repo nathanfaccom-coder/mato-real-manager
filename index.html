@@ -199,10 +199,14 @@
             }, []);
 
             useEffect(() => {
-                if (user?.type === 'USER') {
-                    const me = teams.find(t => t.id === user.data.id);
+                if (user?.type === 'USER' || user?.type === 'PLAYER') { // ADICIONADO PLAYER AQUI
+                    const me = user.type === 'USER' 
+                        ? teams.find(t => t.id === user.data.id)
+                        : players.find(p => p.id === user.data.id);
+                    
                     if (me) setUser(prev => ({...prev, data: me}));
                     
+                    // Agora tanto Clube quanto Jogador vão "ouvir" as propostas do banco
                     return db.collection('offers').onSnapshot(s => {
                         setOffers(s.docs.map(d => ({id:d.id, ...d.data()})));
                     });
@@ -215,7 +219,7 @@
                         else setUser(prev => ({...prev, data: me}));
                     }
                 }
-            }, [teams, companies, user?.data?.id]);
+            }, [teams, players, companies, user?.data?.id, user?.type]); // Adicionado players e user.type na dependência
 
             const postNews = (text, type='normal') => db.collection('news').add({ text, type, date: Date.now() });
 
@@ -872,31 +876,20 @@ const resetDatabase = async () => {
                                     onClick={() => setScreen('OFFERS')} 
                                     style={{ position: 'relative', cursor: 'pointer', padding: '5px', display: 'flex', alignItems: 'center' }}
                                 >
-                                    <i 
-                                        className="fas fa-bell" 
-                                        style={{
-                                            fontSize: '20px',
-                                            // Fica amarelo se houver proposta pendente para VOCÊ
-                                           // --- NO CABEÇALHO, ONDE FICA O SINO (COR DO ÍCONE) ---
-color: (offers || []).filter(o => (o.recipientId === user.data.id || o.playerId === user.data.id) && o.status === 'PENDING').length > 0 ? 'var(--warning)' : '#666',
-                                            transition: '0.3s'
-                                        }}
-                                    ></i>
-                                    
-                                    {/* Bolinha vermelha de alerta */}
-                                    {(offers || []).filter(o => o.recipientId === user.data.id && o.status === 'PENDING').length > 0 && (
-                                        <span 
-                                            className="pulse"
-                                            style={{
-                                                position: 'absolute', top: '2px', right: '2px',
-                                                background: 'red', borderRadius: '50%',
-                                                width: '10px', height: '10px',
-                                                border: '2px solid var(--bg-card)'
-                                            }}
-                                        ></span>
-                                    )}
-                                </div>
-                            )}
+                                   
+<i 
+    className="fas fa-bell" 
+    style={{
+        fontSize: '20px',
+        color: (offers || []).filter(o => (o.recipientId === user.data.id || o.playerName === user.data.name) && o.status === 'PENDING').length > 0 ? 'var(--warning)' : '#666',
+        transition: '0.3s'
+    }}
+></i>
+
+{/* Bolinha vermelha de alerta */}
+{(offers || []).filter(o => (o.recipientId === user.data.id || o.playerName === user.data.name) && o.status === 'PENDING').length > 0 && (
+    <span className="pulse" style={{ position: 'absolute', top: '2px', right: '2px', background: 'red', borderRadius: '50%', width: '10px', height: '10px', border: '2px solid var(--bg-card)' }}></span>
+)}
 
                             {/* EXIBIÇÃO DE SALDO EM DINHEIRO */}
                             {(user.type === 'USER' || user.type === 'COMPANY' || user.type === 'PLAYER') && (
@@ -1891,6 +1884,7 @@ const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) 
                 </div>
             );
         };
+                    
         //fim
 
 const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) => {
@@ -1898,11 +1892,10 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
     // Se eu sou jogador, procuro propostas que tenham o MEU NOME exato ou o MEU ID.
     // Se eu sou clube, procuro propostas enviadas para o MEU ID de clube.
     const myOffers = offers.filter(o => {
-        const isTargetPlayer = o.playerName === user.data.name || o.playerId === user.data.id || o.recipientId === user.data.id;
-        const isTargetClub = o.recipientId === user.data.id;
-        
-        return (isTargetPlayer || isTargetClub) && o.status === 'PENDING';
-    });
+    // Busca por ID de recebedor OU pelo Nome exato do jogador
+    const isTarget = o.recipientId === user.data.id || o.playerName === user.data.name || o.playerId === user.data.id;
+    return isTarget && o.status === 'PENDING';
+});
 
     return (
         <div>

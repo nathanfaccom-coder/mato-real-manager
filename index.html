@@ -866,39 +866,37 @@ const resetDatabase = async () => {
                                 <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.94.0</div>
                             </div>
                         </div>
+                        
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
-                     
-                           
-                            
-                            {/* ÍCONE DE NOTIFICAÇÃO (SINO) - APARECE PARA TIMES E JOGADORES */}
+                            {/* ÍCONE DE NOTIFICAÇÃO (SINO) */}
                             {(user.type === 'USER' || user.type === 'PLAYER') && (
                                 <div 
                                     onClick={() => setScreen('OFFERS')} 
                                     style={{ position: 'relative', cursor: 'pointer', padding: '5px', display: 'flex', alignItems: 'center' }}
                                 >
-                                   
-<i 
-    className="fas fa-bell" 
-    style={{
-        fontSize: '20px',
-        color: (offers || []).filter(o => (o.recipientId === user.data.id || o.playerName === user.data.name) && o.status === 'PENDING').length > 0 ? 'var(--warning)' : '#666',
-        transition: '0.3s'
-    }}
-></i>
+                                    <i 
+                                        className="fas fa-bell" 
+                                        style={{
+                                            fontSize: '20px',
+                                            color: (offers || []).filter(o => (o.recipientId === user.data.id || o.playerName === user.data.name) && o.status === 'PENDING').length > 0 ? 'var(--warning)' : '#666',
+                                            transition: '0.3s'
+                                        }}
+                                    ></i>
+                                    
+                                    {(offers || []).filter(o => (o.recipientId === user.data.id || o.playerName === user.data.name) && o.status === 'PENDING').length > 0 && (
+                                        <span className="pulse" style={{ position: 'absolute', top: '2px', right: '2px', background: 'red', borderRadius: '50%', width: '10px', height: '10px', border: '2px solid var(--bg-card)' }}></span>
+                                    )}
+                                </div>
+                            )}
 
-{/* Bolinha vermelha de alerta */}
-{(offers || []).filter(o => (o.recipientId === user.data.id || o.playerName === user.data.name) && o.status === 'PENDING').length > 0 && (
-    <span className="pulse" style={{ position: 'absolute', top: '2px', right: '2px', background: 'red', borderRadius: '50%', width: '10px', height: '10px', border: '2px solid var(--bg-card)' }}></span>
-)}
-
-                            {/* EXIBIÇÃO DE SALDO EM DINHEIRO */}
+                            {/* SALDO EM DINHEIRO */}
                             {(user.type === 'USER' || user.type === 'COMPANY' || user.type === 'PLAYER') && (
                                 <div style={{color:'var(--primary)', fontWeight:'bold', marginLeft:10}}>
                                     {fmt(user.data.balance)}
                                 </div>
                             )}
 
-                            {/* ÍCONE DE CONFIGURAÇÕES (SÓ PARA TIMES) */}
+                            {/* CONFIGURAÇÕES */}
                             {user.type === 'USER' && (
                                 <i className="fas fa-cog" style={{cursor:'pointer', marginLeft:10}} onClick={()=>setModal({type:'SETTINGS', data:user.data})}></i>
                             )}
@@ -909,6 +907,7 @@ const resetDatabase = async () => {
                     </div>
 
                     <div className="container">
+                        {/* AQUI CONTINUA O RESTANTE DO SEU CÓDIGO (PAINEL ADMIN, ETC) */}
                         {/* PAINEL DO ADMIN */}
                         {screen === 'HOME' && user.type === 'ADMIN' && 
                             <AdminPanel 

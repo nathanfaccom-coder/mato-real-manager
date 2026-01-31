@@ -199,27 +199,38 @@
             }, []);
 
             useEffect(() => {
-                if (user?.type === 'USER' || user?.type === 'PLAYER') { // ADICIONADO PLAYER AQUI
+                // Se for um Time (USER) ou um Jogador (PLAYER)
+                if (user?.type === 'USER' || user?.type === 'PLAYER') {
+                    // Sincroniza os dados do perfil logado com a lista global
                     const me = user.type === 'USER' 
                         ? teams.find(t => t.id === user.data.id)
                         : players.find(p => p.id === user.data.id);
                     
                     if (me) setUser(prev => ({...prev, data: me}));
                     
-                    // Agora tanto Clube quanto Jogador vão "ouvir" as propostas do banco
-                    return db.collection('offers').onSnapshot(s => {
+                    // --- CANAL DE PROPOSTAS RIGOROSO ---
+                    // Abre a escuta do banco de dados para as ofertas
+                    const unsubOffers = db.collection('offers').onSnapshot(s => {
                         setOffers(s.docs.map(d => ({id:d.id, ...d.data()})));
                     });
+                    
+                    // Limpa a escuta ao deslogar ou mudar de tela para não pesar o app
+                    return () => unsubOffers();
                 }
                 
+                // Lógica de Empresas
                 if (user?.type === 'COMPANY') {
                     const me = companies.find(c => c.id === user.data.id);
                     if (me) {
-                        if (me.status === 'BLOCKED') { alert("🚫 Empresa Bloqueada/Falida."); window.location.reload(); }
-                        else setUser(prev => ({...prev, data: me}));
+                        if (me.status === 'BLOCKED') { 
+                            alert("🚫 Sua empresa foi bloqueada ou faliu."); 
+                            window.location.reload(); 
+                        } else {
+                            setUser(prev => ({...prev, data: me}));
+                        }
                     }
                 }
-            }, [teams, players, companies, user?.data?.id, user?.type]); // Adicionado players e user.type na dependência
+            }, [teams, players, companies, user?.data?.id, user?.type]); 
 
             const postNews = (text, type='normal') => db.collection('news').add({ text, type, date: Date.now() });
 
@@ -227,31 +238,31 @@
                 if (type === 'TEAM') { 
                     const t = teams.find(x => x.id === id); 
                     if (t && t.password === pwd) { 
-                        if (t.status === 'PENDING') alert("⏳ Aguarde a Federação."); 
+                        if (t.status === 'PENDING') alert("⏳ Aguarde a aprovação da Federação."); 
                         else { setUser({type:'USER', data:t}); setScreen('HOME'); } 
-                    } else alert("Erro!"); 
+                    } else alert("Senha ou ID incorretos!"); 
                 } 
                 else if (type === 'PAPER') { 
                     const p = papers.find(x => x.id === id); 
                     if (p && p.password === pwd) { 
-                        if (p.status === 'PENDING') alert("⏳ Aguarde a Federação."); 
+                        if (p.status === 'PENDING') alert("⏳ Jornal aguardando aprovação."); 
                         else { setUser({type:'PRESS', data:p}); setScreen('PRESS_DASH'); } 
-                    } else alert("Erro!"); 
+                    } else alert("Erro no login da Imprensa!"); 
                 } 
                 else if (type === 'JOURNALIST') { 
                     const j = journalists.find(x => x.id === id); 
                     if (j && j.password === pwd) { 
-                        if (j.status === 'PENDING') alert("⏳ Aguarde o Dono do Jornal."); 
+                        if (j.status === 'PENDING') alert("⏳ Peça ao dono do jornal para aprovar seu acesso."); 
                         else { setUser({type:'PRESS_WORKER', data:j}); setScreen('PRESS_DASH'); } 
-                    } else alert("Erro!"); 
+                    } else alert("Erro no login do Jornalista!"); 
                 }
                 else if (type === 'COMPANY') { 
                     const c = companies.find(x => x.id === id); 
                     if (c && c.password === pwd) { 
-                        if (c.status === 'PENDING') alert("⏳ Aguarde a Federação."); 
-                        else if (c.status === 'BLOCKED') alert("🚫 Empresa Bloqueada."); 
+                        if (c.status === 'PENDING') alert("⏳ Empresa aguardando alvará da Federação."); 
+                        else if (c.status === 'BLOCKED') alert("🚫 Esta empresa está bloqueada."); 
                         else { setUser({type:'COMPANY', data:c}); setScreen('COMPANY_HOME'); } 
-                    } else alert("Erro!"); 
+                    } else alert("Senha da Empresa incorreta!"); 
                 }
                 else if (type === 'PLAYER') { 
                      const pl = players.find(x => x.id === id); 
@@ -259,7 +270,7 @@
                      if (pl && pass === pwd) { 
                          setUser({type:'PLAYER', data:pl}); 
                          setScreen('PLAYER_DASH'); 
-                     } else alert("Senha incorreta!"); 
+                     } else alert("Senha do Jogador incorreta!"); 
                 }
             };
 
@@ -872,7 +883,7 @@ const resetDatabase = async () => {
                         </div>
                         
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
-                            {/* ÍCONE DE NOTIFICAÇÃO (SINO) */}
+                            {/* ÍCONE DE NOTIFICAÇÃO (SINO) - FILTRO RIGOROSO PELO RECIPIENTID */}
                             {(user.type === 'USER' || user.type === 'PLAYER') && (
                                 <div 
                                     onClick={() => setScreen('OFFERS')} 
@@ -882,12 +893,14 @@ const resetDatabase = async () => {
                                         className="fas fa-bell" 
                                         style={{
                                             fontSize: '20px',
-                                            color: (offers || []).filter(o => (o.recipientId === user.data.id || o.playerName === user.data.name) && o.status === 'PENDING').length > 0 ? 'var(--warning)' : '#666',
+                                            // SÓ FICA AMARELO SE O RECIPIENTID FOR O SEU ID
+                                            color: (offers || []).filter(o => o.recipientId === user.data.id && o.status === 'PENDING').length > 0 ? 'var(--warning)' : '#666',
                                             transition: '0.3s'
                                         }}
                                     ></i>
                                     
-                                    {(offers || []).filter(o => (o.recipientId === user.data.id || o.playerName === user.data.name) && o.status === 'PENDING').length > 0 && (
+                                    {/* Bolinha vermelha de alerta */}
+                                    {(offers || []).filter(o => o.recipientId === user.data.id && o.status === 'PENDING').length > 0 && (
                                         <span className="pulse" style={{ position: 'absolute', top: '2px', right: '2px', background: 'red', borderRadius: '50%', width: '10px', height: '10px', border: '2px solid var(--bg-card)' }}></span>
                                     )}
                                 </div>
@@ -900,7 +913,7 @@ const resetDatabase = async () => {
                                 </div>
                             )}
 
-                            {/* CONFIGURAÇÕES */}
+                            {/* CONFIGURAÇÕES (SÓ PARA CLUBES) */}
                             {user.type === 'USER' && (
                                 <i className="fas fa-cog" style={{cursor:'pointer', marginLeft:10}} onClick={()=>setModal({type:'SETTINGS', data:user.data})}></i>
                             )}
@@ -1891,9 +1904,9 @@ const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) 
         //fim
 
 const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) => {
-    // FILTRO ATUALIZADO: 
-    // Para a proposta sumir ao enviar uma contra, filtramos APENAS pelo recipientId.
-    // Assim, se o recipientId mudar para o Clube, ela desaparece da sua lista.
+    // FILTRO RIGOROSO: 
+    // Exibe apenas propostas onde o usuário logado é o DESTINATÁRIO (recipientId).
+    // Isso faz com que, ao enviar uma contraproposta, o ID mude e ela suma da lista.
     const myOffers = offers.filter(o => 
         o.recipientId === user.data.id && 
         o.status === 'PENDING'
@@ -1911,14 +1924,14 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
             {myOffers.length === 0 && (
                 <div style={{marginTop: 30, textAlign:'center'}}>
                     <i className="fas fa-envelope-open" style={{fontSize: 40, color: '#333', marginBottom: 10}}></i>
-                    <p style={{color:'#666'}}>Nenhuma proposta aguardando sua ação.</p>
+                    <p style={{color:'#666'}}>Nenhuma proposta aguardando sua ação no momento.</p>
                 </div>
             )}
             
             {myOffers.map(o => (
                 <div key={o.id} className="card" style={{borderLeft:'4px solid gold', background: '#1e1e1e'}}>
                     
-                    {/* AVISOS DE STATUS REALISTA */}
+                    {/* AVISO DE FLUXO REALISTA PARA O JOGADOR */}
                     {o.sellerAccepted && user.type === 'PLAYER' && (
                         <div style={{background:'rgba(0,230,118,0.2)', color:'var(--primary)', padding:'6px', borderRadius:8, fontSize:10, marginBottom:10, textAlign:'center', fontWeight:'bold', border:'1px solid var(--primary)'}}>
                             ✅ O SEU CLUBE ACEITOU A VENDA. DEPENDE DE VOCÊ!
@@ -1935,13 +1948,15 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         <b style={{color:'var(--primary)', fontSize:16}}>{o.playerName}</b>
                         <span style={{fontSize:10, background:'gold', color:'black', padding:'2px 5px', borderRadius:4, fontWeight:'bold'}}>{o.type}</span>
                     </div>
-                    <small style={{display:'block', marginBottom:10, color: '#aaa'}}>Proposta de: <b style={{color:'#fff'}}>{o.buyerName}</b></small>
+                    <small style={{display:'block', marginBottom:10, color: '#aaa'}}>
+                        Interessado: <b style={{color:'#fff'}}>{o.buyerName}</b>
+                    </small>
                     
                     <div style={{background:'#121212', padding:12, borderRadius:8, whiteSpace:'pre-wrap', fontSize:12, border:'1px solid #333', lineHeight:'1.5', color: '#eee', marginBottom: 10}}>
                         {o.description}
                     </div>
 
-                    <div style={{display:'flex', gap:5, marginTop:10}}>
+                    <div style={{display:'flex', gap:5}}>
                         <button className="btn btn-green" style={{flex:1}} onClick={()=>onAccept(o)}>ACEITAR</button>
                         <button className="btn btn-blue" style={{flex:1}} onClick={()=>onCounter(o)}>CONTRA</button>
                         <button className="btn btn-red" style={{flex:1}} onClick={()=>onReject(o)}>RECUSAR</button>
@@ -1953,7 +1968,6 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
 };
 // FIM DO BLOCO DE ADMIN, SETTINGS, PLAYER DASH E OFFERS
 
-// ... continuação do código anterior
 
 const Ranking = ({ teams, players }) => {
             const [view, setView] = React.useState('TEAMS');

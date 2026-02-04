@@ -889,7 +889,7 @@ const resetDatabase = async () => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.94.6</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.94.7</div>
                             </div>
                         </div>
                         
@@ -1155,7 +1155,7 @@ const resetDatabase = async () => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.94.6</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.94.7</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1630,8 +1630,9 @@ const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) 
     const old = target.oldOffer || {};
     const isCounter = !!old.id;
     
-    // Identifica se quem está abrindo o formulário é um JOGADOR (não possui lista de myPlayers)
-    const isPlayerActing = !myPlayers || myPlayers.length === 0;
+    // --- LÓGICA INFALÍVEL ---
+    // Verificamos o tipo de usuário logado no sistema (Variável global 'user')
+    const isPlayerActing = user.type === 'PLAYER';
 
     // ESTADOS INICIAIS
     const [t, setT] = useState(old.type || 'COMPRA');
@@ -1647,7 +1648,7 @@ const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) 
             <div className="modal-content" style={{maxWidth: '500px'}}>
                 <h3 style={{color:'var(--primary)'}}>{isCounter ? 'Contraproposta' : `Negociar ${target.name}`}</h3>
                 
-                {/* PARTE 1: ACORDO ENTRE CLUBES - SÓ APARECE PARA CLUBES */}
+                {/* PARTE 1: SÓ APARECE EDITÁVEL SE NÃO FOR JOGADOR */}
                 {!isPlayerActing ? (
                     <div style={{borderBottom: '1px solid #444', paddingBottom: 15, marginBottom: 15}}>
                         <label style={{fontSize: '11px', color: 'gold', fontWeight: 'bold'}}>1. ACORDO ENTRE CLUBES</label>
@@ -1670,7 +1671,7 @@ const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) 
                         )}
                     </div>
                 ) : (
-                    /* SE FOR JOGADOR, EXIBE OS VALORES APENAS COMO LEITURA (FIXOS) */
+                    /* SE FOR JOGADOR, EXIBE OS VALORES APENAS COMO LEITURA */
                     <div style={{background: 'rgba(255,255,255,0.05)', padding: 12, borderRadius: 8, marginBottom: 15, fontSize: 11, border: '1px solid #333'}}>
                         <b style={{color: 'gold', display: 'block', marginBottom: 5}}><i className="fas fa-handshake"></i> ACORDO ENTRE CLUBES (DEFINIDO):</b>
                         <div style={{display: 'flex', justifyContent: 'space-between', color: '#ccc'}}>
@@ -1682,9 +1683,9 @@ const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) 
                     </div>
                 )}
 
-                {/* PARTE 2: CONTRATO DO JOGADOR - SEMPRE EDITÁVEL */}
+                {/* PARTE 2: TERMOS PESSOAIS - SEMPRE EDITÁVEL */}
                 <div>
-                    <label style={{fontSize: '11px', color: 'cyan', fontWeight: 'bold'}}>2. TERMOS PESSOAIS (SEU CONTRATO)</label>
+                    <label style={{fontSize: '11px', color: 'cyan', fontWeight: 'bold'}}>2. TERMOS PESSOAIS (CONTRATO)</label>
                     <div style={{marginTop: 10}}>
                         <label>Salário Semanal (₣)</label>
                         <input className="input-field" type="number" value={sal} onChange={e=>setSal(e.target.value)} />

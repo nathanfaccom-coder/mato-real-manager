@@ -889,7 +889,7 @@ const resetDatabase = async () => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.50.9</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.51.0</div>
                             </div>
                         </div>
                         
@@ -1156,7 +1156,7 @@ const resetDatabase = async () => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.50.9</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.51.0</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1631,21 +1631,15 @@ const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) 
 const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
     const old = target.oldOffer || {};
     const isCounter = !!old.id;
-    
-    // --- LÓGICA DE VIDA REAL: SEPARAÇÃO DE ACORDOS ---
-    
-    // 1. Identificamos se o "Acordo de Cavalheiros" entre os clubes já foi selado
-    // Se o vendedor já aceitou (sellerAccepted), a Parte 1 é bloqueada para evitar má fé.
-    const clubsHaveAgreed = old?.sellerAccepted === true;
-
-    // 2. Identificamos se quem abriu o formulário é o Jogador
     const isPlayerActing = user?.type === 'PLAYER';
 
-    // 3. REGRA DE EXIBIÇÃO:
-    // A Parte 1 (Valores) só é editável se for uma conversa entre CLUBES e antes do ACEITE final.
-    const canEditFinance = !isPlayerActing && !clubsHaveAgreed;
+    // SEPARAÇÃO REALISTA: Se o vendedor já aceitou, os valores entre clubes estão "SELADOS".
+    const financeIsLocked = old?.sellerAccepted === true;
+    
+    // A Parte 1 só deve ser editável se NÃO for o Jogador e se os CLUBES ainda não se acertaram.
+    const canEditFinance = !isPlayerActing && !financeIsLocked;
 
-    // ESTADOS INICIAIS
+    // ESTADOS INICIAIS (RESTAURADOS)
     const [t, setT] = useState(old.type || 'COMPRA');
     const [v, setV] = useState(old.value || '');
     const [sal, setSal] = useState(old.meta?.newSalary || target.salary || 0);
@@ -1662,24 +1656,25 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
     return (
         <div className="modal-bg">
             <div className="modal-content" style={{maxWidth: '500px'}}>
-                <h3 style={{color:'var(--primary)'}}>{isCounter ? 'Responder Proposta' : `Negociar ${target.name}`}</h3>
+                <h3 style={{color:'var(--primary)'}}>{isCounter ? 'Contraproposta' : `Negociar ${target.name}`}</h3>
                 
-                {/* ETAPA 1: ACORDO ENTRE CLUBES */}
+                {/* 1. ACORDO ENTRE CLUBES */}
                 {canEditFinance ? (
                     <div style={{borderBottom: '1px solid #444', paddingBottom: 15, marginBottom: 15}}>
-                        <label style={{fontSize: '11px', color: 'gold', fontWeight: 'bold'}}>1. ACORDO ENTRE CLUBES (FINANCEIRO)</label>
+                        <label style={{fontSize: '11px', color: 'gold', fontWeight: 'bold'}}>1. ACORDO ENTRE CLUBES</label>
                         <div style={{display:'flex', gap:5, margin:'10px 0'}}>
                             {['COMPRA','EMPRESTIMO','TROCA'].map(x=>(
                                 <button key={x} className={`btn ${t===x?'btn-green':'btn-ghost'}`} onClick={()=>setT(x)} style={{flex: 1}}>{x}</button>
                             ))}
                         </div>
 
-                        <label>{t === 'TROCA' ? 'Compensação (₣)' : 'Taxa de Transferência (₣)'}</label>
+                        <label>{t === 'TROCA' ? 'Compensação (₣)' : (t === 'EMPRESTIMO' ? 'Taxa Empréstimo (₣)' : 'Taxa Transferência (₣)')}</label>
                         <input className="input-field" type="number" value={v} onChange={e=>setV(e.target.value)} />
 
+                        {/* RESTAURADO: TROCA DE ATÉ 3 JOGADORES */}
                         {t === 'TROCA' && (
                             <div className="card" style={{background: '#222', padding: '10px', marginTop: 10}}>
-                                <small style={{display:'block', marginBottom: 10}}>Oferecer jogadores (Máx 3):</small>
+                                <small style={{display:'block', marginBottom: 10}}>Escolha até 3 jogadores:</small>
                                 <div style={{maxHeight: '120px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5}}>
                                     {(myPlayers || []).map(p => (
                                         <div key={p.id} onClick={() => toggleSwap(p.id)} style={{padding: '8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', background: swaps.includes(p.id) ? 'var(--primary)' : '#333', color: swaps.includes(p.id) ? '#000' : '#fff', display: 'flex', justifyContent: 'space-between'}}>
@@ -1690,29 +1685,32 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                             </div>
                         )}
 
+                        {/* RESTAURADO: PARCELAMENTO E REVENDA */}
                         {t === 'COMPRA' && (
                             <div className="card" style={{background: '#222', padding: '10px', marginTop: 10}}>
-                                <small>Parcelas: <b>{meta.installments}x</b></small>
-                                <input type="range" min="1" max="12" value={meta.installments} onChange={e=>setMeta({...meta, installments: parseInt(e.target.value)})} style={{width:'100%'}} />
+                                <small>📦 PARCELAMENTO: <b>{meta.installments}x</b></small>
+                                <input type="range" min="1" max="12" value={meta.installments} onChange={e=>setMeta({...meta, installments: parseInt(e.target.value)})} style={{width:'100%', accentColor: 'var(--primary)'}} />
+                                <small style={{display:'block', marginTop:10}}>📈 REVENDA (SELL-ON): <b>{meta.sellOn}%</b></small>
+                                <input type="range" min="0" max="50" value={meta.sellOn} onChange={e=>setMeta({...meta, sellOn: parseInt(e.target.value)})} style={{width:'100%', accentColor: 'var(--primary)'}} />
                             </div>
                         )}
                     </div>
                 ) : (
-                    /* VISÃO DE ACORDO SELADO: APENAS LEITURA PARA JOGADOR E COMPRADOR */
+                    /* VISÃO BLOQUEADA (APENAS LEITURA) - SEGURANÇA CONTRA MÁ FÉ */
                     <div style={{background: 'rgba(0,230,118,0.05)', padding: 12, borderRadius: 8, marginBottom: 15, fontSize: 11, border: '1px solid var(--primary)'}}>
-                        <b style={{color: 'gold', display: 'block', marginBottom: 5}}><i className="fas fa-check-circle"></i> ACORDO FINANCEIRO SELADO:</b>
+                        <b style={{color: 'gold', display: 'block', marginBottom: 5}}><i className="fas fa-lock"></i> ACORDO FINANCEIRO DEFINIDO:</b>
                         <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, color: '#ccc'}}>
                             <span>Tipo: <b>{t}</b></span>
                             <span>Valor: <b>{fmt(v)}</b></span>
-                            {t === 'COMPRA' && <span>Parcelas: <b>{meta.installments}x</b></span>}
+                            {t === 'COMPRA' && meta.installments > 1 && <span>Parcelas: <b>{meta.installments}x</b></span>}
                         </div>
-                        <small style={{color: '#888', marginTop: 5, display: 'block'}}>* Valores aceitos pelos clubes. Negocie apenas o contrato pessoal abaixo.</small>
+                        <small style={{color: '#888', marginTop: 5, display: 'block'}}>* Termos aceitos pelos clubes. Negocie o contrato pessoal abaixo.</small>
                     </div>
                 )}
 
-                {/* ETAPA 2: TERMOS PESSOAIS (JOGADOR x COMPRADOR) */}
+                {/* 2. TERMOS PESSOAIS (SEMPRE EDITÁVEL ENTRE JOGADOR E COMPRADOR) */}
                 <div>
-                    <label style={{fontSize: '11px', color: 'cyan', fontWeight: 'bold'}}>2. CONTRATO PESSOAL DO ATLETA</label>
+                    <label style={{fontSize: '11px', color: 'cyan', fontWeight: 'bold'}}>2. SEU CONTRATO PESSOAL (SALÁRIO)</label>
                     <div style={{marginTop: 10}}>
                         <label>Salário Semanal (₣)</label>
                         <input className="input-field" type="number" value={sal} onChange={e=>setSal(e.target.value)} />
@@ -1732,7 +1730,7 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
 
                 <div style={{display:'flex', gap:10, marginTop:15}}>
                     <button className="btn btn-green" style={{flex: 2}} onClick={() => onSend(target, t, v, swaps, con, {...meta, newSalary: parseFloat(sal), role, status: 'PENDING'}, old)}>
-                        {isCounter ? 'ENVIAR RESPOSTA' : 'ENVIAR PROPOSTA'}
+                        ENVIAR RESPOSTA
                     </button>
                     <button className="btn btn-red" style={{flex: 1}} onClick={()=>setModal(null)}>CANCELAR</button>
                 </div>

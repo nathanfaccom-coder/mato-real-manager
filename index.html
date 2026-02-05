@@ -889,7 +889,7 @@ const resetDatabase = async () => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.50.1</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.50.2</div>
                             </div>
                         </div>
                         
@@ -1156,7 +1156,7 @@ const resetDatabase = async () => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.50.1</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.50.2</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1632,10 +1632,14 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
     const old = target.oldOffer || {};
     const isCounter = !!old.id;
     
-    // --- TRAVA DE SEGURANÇA MESTRE REFINADA ---
+    // --- LÓGICA DE TRAVA DE SEGURANÇA ---
     const isPlayerActing = user?.type === 'PLAYER';
-    // O comprador só fica travado se o vendedor já aceitou (sellerAccepted) E ele não é o vendedor
-    const isLockedForBuyer = old?.sellerAccepted === true && user.data.id === (old.buyerId || user.data.id);
+    
+    // O comprador só fica travado se o vendedor já deu o "OK" (sellerAccepted) 
+    // E se a proposta está atualmente com o comprador (indicando que o jogador mandou uma contra de salário)
+    const isLockedForBuyer = old?.sellerAccepted === true && old?.recipientId === user.data.id;
+    
+    // Esconde a edição da Parte 1 se for o Jogador OU se estiver travado para o Comprador
     const shouldHidePart1 = isPlayerActing || isLockedForBuyer;
 
     // ESTADOS INICIAIS
@@ -1665,6 +1669,7 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                 
                 {/* PARTE 1: ACORDO ENTRE CLUBES */}
                 {!shouldHidePart1 ? (
+                    /* VISÃO EDITÁVEL PARA CLUBES EM NEGOCIAÇÃO */
                     <div style={{borderBottom: '1px solid #444', paddingBottom: 15, marginBottom: 15}}>
                         <label style={{fontSize: '11px', color: 'gold', fontWeight: 'bold'}}>1. ACORDO ENTRE CLUBES</label>
                         <div style={{display:'flex', gap:5, margin:'10px 0'}}>
@@ -1682,16 +1687,28 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                                 <small style={{display:'block', marginBottom: 10}}>Selecione até 3 jogadores para oferecer:</small>
                                 <div style={{maxHeight: '150px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5}}>
                                     {(myPlayers || []).map(p => (
-                                        <div key={p.id} onClick={() => toggleSwap(p.id)} style={{padding: '8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', background: swaps.includes(p.id) ? 'var(--primary)' : '#333', color: swaps.includes(p.id) ? '#000' : '#fff', display: 'flex', justifyContent: 'space-between'}}>
-                                            <span>{p.name}</span><b>OV: {p.overall}</b>
+                                        <div 
+                                            key={p.id} 
+                                            onClick={() => toggleSwap(p.id)}
+                                            style={{
+                                                padding: '8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer',
+                                                background: swaps.includes(p.id) ? 'var(--primary)' : '#333',
+                                                color: swaps.includes(p.id) ? '#000' : '#fff',
+                                                display: 'flex', justifyContent: 'space-between'
+                                            }}
+                                        >
+                                            <span>{p.name}</span>
+                                            <b>OV: {p.overall}</b>
                                         </div>
                                     ))}
                                 </div>
-                                <small style={{display:'block', marginTop: 10, textAlign:'right', color: swaps.length > 0 ? 'var(--primary)' : '#666'}}>{swaps.length}/3 Selecionados</small>
+                                <small style={{display:'block', marginTop: 10, textAlign:'right', color: swaps.length > 0 ? 'var(--primary)' : '#666'}}>
+                                    {swaps.length}/3 Selecionados
+                                </small>
                             </div>
                         )}
 
-                        {/* COMPRA */}
+                        {/* OPÇÕES TÉCNICAS DE COMPRA */}
                         {t === 'COMPRA' && (
                             <div className="card" style={{background: '#222', padding: '10px', marginTop: 10}}>
                                 <small>📦 PARCELAMENTO: <b>{meta.installments}x</b></small>
@@ -1701,7 +1718,7 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                             </div>
                         )}
 
-                        {/* EMPRÉSTIMO */}
+                        {/* OPÇÕES TÉCNICAS DE EMPRÉSTIMO */}
                         {t === 'EMPRESTIMO' && (
                             <div className="card" style={{background: '#222', padding: '10px', marginTop: 10}}>
                                 <small>💸 DIVISÃO SALARIAL (Comprador paga): <b>{meta.wageSplit}%</b></small>
@@ -1712,8 +1729,8 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                         )}
                     </div>
                 ) : (
-                    /* VISÃO BLOQUEADA (APENAS LEITURA) */
-                    <div style={{background: 'rgba(0,230,118,0.05)', padding: 12, borderRadius: 8, marginBottom: 15, fontSize: 11, border: '1px solid #333'}}>
+                    /* VISÃO BLOQUEADA (APENAS LEITURA) PARA JOGADOR OU FINALIZAÇÃO */
+                    <div style={{background: 'rgba(0,230,118,0.05)', padding: 12, borderRadius: 8, marginBottom: 15, fontSize: 11, border: '1px solid var(--primary)'}}>
                         <b style={{color: 'gold', display: 'block', marginBottom: 5}}><i className="fas fa-lock"></i> ACORDO ENTRE CLUBES (DEFINIDO):</b>
                         <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, color: '#ccc'}}>
                             <span>Tipo: <b>{t}</b></span>
@@ -1721,11 +1738,11 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                             {t === 'TROCA' && swaps.length > 0 && <span style={{gridColumn: 'span 2'}}>Jogadores envolvidos: <b>{swaps.length}</b></span>}
                             {t === 'COMPRA' && meta.installments > 1 && <span>Parcelas: <b>{meta.installments}x</b></span>}
                         </div>
-                        <small style={{color: '#888', marginTop: 5, display: 'block'}}>* Os termos financeiros acima não podem mais ser alterados.</small>
+                        <small style={{color: '#888', marginTop: 5, display: 'block'}}>* Termos financeiros já aceitos pelos clubes. Negocie apenas o contrato pessoal.</small>
                     </div>
                 )}
 
-                {/* PARTE 2: TERMOS PESSOAIS */}
+                {/* PARTE 2: SEU CONTRATO PESSOAL */}
                 <div>
                     <label style={{fontSize: '11px', color: 'cyan', fontWeight: 'bold'}}>2. SEU CONTRATO PESSOAL</label>
                     <div style={{marginTop: 10}}>

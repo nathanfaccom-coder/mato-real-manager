@@ -889,7 +889,7 @@ const resetDatabase = async () => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.50.2</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.50.3</div>
                             </div>
                         </div>
                         
@@ -1156,7 +1156,7 @@ const resetDatabase = async () => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.50.2</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.50.3</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1632,15 +1632,15 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
     const old = target.oldOffer || {};
     const isCounter = !!old.id;
     
-    // --- LÓGICA DE TRAVA DE SEGURANÇA ---
+    // --- LÓGICA DE TRAVA REFINADA ---
+    // 1. Se quem está logado é um JOGADOR, trava sempre.
     const isPlayerActing = user?.type === 'PLAYER';
     
-    // O comprador só fica travado se o vendedor já deu o "OK" (sellerAccepted) 
-    // E se a proposta está atualmente com o comprador (indicando que o jogador mandou uma contra de salário)
-    const isLockedForBuyer = old?.sellerAccepted === true && old?.recipientId === user.data.id;
+    // 2. Se for um CLUBE, só trava se o vendedor JÁ ACEITOU e o próximo passo é o JOGADOR assinar.
+    // (Se o jogador mandou uma contra de salário, o recipientId vira o Clube e a trava solta para o clube renegociar se quiser)
+    const isSentToPlayer = old?.sellerAccepted === true && old?.recipientId === old?.playerId;
     
-    // Esconde a edição da Parte 1 se for o Jogador OU se estiver travado para o Comprador
-    const shouldHidePart1 = isPlayerActing || isLockedForBuyer;
+    const shouldHidePart1 = isPlayerActing || isSentToPlayer;
 
     // ESTADOS INICIAIS
     const [t, setT] = useState(old.type || 'COMPRA');
@@ -1729,7 +1729,7 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                         )}
                     </div>
                 ) : (
-                    /* VISÃO BLOQUEADA (APENAS LEITURA) PARA JOGADOR OU FINALIZAÇÃO */
+                    /* VISÃO BLOQUEADA (APENAS LEITURA) QUANDO JÁ DEFINIDO PELOS CLUBES */
                     <div style={{background: 'rgba(0,230,118,0.05)', padding: 12, borderRadius: 8, marginBottom: 15, fontSize: 11, border: '1px solid var(--primary)'}}>
                         <b style={{color: 'gold', display: 'block', marginBottom: 5}}><i className="fas fa-lock"></i> ACORDO ENTRE CLUBES (DEFINIDO):</b>
                         <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, color: '#ccc'}}>
@@ -1738,7 +1738,7 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                             {t === 'TROCA' && swaps.length > 0 && <span style={{gridColumn: 'span 2'}}>Jogadores envolvidos: <b>{swaps.length}</b></span>}
                             {t === 'COMPRA' && meta.installments > 1 && <span>Parcelas: <b>{meta.installments}x</b></span>}
                         </div>
-                        <small style={{color: '#888', marginTop: 5, display: 'block'}}>* Termos financeiros já aceitos pelos clubes. Negocie apenas o contrato pessoal.</small>
+                        <small style={{color: '#888', marginTop: 5, display: 'block'}}>* Termos financeiros aceitos pelos clubes. Negocie apenas o contrato pessoal.</small>
                     </div>
                 )}
 

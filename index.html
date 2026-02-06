@@ -889,7 +889,7 @@ const resetDatabase = async () => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.51.2</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.51.3</div>
                             </div>
                         </div>
                         
@@ -1156,7 +1156,7 @@ const resetDatabase = async () => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.51.2</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.51.3</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1631,15 +1631,21 @@ const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) 
 const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
     const old = target.oldOffer || {};
     const isCounter = !!old.id;
+    
+    // --- MÉTODO DE CHAVE POR DESTINATÁRIO (SOLUÇÃO DEFINITIVA) ---
+    
+    // 1. Quem está operando é um Jogador?
     const isPlayerActing = user?.type === 'PLAYER';
 
-    // --- TRAVA INTELIGENTE ---
-    // A Parte 1 (Valores entre Clubes) SÓ deve ser travada se:
-    // 1. O Vendedor já aceitou explicitamente (sellerAccepted === true)
-    // 2. OU quem está operando agora é o JOGADOR.
-    // Caso contrário, se for entre CLUBES e não houve aceite, fica TUDO liberado.
-    const financeIsLocked = old?.sellerAccepted === true;
-    const shouldHidePart1 = isPlayerActing || financeIsLocked;
+    // 2. A proposta está no "Sino" de um Jogador? 
+    // Se o recipientId for igual ao playerId, significa que um clube mandou para o jogador.
+    const isSentToPlayer = old?.recipientId === (old?.playerId || target.id);
+
+    // REGRA DE OURO: 
+    // Esconde a Parte 1 APENAS se quem estiver vendo for o Jogador 
+    // OU se a proposta estiver endereçada ao Jogador (fase final de contrato).
+    // Se estiver endereçada a um CLUBE, a Parte 1 REAPARECE para negociação.
+    const shouldHidePart1 = isPlayerActing || isSentToPlayer;
 
     // ESTADOS
     const [t, setT] = useState(old.type || 'COMPRA');
@@ -1660,7 +1666,7 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
             <div className="modal-content" style={{maxWidth: '500px'}}>
                 <h3 style={{color:'var(--primary)'}}>{isCounter ? 'Responder Proposta' : `Negociar ${target.name}`}</h3>
                 
-                {/* 1. ACORDO ENTRE CLUBES (FINANCEIRO) */}
+                {/* 1. ACORDO ENTRE CLUBES */}
                 {!shouldHidePart1 ? (
                     <div style={{borderBottom: '1px solid #444', paddingBottom: 15, marginBottom: 15}}>
                         <label style={{fontSize: '11px', color: 'gold', fontWeight: 'bold'}}>1. ACORDO ENTRE CLUBES (EDITÁVEL)</label>
@@ -1696,15 +1702,16 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                         )}
                     </div>
                 ) : (
-                    /* VISÃO BLOQUEADA (APENAS LEITURA) - SÓ QUANDO HÁ ACEITE */
+                    /* VISÃO BLOQUEADA (APENAS LEITURA) - APARECE PARA O JOGADOR OU SE O CLUBE VENDEDOR JÁ ACEITOU */
                     <div style={{background: 'rgba(0,230,118,0.05)', padding: 12, borderRadius: 8, marginBottom: 15, fontSize: 11, border: '1px solid var(--primary)'}}>
-                        <b style={{color: 'gold', display: 'block', marginBottom: 5}}><i className="fas fa-lock"></i> ACORDO FINANCEIRO SELADO:</b>
+                        <b style={{color: 'gold', display: 'block', marginBottom: 5}}><i className="fas fa-lock"></i> ACORDO ENTRE CLUBES (DEFINIDO):</b>
                         <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, color: '#ccc'}}>
                             <span>Tipo: <b>{t}</b></span>
-                            <span>Valor: <b>{fmt(v)}</b></span>
+                            <span>Taxa: <b>{fmt(v)}</b></span>
+                            {t === 'TROCA' && swaps.length > 0 && <span style={{gridColumn: 'span 2'}}>Jogadores envolvidos: <b>{swaps.length}</b></span>}
                             {t === 'COMPRA' && meta.installments > 1 && <span>Parcelas: <b>{meta.installments}x</b></span>}
                         </div>
-                        <small style={{color: '#888', marginTop: 5, display: 'block'}}>* Valores aceitos pelos clubes. Negocie o contrato abaixo.</small>
+                        <small style={{color: '#888', marginTop: 5, display: 'block'}}>* Termos financeiros aceitos pelos clubes. Negocie o contrato pessoal abaixo.</small>
                     </div>
                 )}
 

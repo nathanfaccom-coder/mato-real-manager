@@ -676,9 +676,87 @@ const acceptOffer = async (o) => {
 };
 
 const rejectOffer = async (o) => {
-    if(!confirm("Deseja recusar e encerrar esta negociação?")) return;
-    await db.collection('offers').doc(o.id).delete();
-    postNews(`❌ **NEGOCIAÇÃO ENCERRADA**\nO acordo por **${o.playerName}** não avançou.`, 'transfer');
+    try {
+        // --- CASO 1: RECUSA DE OPÇÃO DE COMPRA (FIM DE EMPRÉSTIMO) ---
+        if (o.type === 'COMPRA_DEFINITIVA' && o.isLoanOption) {
+            const p = players.find(x => x.id === o.playerId);
+            const ownerId = o.sellerId; // ID do dono original (salvo na oferta)
+            const ownerTeam = teams.find(t => t.id === ownerId);
+
+            if (!confirm("Deseja recusar a compra? O jogador retornará ao clube de origem.")) return;
+
+            const b = db.batch();
+            const pRef = db.collection('players').doc(p.id);
+
+            // Verifica se o contrato com o dono original acabou (0 anos)
+            if (parseInt(p.contract) <= 0) {
+                // GERA NOTIFICAÇÃO DE RENOVAÇÃO OBRIGATÓRIA PARA O DONO ORIGINAL
+                const renewalReqRef = db.collection('offers').doc();
+                b.set(renewalReqRef, {
+                    type: 'RENOVACAO_URGENTE',
+                    playerId: p.id,
+                    playerName: p.name,
+                    buyerId: ownerId, // O próprio dono precisa agir
+                    buyerName: ownerTeam?.name || 'Clube de Origem',
+                    sellerId: 'SISTEMA',
+                    recipientId: ownerId,
+                    status: 'PENDING',
+                    description: `⚠️ **URGENTE: FIM DE CONTRATO**\nO empréstimo de **${p.name}** acabou e ele não tem mais contrato com você.\n\nClique em **CONTRA** para renovar ou **RECUSAR** para mandá-lo aos passes livres.`,
+                    date: Date.now()
+                });
+
+                // Devolve ao dono, mas trava o jogador até resolver a renovação
+                b.update(pRef, {
+                    teamId: ownerId,
+                    loanMeta: firebase.firestore.FieldValue.delete(),
+                    status: 'INTRANSFERIVEL' 
+                });
+
+                postNews(`🔙 **RETORNO CRÍTICO**\nO empréstimo de ${p.name} acabou. O ${ownerTeam?.name} deve decidir se renova ou libera o atleta!`, 'rumor');
+            } else {
+                // RETORNO NORMAL (Ainda possui anos de contrato restantes)
+                b.update(pRef, {
+                    teamId: ownerId,
+                    loanMeta: firebase.firestore.FieldValue.delete(),
+                    status: 'NAO_A_VENDA'
+                });
+                postNews(`🔙 **RETORNO**\n${p.name} retornou ao ${ownerTeam?.name} após o fim do empréstimo.`, 'transfer');
+            }
+
+            b.delete(db.collection('offers').doc(o.id));
+            await b.commit();
+            alert("Jogador devolvido ao clube de origem.");
+            return;
+        }
+
+        // --- CASO 2: RECUSA DE RENOVAÇÃO URGENTE (LIBERAR PARA PASSE LIVRE) ---
+        if (o.type === 'RENOVACAO_URGENTE') {
+            if (!confirm("Tem certeza? O jogador perderá o vínculo com o clube e irá para os Agentes Livres.")) return;
+            
+            const b = db.batch();
+            b.update(db.collection('players').doc(o.playerId), {
+                teamId: 'FREE',
+                status: 'VENDA',
+                mood: '😐',
+                contract: 0
+            });
+            b.delete(db.collection('offers').doc(o.id));
+            await b.commit();
+            
+            postNews(`🆓 **AGENTE LIVRE**\nO vínculo de **${o.playerName}** expirou e ele está livre no mercado!`, 'transfer');
+            alert("Jogador enviado para os Agentes Livres.");
+            return;
+        }
+
+        // --- CASO 3: RECUSA NORMAL DE PROPOSTAS ---
+        if (!confirm("Deseja recusar e encerrar esta negociação?")) return;
+        await db.collection('offers').doc(o.id).delete();
+        postNews(`❌ **NEGOCIAÇÃO ENCERRADA**\nO acordo por **${o.playerName}** não avançou.`, 'transfer');
+
+    } catch (e) {
+        console.error(e);
+        alert("Erro técnico ao processar a recusa.");
+    }
 };
 
 const renewContract = async (p) => {
@@ -696,7 +774,7 @@ const renewContract = async (p) => {
         b.update(db.collection('players').doc(p.id), {
             contract: (parseInt(p.contract)||0) + 1,
             balance: firebase.firestore.FieldValue.increment(cost),
-            status: 'NAO_A_VENDA'
+            status: 'NAO_A_VENDA' // Destrava o jogador após renovar
         });
         await b.commit();
         postNews(`📝 **RENOVAÇÃO**\nO **${user.data.name}** renovou com **${p.name}**!`, 'transfer');
@@ -984,7 +1062,7 @@ const resetDatabase = async () => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.51.7</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.51.8</div>
                             </div>
                         </div>
                         
@@ -1251,7 +1329,7 @@ const resetDatabase = async () => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.51.7</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.51.8</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

@@ -552,7 +552,39 @@ const acceptOffer = async (o) => {
         const isFreeAgent = !o.sellerId || o.sellerId === 'FREE';
         const sel = isFreeAgent ? null : teams.find(t => t.id === o.sellerId);
 
-        // --- PASSO 1: O CLUBE VENDEDOR ACEITA A TAXA ---
+        // --- CASO ESPECIAL: COMPRA DEFINITIVA (EXERCER OPÇÃO DE EMPRÉSTIMO) ---
+        // Este caso ignora a trava de "sellerAccepted" pois o valor já foi definido no contrato de empréstimo.
+        if (o.type === 'COMPRA_DEFINITIVA') {
+            if (!buy || !p) return alert("Erro: Dados do comprador ou jogador não encontrados.");
+            if (buy.balance < o.value) return alert(`Saldo insuficiente para exercer a opção de compra! Necessário: ${fmt(o.value)}`);
+
+            if (!confirm(`Confirmar a compra definitiva de ${p.name} por ${fmt(o.value)}?`)) return;
+
+            const b = db.batch();
+            // Pagamento integral do valor da opção ao dono original
+            b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - o.value });
+            if (sel) b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + o.value });
+
+            // Efetivação: Remove dados de empréstimo e renova contrato fixo
+            b.update(db.collection('players').doc(p.id), {
+                teamId: buy.id,
+                loanMeta: firebase.firestore.FieldValue.delete(), // Remove vínculo e divisões de salário do empréstimo
+                status: 'NAO_A_VENDA',
+                contract: 3, // Por padrão, ganha 3 anos de contrato fixo ao ser comprado em definitivo
+                history: firebase.firestore.FieldValue.arrayUnion({ 
+                    date: Date.now(), from: sel ? sel.name : 'EMPRÉSTIMO', to: buy.name, type: 'COMPRA_DEFINITIVA', value: o.value 
+                })
+            });
+
+            b.delete(db.collection('offers').doc(o.id));
+            await b.commit();
+            
+            postNews(`✅ **OPÇÃO EXERCIDA**\nO **${buy.name}** exerceu a opção de compra e contratou **${p.name}** em definitivo por ${fmt(o.value)}!`, 'transfer');
+            alert("Compra definitiva realizada com sucesso!");
+            return;
+        }
+
+        // --- PASSO 1: O CLUBE VENDEDOR ACEITA A TAXA (FLUXO NORMAL) ---
         if (user.type === 'USER' && user.data.id === o.sellerId) {
             if (!confirm("Você aceita os valores financeiros? O jogador decidirá o contrato agora.")) return;
             
@@ -567,7 +599,7 @@ const acceptOffer = async (o) => {
             return;
         }
 
-        // --- PASSO 2: O JOGADOR ACEITA O CONTRATO (FASE FINAL) ---
+        // --- PASSO 2: O JOGADOR ACEITA O CONTRATO (FASE FINAL / FLUXO NORMAL) ---
         if (user.type === 'PLAYER' || isFreeAgent) {
             if (!buy || !p) return alert("Erro: Dados incompletos.");
             
@@ -615,14 +647,12 @@ const acceptOffer = async (o) => {
             b.update(db.collection('players').doc(p.id), {
                 teamId: buy.id,
                 status: 'NAO_A_VENDA',
-                // Se for empréstimo, usa a duração do empréstimo. Se for compra, usa a oferta de contrato.
                 contract: o.type === 'EMPRESTIMO' ? (parseInt(o.meta.loanDuration) || 1) : (parseInt(o.offerContract) || 1),
                 salary: parseFloat(o.meta?.newSalary) || p.salary,
                 role: o.meta?.role || 'ROTACAO',
-                // Registra metadados de empréstimo para o sistema de pagamento semanal saber a divisão
                 loanMeta: o.type === 'EMPRESTIMO' ? { 
                     ownerId: sel?.id, 
-                    salarySplit: o.meta.salarySplit || 100 // % que o COMPRADOR paga
+                    salarySplit: o.meta.salarySplit || 100 
                 } : null,
                 history: firebase.firestore.FieldValue.arrayUnion({ 
                     date: Date.now(), from: isFreeAgent ? 'AGENTE LIVRE' : sel.name, to: buy.name, type: o.type, value: o.value 

@@ -575,15 +575,31 @@ const acceptOffer = async (o) => {
                 return alert("Seu clube ainda não aceitou os valores desta venda!");
             }
 
+            // --- LÓGICA DE PAGAMENTO AMPLIADA (TAXA + LUVAS) ---
             const valorEntrada = o.meta?.installments > 1 ? (o.value / o.meta.installments) : o.value;
-            if (buy.balance < valorEntrada) return alert("O comprador não tem saldo para pagar a entrada!");
+            const luvas = parseFloat(o.meta?.signingBonus) || 0;
+            const custoTotalImediato = valorEntrada + luvas;
 
-            if (!confirm(`Deseja assinar o contrato com o ${buy.name} e finalizar a transferência?`)) return;
+            if (buy.balance < custoTotalImediato) {
+                return alert(`O comprador não tem saldo suficiente!\nNecessário: ${fmt(custoTotalImediato)} (Entrada: ${fmt(valorEntrada)} + Luvas: ${fmt(luvas)})`);
+            }
+
+            if (!confirm(`Deseja assinar com o ${buy.name}? As luvas de ${fmt(luvas)} serão depositadas em seu saldo pessoal.`)) return;
 
             const b = db.batch();
-            b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - valorEntrada });
+            
+            // 1. Débito total do Comprador (Taxa/Entrada + Luvas)
+            b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - custoTotalImediato });
+
+            // 2. Crédito das Luvas diretamente no saldo do Jogador
+            if (luvas > 0) {
+                b.update(db.collection('players').doc(p.id), { balance: firebase.firestore.FieldValue.increment(luvas) });
+            }
+
+            // 3. Crédito da Taxa ao Vendedor e Gestão de Dívidas
             if (sel) {
                 b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorEntrada });
+                
                 if (o.meta?.installments > 1) {
                     const debtRef = db.collection('debts').doc();
                     b.set(debtRef, {
@@ -595,12 +611,19 @@ const acceptOffer = async (o) => {
                 }
             }
 
+            // 4. Efetivação da Transferência / Empréstimo
             b.update(db.collection('players').doc(p.id), {
                 teamId: buy.id,
                 status: 'NAO_A_VENDA',
-                contract: parseInt(o.offerContract) || 1,
+                // Se for empréstimo, usa a duração do empréstimo. Se for compra, usa a oferta de contrato.
+                contract: o.type === 'EMPRESTIMO' ? (parseInt(o.meta.loanDuration) || 1) : (parseInt(o.offerContract) || 1),
                 salary: parseFloat(o.meta?.newSalary) || p.salary,
                 role: o.meta?.role || 'ROTACAO',
+                // Registra metadados de empréstimo para o sistema de pagamento semanal saber a divisão
+                loanMeta: o.type === 'EMPRESTIMO' ? { 
+                    ownerId: sel?.id, 
+                    salarySplit: o.meta.salarySplit || 100 // % que o COMPRADOR paga
+                } : null,
                 history: firebase.firestore.FieldValue.arrayUnion({ 
                     date: Date.now(), from: isFreeAgent ? 'AGENTE LIVRE' : sel.name, to: buy.name, type: o.type, value: o.value 
                 })
@@ -611,10 +634,10 @@ const acceptOffer = async (o) => {
             
             const newsMsg = isFreeAgent 
                 ? `✍️ **ASSINOU!**\nO Agente Livre **${p.name}** agora é jogador do **${buy.name}**!`
-                : `🤝 **TRANSFERÊNCIA CONCLUÍDA**\n**${p.name}** aceitou os termos e assinou com o **${buy.name}**!`;
+                : `🤝 **TRANSFERÊNCIA CONCLUÍDA**\n**${p.name}** assinou com o **${buy.name}**! (Luvas: ${fmt(luvas)})`;
             
             postNews(newsMsg, 'transfer');
-            alert("Contrato assinado!");
+            alert("Contrato assinado e luvas recebidas!");
         }
     } catch (e) {
         console.error(e);
@@ -630,9 +653,12 @@ const rejectOffer = async (o) => {
 
 const renewContract = async (p) => {
     if (!p.teamId || p.teamId === 'FREE') return alert("Jogadores livres assinam novos contratos, não renovam!");
+    
+    // Bônus de renovação: 10% do valor de mercado vai para o jogador como luvas
     const cost = (parseFloat(p.value) || 1000000) * 0.10; 
-    if(user.data.balance < cost) return alert(`Saldo insuficiente para luvas (Custo: ${fmt(cost)})`);
-    if(!confirm(`Renovar com ${p.name}?\nCusto: ${fmt(cost)} (Bônus para o jogador)`)) return;
+    if(user.data.balance < cost) return alert(`Saldo insuficiente para bônus de renovação (Custo: ${fmt(cost)})`);
+    
+    if(!confirm(`Renovar com ${p.name}?\nCusto: ${fmt(cost)} (Este valor irá para o saldo do jogador)`)) return;
 
     try {
         const b = db.batch();
@@ -892,7 +918,7 @@ const resetDatabase = async () => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.51.5</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.51.6</div>
                             </div>
                         </div>
                         
@@ -1159,7 +1185,7 @@ const resetDatabase = async () => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.51.5</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.51.6</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1638,17 +1664,24 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
 
     // --- LÓGICA DE FASES REFEITA ---
     // A Parte 1 só tranca se o vendedor já tiver clicado em ACEITAR explicitamente.
-    // Contrapropostas entre clubes NÃO ativam esta trava.
     const clubsHaveAgreed = old?.sellerAccepted === true;
     const shouldHidePart1 = isPlayerActing || clubsHaveAgreed;
 
-    // ESTADOS (TODOS RESTAURADOS)
+    // ESTADOS
     const [t, setT] = useState(old.type || 'COMPRA');
     const [v, setV] = useState(old.value || '');
     const [sal, setSal] = useState(old.meta?.newSalary || target.salary || 0);
     const [con, setCon] = useState(old.offerContract || '1');
     const [role, setRole] = useState(old.meta?.role || 'ROTACAO');
-    const [meta, setMeta] = useState(old.meta || { sellOn: 0, installments: 1, signingBonus: 0 });
+    
+    // META (Incluindo Luvas, Divisão Salarial e Duração do Empréstimo)
+    const [meta, setMeta] = useState(old.meta || { 
+        sellOn: 0, 
+        installments: 1, 
+        signingBonus: 0, 
+        loanDuration: 1, 
+        salarySplit: 100 // % que o COMPRADOR paga
+    });
     const [swaps, setSwaps] = useState(old.swapPlayerIds || []);
 
     const toggleSwap = (id) => {
@@ -1661,7 +1694,7 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
             <div className="modal-content" style={{maxWidth: '500px'}}>
                 <h3 style={{color:'var(--primary)'}}>{isCounter ? 'Responder Negociação' : `Negociar ${target.name}`}</h3>
                 
-                {/* 1. ACORDO ENTRE CLUBES (SÓ TRAVA NO ACEITE OFICIAL) */}
+                {/* 1. ACORDO ENTRE CLUBES (FINANCEIRO) */}
                 {!shouldHidePart1 ? (
                     <div style={{borderBottom: '1px solid #444', paddingBottom: 15, marginBottom: 15}}>
                         <label style={{fontSize: '11px', color: 'gold', fontWeight: 'bold'}}>1. ACORDO ENTRE CLUBES (FINANCEIRO)</label>
@@ -1671,8 +1704,22 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                             ))}
                         </div>
 
-                        <label>{t === 'TROCA' ? 'Compensação Financeira (₣)' : 'Taxa de Transferência (₣)'}</label>
+                        <label>{t === 'EMPRESTIMO' ? 'Taxa de Empréstimo (₣)' : 'Taxa de Transferência (₣)'}</label>
                         <input className="input-field" type="number" value={v} onChange={e=>setV(e.target.value)} />
+
+                        {t === 'EMPRESTIMO' && (
+                            <div className="card" style={{background: '#222', padding: '10px', marginTop: 10}}>
+                                <label style={{fontSize: '11px'}}>Duração do Empréstimo (Temporadas)</label>
+                                <input className="input-field" type="number" value={meta.loanDuration} onChange={e=>setMeta({...meta, loanDuration: e.target.value})} />
+                                
+                                <label style={{marginTop:10, display:'block', fontSize: '11px'}}>Divisão Salarial (Comprador paga: {meta.salarySplit}%)</label>
+                                <input type="range" min="0" max="100" step="10" value={meta.salarySplit} onChange={e=>setMeta({...meta, salarySplit: parseInt(e.target.value)})} style={{width:'100%', accentColor: 'var(--primary)'}} />
+                                <div style={{display:'flex', justifyContent:'space-between', fontSize:'9px', color: '#aaa'}}>
+                                    <span>Vendedor: {100 - meta.salarySplit}%</span>
+                                    <span>Comprador: {meta.salarySplit}%</span>
+                                </div>
+                            </div>
+                        )}
 
                         {t === 'TROCA' && (
                             <div className="card" style={{background: '#222', padding: '10px', marginTop: 10}}>
@@ -1697,12 +1744,13 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                         )}
                     </div>
                 ) : (
-                    /* VISÃO BLOQUEADA - SOMENTE APÓS CLICAR EM "ACEITAR" */
+                    /* VISÃO BLOQUEADA - APENAS LEITURA APÓS ACEITE */
                     <div style={{background: 'rgba(0,230,118,0.05)', padding: 12, borderRadius: 8, marginBottom: 15, fontSize: 11, border: '1px solid var(--primary)'}}>
                         <b style={{color: 'gold', display: 'block', marginBottom: 5}}><i className="fas fa-lock"></i> ACORDO FINANCEIRO SELADO:</b>
                         <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, color: '#ccc'}}>
                             <span>Tipo: <b>{t}</b></span>
                             <span>Valor: <b>{fmt(v)}</b></span>
+                            {t === 'EMPRESTIMO' && <span>Duração: <b>{meta.loanDuration} Temp.</b></span>}
                             {t === 'COMPRA' && meta.installments > 1 && <span>Parcelas: <b>{meta.installments}x</b></span>}
                         </div>
                         <small style={{color: '#888', marginTop: 5, display: 'block'}}>* Valores aceitos pelos clubes. Negocie o contrato pessoal abaixo.</small>
@@ -1712,12 +1760,23 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                 {/* 2. TERMOS PESSOAIS (JOGADOR x COMPRADOR) */}
                 <div>
                     <label style={{fontSize: '11px', color: 'cyan', fontWeight: 'bold'}}>2. CONTRATO PESSOAL DO ATLETA</label>
+                    
+                    {/* CAMPO DE LUVAS (SIGNING BONUS) */}
+                    <div style={{background: 'rgba(0,230,118,0.05)', padding: '10px', borderRadius: '8px', marginTop: 10, border: '1px dashed var(--primary)'}}>
+                        <label style={{color: 'var(--primary)', fontWeight: 'bold', fontSize: '12px'}}>💰 Luvas / Bônus de Assinatura (₣)</label>
+                        <input className="input-field" type="number" placeholder="Valor pago à vista ao jogador" value={meta.signingBonus} onChange={e=>setMeta({...meta, signingBonus: parseFloat(e.target.value)})} />
+                        <small style={{color:'#888', fontSize:'9px', display: 'block'}}>* Este valor será transferido do clube comprador diretamente para o saldo do jogador no ato da assinatura.</small>
+                    </div>
+
                     <div style={{marginTop: 10}}>
                         <label>Salário Semanal (₣)</label>
                         <input className="input-field" type="number" value={sal} onChange={e=>setSal(e.target.value)} />
                     </div>
                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                        <div><label>Duração (Anos)</label><input className="input-field" type="number" value={con} onChange={e=>setCon(e.target.value)} /></div>
+                        <div>
+                            <label>{t === 'EMPRESTIMO' ? 'Duração (Fixo)' : 'Contrato (Anos)'}</label>
+                            <input className="input-field" type="number" value={t === 'EMPRESTIMO' ? meta.loanDuration : con} disabled={t === 'EMPRESTIMO'} onChange={e=>setCon(e.target.value)} />
+                        </div>
                         <div><label>Papel</label>
                             <select className="input-field" value={role} onChange={e=>setRole(e.target.value)}>
                                 <option value="CRUCIAL">⭐ Crucial</option>
@@ -1730,7 +1789,7 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                 </div>
 
                 <div style={{display:'flex', gap:10, marginTop:15}}>
-                    <button className="btn btn-green" style={{flex: 2}} onClick={() => onSend(target, t, v, swaps, con, {...meta, newSalary: parseFloat(sal), role, status: 'PENDING'}, old)}>
+                    <button className="btn btn-green" style={{flex: 2}} onClick={() => onSend(target, t, v, swaps, (t === 'EMPRESTIMO' ? meta.loanDuration : con), {...meta, newSalary: parseFloat(sal), role, status: 'PENDING'}, old)}>
                         ENVIAR RESPOSTA
                     </button>
                     <button className="btn btn-red" style={{flex: 1}} onClick={()=>setModal(null)}>CANCELAR</button>

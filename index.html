@@ -889,7 +889,7 @@ const resetDatabase = async () => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.51.0</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.51.1</div>
                             </div>
                         </div>
                         
@@ -1156,7 +1156,7 @@ const resetDatabase = async () => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.51.0</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.51.1</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1633,19 +1633,20 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
     const isCounter = !!old.id;
     const isPlayerActing = user?.type === 'PLAYER';
 
-    // SEPARAÇÃO REALISTA: Se o vendedor já aceitou, os valores entre clubes estão "SELADOS".
-    const financeIsLocked = old?.sellerAccepted === true;
+    // SEPARAÇÃO DE FASES: O vendedor já aceitou o dinheiro?
+    // Se SIM, a Fase 1 (Financeiro) está encerrada e trancada.
+    const isFinanceLocked = old?.sellerAccepted === true;
     
-    // A Parte 1 só deve ser editável se NÃO for o Jogador e se os CLUBES ainda não se acertaram.
-    const canEditFinance = !isPlayerActing && !financeIsLocked;
+    // REGRA DE EXIBIÇÃO: Só edita o financeiro se for CLUBE e se a FASE 1 ainda estiver aberta.
+    const canEditFinance = !isPlayerActing && !isFinanceLocked;
 
-    // ESTADOS INICIAIS (RESTAURADOS)
+    // ESTADOS
     const [t, setT] = useState(old.type || 'COMPRA');
     const [v, setV] = useState(old.value || '');
     const [sal, setSal] = useState(old.meta?.newSalary || target.salary || 0);
     const [con, setCon] = useState(old.offerContract || '1');
     const [role, setRole] = useState(old.meta?.role || 'ROTACAO');
-    const [meta, setMeta] = useState(old.meta || { sellOn: 0, installments: 1, wageSplit: 50, buyOpt: 0 });
+    const [meta, setMeta] = useState(old.meta || { sellOn: 0, installments: 1, signingBonus: 0 });
     const [swaps, setSwaps] = useState(old.swapPlayerIds || []);
 
     const toggleSwap = (id) => {
@@ -1656,25 +1657,24 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
     return (
         <div className="modal-bg">
             <div className="modal-content" style={{maxWidth: '500px'}}>
-                <h3 style={{color:'var(--primary)'}}>{isCounter ? 'Contraproposta' : `Negociar ${target.name}`}</h3>
+                <h3 style={{color:'var(--primary)'}}>{isCounter ? 'Responder Negociação' : `Proposta para ${target.name}`}</h3>
                 
-                {/* 1. ACORDO ENTRE CLUBES */}
+                {/* --- FASE 1: ACORDO ENTRE CLUBES --- */}
                 {canEditFinance ? (
                     <div style={{borderBottom: '1px solid #444', paddingBottom: 15, marginBottom: 15}}>
-                        <label style={{fontSize: '11px', color: 'gold', fontWeight: 'bold'}}>1. ACORDO ENTRE CLUBES</label>
+                        <label style={{fontSize: '11px', color: 'gold', fontWeight: 'bold'}}>FASE 1: ACORDO FINANCEIRO (ENTRE CLUBES)</label>
                         <div style={{display:'flex', gap:5, margin:'10px 0'}}>
                             {['COMPRA','EMPRESTIMO','TROCA'].map(x=>(
                                 <button key={x} className={`btn ${t===x?'btn-green':'btn-ghost'}`} onClick={()=>setT(x)} style={{flex: 1}}>{x}</button>
                             ))}
                         </div>
 
-                        <label>{t === 'TROCA' ? 'Compensação (₣)' : (t === 'EMPRESTIMO' ? 'Taxa Empréstimo (₣)' : 'Taxa Transferência (₣)')}</label>
+                        <label>Valor da Operação (₣)</label>
                         <input className="input-field" type="number" value={v} onChange={e=>setV(e.target.value)} />
 
-                        {/* RESTAURADO: TROCA DE ATÉ 3 JOGADORES */}
                         {t === 'TROCA' && (
                             <div className="card" style={{background: '#222', padding: '10px', marginTop: 10}}>
-                                <small style={{display:'block', marginBottom: 10}}>Escolha até 3 jogadores:</small>
+                                <small style={{display:'block', marginBottom: 10}}>Incluir jogadores (Máx 3):</small>
                                 <div style={{maxHeight: '120px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5}}>
                                     {(myPlayers || []).map(p => (
                                         <div key={p.id} onClick={() => toggleSwap(p.id)} style={{padding: '8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', background: swaps.includes(p.id) ? 'var(--primary)' : '#333', color: swaps.includes(p.id) ? '#000' : '#fff', display: 'flex', justifyContent: 'space-between'}}>
@@ -1685,39 +1685,38 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                             </div>
                         )}
 
-                        {/* RESTAURADO: PARCELAMENTO E REVENDA */}
                         {t === 'COMPRA' && (
                             <div className="card" style={{background: '#222', padding: '10px', marginTop: 10}}>
                                 <small>📦 PARCELAMENTO: <b>{meta.installments}x</b></small>
-                                <input type="range" min="1" max="12" value={meta.installments} onChange={e=>setMeta({...meta, installments: parseInt(e.target.value)})} style={{width:'100%', accentColor: 'var(--primary)'}} />
-                                <small style={{display:'block', marginTop:10}}>📈 REVENDA (SELL-ON): <b>{meta.sellOn}%</b></small>
-                                <input type="range" min="0" max="50" value={meta.sellOn} onChange={e=>setMeta({...meta, sellOn: parseInt(e.target.value)})} style={{width:'100%', accentColor: 'var(--primary)'}} />
+                                <input type="range" min="1" max="12" value={meta.installments} onChange={e=>setMeta({...meta, installments: parseInt(e.target.value)})} style={{width:'100%'}} />
+                                <small style={{display:'block', marginTop:10}}>📈 REVENDA: <b>{meta.sellOn}%</b></small>
+                                <input type="range" min="0" max="50" value={meta.sellOn} onChange={e=>setMeta({...meta, sellOn: parseInt(e.target.value)})} style={{width:'100%'}} />
                             </div>
                         )}
                     </div>
                 ) : (
-                    /* VISÃO BLOQUEADA (APENAS LEITURA) - SEGURANÇA CONTRA MÁ FÉ */
+                    /* VISÃO DE ACORDO SELADO (INFORMATIVO) */
                     <div style={{background: 'rgba(0,230,118,0.05)', padding: 12, borderRadius: 8, marginBottom: 15, fontSize: 11, border: '1px solid var(--primary)'}}>
-                        <b style={{color: 'gold', display: 'block', marginBottom: 5}}><i className="fas fa-lock"></i> ACORDO FINANCEIRO DEFINIDO:</b>
+                        <b style={{color: 'gold', display: 'block', marginBottom: 5}}><i className="fas fa-lock"></i> ACORDO FINANCEIRO (SELADO):</b>
                         <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, color: '#ccc'}}>
                             <span>Tipo: <b>{t}</b></span>
                             <span>Valor: <b>{fmt(v)}</b></span>
-                            {t === 'COMPRA' && meta.installments > 1 && <span>Parcelas: <b>{meta.installments}x</b></span>}
+                            {swaps.length > 0 && <span>Trocas: <b>{swaps.length} jogadores</b></span>}
                         </div>
-                        <small style={{color: '#888', marginTop: 5, display: 'block'}}>* Termos aceitos pelos clubes. Negocie o contrato pessoal abaixo.</small>
+                        <small style={{color: '#888', marginTop: 5, display: 'block'}}>* Os clubes já entraram em acordo. Negocie os termos do atleta abaixo.</small>
                     </div>
                 )}
 
-                {/* 2. TERMOS PESSOAIS (SEMPRE EDITÁVEL ENTRE JOGADOR E COMPRADOR) */}
+                {/* --- FASE 2: CONTRATO DO ATLETA --- */}
                 <div>
-                    <label style={{fontSize: '11px', color: 'cyan', fontWeight: 'bold'}}>2. SEU CONTRATO PESSOAL (SALÁRIO)</label>
+                    <label style={{fontSize: '11px', color: 'cyan', fontWeight: 'bold'}}>FASE 2: TERMOS DO ATLETA (SALÁRIO E VÍNCULO)</label>
                     <div style={{marginTop: 10}}>
                         <label>Salário Semanal (₣)</label>
                         <input className="input-field" type="number" value={sal} onChange={e=>setSal(e.target.value)} />
                     </div>
                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
                         <div><label>Duração (Anos)</label><input className="input-field" type="number" value={con} onChange={e=>setCon(e.target.value)} /></div>
-                        <div><label>Papel</label>
+                        <div><label>Papel no Elenco</label>
                             <select className="input-field" value={role} onChange={e=>setRole(e.target.value)}>
                                 <option value="CRUCIAL">⭐ Crucial</option>
                                 <option value="TITULAR">✅ Titular</option>

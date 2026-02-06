@@ -459,6 +459,7 @@
         
            // --- SISTEMA DE NEGOCIAÇÃO E MERCADO (VERSÃO REALISTA 3.0 - REVISADA) ---
            // --- SISTEMA DE NEGOCIAÇÃO E MERCADO (VERSÃO REALISTA 3.1 - CORRIGIDA) ---
+// --- SISTEMA DE NEGOCIAÇÃO E MERCADO (VERSÃO REALISTA 3.2 - FINAL) ---
 const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
     try {
         const v = parseFloat(value) || 0;
@@ -475,20 +476,28 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
         details += `💵 Salário Sugerido: ${fmt(finalSal)}/sem\n`;
         details += `👔 Papel: ${role}`;
 
-        // --- LÓGICA DE DESTINATÁRIO INTELIGENTE ---
+        // --- LÓGICA DE DESTINATÁRIO BLINDADA (EVITA VOLTAR PARA O VENDEDOR APÓS O ACEITE) ---
         let recipientId; 
 
         if (old && old.id) {
-            // Se for CONTRAPROPOSTA: Inverte o destinatário atual
-            if (user.data.id === old.buyerId) {
-                // Comprador respondendo: vai para o vendedor (clube ou jogador se for livre)
-                recipientId = (old.sellerId === 'FREE' || !old.sellerId) ? old.playerId : old.sellerId;
-            } else {
-                // Vendedor ou Jogador respondendo: volta obrigatoriamente para o Comprador
-                recipientId = old.buyerId;
+            // SE O ACORDO ENTRE CLUBES JÁ FOI SELADO:
+            if (old.sellerAccepted === true) {
+                // A proposta agora circula apenas entre Clube Comprador e Jogador.
+                // Se quem envia é o Comprador, vai para o Jogador. Se é o Jogador, volta para o Comprador.
+                recipientId = (user.data.id === old.buyerId) ? old.playerId : old.buyerId;
+            } 
+            // SE AINDA ESTÃO NEGOCIANDO VALORES (ENTRE CLUBES):
+            else {
+                if (user.data.id === old.buyerId) {
+                    // Comprador respondendo: vai para o vendedor (clube ou jogador livre)
+                    recipientId = (old.sellerId === 'FREE' || !old.sellerId) ? old.playerId : old.sellerId;
+                } else {
+                    // Vendedor ou Jogador respondendo: volta para o Comprador
+                    recipientId = old.buyerId;
+                }
             }
         } else {
-            // Se for OFERTA NOVA:
+            // OFERTA NOVA (Primeiro contato):
             recipientId = (target.teamId === 'FREE' || !target.teamId || target.teamId === '') 
                 ? target.id 
                 : target.teamId;
@@ -506,8 +515,7 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
             offerContract: contractYears,
             description: details,
             status: 'PENDING',
-            // CORREÇÃO: Mantém o aceite se já existia, senão inicia falso. 
-            // Uma contraproposta entre clubes não deve "auto-aceitar" o financeiro.
+            // CORREÇÃO: Mantém o selo de "Aceito pelo Clube" se ele já existia, senão inicia falso.
             sellerAccepted: old ? (old.sellerAccepted || false) : false,
             meta: {
                 ...meta,
@@ -549,13 +557,13 @@ const acceptOffer = async (o) => {
             if (!confirm("Você aceita os valores financeiros? O jogador decidirá o contrato agora.")) return;
             
             await db.collection('offers').doc(o.id).update({
-                recipientId: o.playerId, // Agora sim, a proposta vai para o sino do jogador
+                recipientId: o.playerId, // Manda para o sino do jogador
                 sellerAccepted: true,    // Lacra a Fase 1 (Financeira)
                 status: 'PENDING'
             });
             
-            postNews(`💰 **VALORES ACEITOS**\nO ${sel.name} aceitou a proposta por **${p.name}**. O negócio agora depende do acerto pessoal!`, 'transfer');
-            alert("Valores aceitos! Proposta enviada para o jogador.");
+            postNews(`💰 **VALORES ACEITOS**\nO ${sel.name} aceitou a proposta por **${p.name}**. O negócio agora depende do atleta!`, 'transfer');
+            alert("Valores aceitos! Proposta enviada para o sino do jogador.");
             return;
         }
 
@@ -563,7 +571,6 @@ const acceptOffer = async (o) => {
         if (user.type === 'PLAYER' || isFreeAgent) {
             if (!buy || !p) return alert("Erro: Dados incompletos.");
             
-            // Segurança: Jogador de clube só assina se o clube já liberou (sellerAccepted)
             if (!isFreeAgent && !o.sellerAccepted) {
                 return alert("Seu clube ainda não aceitou os valores desta venda!");
             }
@@ -574,8 +581,6 @@ const acceptOffer = async (o) => {
             if (!confirm(`Deseja assinar o contrato com o ${buy.name} e finalizar a transferência?`)) return;
 
             const b = db.batch();
-            
-            // Pagamentos
             b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - valorEntrada });
             if (sel) {
                 b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorEntrada });
@@ -590,7 +595,6 @@ const acceptOffer = async (o) => {
                 }
             }
 
-            // Efetiva transferência e novo contrato
             b.update(db.collection('players').doc(p.id), {
                 teamId: buy.id,
                 status: 'NAO_A_VENDA',
@@ -888,7 +892,7 @@ const resetDatabase = async () => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.51.4</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.51.5</div>
                             </div>
                         </div>
                         
@@ -1155,7 +1159,7 @@ const resetDatabase = async () => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.51.4</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.51.5</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

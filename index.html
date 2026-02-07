@@ -628,11 +628,11 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
 
 const acceptOffer = async (o) => {
     try {
-        // --- v1.52.7: LÓGICA DE NOTIFICAÇÃO (APENAS LEITURA) ---
+        // --- v1.52.8: LÓGICA DE NOTIFICAÇÃO (APENAS LEITURA) ---
         if (o.type === 'NOTIFICACAO') {
             await db.collection('offers').doc(o.id).delete();
             alert('Confirmado!');
-            return; 
+            return;
         }
 
         const buy = teams.find(t => t.id === o.buyerId);
@@ -642,10 +642,9 @@ const acceptOffer = async (o) => {
 
         // --- CASO ESPECIAL: COMPRA DEFINITIVA (EXERCER OPÇÃO DE EMPRÉSTIMO) ---
         if (o.type === 'COMPRA_DEFINITIVA') {
-            if (!buy || !p) return alert("Erro: Dados do comprador ou jogador não encontrados.");
-            if (buy.balance < o.value) return alert(`Saldo insuficiente para exercer a opção de compra! Necessário: ${fmt(o.value)}`);
-
-            if (!confirm(`Confirmar a compra definitiva de ${p.name} por ${fmt(o.value)}?`)) return;
+            if (!buy || !p) return alert("Erro: Dados incompletos.");
+            if (buy.balance < o.value) return alert(`Saldo insuficiente! Necessário: ${fmt(o.value)}`);
+            if (!confirm(`Exercer opção de compra de ${p.name} por ${fmt(o.value)}?`)) return;
 
             const b = db.batch();
             b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - o.value });
@@ -660,57 +659,79 @@ const acceptOffer = async (o) => {
                     date: Date.now(), from: sel ? sel.name : 'EMPRÉSTIMO', to: buy.name, type: 'COMPRA_DEFINITIVA', value: o.value 
                 })
             });
-
             b.delete(db.collection('offers').doc(o.id));
             await b.commit();
-            
-            postNews(`✅ **OPÇÃO EXERCIDA**\nO **${buy.name}** exerceu a opção de compra e contratou **${p.name}** em definitivo por ${fmt(o.value)}!`, 'transfer');
-            alert("Compra definitiva realizada com sucesso!");
+            postNews(`✅ **OPÇÃO EXERCIDA**\nO **${buy.name}** contratou **${p.name}** em definitivo!`, 'transfer');
+            alert("Compra realizada!");
             return;
         }
 
-        // --- PASSO 1: O CLUBE VENDEDOR ACEITA A TAXA ---
-        if (user.type === 'USER' && user.data.id === o.sellerId) {
-            if (!confirm("Você aceita os valores financeiros? O jogador decidirá o contrato agora.")) return;
+        // =================================================================================
+        // LÓGICA DE NEGOCIAÇÃO INTELIGENTE (ACEITE BIDIRECIONAL)
+        // =================================================================================
+
+        const iAmBuyer = user.type === 'USER' && user.data.id === o.buyerId;
+        const iAmSeller = user.type === 'USER' && user.data.id === o.sellerId;
+        // Verifica se é o jogador logado ou se é um admin/visitante atuando como agente livre
+        const iAmPlayer = user.type === 'PLAYER' || (isFreeAgent && !iAmBuyer);
+
+        // --- FASE 1: ACORDO ENTRE CLUBES (TAXA DE TRANSFERÊNCIA) ---
+        // Acontece se: Não é Agente Livre E o acordo ainda não foi selado.
+        // Quem pode aceitar: O Vendedor (proposta original) OU O Comprador (contraproposta do vendedor).
+        if (!isFreeAgent && !o.sellerAccepted && (iAmSeller || iAmBuyer)) {
             
+            if (iAmBuyer) {
+                // Se eu sou o Comprador aceitando aqui, é porque o Vendedor mandou uma contraproposta.
+                if (!confirm(`Aceitar a pedida do clube vendedor (${fmt(o.value)}) e negociar com o jogador?`)) return;
+            } else {
+                // Sou o Vendedor aceitando a oferta do Comprador.
+                if (!confirm("Aceitar os valores propostos? O jogador decidirá o contrato agora.")) return;
+            }
+            
+            // Marca como aceito pelo vendedor e passa a bola para o JOGADOR (Fase 2)
             await db.collection('offers').doc(o.id).update({
                 recipientId: o.playerId, 
                 sellerAccepted: true,     
                 status: 'PENDING'
             });
             
-            postNews(`💰 **VALORES ACEITOS**\nO ${sel.name} aceitou a proposta por **${p.name}**. O negócio agora depende do atleta!`, 'transfer');
-            alert("Valores aceitos! Proposta enviada para o sino do jogador.");
+            postNews(`💰 **ACORDO ENTRE CLUBES**\n${buy.name} e ${sel.name} chegaram a um acordo por **${p.name}**. Falta o "Sim" do atleta!`, 'transfer');
+            alert("Acordo financeiro selado! A proposta foi enviada para o jogador.");
             return;
         }
 
-        // --- PASSO 2: O JOGADOR ACEITA O CONTRATO (FASE FINAL) ---
-        if (user.type === 'PLAYER' || isFreeAgent) {
-            if (!buy || !p) return alert("Erro: Dados incompletos.");
+        // --- FASE 2: ACORDO FINAL (CONTRATO E ASSINATURA) ---
+        // Acontece se: É Agente Livre OU (Clubes já se acertaram na Fase 1).
+        // Quem pode aceitar: O Jogador (proposta original) OU O Comprador (contraproposta de salário do jogador).
+        const readyForContract = isFreeAgent || o.sellerAccepted;
+
+        if (readyForContract && (iAmPlayer || iAmBuyer)) {
             
-            if (!isFreeAgent && !o.sellerAccepted) {
-                return alert("Seu clube ainda não aceitou os valores desta venda!");
-            }
+            if (!buy || !p) return alert("Erro: Dados incompletos.");
 
             const valorEntrada = o.meta?.installments > 1 ? (o.value / o.meta.installments) : o.value;
             const luvas = parseFloat(o.meta?.signingBonus) || 0;
             const custoTotalImediato = valorEntrada + luvas;
 
+            // Validação de Saldo do Comprador
             if (buy.balance < custoTotalImediato) {
-                return alert(`O comprador não tem saldo suficiente!\nNecessário: ${fmt(custoTotalImediato)} (Entrada: ${fmt(valorEntrada)} + Luvas: ${fmt(luvas)})`);
+                return alert(`Saldo insuficiente no caixa do comprador!\nNecessário: ${fmt(custoTotalImediato)}`);
             }
 
-            if (!confirm(`Deseja assinar com o ${buy.name}? As luvas de ${fmt(luvas)} serão depositadas em seu saldo pessoal.`)) return;
+            // Confirmação Diferenciada
+            if (iAmBuyer) {
+                if (!confirm(`Aceitar a pedida salarial do jogador e fechar a contratação?\nCusto Imediato: ${fmt(custoTotalImediato)}`)) return;
+            } else {
+                if (!confirm(`Deseja assinar com o ${buy.name}?`)) return;
+            }
 
+            // --- EXECUÇÃO DA TRANSFERÊNCIA ---
             const b = db.batch();
-            b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - custoTotalImediato });
-
-            if (luvas > 0) {
-                b.update(db.collection('players').doc(p.id), { balance: firebase.firestore.FieldValue.increment(luvas) });
-            }
-
+            
+            // 1. Paga o Clube Vendedor (se houver)
             if (sel) {
                 b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorEntrada });
+                // Cria dívida se parcelado
                 if (o.meta?.installments > 1) {
                     const debtRef = db.collection('debts').doc();
                     b.set(debtRef, {
@@ -722,13 +743,22 @@ const acceptOffer = async (o) => {
                 }
             }
 
-            // Registro de Transferência ou Empréstimo
+            // 2. Desconta do Comprador
+            b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - custoTotalImediato });
+
+            // 3. Paga Luvas ao Jogador
+            if (luvas > 0) {
+                b.update(db.collection('players').doc(p.id), { balance: firebase.firestore.FieldValue.increment(luvas) });
+            }
+
+            // 4. Atualiza o Jogador (Move de time)
             b.update(db.collection('players').doc(p.id), {
                 teamId: buy.id,
                 status: 'NAO_A_VENDA',
                 contract: o.type === 'EMPRESTIMO' ? (parseInt(o.meta.loanDuration) || 1) : (parseInt(o.offerContract) || 1),
                 salary: parseFloat(o.meta?.newSalary) || p.salary,
                 role: o.meta?.role || 'ROTACAO',
+                // Salva contrato original se for empréstimo
                 loanMeta: o.type === 'EMPRESTIMO' ? { 
                     ownerId: sel?.id, 
                     salarySplit: o.meta.salarySplit || 100,
@@ -737,23 +767,25 @@ const acceptOffer = async (o) => {
                     originalContract: p.contract 
                 } : null,
                 history: firebase.firestore.FieldValue.arrayUnion({ 
-                    date: Date.now(), from: isFreeAgent ? 'AGENTE LIVRE' : sel.name, to: buy.name, type: o.type, value: o.value 
+                    date: Date.now(), from: isFreeAgent ? 'AGENTE LIVRE' : (sel ? sel.name : 'Desconhecido'), to: buy.name, type: o.type, value: o.value 
                 })
             });
 
+            // 5. Apaga a oferta e notifica
             b.delete(db.collection('offers').doc(o.id));
             await b.commit();
             
             const newsMsg = isFreeAgent 
-                ? `✍️ **ASSINOU!**\nO Agente Livre **${p.name}** agora é jogador do **${buy.name}**!`
-                : `🤝 **TRANSFERÊNCIA CONCLUÍDA**\n**${p.name}** assinou com o **${buy.name}**! (Luvas: ${fmt(luvas)})`;
+                ? `✍️ **ASSINOU!**\nO Agente Livre **${p.name}** é o novo reforço do **${buy.name}**!`
+                : `🤝 **TRANSFERÊNCIA CONCLUÍDA**\n**${p.name}** assinou com o **${buy.name}**!`;
             
             postNews(newsMsg, 'transfer');
-            alert("Contrato assinado e luvas recebidas!");
+            alert("Negócio fechado com sucesso!");
         }
+
     } catch (e) {
         console.error(e);
-        alert("Erro ao processar o aceite.");
+        alert("Erro ao processar o aceite: " + e.message);
     }
 };
 
@@ -770,7 +802,7 @@ const rejectOffer = async (o) => {
             const b = db.batch();
             const pRef = db.collection('players').doc(p.id);
 
-            // --- CORREÇÃO DE SEGURANÇA PARA DADOS ANTIGOS (V1.52.7) ---
+            // --- CORREÇÃO DE SEGURANÇA PARA DADOS ANTIGOS (v1.52.8) ---
             let originalDuration = 0;
             
             // Verifica se o contrato original foi salvo no momento do empréstimo
@@ -778,7 +810,6 @@ const rejectOffer = async (o) => {
                 originalDuration = parseInt(p.loanMeta.originalContract);
             } else {
                 // FALLBACK: Se for um empréstimo antigo (sem dado salvo), assume 6 anos
-                // para que, ao subtrair 1, sobrem 5 anos e não zere o contrato.
                 console.warn("Contrato original não encontrado. Usando fallback de 6 anos.");
                 originalDuration = 6; 
             }
@@ -830,7 +861,7 @@ const rejectOffer = async (o) => {
                     teamId: ownerId,
                     loanMeta: firebase.firestore.FieldValue.delete(),
                     status: 'NAO_A_VENDA',
-                    contract: remainingContract // Devolve os anos corretos (ex: 5)
+                    contract: remainingContract 
                 });
                 
                 postNews(`🔙 **RETORNO**\n${p.name} retornou ao ${ownerTeam?.name} (${remainingContract} anos rest.).`, 'transfer');
@@ -1059,7 +1090,7 @@ const renewContract = async (p) => {
                     setLoading(false);
                 }
 
-                // --- VIRADA DE TEMPORADA (SISTEMA DE RETORNO INTELIGENTE v1.52.7) ---
+                // --- VIRADA DE TEMPORADA (SISTEMA DE RETORNO INTELIGENTE v1.52.8) ---
                 if (act === 'SEASON') {
                     if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos\n3. Processar Opções de Compra/Retorno\n4. Mover sem contrato para Agentes Livres")) return;
 
@@ -1107,7 +1138,7 @@ const renewContract = async (p) => {
                                 u.status = 'INTRANSFERIVEL'; 
                             } else {
                                 // CASO 2: SEM OPÇÃO DE COMPRA -> RETORNO AO DONO
-                                // v1.52.7: Calcula os anos restantes: (Contrato original com o dono - 1 temporada que passou)
+                                // v1.52.8: Calcula os anos restantes: (Contrato original com o dono - 1 temporada que passou)
                                 let contractWithDonoRemaining = (parseInt(p.loanMeta.originalContract) || 1) - 1;
 
                                 if (contractWithDonoRemaining <= 0) {
@@ -1215,7 +1246,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.52.7</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.52.8</div>
                             </div>
                         </div>
                         
@@ -1478,7 +1509,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.52.7</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.52.8</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2322,7 +2353,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         {o.description}
                     </div>
 
-                    {/* v1.52.7: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
+                    {/* v1.52.8: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
                     {o.type === 'NOTIFICACAO' ? (
                         <div style={{display:'flex', gap:5}}>
                             <button className="btn btn-green" style={{width:'100%'}} onClick={()=>onAccept(o)}>

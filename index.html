@@ -863,7 +863,7 @@ const renewContract = async (p) => {
             };
             
             // 3. Função Mestra do Admin (COM REGRA DE AGENTES LIVRES)
-         const adminAction = async (act, data) => {
+     const adminAction = async (act, data) => {
     if (act === 'MARKET') {
         db.collection('config').doc('system').update({ marketOpen: data });
         postNews(data ? "📢 JANELA ABERTA" : "🔒 JANELA FECHADA", 'infra');
@@ -945,7 +945,7 @@ const renewContract = async (p) => {
         setLoading(false);
     }
 
-    // --- VIRADA DE TEMPORADA (SISTEMA DE RETORNO INTELIGENTE E AGENTES LIVRES) ---
+    // --- VIRADA DE TEMPORADA (SISTEMA DE RETORNO INTELIGENTE CORRIGIDO) ---
     if (act === 'SEASON') {
         if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos\n3. Processar Opções de Compra/Retorno\n4. Mover sem contrato para Agentes Livres")) return;
 
@@ -962,78 +962,77 @@ const renewContract = async (p) => {
                 u.xp = res.xp;
             }
 
-            // Diminui 1 ano do contrato atual (que no empréstimo representa o tempo de empréstimo)
+            // Envelhece o contrato atual (que no empréstimo representa o tempo do empréstimo)
             let nc = (parseInt(p.contract) || 0) - 1;
             if (nc < 0) nc = 0;
             u.contract = nc;
 
             // --- LÓGICA DE FIM DE VÍNCULO / EMPRÉSTIMO ---
-            if (nc === 0) {
-                // CASO 1: Jogador estava emprestado
-                if (p.loanMeta && p.loanMeta.ownerId) {
-                    const ownerTeam = teams.find(t => t.id === p.loanMeta.ownerId);
-                    
-                    // Se o empréstimo original TINHA opção de compra e o valor é válido
-                    if (p.loanMeta.hasBuyOption && p.loanMeta.buyOpt > 0) {
-                        const currentTeam = teams.find(t => t.id === p.teamId);
-                        const offerRef = db.collection('offers').doc();
-                        b.set(offerRef, {
-                            type: 'COMPRA_DEFINITIVA',
+            if (nc === 0 && p.loanMeta && p.loanMeta.ownerId) {
+                const ownerId = p.loanMeta.ownerId;
+                const ownerTeam = teams.find(t => t.id === ownerId);
+                
+                // CASO 1: TEM OPÇÃO DE COMPRA -> Gera oferta para o clube atual decidir
+                if (p.loanMeta.hasBuyOption && p.loanMeta.buyOpt > 0) {
+                    const currentTeam = teams.find(t => t.id === p.teamId);
+                    const offerRef = db.collection('offers').doc();
+                    b.set(offerRef, {
+                        type: 'COMPRA_DEFINITIVA',
+                        playerId: p.id,
+                        playerName: p.name,
+                        buyerId: p.teamId,
+                        buyerName: currentTeam?.name || 'Clube Atual',
+                        sellerId: ownerId,
+                        recipientId: p.teamId, 
+                        value: p.loanMeta.buyOpt,
+                        status: 'PENDING',
+                        description: `🏁 **FIM DE EMPRÉSTIMO**\nDeseja exercer a opção de compra de **${p.name}** por ${fmt(p.loanMeta.buyOpt)}?\nCaso recuse, o jogador retornará ao clube de origem.`,
+                        date: Date.now(),
+                        isLoanOption: true 
+                    });
+                    u.status = 'INTRANSFERIVEL'; 
+                } else {
+                    // CASO 2: SEM OPÇÃO DE COMPRA -> RETORNO AO DONO
+                    // Calcula os anos restantes: (Contrato original com o dono - 1 temporada que passou)
+                    let contractWithDonoRemaining = (parseInt(p.loanMeta.originalContract) || 1) - 1;
+
+                    if (contractWithDonoRemaining <= 0) {
+                        // SÓ GERA A MENSAGEM SE O CONTRATO COM O DONO TAMBÉM ACABOU
+                        const renewalReqRef = db.collection('offers').doc();
+                        b.set(renewalReqRef, {
+                            type: 'RENOVACAO_URGENTE',
                             playerId: p.id,
                             playerName: p.name,
-                            buyerId: p.teamId,
-                            buyerName: currentTeam?.name || 'Clube Atual',
-                            sellerId: p.loanMeta.ownerId,
-                            recipientId: p.teamId, 
-                            value: p.loanMeta.buyOpt,
+                            buyerId: ownerId,
+                            buyerName: ownerTeam?.name || 'Clube de Origem',
+                            sellerId: 'SISTEMA',
+                            recipientId: ownerId,
                             status: 'PENDING',
-                            description: `🏁 **FIM DE EMPRÉSTIMO**\nDeseja exercer a opção de compra de **${p.name}** por ${fmt(p.loanMeta.buyOpt)}?\nCaso recuse, o jogador retornará ao clube de origem.`,
-                            date: Date.now(),
-                            isLoanOption: true 
+                            description: `⚠️ **URGENTE: FIM DE VÍNCULO**\nO empréstimo de **${p.name}** acabou e ele está sem contrato com você.`,
+                            date: Date.now()
                         });
-                        u.status = 'INTRANSFERIVEL'; // Trava o jogador até o clube decidir se compra ou devolve
+                        u.teamId = ownerId;
+                        u.contract = 0;
+                        u.status = 'INTRANSFERIVEL';
                     } else {
-                        // SEM OPÇÃO DE COMPRA: Calcula retorno baseado no contrato original com o dono
-                        // Calculamos: (Contrato que ele tinha antes de sair - 1 temporada que passou emprestado)
-                        let contractRemainingWithDono = (parseInt(p.loanMeta.originalContract) || 1) - 1;
-
-                        if (contractRemainingWithDono <= 0) {
-                            // Caso o contrato com o dono original também tenha expirado: GERA RENOVAÇÃO URGENTE
-                            const renewalReqRef = db.collection('offers').doc();
-                            b.set(renewalReqRef, {
-                                type: 'RENOVACAO_URGENTE',
-                                playerId: p.id,
-                                playerName: p.name,
-                                buyerId: p.loanMeta.ownerId,
-                                buyerName: ownerTeam?.name || 'Clube de Origem',
-                                sellerId: 'SISTEMA',
-                                recipientId: p.loanMeta.ownerId,
-                                status: 'PENDING',
-                                description: `⚠️ **URGENTE: FIM DE VÍNCULO**\nO empréstimo de **${p.name}** acabou e ele não tem mais contrato com você.\nEscolha: **CONTRA** para renovar ou **RECUSAR** para o Passe Livre.`,
-                                date: Date.now()
-                            });
-                            u.teamId = p.loanMeta.ownerId;
-                            u.contract = 0;
-                            u.status = 'INTRANSFERIVEL';
-                        } else {
-                            // RETORNO SILENCIOSO: Ainda possui contrato com o dono original
-                            u.teamId = p.loanMeta.ownerId;
-                            u.contract = contractRemainingWithDono;
-                            u.status = 'NAO_A_VENDA';
-                            postNews(`🔙 **RETORNO**\n${p.name} voltou ao ${ownerTeam?.name} (${contractRemainingWithDono} anos rest.).`, 'transfer');
-                        }
-                        u.loanMeta = firebase.firestore.FieldValue.delete(); // Limpa dados de empréstimo
+                        // RETORNO SILENCIOSO: Volta para o dono com o tempo correto
+                        // u.teamId define a mudança de clube para corrigir o erro da imagem
+                        u.teamId = ownerId;
+                        u.contract = contractWithDonoRemaining;
+                        u.status = 'NAO_A_VENDA';
+                        postNews(`🔙 **RETORNO**\n${p.name} voltou ao ${ownerTeam?.name} (${contractWithDonoRemaining} anos rest.).`, 'transfer');
                     }
-                } 
-                // CASO 2: Jogador normal (não emprestado) cujo contrato acabou
-                else if (p.preContract && teams.some(t => t.id === p.preContract.teamId)) {
+                    u.loanMeta = firebase.firestore.FieldValue.delete(); 
+                }
+            } 
+            // CASO NORMAL: Terminou contrato de jogador fixo
+            else if (nc === 0 && (!p.loanMeta || !p.loanMeta.ownerId)) {
+                if (p.preContract && teams.some(t => t.id === p.preContract.teamId)) {
                     u.teamId = p.preContract.teamId;
                     u.contract = 2;
                     u.status = 'NAO_A_VENDA';
                     u.preContract = firebase.firestore.FieldValue.delete();
-                } 
-                // CASO 3: Sem vínculo algum -> Agente Livre
-                else {
+                } else {
                     u.teamId = 'FREE';
                     u.status = 'VENDA';
                     u.mood = '😐';
@@ -1046,12 +1045,12 @@ const renewContract = async (p) => {
 
         try {
             await b.commit();
-            alert("Temporada virada! Verifique as pendências e opções de compra na Caixa de Entrada.");
+            alert("Temporada virada! Retornos de empréstimo processados.");
         } catch (e) {
             alert("Erro: " + e.message);
         }
         setLoading(false);
-        postNews("🌞 **NOVA TEMPORADA**\nOs jogadores retornaram de empréstimo e os contratos foram atualizados!", 'season');
+        postNews("🌞 **NOVA TEMPORADA**\nContratos atualizados e jogadores retornaram de empréstimo!", 'season');
     }
 };
 
@@ -1089,7 +1088,7 @@ const resetDatabase = async () => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.52.1</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.52.2</div>
                             </div>
                         </div>
                         
@@ -1356,7 +1355,7 @@ const resetDatabase = async () => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.52.1</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.52.2</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

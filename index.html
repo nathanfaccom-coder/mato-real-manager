@@ -386,7 +386,79 @@
 
 // FIM DA LÓGICA DE EMPRESAS E SHOPPING
 
+// --- COMPONENTS QUE FICAM FORA DO APP ---
 
+const AdminPanel = ({ onReset, onUpdateCompBal, teams, papers, journalists, companies, reqs, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onConfig, onApprovePaper, onDeletePaper, onDeleteJourno, onRejectPaper, onApproveComp, onDeleteComp }) => (
+    <div>
+        <h3>Painel Master</h3>
+        <div className="card" style={{border: '1px solid var(--danger)'}}>
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10}}>
+                <button className={`btn ${config.marketOpen?'btn-red':'btn-green'}`} onClick={()=>onAct('MARKET', !config.marketOpen)}>{config.marketOpen?'FECHAR MERCADO':'ABRIR MERCADO'}</button>
+                <button className="btn btn-purple" onClick={()=>onAct('WEEK')}>VIRAR SEMANA</button>
+            </div>
+            <button className="btn btn-red" onClick={()=>onAct('SEASON')}>VIRAR TEMPORADA</button>
+            <button className="btn btn-gold" onClick={()=>{ const t=prompt("Título"); const b=prompt("Texto"); if(t)onPost(t,b,'admin'); }}>COMUNICADO</button>
+            
+            <button 
+                className="btn" 
+                style={{background: 'black', color: 'red', border: '1px solid red', marginTop: 15}} 
+                onClick={onReset}
+            >
+                <i className="fas fa-bomb"></i> RESETAR TODO O GAME
+            </button>
+        </div>
+
+        {(companies||[]).some(c=>c.status==='PENDING') && <h4>Empresas Pendentes</h4>}
+        {(companies||[]).filter(c=>c.status==='PENDING').map(c => (
+            <div key={c.id} className="card" style={{borderLeft:'4px solid var(--purple)'}}>
+                <b>{c.name}</b> ({(COMPANY_TYPES[c.companyType] || {}).label || 'Tipo Desconhecido'})<br/>
+                Dono: {c.owner}
+                <div style={{display:'flex', gap:5, marginTop:5}}>
+                    <button className="btn btn-green" onClick={()=>onApproveComp(c.id)}>APROVAR</button>
+                    <button className="btn btn-red" onClick={()=>onDeleteComp(c.id)}>X</button>
+                </div>
+            </div>
+        ))}
+
+        <h4>Gestão de Empresas</h4>
+        {(companies||[]).filter(c=>c.status!=='PENDING').map(c => (
+            <div key={c.id} className="card">
+                <b>{c.name}</b> {c.status==='BLOCKED' && <span style={{color:'red'}}>(BLOQUEADA)</span>}<br/>
+                Saldo: {fmt(c.balance)}
+                <div style={{display:'flex', gap:5, marginTop:5}}>
+                    <button className="btn btn-green" onClick={()=>{
+                        const n = prompt("Novo Saldo da Empresa:", c.balance); 
+                        if(n !== null) onUpdateCompBal(c.id, n);
+                    }}>$</button>
+                    <button className="btn btn-red" onClick={()=>onDeleteComp(c.id)}>EXCLUIR</button>
+                </div>
+            </div>
+        ))}
+
+        {(teams||[]).some(t=>t.status==='PENDING') && <h4>Times Pendentes</h4>}
+        {(teams||[]).filter(t=>t.status==='PENDING').map(t=><div key={t.id} className="card" style={{borderLeft:'4px solid var(--warning)'}}><b>{t.name}</b><div style={{display:'flex', gap:5}}><input className="input-field" style={{marginBottom:0, width:100}} defaultValue={t.balance} id={`bal-${t.id}`} /><button className="btn btn-green" onClick={()=>onApproveTeam(t.id, document.getElementById(`bal-${t.id}`).value)}>V</button><button className="btn btn-red" onClick={()=>onDeleteTeam(t.id)}>X</button></div></div>)}
+        
+        {(papers||[]).some(p=>p.status==='PENDING') && <h4>Jornais Pendentes</h4>}
+        {(papers||[]).filter(p=>p.status==='PENDING').map(p=><div key={p.id} className="card"><b>📰 {p.name}</b><br/><small>Dono: {p.ownerName}</small><button className="btn btn-green" onClick={()=>onApprovePaper(p.id)}>APROVAR</button><button className="btn btn-red" style={{marginLeft:5}} onClick={()=>onRejectPaper(p.id)}>X</button></div>)}
+        
+        <h4>Gestão de Imprensa</h4>
+        {(papers||[]).filter(p=>p.status==='ACTIVE').map(p=><div key={p.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>📰 {p.name}</span><button className="btn btn-red" style={{width:'auto'}} onClick={()=>onDeletePaper(p.id)}>X</button></div>)}
+        {(journalists||[]).map(j=><div key={j.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>✒️ {j.name}</span><button className="btn btn-red" style={{width:'auto'}} onClick={()=>onDeleteJourno(j.id)}>X</button></div>)}
+        
+        <h4>Solicitações Financeiras</h4>
+        {(reqs||[]).filter(r=>r.status==='PENDING').map(r=><div key={r.id} className="card"><b>{r.teamName}</b>: {fmt(r.amount)} ({r.type})<br/>{r.details}<br/><button className="btn-green" style={{width:'auto', marginRight:5}} onClick={()=>onApprove(r)}>V</button><button className="btn-red" style={{width:'auto'}} onClick={()=>onReject(r.id)}>X</button></div>)}
+        
+        <h4>Clubes</h4>
+        {(teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>{t.name}</span><div><button className="btn btn-ghost" style={{width:'auto', marginRight:5}} onClick={()=>onConfig(t)}><i className="fas fa-cog"></i></button><button className="btn btn-green" style={{width:'auto', marginRight:5}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button><button className="btn btn-purple" style={{width:'auto'}} onClick={()=>onEditT(t)}>ELENCO</button><button className="btn btn-red" style={{width:'auto', marginLeft:5}} onClick={()=>onDeleteTeam(t.id)}><i className="fas fa-trash"></i></button></div></div>)}
+    </div>
+);
+
+const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => {
+    const [form, setF] = useState({name: team.name, logo: team.logo, balance: team.balance, serie: team.serie});
+    useEffect(() => { setF({name: team.name, logo: team.logo, balance: team.balance, serie: team.serie}); }, [team]);
+    return <div><label>Nome</label><input className="input-field" value={form.name} onChange={e=>setF({...form, name:e.target.value})} /><label>Logo</label><input className="input-field" value={form.logo} onChange={e=>setF({...form, logo:e.target.value})} />{isAdmin && <label>Saldo (ADM)</label>} {isAdmin && <input className="input-field" type="number" value={form.balance} onChange={e=>setF({...form, balance:parseFloat(e.target.value)})} />}{isAdmin && <label>Série (ADM)</label>}{isAdmin && <select className="input-field" value={form.serie} onChange={e=>setF({...form, serie:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>{s}</option>)}</select>}<button className="btn btn-blue" onClick={()=>onUp(form)}>SALVAR</button><hr style={{borderColor:'#444'}}/><p>Estádio Nível {team.stadiumLevel||1}</p><button className="btn btn-purple" onClick={onUpgrade}>EVOLUIR (₣ {fmt(COSTS[team.stadiumLevel]||0).replace('₣ ','')})</button><hr style={{borderColor:'#444'}}/><button className="btn btn-green" onClick={()=>{const v=prompt("Valor");const m=prompt("Motivo"); if(v)onReq('INJECTION',v,m)}}>PEDIR INJEÇÃO</button><button className="btn btn-gold" onClick={()=>{const v=prompt("Valor");const m=prompt("Empresa"); if(v)onReq('SPONSORSHIP',v,m)}}>PEDIR PATROCÍNIO</button><button className="btn btn-red" onClick={()=>{const v=prompt("Valor a retirar:"); if(v){ const m=prompt("Motivo:"); if(m) onWithdraw(v, m); }}}>RETIRAR DINHEIRO</button></div>;
+};
+            //fim
         // ... continuação do código anterior
     const approveTeam = async (teamId, finalBalance) => { await db.collection('teams').doc(teamId).update({ status: 'ACTIVE', balance: parseFloat(finalBalance) }); const t = teams.find(x=>x.id===teamId); postNews(`🛡️ **NOVO CLUBE!**\nO **${t.name}** foi aprovado na Série ${t.serie}.`, 'infra'); alert("Aprovado!"); };
 
@@ -554,7 +626,7 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
 
 const acceptOffer = async (o) => {
     try {
-        // --- V1.52.3: LÓGICA DE NOTIFICAÇÃO (APENAS LEITURA) ---
+        // --- v1.52.4: LÓGICA DE NOTIFICAÇÃO (APENAS LEITURA) ---
         // Se for notificação, apenas deleta o aviso e encerra a execução.
         if (o.type === 'NOTIFICACAO') {
             await db.collection('offers').doc(o.id).delete();
@@ -954,7 +1026,7 @@ const renewContract = async (p) => {
                     setLoading(false);
                 }
 
-                // --- VIRADA DE TEMPORADA (SISTEMA DE RETORNO INTELIGENTE v1.52.3) ---
+                // --- VIRADA DE TEMPORADA (SISTEMA DE RETORNO INTELIGENTE v1.52.4) ---
                 if (act === 'SEASON') {
                     if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos\n3. Processar Opções de Compra/Retorno\n4. Mover sem contrato para Agentes Livres")) return;
 
@@ -1002,7 +1074,7 @@ const renewContract = async (p) => {
                                 u.status = 'INTRANSFERIVEL'; 
                             } else {
                                 // CASO 2: SEM OPÇÃO DE COMPRA -> RETORNO AO DONO
-                                // v1.52.3: Calcula os anos restantes: (Contrato original com o dono - 1 temporada que passou)
+                                // v1.52.4: Calcula os anos restantes: (Contrato original com o dono - 1 temporada que passou)
                                 let contractWithDonoRemaining = (parseInt(p.loanMeta.originalContract) || 1) - 1;
 
                                 if (contractWithDonoRemaining <= 0) {
@@ -1110,7 +1182,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.52.3</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.52.4</div>
                             </div>
                         </div>
                         
@@ -1373,7 +1445,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.52.3</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.52.4</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2068,7 +2140,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         {o.description}
                     </div>
 
-                    {/* V1.52.3: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
+                    {/* v1.52.4: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
                     {o.type === 'NOTIFICACAO' ? (
                         <div style={{display:'flex', gap:5}}>
                             <button className="btn btn-green" style={{width:'100%'}} onClick={()=>onAccept(o)}>

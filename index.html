@@ -628,10 +628,36 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
 
 const acceptOffer = async (o) => {
     try {
-        // --- v1.52.9: LÓGICA DE NOTIFICAÇÃO (APENAS LEITURA) ---
+        // --- 1. LÓGICA DE NOTIFICAÇÃO (APENAS LEITURA) ---
         if (o.type === 'NOTIFICACAO') {
             await db.collection('offers').doc(o.id).delete();
             alert('Confirmado!');
+            return;
+        }
+
+        // --- 2. LÓGICA DE PRÉ-CONTRATO (V1.52.9) ---
+        // (Mantido para não perder a funcionalidade de assinar com jogadores em fim de contrato)
+        if (o.type === 'PRE_CONTRATO') {
+            if (!confirm(`Confirmar assinatura de Pré-Contrato com ${o.buyerName}?\nVocê se juntará a eles na próxima temporada.`)) return;
+            
+            const b = db.batch();
+            
+            // Grava o pré-contrato no perfil do jogador
+            b.update(db.collection('players').doc(o.playerId), {
+                preContract: {
+                    teamId: o.buyerId,
+                    teamName: o.buyerName,
+                    salary: o.meta.newSalary,
+                    date: Date.now()
+                },
+                mood: '🤩'
+            });
+
+            b.delete(db.collection('offers').doc(o.id));
+            await b.commit();
+            
+            postNews(`📝 **PRÉ-CONTRATO ASSINADO**\n**${o.playerName}** assinou com o **${o.buyerName}** e se apresentará na próxima temporada!`, 'transfer');
+            alert("Pré-contrato assinado com sucesso!");
             return;
         }
 
@@ -640,7 +666,7 @@ const acceptOffer = async (o) => {
         const isFreeAgent = !o.sellerId || o.sellerId === 'FREE';
         const sel = isFreeAgent ? null : teams.find(t => t.id === o.sellerId);
 
-        // --- CASO ESPECIAL: COMPRA DEFINITIVA (EXERCER OPÇÃO DE EMPRÉSTIMO) ---
+        // --- 3. CASO ESPECIAL: COMPRA DEFINITIVA (EXERCER OPÇÃO DE EMPRÉSTIMO) ---
         if (o.type === 'COMPRA_DEFINITIVA') {
             if (!buy || !p) return alert("Erro: Dados incompletos.");
             if (buy.balance < o.value) return alert(`Saldo insuficiente! Necessário: ${fmt(o.value)}`);
@@ -697,7 +723,6 @@ const acceptOffer = async (o) => {
         const readyForContract = isFreeAgent || o.sellerAccepted;
 
         if (readyForContract && (iAmPlayer || iAmBuyer)) {
-            
             if (!buy || !p) return alert("Erro: Dados incompletos.");
 
             const valorEntrada = o.meta?.installments > 1 ? (o.value / o.meta.installments) : o.value;
@@ -722,7 +747,7 @@ const acceptOffer = async (o) => {
                 let valorParaVendedor = valorEntrada;
 
                 // >>>> LÓGICA DE REVENDA (SELL-ON FEE) AUTOMÁTICA <<<<
-                // Se o jogador tinha uma cláusula antiga, desconta agora.
+                // Se o jogador tem uma cláusula salva, calcula a parte do antigo dono
                 if (p.sellOnClause && p.sellOnClause.percentage > 0) {
                     const beneficiaryId = p.sellOnClause.beneficiaryId;
                     
@@ -743,7 +768,7 @@ const acceptOffer = async (o) => {
                 // Paga o vendedor (já descontado a revenda, se houve)
                 b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorParaVendedor });
 
-                // Cria dívida se parcelado (Nota: A revenda incide sobre a entrada neste modelo)
+                // Cria dívida se parcelado
                 if (o.meta?.installments > 1) {
                     const debtRef = db.collection('debts').doc();
                     b.set(debtRef, {
@@ -765,11 +790,11 @@ const acceptOffer = async (o) => {
 
             // 4. Atualiza o Jogador (Move de time e Grava NOVA Cláusula)
             
-            // Prepara a NOVA cláusula se foi negociada agora
+            // Prepara a NOVA cláusula se foi negociada agora (0 a 80%)
             const newSellOnClause = (o.meta && o.meta.sellOn > 0 && sel) ? {
                 beneficiaryId: sel.id,
                 percentage: o.meta.sellOn
-            } : firebase.firestore.FieldValue.delete(); // Se não tem revenda nova, apaga a antiga
+            } : firebase.firestore.FieldValue.delete(); // Se não tem revenda nova, apaga a antiga para limpar o histórico
 
             b.update(db.collection('players').doc(p.id), {
                 teamId: buy.id,
@@ -1110,7 +1135,7 @@ const renewContract = async (p) => {
                     setLoading(false);
                 }
 
-                // --- VIRADA DE TEMPORADA (SISTEMA DE RETORNO INTELIGENTE v1.52.9) ---
+                // --- VIRADA DE TEMPORADA (SISTEMA DE RETORNO INTELIGENTE v1.53.0) ---
                 if (act === 'SEASON') {
                     if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos\n3. Processar Opções de Compra/Retorno\n4. Mover sem contrato para Agentes Livres")) return;
 
@@ -1158,7 +1183,7 @@ const renewContract = async (p) => {
                                 u.status = 'INTRANSFERIVEL'; 
                             } else {
                                 // CASO 2: SEM OPÇÃO DE COMPRA -> RETORNO AO DONO
-                                // v1.52.9: Calcula os anos restantes: (Contrato original com o dono - 1 temporada que passou)
+                                // v1.53.0: Calcula os anos restantes: (Contrato original com o dono - 1 temporada que passou)
                                 let contractWithDonoRemaining = (parseInt(p.loanMeta.originalContract) || 1) - 1;
 
                                 if (contractWithDonoRemaining <= 0) {
@@ -1266,7 +1291,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.52.9</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.53.0</div>
                             </div>
                         </div>
                         
@@ -1529,7 +1554,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.52.9</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.53.0</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2106,7 +2131,7 @@ const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) 
             {list.length === 0 && <p style={{textAlign:'center', color:'#666', marginTop:30, fontStyle:'italic'}}>Nenhum jogador disponível nesta categoria.</p>}
             
             {list.map(p => (
-                <div key={p.id} className="card" style={{borderLeft: `4px solid ${getPosColor(p.position)}`}}>
+                <div key={p.id} className="card" style={{borderLeft: `4px solid ${getPosColor(p.position)}`, opacity: p.preContract ? 0.7 : 1}}>
                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'start'}}>
                         <div>
                             <span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span>
@@ -2120,22 +2145,47 @@ const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) 
 
                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, fontSize:11, color:'#aaa', marginTop:10, background:'rgba(0,0,0,0.2)', padding:8, borderRadius:8}}>
                         <div>Valor: <b style={{color:'#fff'}}>{fmt(p.value)}</b></div>
-                        <div>Contrato: <b style={{color: p.contract === 0 ? 'var(--danger)' : '#fff'}}>{p.contract} Temporada{p.contract !== 1 ? 's' : ''}</b></div>
+                        <div>Contrato: <b style={{color: p.contract === 0 ? 'var(--danger)' : (p.contract === 1 ? 'var(--warning)' : '#fff')}}>{p.contract} Temporada{p.contract !== 1 ? 's' : ''}</b></div>
                     </div>
 
-                    {!isVis && (
+                    {/* AVISO DE PRÉ-CONTRATO ASSINADO */}
+                    {p.preContract && (
+                        <div style={{marginTop:10, background:'rgba(0,0,0,0.5)', padding:5, borderRadius:4, textAlign:'center', border:'1px solid var(--secondary)'}}>
+                            <small style={{color:'var(--secondary)', fontWeight:'bold'}}>📝 JÁ ASSINOU PRÉ-CONTRATO</small><br/>
+                            <small style={{color:'#aaa', fontSize:9}}>Vai para o {p.preContract.teamName} no fim da temporada.</small>
+                        </div>
+                    )}
+
+                    {!isVis && !p.preContract && (
                         <div style={{marginTop:12, display:'flex', gap:8}}>
-                            {/* LÓGICA DE BOTÃO: Abre negociação se mercado aberto OU se for Agente Livre */}
-                            {(open || p.teamId === 'FREE') && p.status !== 'INTRANSFERIVEL' ? 
+                            
+                            {/* BOTÃO NORMAL DE NEGOCIAÇÃO */}
+                            {(open || p.teamId === 'FREE') && p.status !== 'INTRANSFERIVEL' && (
                                 <button className="btn btn-purple" style={{flex:1, marginBottom:0}} onClick={()=>onNeg(p)}>
                                     <i className="fas fa-handshake"></i> {p.teamId === 'FREE' ? 'CONTRATAR' : 'NEGOCIAR'}
-                                </button> : 
+                                </button>
+                            )}
+
+                            {/* BOTÃO PRÉ-CONTRATO (SÓ APARECE SE TIVER 1 ANO DE CONTRATO) */}
+                            {p.contract === 1 && p.teamId !== 'FREE' && p.status !== 'INTRANSFERIVEL' && (
+                                <button className="btn btn-blue" style={{flex:1, marginBottom:0}} onClick={()=>{
+                                    // Abre a modal já setando o tipo para PRE_CONTRATO na oferta
+                                    const dummyOffer = { type: 'PRE_CONTRATO', value: 0 };
+                                    // Passamos dummyOffer dentro do objeto target para o OfferForm ler
+                                    onNeg({...p, oldOffer: dummyOffer});
+                                }}>
+                                    <i className="fas fa-file-signature"></i> PRÉ-CONTRATO
+                                </button>
+                            )}
+                            
+                            {/* BOTÃO DE FECHADO (se não se encaixar nos de cima) */}
+                            {!open && p.teamId !== 'FREE' && p.contract !== 1 && (
                                 <button className="btn btn-ghost" style={{flex:1, marginBottom:0, opacity:0.5}} disabled>
                                     <i className="fas fa-lock"></i> FECHADO
                                 </button>
-                            }
+                            )}
                             
-                            {/* BOTÃO DE MULTA: Só aparece se o jogador tiver time e valor de multa > 0 */}
+                            {/* BOTÃO DE MULTA */}
                             {p.teamId !== 'FREE' && parseFloat(p.clause) > 0 && (
                                 <button className="btn btn-gold" style={{width:'auto', marginBottom:0}} onClick={()=>onPayClause(p)}>
                                     <i className="fas fa-gavel"></i> MULTA
@@ -2154,26 +2204,17 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
     const old = target.oldOffer || {};
     const isCounter = !!old.id;
     const isPlayerActing = user?.type === 'PLAYER';
-
-    // --- LÓGICA DE FASES E TRAVAS ---
     const clubsHaveAgreed = old?.sellerAccepted === true;
     const isUrgentRenewal = old?.type === 'RENOVACAO_URGENTE';
-    
-    // A Parte 1 (Financeiro) só some se for o JOGADOR atuando ou se clubes já se acertaram.
-    // Em caso de Renovação Urgente, a Parte 1 também some para focar no contrato.
     const shouldHidePart1 = isPlayerActing || clubsHaveAgreed || isUrgentRenewal;
-
-    // Trava: Empréstimo não pode ser maior que o contrato restante do dono
     const maxLoanAllowed = parseInt(target.contract) || 1;
 
-    // ESTADOS
+    // Se vier do botão "Pré-Contrato", o type inicial será PRE_CONTRATO
     const [t, setT] = useState(old.type || 'COMPRA');
     const [v, setV] = useState(old.value || '');
     const [sal, setSal] = useState(old.meta?.newSalary || target.salary || 0);
     const [con, setCon] = useState(old.offerContract || '1');
     const [role, setRole] = useState(old.meta?.role || 'ROTACAO');
-    
-    // NOVO: Controle explícito de Opção de Compra
     const [hasBuyOption, setHasBuyOption] = useState(old.meta?.hasBuyOption || false);
 
     const [meta, setMeta] = useState(old.meta || { 
@@ -2191,15 +2232,26 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
         setSwaps(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
     };
 
+    const isPreContract = t === 'PRE_CONTRATO';
+
     return (
         <div className="modal-bg">
             <div className="modal-content" style={{maxWidth: '500px'}}>
                 <h3 style={{color:'var(--primary)'}}>
-                    {isUrgentRenewal ? '🚨 Renovação Obrigatória' : (isCounter ? 'Responder Proposta' : `Negociar ${target.name}`)}
+                    {isUrgentRenewal ? '🚨 Renovação Obrigatória' : (isPreContract ? '📝 Pré-Contrato' : (isCounter ? 'Responder Proposta' : `Negociar ${target.name}`))}
                 </h3>
                 
+                {/* AVISO DE PRÉ-CONTRATO */}
+                {isPreContract && (
+                    <div style={{background:'rgba(41, 121, 255, 0.2)', padding:10, borderRadius:8, border:'1px solid var(--secondary)', marginBottom:15, fontSize:12, color:'#fff'}}>
+                        ℹ️ <b>ASSINATURA LIVRE:</b> O jogador tem menos de 6 meses de contrato protegido.
+                        <br/>Ele virá <b>de graça</b> para o seu time apenas no início da <b>próxima temporada</b>.
+                    </div>
+                )}
+
                 {/* 1. ACORDO ENTRE CLUBES (FINANCEIRO) */}
-                {!shouldHidePart1 ? (
+                {/* Se for pré-contrato, esconde essa parte pois não tem taxa */}
+                {!shouldHidePart1 && !isPreContract ? (
                     <div style={{borderBottom: '1px solid #444', paddingBottom: 15, marginBottom: 15}}>
                         <label style={{fontSize: '11px', color: 'gold', fontWeight: 'bold'}}>1. ACORDO ENTRE CLUBES (FINANCEIRO)</label>
                         <div style={{display:'flex', gap:5, margin:'10px 0'}}>
@@ -2226,7 +2278,6 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                                     }} 
                                 />
                                 
-                                {/* INTERRUPTOR DE OPÇÃO DE COMPRA */}
                                 <div style={{margin: '10px 0', display: 'flex', alignItems: 'center', gap: 10}}>
                                     <label style={{fontSize: '11px'}}>Opção de Compra?</label>
                                     <button className={`btn ${hasBuyOption ? 'btn-green' : 'btn-ghost'}`} style={{width: '60px', padding: '5px', marginBottom:0}} onClick={() => setHasBuyOption(true)}>SIM</button>
@@ -2262,28 +2313,24 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                             <div className="card" style={{background: '#222', padding: '10px', marginTop: 10}}>
                                 <small>📦 PARCELAMENTO: <b>{meta.installments}x</b></small>
                                 <input type="range" min="1" max="12" value={meta.installments} onChange={e=>setMeta({...meta, installments: parseInt(e.target.value)})} style={{width:'100%'}} />
-                                
                                 <hr style={{borderColor: '#444', margin: '10px 0'}} />
-                                
                                 <small>📈 REVENDA FUTURA: <b style={{color:'gold'}}>{meta.sellOn}%</b></small>
                                 <input type="range" min="0" max="80" step="5" value={meta.sellOn} onChange={e=>setMeta({...meta, sellOn: parseInt(e.target.value)})} style={{width:'100%', accentColor: 'gold'}} />
-                                <div style={{fontSize:9, color:'#888'}}>O vendedor receberá esta % quando você vender o jogador.</div>
                             </div>
                         )}
                     </div>
-                ) : (
-                    /* VISÃO BLOQUEADA */
+                ) : !isPreContract ? (
+                    /* VISÃO BLOQUEADA (Normal) */
                     <div style={{background: 'rgba(0,230,118,0.05)', padding: 12, borderRadius: 8, marginBottom: 15, fontSize: 11, border: '1px solid var(--primary)'}}>
                         <b style={{color: 'gold', display: 'block', marginBottom: 5}}><i className="fas fa-lock"></i> ACORDO SELADO:</b>
                         <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, color: '#ccc'}}>
                             <span>Tipo: <b>{isUrgentRenewal ? 'RENOVAÇÃO' : t}</b></span>
                             {!isUrgentRenewal && <span>Valor: <b>{fmt(v)}</b></span>}
                             {t === 'EMPRESTIMO' && <span>Duração: <b>{meta.loanDuration} Temp.</b></span>}
-                            {/* v1.52.9: Mostra a cláusula acordada */}
                             {t === 'COMPRA' && meta.sellOn > 0 && <span style={{color:'gold'}}>Revenda: <b>{meta.sellOn}%</b></span>}
                         </div>
                     </div>
-                )}
+                ) : null}
 
                 {/* 2. TERMOS PESSOAIS (JOGADOR x COMPRADOR) */}
                 <div>
@@ -2315,8 +2362,12 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                 </div>
 
                 <div style={{display:'flex', gap:10, marginTop:15}}>
-                    <button className="btn btn-green" style={{flex: 2}} onClick={() => onSend(target, t, v, swaps, (t === 'EMPRESTIMO' ? meta.loanDuration : con), {...meta, hasBuyOption, newSalary: parseFloat(sal), role, status: 'PENDING'}, old)}>
-                        {isUrgentRenewal ? 'OFERECER RENOVAÇÃO' : 'ENVIAR RESPOSTA'}
+                    <button className="btn btn-green" style={{flex: 2}} onClick={() => {
+                        // Se for pré-contrato, o valor é 0
+                        const finalVal = isPreContract ? 0 : v;
+                        onSend(target, t, finalVal, swaps, (t === 'EMPRESTIMO' ? meta.loanDuration : con), {...meta, hasBuyOption, newSalary: parseFloat(sal), role, status: 'PENDING'}, old);
+                    }}>
+                        {isUrgentRenewal ? 'OFERECER RENOVAÇÃO' : (isPreContract ? 'ENVIAR PRÉ-CONTRATO' : 'ENVIAR RESPOSTA')}
                     </button>
                     <button className="btn btn-red" style={{flex: 1}} onClick={()=>setModal(null)}>CANCELAR</button>
                 </div>
@@ -2381,7 +2432,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         {o.description}
                     </div>
 
-                    {/* v1.52.9: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
+                    {/* v1.53.0: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
                     {o.type === 'NOTIFICACAO' ? (
                         <div style={{display:'flex', gap:5}}>
                             <button className="btn btn-green" style={{width:'100%'}} onClick={()=>onAccept(o)}>

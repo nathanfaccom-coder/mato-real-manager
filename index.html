@@ -1700,7 +1700,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.53.3.2</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis |v1.53.3</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2139,34 +2139,33 @@ const renewContract = async (p) => {
                 attributes: null 
             });
             
-            // Função wrapper para salvar e controlar a geração
+            // Função wrapper para controlar a geração e o salvamento
             const handleSave = () => {
-                // 1. Verifica se JÁ TEM atributos. Se tiver, salva direto sem mexer em nada.
+                // 1. CASO JÁ TENHA ATRIBUTOS (Segundo clique ou Edição):
+                // Salva no banco e fecha o modal.
                 if (f.attributes && Object.keys(f.attributes).length > 0) {
                     onSave(f);
                     return;
                 }
 
-                // 2. Se NÃO TEM (Primeira vez), gera agora.
+                // 2. CASO NÃO TENHA (Primeiro clique / Criação):
+                // Apenas GERA visualmente para você conferir.
                 const targetOv = parseInt(f.overall) || 60;
                 const newAttrs = generateAttributes(f.position, targetOv);
                 
-                // Calcula a média EXATA desses novos atributos
+                // Calcula a média EXATA desses novos atributos para corrigir o Overall
                 const vals = Object.values(newAttrs);
                 const realAvg = Math.round(vals.reduce((a,b)=>a+b,0) / vals.length);
                 
-                // Prepara o objeto final atualizado
-                const finalData = { 
+                // Atualiza o estado local (Mostra na tela)
+                setF({ 
                     ...f, 
                     attributes: newAttrs,
-                    overall: realAvg // Atualiza o Overall para bater com a matemática
-                };
+                    overall: realAvg // Atualiza o input de Overall para bater com a matemática
+                });
 
-                // Atualiza visualmente AGORA (para aparecer a tabela) e Salva no Banco
-                setF(finalData); 
-                onSave(finalData);
-                
-                alert(`Atributos gerados com sucesso!\nOverall Real calculado: ${realAvg}`);
+                // AVISA O USUÁRIO, MAS NÃO FECHA O MODAL AINDA
+                alert(`Atributos gerados!\n\nO Overall foi ajustado para ${realAvg} (Média Real).\nConfira a tabela e clique em SALVAR novamente para confirmar.`);
             };
 
             return (
@@ -2209,9 +2208,7 @@ const renewContract = async (p) => {
                                 
                                 {isAdmin && (
                                     <button className="btn btn-gold" style={{marginTop:5, fontSize:10}} onClick={()=>{
-                                        if(confirm("Deseja apagar os atributos atuais e gerar novos baseados no Overall acima?")) {
-                                            // Força null para o handleSave gerar de novo ao clicar em Salvar
-                                            // Ou gera imediatamente aqui:
+                                        if(confirm("Regerar atributos? O Overall atual será recalculado.")) {
                                             const novoOv = parseInt(f.overall) || 60;
                                             const novos = generateAttributes(f.position, novoOv);
                                             const vals = Object.values(novos);
@@ -2226,7 +2223,7 @@ const renewContract = async (p) => {
                         ) : (
                             <div style={{padding:15, textAlign:'center', color:'#aaa', border:'1px dashed #666', borderRadius:8, margin:'10px 0', background:'rgba(0,0,0,0.2)'}}>
                                 <i className="fas fa-magic" style={{fontSize:20, marginBottom:5}}></i><br/>
-                                Os atributos detalhados serão gerados automaticamente<br/>na primeira vez que clicar em <b>SALVAR</b>.
+                                Os atributos serão gerados automaticamente<br/>na primeira vez que clicar em <b>SALVAR</b>.
                             </div>
                         )}
 
@@ -2286,8 +2283,10 @@ const renewContract = async (p) => {
                         </div>}
                         
                         <div style={{display:'flex', gap:10, marginTop:15}}>
-                            {/* Usa handleSave para garantir a geração apenas se necessário */}
-                            <button className="btn btn-green" onClick={handleSave}>SALVAR</button>
+                            {/* BOTÃO SALVAR AGORA USA A NOVA LÓGICA */}
+                            <button className="btn btn-green" onClick={handleSave}>
+                                {f.attributes ? 'SALVAR (Confirmar)' : 'SALVAR (Gerar)'}
+                            </button>
                             
                             {isOwner && <button className="btn btn-blue" onClick={()=>onRenew(initial)}>RENOVAR</button>}
                             {initial && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>X</button>}
@@ -2675,7 +2674,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         {o.description}
                     </div>
 
-                    {/* v1.53.3.2: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
+                    {/*v1.53.3: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
                     {o.type === 'NOTIFICACAO' ? (
                         <div style={{display:'flex', gap:5}}>
                             <button className="btn btn-green" style={{width:'100%'}} onClick={()=>onAccept(o)}>

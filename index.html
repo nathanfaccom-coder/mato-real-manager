@@ -702,7 +702,30 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
                 await b.commit();
                 alert("Compra realizada com sucesso!");
             };
+// --- FUNÇÃO DE RESETAR O BANCO DE DADOS (DENTRO DO APP) ---
+            const resetDatabase = async () => {
+                const senha = prompt("⚠️ PERIGO: Isso apagará TODOS os dados do jogo. Digite a senha master para confirmar:");
+                if (senha !== '2503') return; 
 
+                if (!confirm("TEM CERTEZA? Todos os times, jogadores e finanças sumirão para sempre!")) return;
+
+                setLoading(true);
+                const collections = ['teams', 'players', 'news', 'offers', 'sponsorships', 'sales', 'debts', 'financeRequests', 'products', 'companies', 'journalists', 'newspapers'];
+                
+                try {
+                    for (const col of collections) {
+                        const snapshot = await db.collection(col).get();
+                        const batch = db.batch();
+                        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+                        await batch.commit();
+                    }
+                    alert("💥 BANCO DE DADOS RESETADO! O sistema irá reiniciar.");
+                    window.location.reload();
+                } catch (e) {
+                    alert("Erro ao resetar: " + e.message);
+                }
+                setLoading(false);
+            };
 // FIM DA LÓGICA DE EMPRESAS E SHOPPING
 
 // --- COMPONENTS QUE FICAM FORA DO APP ---

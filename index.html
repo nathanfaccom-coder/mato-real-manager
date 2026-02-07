@@ -110,7 +110,7 @@
 
 // FIM DO BLOCO INICIAL
 
-      // --- SISTEMA DE ATRIBUTOS REALISTA (v1.53.5) ---
+      // --- SISTEMA DE ATRIBUTOS REALISTA (v1.53.6) ---
 // (Substitui o antigo Sistema de RPG)
 
 const ATTR_LABELS = {
@@ -473,7 +473,7 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
                 setLoading(false);
             }
 
-            // --- VIRADA DE TEMPORADA (ATRIBUTOS REALISTAS v1.53.5) ---
+            // --- VIRADA DE TEMPORADA (ATRIBUTOS REALISTAS v1.53.6) ---
             if (act === 'SEASON') {
                 if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Atributos (XP)\n2. Envelhecer Contratos\n3. Processar Retornos")) return;
 
@@ -1385,7 +1385,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.53.5</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.53.6</div>
                             </div>
                         </div>
                         
@@ -1664,7 +1664,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis |v1.53.5</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis |v1.53.6</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2090,7 +2090,6 @@ const renewContract = async (p) => {
                 </div>
             );
         };
-
 // FIM DO SHOPPING E TEAM DASHBOARD
 
 
@@ -2104,7 +2103,7 @@ const renewContract = async (p) => {
 
        const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams, onRenew, isOwner }) => {
             const [f, setF] = useState(initial || {
-                name:'', position:'ATA', overall:60, value:'', salary:'', 
+                name:'', position:'ATA', overall:45, value:'', salary:'', 
                 clause:'', contract:'', mood:'😐', status:'NAO_A_VENDA', 
                 password:'', balance: 0, rating: '', 
                 stats: {goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0},
@@ -2112,22 +2111,30 @@ const renewContract = async (p) => {
             });
             
             const handleSave = () => {
-                let dataToSave = { ...f };
-                
-                // Se não tiver atributos, GERA e SALVA IMEDIATAMENTE (Sem preview para evitar "reroll")
-                if (!dataToSave.attributes) {
-                    const ov = parseInt(dataToSave.overall) || 60;
-                    dataToSave.attributes = generateAttributes(dataToSave.position, ov);
-                    
-                    // Ajusta o Overall pela média real
-                    const vals = Object.values(dataToSave.attributes);
-                    const avg = Math.round(vals.reduce((a,b)=>a+b,0) / vals.length);
-                    dataToSave.overall = avg;
-                    
-                    alert(`Atributos gerados! Overall definido para: ${avg}`);
+                // 1. Se já tem atributos (edição), usa o que tem.
+                if (f.attributes && Object.keys(f.attributes).length > 0) {
+                    onSave(f);
+                    return;
                 }
+
+                // 2. Se é NOVO (não tem atributos), gera e SALVA DIRETO a variável 'finalData'
+                const targetOv = parseInt(f.overall) || 60;
+                const newAttrs = generateAttributes(f.position, targetOv);
                 
-                onSave(dataToSave);
+                // Calcula a média real
+                const vals = Object.values(newAttrs);
+                const realAvg = Math.round(vals.reduce((a,b)=>a+b,0) / vals.length);
+                
+                // CRIA O PACOTE PRONTO PARA SALVAR
+                const finalData = { 
+                    ...f, 
+                    attributes: newAttrs,
+                    overall: realAvg 
+                };
+
+                // MANDA PARA O BANCO IMEDIATAMENTE (Não espera o setF)
+                onSave(finalData);
+                alert(`Jogador criado! Atributos gerados com média ${realAvg}.`);
             };
 
             return (
@@ -2163,7 +2170,7 @@ const renewContract = async (p) => {
                             </div>
                         </div>
 
-                        {/* VISUALIZAÇÃO (Apenas Leitura) */}
+                        {/* VISUALIZAÇÃO APENAS (Read-Only) */}
                         {f.attributes ? (
                             <div style={{border:'1px solid #444', padding:10, borderRadius:8, margin:'10px 0'}}>
                                 <AttributeGrid attrs={f.attributes} pendingXP={f.pendingXP || 0} />
@@ -2177,7 +2184,7 @@ const renewContract = async (p) => {
                         ) : (
                             <div style={{padding:15, textAlign:'center', color:'#aaa', border:'1px dashed #666', borderRadius:8, margin:'10px 0', background:'rgba(0,0,0,0.2)'}}>
                                 <i className="fas fa-magic" style={{fontSize:20, marginBottom:5}}></i><br/>
-                                Atributos serão gerados ao <b>SALVAR</b>.
+                                Os atributos serão gerados e salvos<br/>automaticamente ao clicar em <b>SALVAR</b>.
                             </div>
                         )}
 
@@ -2615,7 +2622,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         {o.description}
                     </div>
 
-                    {/*v1.53.5: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
+                    {/*v1.53.6: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
                     {o.type === 'NOTIFICACAO' ? (
                         <div style={{display:'flex', gap:5}}>
                             <button className="btn btn-green" style={{width:'100%'}} onClick={()=>onAccept(o)}>

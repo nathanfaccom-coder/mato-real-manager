@@ -554,6 +554,14 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
 
 const acceptOffer = async (o) => {
     try {
+        // --- V1.52.3: LÓGICA DE NOTIFICAÇÃO (APENAS LEITURA) ---
+        // Se for notificação, apenas deleta o aviso e encerra a execução.
+        if (o.type === 'NOTIFICACAO') {
+            await db.collection('offers').doc(o.id).delete();
+            alert('Confirmado!');
+            return; // 🛑 PARA A EXECUÇÃO AQUI. Não roda lógica de contrato/transferência.
+        }
+
         const buy = teams.find(t => t.id === o.buyerId);
         const p = players.find(x => x.id === o.playerId);
         const isFreeAgent = !o.sellerId || o.sellerId === 'FREE';
@@ -594,7 +602,7 @@ const acceptOffer = async (o) => {
             
             await db.collection('offers').doc(o.id).update({
                 recipientId: o.playerId, 
-                sellerAccepted: true,    
+                sellerAccepted: true,     
                 status: 'PENDING'
             });
             
@@ -1015,11 +1023,24 @@ const renewContract = async (p) => {
                         u.contract = 0;
                         u.status = 'INTRANSFERIVEL';
                     } else {
-                        // RETORNO SILENCIOSO: Volta para o dono com o tempo correto
-                        // u.teamId define a mudança de clube para corrigir o erro da imagem
+                        // RETORNO COM SUCESSO E NOTIFICAÇÃO
                         u.teamId = ownerId;
                         u.contract = contractWithDonoRemaining;
                         u.status = 'NAO_A_VENDA';
+                        
+                        // --- ADICIONADO: NOTIFICAÇÃO PARA O DONO ---
+                        const notifRef = db.collection('offers').doc();
+                        b.set(notifRef, {
+                            type: 'NOTIFICACAO',
+                            playerId: p.id,
+                            playerName: p.name,
+                            buyerName: 'Sistema', // Remetente
+                            recipientId: ownerId, // Destinatário (Dono)
+                            status: 'PENDING',
+                            description: `🔙 **RETORNO DE EMPRÉSTIMO**\nO jogador **${p.name}** retornou ao seu elenco vindo do empréstimo.\n\n📄 Contrato Restante: ${contractWithDonoRemaining} temporada(s).`,
+                            date: Date.now()
+                        });
+
                         postNews(`🔙 **RETORNO**\n${p.name} voltou ao ${ownerTeam?.name} (${contractWithDonoRemaining} anos rest.).`, 'transfer');
                     }
                     u.loanMeta = firebase.firestore.FieldValue.delete(); 
@@ -1052,7 +1073,6 @@ const renewContract = async (p) => {
         setLoading(false);
         postNews("🌞 **NOVA TEMPORADA**\nContratos atualizados e jogadores retornaram de empréstimo!", 'season');
     }
-};
 
 const resetDatabase = async () => {
     const senha = prompt("⚠️ PERIGO: Isso apagará TODOS os dados do jogo. Digite a senha master para confirmar:");
@@ -1088,7 +1108,7 @@ const resetDatabase = async () => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.52.2</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.52.3</div>
                             </div>
                         </div>
                         
@@ -1355,7 +1375,7 @@ const resetDatabase = async () => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.52.2</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.52.3</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2245,7 +2265,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
             )}
             
             {myOffers.map(o => (
-                <div key={o.id} className="card" style={{borderLeft:'4px solid gold', background: '#1e1e1e'}}>
+                <div key={o.id} className="card" style={{borderLeft: o.type === 'NOTIFICACAO' ? '4px solid #00E676' : '4px solid gold', background: '#1e1e1e'}}>
                     
                     {/* AVISOS DE STATUS REALISTA PARA O JOGADOR */}
                     {o.sellerAccepted && user.type === 'PLAYER' && (
@@ -2262,21 +2282,30 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
 
                     <div style={{display:'flex', justifyContent:'space-between'}}>
                         <b style={{color:'var(--primary)', fontSize:16}}>{o.playerName}</b>
-                        <span style={{fontSize:10, background:'gold', color:'black', padding:'2px 5px', borderRadius:4, fontWeight:'bold'}}>{o.type}</span>
+                        <span style={{fontSize:10, background: o.type === 'NOTIFICACAO' ? '#00E676' : 'gold', color:'black', padding:'2px 5px', borderRadius:4, fontWeight:'bold'}}>{o.type}</span>
                     </div>
                     <small style={{display:'block', marginBottom:10, color: '#aaa'}}>
-                        Interessado: <b style={{color:'#fff'}}>{o.buyerName}</b>
+                        {o.type === 'NOTIFICACAO' ? 'Remetente:' : 'Interessado:'} <b style={{color:'#fff'}}>{o.buyerName}</b>
                     </small>
                     
                     <div style={{background:'#121212', padding:12, borderRadius:8, whiteSpace:'pre-wrap', fontSize:12, border:'1px solid #333', lineHeight:'1.5', color: '#eee', marginBottom: 10}}>
                         {o.description}
                     </div>
 
-                    <div style={{display:'flex', gap:5}}>
-                        <button className="btn btn-green" style={{flex:1}} onClick={()=>onAccept(o)}>ACEITAR</button>
-                        <button className="btn btn-blue" style={{flex:1}} onClick={()=>onCounter(o)}>CONTRA</button>
-                        <button className="btn btn-red" style={{flex:1}} onClick={()=>onReject(o)}>RECUSAR</button>
-                    </div>
+                    {/* V1.52.3: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
+                    {o.type === 'NOTIFICACAO' ? (
+                        <div style={{display:'flex', gap:5}}>
+                            <button className="btn btn-green" style={{width:'100%'}} onClick={()=>onAccept(o)}>
+                                <i className="fas fa-check"></i> ENTENDIDO
+                            </button>
+                        </div>
+                    ) : (
+                        <div style={{display:'flex', gap:5}}>
+                            <button className="btn btn-green" style={{flex:1}} onClick={()=>onAccept(o)}>ACEITAR</button>
+                            <button className="btn btn-blue" style={{flex:1}} onClick={()=>onCounter(o)}>CONTRA</button>
+                            <button className="btn btn-red" style={{flex:1}} onClick={()=>onReject(o)}>RECUSAR</button>
+                        </div>
+                    )}
                 </div>
             ))}
         </div>

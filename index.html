@@ -628,12 +628,11 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
 
 const acceptOffer = async (o) => {
     try {
-        // --- v1.52.6: LÓGICA DE NOTIFICAÇÃO (APENAS LEITURA) ---
-        // Se for notificação, apenas deleta o aviso e encerra a execução.
+        // --- v1.52.7: LÓGICA DE NOTIFICAÇÃO (APENAS LEITURA) ---
         if (o.type === 'NOTIFICACAO') {
             await db.collection('offers').doc(o.id).delete();
             alert('Confirmado!');
-            return; // 🛑 PARA A EXECUÇÃO AQUI. Não roda lógica de contrato/transferência.
+            return; 
         }
 
         const buy = teams.find(t => t.id === o.buyerId);
@@ -730,7 +729,6 @@ const acceptOffer = async (o) => {
                 contract: o.type === 'EMPRESTIMO' ? (parseInt(o.meta.loanDuration) || 1) : (parseInt(o.offerContract) || 1),
                 salary: parseFloat(o.meta?.newSalary) || p.salary,
                 role: o.meta?.role || 'ROTACAO',
-                // CORREÇÃO: Salva o contrato original para garantir o retorno correto após o empréstimo
                 loanMeta: o.type === 'EMPRESTIMO' ? { 
                     ownerId: sel?.id, 
                     salarySplit: o.meta.salarySplit || 100,
@@ -764,7 +762,7 @@ const rejectOffer = async (o) => {
         // --- CASO 1: RECUSA DE OPÇÃO DE COMPRA (FIM DE EMPRÉSTIMO) ---
         if (o.type === 'COMPRA_DEFINITIVA' && o.isLoanOption) {
             const p = players.find(x => x.id === o.playerId);
-            const ownerId = o.sellerId; // ID do dono original (salvo na oferta)
+            const ownerId = o.sellerId; 
             const ownerTeam = teams.find(t => t.id === ownerId);
 
             if (!confirm("Deseja recusar a compra? O jogador retornará ao clube de origem.")) return;
@@ -772,34 +770,40 @@ const rejectOffer = async (o) => {
             const b = db.batch();
             const pRef = db.collection('players').doc(p.id);
 
-            // --- CORREÇÃO DO CÁLCULO DE RETORNO (V1.52.5) ---
-            // Recupera o contrato original salvo no loanMeta. Se não existir, assume 0.
-            const originalDuration = p.loanMeta ? parseInt(p.loanMeta.originalContract) : 0;
+            // --- CORREÇÃO DE SEGURANÇA PARA DADOS ANTIGOS (V1.52.7) ---
+            let originalDuration = 0;
+            
+            // Verifica se o contrato original foi salvo no momento do empréstimo
+            if (p.loanMeta && p.loanMeta.originalContract) {
+                originalDuration = parseInt(p.loanMeta.originalContract);
+            } else {
+                // FALLBACK: Se for um empréstimo antigo (sem dado salvo), assume 6 anos
+                // para que, ao subtrair 1, sobrem 5 anos e não zere o contrato.
+                console.warn("Contrato original não encontrado. Usando fallback de 6 anos.");
+                originalDuration = 6; 
+            }
             
             // Subtrai 1 temporada (o tempo que passou emprestado)
             let remainingContract = originalDuration - 1;
-
-            // Segurança para não ficar negativo
             if (remainingContract < 0) remainingContract = 0;
 
             // Verifica se o contrato com o dono original acabou
             if (remainingContract <= 0) {
-                // REALMENTE ACABOU: GERA NOTIFICAÇÃO DE RENOVAÇÃO URGENTE
+                // REALMENTE ACABOU
                 const renewalReqRef = db.collection('offers').doc();
                 b.set(renewalReqRef, {
                     type: 'RENOVACAO_URGENTE',
                     playerId: p.id,
                     playerName: p.name,
-                    buyerId: ownerId, // O próprio dono precisa agir
+                    buyerId: ownerId, 
                     buyerName: ownerTeam?.name || 'Clube de Origem',
                     sellerId: 'SISTEMA',
                     recipientId: ownerId,
                     status: 'PENDING',
-                    description: `⚠️ **URGENTE: FIM DE CONTRATO**\nO empréstimo de **${p.name}** acabou e, ao descontar o tempo passado, o contrato dele com você expirou.\n\nRenove ou libere para os passes livres.`,
+                    description: `⚠️ **URGENTE: FIM DE CONTRATO**\nO empréstimo de **${p.name}** acabou e o contrato dele com você expirou.\n\nRenove ou libere para os passes livres.`,
                     date: Date.now()
                 });
 
-                // Devolve ao dono, mas trava o jogador
                 b.update(pRef, {
                     teamId: ownerId,
                     loanMeta: firebase.firestore.FieldValue.delete(),
@@ -807,9 +811,9 @@ const rejectOffer = async (o) => {
                     contract: 0
                 });
 
-                postNews(`🔙 **RETORNO CRÍTICO**\nO empréstimo de ${p.name} acabou. O ${ownerTeam?.name} deve decidir se renova ou libera o atleta!`, 'rumor');
+                postNews(`🔙 **RETORNO CRÍTICO**\nO empréstimo de ${p.name} acabou e o contrato expirou!`, 'rumor');
             } else {
-                // AINDA TEM CONTRATO: RETORNO NORMAL (NOTIFICAÇÃO)
+                // AINDA TEM CONTRATO (NOTIFICAÇÃO)
                 const notifRef = db.collection('offers').doc();
                 b.set(notifRef, {
                     type: 'NOTIFICACAO',
@@ -826,10 +830,10 @@ const rejectOffer = async (o) => {
                     teamId: ownerId,
                     loanMeta: firebase.firestore.FieldValue.delete(),
                     status: 'NAO_A_VENDA',
-                    contract: remainingContract // Aplica os anos restantes corretos (ex: 5)
+                    contract: remainingContract // Devolve os anos corretos (ex: 5)
                 });
                 
-                postNews(`🔙 **RETORNO**\n${p.name} retornou ao ${ownerTeam?.name} após o fim do empréstimo.`, 'transfer');
+                postNews(`🔙 **RETORNO**\n${p.name} retornou ao ${ownerTeam?.name} (${remainingContract} anos rest.).`, 'transfer');
             }
 
             b.delete(db.collection('offers').doc(o.id));
@@ -838,7 +842,7 @@ const rejectOffer = async (o) => {
             return;
         }
 
-        // --- CASO 2: RECUSA DE RENOVAÇÃO URGENTE (LIBERAR PARA PASSE LIVRE) ---
+        // --- CASO 2: RECUSA DE RENOVAÇÃO URGENTE ---
         if (o.type === 'RENOVACAO_URGENTE') {
             if (!confirm("Tem certeza? O jogador perderá o vínculo com o clube e irá para os Agentes Livres.")) return;
             
@@ -861,7 +865,6 @@ const rejectOffer = async (o) => {
         if (!confirm("Deseja recusar e encerrar esta negociação?")) return;
         await db.collection('offers').doc(o.id).delete();
         
-        // Se for notificação, não precisa de post news de recusa (pois é apenas informativo)
         if (o.type !== 'NOTIFICACAO') {
             postNews(`❌ **NEGOCIAÇÃO ENCERRADA**\nO acordo por **${o.playerName}** não avançou.`, 'transfer');
         }
@@ -875,7 +878,6 @@ const rejectOffer = async (o) => {
 const renewContract = async (p) => {
     if (!p.teamId || p.teamId === 'FREE') return alert("Jogadores livres assinam novos contratos, não renovam!");
     
-    // Bônus de renovação: 10% do valor de mercado vai para o jogador como luvas
     const cost = (parseFloat(p.value) || 1000000) * 0.10; 
     if(user.data.balance < cost) return alert(`Saldo insuficiente para bônus de renovação (Custo: ${fmt(cost)})`);
     
@@ -887,7 +889,7 @@ const renewContract = async (p) => {
         b.update(db.collection('players').doc(p.id), {
             contract: (parseInt(p.contract)||0) + 1,
             balance: firebase.firestore.FieldValue.increment(cost),
-            status: 'NAO_A_VENDA' // Destrava o jogador após renovar
+            status: 'NAO_A_VENDA' 
         });
         await b.commit();
         postNews(`📝 **RENOVAÇÃO**\nO **${user.data.name}** renovou com **${p.name}**!`, 'transfer');
@@ -1057,7 +1059,7 @@ const renewContract = async (p) => {
                     setLoading(false);
                 }
 
-                // --- VIRADA DE TEMPORADA (SISTEMA DE RETORNO INTELIGENTE v1.52.6) ---
+                // --- VIRADA DE TEMPORADA (SISTEMA DE RETORNO INTELIGENTE v1.52.7) ---
                 if (act === 'SEASON') {
                     if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos\n3. Processar Opções de Compra/Retorno\n4. Mover sem contrato para Agentes Livres")) return;
 
@@ -1105,7 +1107,7 @@ const renewContract = async (p) => {
                                 u.status = 'INTRANSFERIVEL'; 
                             } else {
                                 // CASO 2: SEM OPÇÃO DE COMPRA -> RETORNO AO DONO
-                                // v1.52.6: Calcula os anos restantes: (Contrato original com o dono - 1 temporada que passou)
+                                // v1.52.7: Calcula os anos restantes: (Contrato original com o dono - 1 temporada que passou)
                                 let contractWithDonoRemaining = (parseInt(p.loanMeta.originalContract) || 1) - 1;
 
                                 if (contractWithDonoRemaining <= 0) {
@@ -1213,7 +1215,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.52.6</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.52.7</div>
                             </div>
                         </div>
                         
@@ -1476,7 +1478,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.52.6</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.52.7</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2320,7 +2322,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         {o.description}
                     </div>
 
-                    {/* v1.52.6: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
+                    {/* v1.52.7: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
                     {o.type === 'NOTIFICACAO' ? (
                         <div style={{display:'flex', gap:5}}>
                             <button className="btn btn-green" style={{width:'100%'}} onClick={()=>onAccept(o)}>

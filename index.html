@@ -560,7 +560,6 @@ const acceptOffer = async (o) => {
         const sel = isFreeAgent ? null : teams.find(t => t.id === o.sellerId);
 
         // --- CASO ESPECIAL: COMPRA DEFINITIVA (EXERCER OPÇÃO DE EMPRÉSTIMO) ---
-        // Este caso ignora a trava de "sellerAccepted" pois o valor já foi definido no contrato de empréstimo.
         if (o.type === 'COMPRA_DEFINITIVA') {
             if (!buy || !p) return alert("Erro: Dados do comprador ou jogador não encontrados.");
             if (buy.balance < o.value) return alert(`Saldo insuficiente para exercer a opção de compra! Necessário: ${fmt(o.value)}`);
@@ -568,16 +567,14 @@ const acceptOffer = async (o) => {
             if (!confirm(`Confirmar a compra definitiva de ${p.name} por ${fmt(o.value)}?`)) return;
 
             const b = db.batch();
-            // Pagamento integral do valor da opção ao dono original
             b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - o.value });
             if (sel) b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + o.value });
 
-            // Efetivação: Remove dados de empréstimo e renova contrato fixo
             b.update(db.collection('players').doc(p.id), {
                 teamId: buy.id,
-                loanMeta: firebase.firestore.FieldValue.delete(), // Remove vínculo e divisões de salário do empréstimo
+                loanMeta: firebase.firestore.FieldValue.delete(), 
                 status: 'NAO_A_VENDA',
-                contract: 3, // Por padrão, ganha 3 anos de contrato fixo ao ser comprado em definitivo
+                contract: 3, 
                 history: firebase.firestore.FieldValue.arrayUnion({ 
                     date: Date.now(), from: sel ? sel.name : 'EMPRÉSTIMO', to: buy.name, type: 'COMPRA_DEFINITIVA', value: o.value 
                 })
@@ -591,13 +588,13 @@ const acceptOffer = async (o) => {
             return;
         }
 
-        // --- PASSO 1: O CLUBE VENDEDOR ACEITA A TAXA (FLUXO NORMAL) ---
+        // --- PASSO 1: O CLUBE VENDEDOR ACEITA A TAXA ---
         if (user.type === 'USER' && user.data.id === o.sellerId) {
             if (!confirm("Você aceita os valores financeiros? O jogador decidirá o contrato agora.")) return;
             
             await db.collection('offers').doc(o.id).update({
-                recipientId: o.playerId, // Manda para o sino do jogador
-                sellerAccepted: true,    // Lacra a Fase 1 (Financeira)
+                recipientId: o.playerId, 
+                sellerAccepted: true,    
                 status: 'PENDING'
             });
             
@@ -606,7 +603,7 @@ const acceptOffer = async (o) => {
             return;
         }
 
-        // --- PASSO 2: O JOGADOR ACEITA O CONTRATO (FASE FINAL / FLUXO NORMAL) ---
+        // --- PASSO 2: O JOGADOR ACEITA O CONTRATO (FASE FINAL) ---
         if (user.type === 'PLAYER' || isFreeAgent) {
             if (!buy || !p) return alert("Erro: Dados incompletos.");
             
@@ -614,7 +611,6 @@ const acceptOffer = async (o) => {
                 return alert("Seu clube ainda não aceitou os valores desta venda!");
             }
 
-            // --- LÓGICA DE PAGAMENTO AMPLIADA (TAXA + LUVAS) ---
             const valorEntrada = o.meta?.installments > 1 ? (o.value / o.meta.installments) : o.value;
             const luvas = parseFloat(o.meta?.signingBonus) || 0;
             const custoTotalImediato = valorEntrada + luvas;
@@ -626,19 +622,14 @@ const acceptOffer = async (o) => {
             if (!confirm(`Deseja assinar com o ${buy.name}? As luvas de ${fmt(luvas)} serão depositadas em seu saldo pessoal.`)) return;
 
             const b = db.batch();
-            
-            // 1. Débito total do Comprador (Taxa/Entrada + Luvas)
             b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - custoTotalImediato });
 
-            // 2. Crédito das Luvas diretamente no saldo do Jogador
             if (luvas > 0) {
                 b.update(db.collection('players').doc(p.id), { balance: firebase.firestore.FieldValue.increment(luvas) });
             }
 
-            // 3. Crédito da Taxa ao Vendedor e Gestão de Dívidas
             if (sel) {
                 b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorEntrada });
-                
                 if (o.meta?.installments > 1) {
                     const debtRef = db.collection('debts').doc();
                     b.set(debtRef, {
@@ -650,16 +641,20 @@ const acceptOffer = async (o) => {
                 }
             }
 
-            // 4. Efetivação da Transferência / Empréstimo
+            // Registro de Transferência ou Empréstimo
             b.update(db.collection('players').doc(p.id), {
                 teamId: buy.id,
                 status: 'NAO_A_VENDA',
                 contract: o.type === 'EMPRESTIMO' ? (parseInt(o.meta.loanDuration) || 1) : (parseInt(o.offerContract) || 1),
                 salary: parseFloat(o.meta?.newSalary) || p.salary,
                 role: o.meta?.role || 'ROTACAO',
+                // CORREÇÃO: Salva o contrato original para garantir o retorno correto após o empréstimo
                 loanMeta: o.type === 'EMPRESTIMO' ? { 
                     ownerId: sel?.id, 
-                    salarySplit: o.meta.salarySplit || 100 
+                    salarySplit: o.meta.salarySplit || 100,
+                    hasBuyOption: o.meta.hasBuyOption || false,
+                    buyOpt: o.meta.buyOpt || 0,
+                    originalContract: p.contract 
                 } : null,
                 history: firebase.firestore.FieldValue.arrayUnion({ 
                     date: Date.now(), from: isFreeAgent ? 'AGENTE LIVRE' : sel.name, to: buy.name, type: o.type, value: o.value 
@@ -868,7 +863,7 @@ const renewContract = async (p) => {
             };
             
             // 3. Função Mestra do Admin (COM REGRA DE AGENTES LIVRES)
-          const adminAction = async (act, data) => {
+         const adminAction = async (act, data) => {
     if (act === 'MARKET') {
         db.collection('config').doc('system').update({ marketOpen: data });
         postNews(data ? "📢 JANELA ABERTA" : "🔒 JANELA FECHADA", 'infra');
@@ -1042,6 +1037,7 @@ const renewContract = async (p) => {
                     u.teamId = 'FREE';
                     u.status = 'VENDA';
                     u.mood = '😐';
+                    u.loanMeta = firebase.firestore.FieldValue.delete();
                 }
             }
 
@@ -1093,7 +1089,7 @@ const resetDatabase = async () => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.52.0</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.52.1</div>
                             </div>
                         </div>
                         
@@ -1360,7 +1356,7 @@ const resetDatabase = async () => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.52.0</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.52.1</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

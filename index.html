@@ -547,6 +547,12 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
         let details = `💰 Taxa: ${fmt(v)}\n`;
         if (meta.installments > 1) details += `📅 Parcelamento: ${meta.installments}x de ${fmt(v / meta.installments)}\n`;
         if (meta.sellOn > 0) details += `📈 Revenda: ${meta.sellOn}%\n`;
+
+        // --- AJUSTE VISUAL: SE FOR PRÉ-CONTRATO ---
+        if (type === 'PRE_CONTRATO') {
+            details = `⚖️ **LEI BOSMAN (PRÉ-CONTRATO)**\nO jogador virá a custo zero no início da próxima temporada.\n`;
+        }
+
         details += `📝 Contrato: ${contractYears} anos\n`;
         details += `💵 Salário Sugerido: ${fmt(finalSal)}/sem\n`;
         details += `👔 Papel: ${role}`;
@@ -556,30 +562,34 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
 
         if (old && old.id) {
             // CASO ESPECIAL 1: CONTRAPROPOSTA DE RENOVAÇÃO URGENTE
-            // Se o dono está respondendo a uma renovação, o destino é obrigatoriamente o JOGADOR.
             if (old.type === 'RENOVACAO_URGENTE') {
                 recipientId = old.playerId;
             } 
             // CASO ESPECIAL 2: ACORDO ENTRE CLUBES JÁ SELADO
-            // A proposta circula apenas entre Clube Comprador e Jogador.
             else if (old.sellerAccepted === true) {
                 recipientId = (user.data.id === old.buyerId) ? old.playerId : old.buyerId;
             } 
             // CASO NORMAL: NEGOCIAÇÃO FINANCEIRA (ENTRE CLUBES)
             else {
                 if (user.data.id === old.buyerId) {
-                    // Comprador respondendo: vai para o vendedor (clube ou jogador livre)
                     recipientId = (old.sellerId === 'FREE' || !old.sellerId) ? old.playerId : old.sellerId;
                 } else {
-                    // Vendedor ou Jogador respondendo: volta para o Comprador
                     recipientId = old.buyerId;
                 }
             }
         } else {
-            // OFERTA NOVA (Primeiro contato):
-            recipientId = (target.teamId === 'FREE' || !target.teamId || target.teamId === '') 
-                ? target.id 
-                : target.teamId;
+            // OFERTA NOVA (Primeiro contato)
+            
+            // >>> CORREÇÃO V1.52.10: SE FOR PRÉ-CONTRATO, VAI DIRETO PRO JOGADOR <<<
+            if (type === 'PRE_CONTRATO') {
+                recipientId = target.id; 
+            } else {
+                // Se não for pré-contrato, segue a regra normal:
+                // Se tem time, vai pro time. Se é Free, vai pro jogador.
+                recipientId = (target.teamId === 'FREE' || !target.teamId || target.teamId === '') 
+                    ? target.id 
+                    : target.teamId;
+            }
         }
 
         const pl = {
@@ -589,13 +599,11 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
             buyerName: old?.buyerName || actingTeamName,
             sellerId: target.teamId || old?.sellerId || 'FREE',
             recipientId: recipientId,
-            // Se vier de uma renovação urgente, o tipo passa a ser 'RENOVACAO' normal para o jogador aceitar
             type: (old?.type === 'RENOVACAO_URGENTE') ? 'RENOVACAO' : type,
             value: v,
             offerContract: contractYears,
             description: details,
             status: 'PENDING',
-            // MANTÉM O SELO: Se o vendedor já aceitou, a flag permanece TRUE para travar a Parte 1
             sellerAccepted: old ? (old.sellerAccepted || false) : false,
             meta: {
                 ...meta,
@@ -615,11 +623,13 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
         b.set(db.collection('offers').doc(), pl);
         await b.commit();
 
-        const msgHead = (old && old.id) ? "🔄 CONTRAPROPOSTA" : "💼 NOVA OFERTA";
-        postNews(`${msgHead}\n**${actingTeamName}** enviou novos termos por **${targetPlayerName}**!\n\n${details}`, 'transfer');
+        // Título da notícia ajustado
+        const msgHead = (old && old.id) ? "🔄 CONTRAPROPOSTA" : (type === 'PRE_CONTRATO' ? "⚖️ PRÉ-CONTRATO" : "💼 NOVA OFERTA");
+        
+        postNews(`${msgHead}\n**${actingTeamName}** enviou uma proposta para **${targetPlayerName}**!\n\n${details}`, 'transfer');
         
         setModal(null); 
-        alert("Enviado com sucesso! Aguarde a resposta do destinatário.");
+        alert("Enviado com sucesso! Aguarde a resposta.");
     } catch (e) {
         console.error("Erro no Firebase:", e);
         alert("Erro técnico ao gravar no banco de dados.");
@@ -1135,7 +1145,7 @@ const renewContract = async (p) => {
                     setLoading(false);
                 }
 
-                // --- VIRADA DE TEMPORADA (SISTEMA DE RETORNO INTELIGENTE v1.53.0) ---
+                // --- VIRADA DE TEMPORADA (SISTEMA DE RETORNO INTELIGENTE v1.53.1) ---
                 if (act === 'SEASON') {
                     if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos\n3. Processar Opções de Compra/Retorno\n4. Mover sem contrato para Agentes Livres")) return;
 
@@ -1183,7 +1193,7 @@ const renewContract = async (p) => {
                                 u.status = 'INTRANSFERIVEL'; 
                             } else {
                                 // CASO 2: SEM OPÇÃO DE COMPRA -> RETORNO AO DONO
-                                // v1.53.0: Calcula os anos restantes: (Contrato original com o dono - 1 temporada que passou)
+                                // v1.53.1: Calcula os anos restantes: (Contrato original com o dono - 1 temporada que passou)
                                 let contractWithDonoRemaining = (parseInt(p.loanMeta.originalContract) || 1) - 1;
 
                                 if (contractWithDonoRemaining <= 0) {
@@ -1291,7 +1301,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.53.0</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.53.1</div>
                             </div>
                         </div>
                         
@@ -1554,7 +1564,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.53.0</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.53.1</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2432,7 +2442,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         {o.description}
                     </div>
 
-                    {/* v1.53.0: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
+                    {/* v1.53.1: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
                     {o.type === 'NOTIFICACAO' ? (
                         <div style={{display:'flex', gap:5}}>
                             <button className="btn btn-green" style={{width:'100%'}} onClick={()=>onAccept(o)}>

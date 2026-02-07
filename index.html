@@ -780,10 +780,10 @@ const renewContract = async (p) => {
 // FIM DA LÓGICA DE IMPRENSA E SÚMULAS
             
 // --- NOVA FUNÇÃO: AÇÕES DE CARREIRA DO JOGADOR ---
+        // --- DENTRO DA FUNÇÃO APP ---
             const handlePlayerActions = async (type, p) => {
                 const team = teams.find(t => t.id === p.teamId);
                 
-                // 1. PEDIR TRANSFERÊNCIA
                 if (type === 'TRANSFER_REQUEST') {
                     if (!team) return alert("Já és um Agente Livre!");
                     if (p.status === 'VENDA') return alert("Já estás na lista de transferências.");
@@ -797,541 +797,278 @@ const renewContract = async (p) => {
                     alert("O pedido foi feito. O teu humor piorou.");
                 }
 
-                // 2. PEDIR AUMENTO
                 if (type === 'ASK_RAISE') {
                     if (!team) return alert("Precisas de um clube para pedir aumento.");
                     if (!confirm("Ir à imprensa pedir um aumento salarial?")) return;
 
-                    // Apenas lança a notícia para pressionar o dono
                     postNews(`💰 **POLÉMICA**\n**${p.name}** declara publicamente: "Mereço ganhar mais no ${team.name}. Espero uma renovação em breve."`, 'press');
                     alert("Declaração feita à imprensa! O presidente foi notificado.");
                 }
             };
             
-            // 3. Função Mestra do Admin (COM REGRA DE AGENTES LIVRES)
-    const adminAction = async (act, data) => {
-    if (act === 'MARKET') {
-        db.collection('config').doc('system').update({ marketOpen: data });
-        postNews(data ? "📢 JANELA ABERTA" : "🔒 JANELA FECHADA", 'infra');
-    }
-
-    // --- VIRADA DE SEMANA ---
-    if (act === 'WEEK') {
-        if (!confirm("⚠️ VIRAR SEMANA?\n\n1. Pagar Salários (+)\n2. Cobrar Imposto Jogador (3%)\n3. Recuperar Energia (100%)\n4. Empresas e XP")) return;
-
-        setLoading(true);
-        const b = db.batch();
-
-        players.forEach(p => {
-            if (p.teamId && p.teamId !== 'FREE') {
-                if (teams.some(t => t.id === p.teamId)) {
-                    const currentBal = parseFloat(p.balance) || 0;
-                    const salary = parseFloat(p.salary) || 0;
-                    const tax = currentBal * 0.03;
-                    const finalBalance = (currentBal + salary) - tax;
-                    const xpTotal = (p.xp || 0) + (p.pendingXP || 0);
-
-                    b.update(db.collection('players').doc(p.id), {
-                        balance: finalBalance,
-                        energy: 100,
-                        xp: xpTotal,
-                        pendingXP: 0
-                    });
+            const adminAction = async (act, data) => {
+                if (act === 'MARKET') {
+                    db.collection('config').doc('system').update({ marketOpen: data });
+                    postNews(data ? "📢 JANELA ABERTA" : "🔒 JANELA FECHADA", 'infra');
                 }
-            }
-        });
 
-        teams.forEach(t => {
-            const currentBal = parseFloat(t.balance) || 0;
-            const wages = players.filter(p => p.teamId === t.id).reduce((a, p) => a + (parseFloat(p.salary) || 0), 0);
-            const income = sps.filter(s => s.teamId === t.id && s.status === 'ACTIVE').reduce((a, s) => a + parseFloat(s.value), 0);
-            b.update(db.collection('teams').doc(t.id), {
-                balance: currentBal + income - wages
-            });
-        });
+                if (act === 'WEEK') {
+                    if (!confirm("⚠️ VIRAR SEMANA?\n\n1. Pagar Salários (+)\n2. Cobrar Imposto Jogador (3%)\n3. Recuperar Energia (100%)\n4. Empresas e XP")) return;
 
-        companies.forEach(c => {
-            if (c.status === 'ACTIVE') {
-                const currentBal = parseFloat(c.balance) || 0;
-                const type = c.companyType || 'COMERCIO';
-                const tax = (COMPANY_TYPES[type] || {}).tax || 50000;
-                b.update(db.collection('companies').doc(c.id), {
-                    balance: currentBal - tax
-                });
-            }
-        });
+                    setLoading(true);
+                    const b = db.batch();
 
-        const ds = await db.collection('debts').get();
-        ds.docs.forEach(doc => {
-            const d = doc.data();
-            const buyerExists = teams.some(t => t.id === d.buyerId);
-            const sellerExists = teams.some(t => t.id === d.sellerId);
+                    players.forEach(p => {
+                        if (p.teamId && p.teamId !== 'FREE') {
+                            if (teams.some(t => t.id === p.teamId)) {
+                                const currentBal = parseFloat(p.balance) || 0;
+                                const salary = parseFloat(p.salary) || 0;
+                                const tax = currentBal * 0.03;
+                                const finalBalance = (currentBal + salary) - tax;
+                                const xpTotal = (p.xp || 0) + (p.pendingXP || 0);
 
-            if (!buyerExists || !sellerExists) {
-                b.delete(doc.ref);
-            } else if (d.weeksRemaining > 0) {
-                b.update(db.collection('teams').doc(d.buyerId), { balance: firebase.firestore.FieldValue.increment(-d.installmentVal) });
-                b.update(db.collection('teams').doc(d.sellerId), { balance: firebase.firestore.FieldValue.increment(d.installmentVal) });
-                if (d.weeksRemaining - 1 === 0) {
-                    b.delete(doc.ref);
-                    postNews(`✅ **DÍVIDA QUITADA**\n${d.buyerName} terminou de pagar ${d.playerName}.`, 'money');
-                } else {
-                    b.update(doc.ref, { weeksRemaining: d.weeksRemaining - 1 });
-                    postNews(`💳 **PARCELA PAGA**\n${d.buyerName} pagou a parcela (${d.weeksRemaining}x) de ${d.playerName}.`, 'money-minus');
-                }
-            }
-        });
-
-        try {
-            await b.commit();
-            alert("Semana processada!");
-        } catch (error) {
-            alert("Erro: " + error.message);
-        }
-        setLoading(false);
-    }
-
-    // --- VIRADA DE TEMPORADA (SISTEMA DE RETORNO INTELIGENTE CORRIGIDO) ---
-    if (act === 'SEASON') {
-        if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos\n3. Processar Opções de Compra/Retorno\n4. Mover sem contrato para Agentes Livres")) return;
-
-        setLoading(true);
-        const b = db.batch();
-
-        players.forEach(p => {
-            let u = {};
-            const currentLvl = p.overall || 45;
-            const currentXP = p.xp || 0;
-            const res = calcNewLevel(currentLvl, currentXP, 0);
-            if (res.lvl !== currentLvl) {
-                u.overall = res.lvl;
-                u.xp = res.xp;
-            }
-
-            let nc = (parseInt(p.contract) || 0) - 1;
-            if (nc < 0) nc = 0;
-            u.contract = nc;
-
-            if (nc === 0 && p.loanMeta && p.loanMeta.ownerId) {
-                const ownerId = p.loanMeta.ownerId;
-                const ownerTeam = teams.find(t => t.id === ownerId);
-                const borrowingTeamName = teams.find(t => t.id === p.teamId)?.name || 'outro clube';
-                
-                if (p.loanMeta.hasBuyOption && p.loanMeta.buyOpt > 0) {
-                    const currentTeam = teams.find(t => t.id === p.teamId);
-                    const offerRef = db.collection('offers').doc();
-                    b.set(offerRef, {
-                        type: 'COMPRA_DEFINITIVA',
-                        playerId: p.id, playerName: p.name,
-                        buyerId: p.teamId, buyerName: currentTeam?.name || 'Clube Atual',
-                        sellerId: ownerId, recipientId: p.teamId, 
-                        value: p.loanMeta.buyOpt, status: 'PENDING',
-                        description: `🏁 **FIM DE EMPRÉSTIMO**\nDeseja exercer a opção de compra de **${p.name}** por ${fmt(p.loanMeta.buyOpt)}?\nCaso recuse, o jogador retornará ao clube de origem.`,
-                        date: Date.now(), isLoanOption: true 
+                                b.update(db.collection('players').doc(p.id), {
+                                    balance: finalBalance,
+                                    energy: 100,
+                                    xp: xpTotal,
+                                    pendingXP: 0
+                                });
+                            }
+                        }
                     });
-                    u.status = 'INTRANSFERIVEL'; 
-                } else {
-                    let contractWithDonoRemaining = (parseInt(p.loanMeta.originalContract) || 1) - 1;
 
-                    if (contractWithDonoRemaining <= 0) {
-                        const renewalReqRef = db.collection('offers').doc();
-                        b.set(renewalReqRef, {
-                            type: 'RENOVACAO_URGENTE',
-                            playerId: p.id, playerName: p.name,
-                            buyerId: ownerId, buyerName: ownerTeam?.name || 'Clube de Origem',
-                            sellerId: 'SISTEMA', recipientId: ownerId, status: 'PENDING',
-                            description: `⚠️ **URGENTE: FIM DE VÍNCULO**\nO empréstimo de **${p.name}** acabou e ele não tem mais contrato com você.`,
-                            date: Date.now()
+                    teams.forEach(t => {
+                        const currentBal = parseFloat(t.balance) || 0;
+                        const wages = players.filter(p => p.teamId === t.id).reduce((a, p) => a + (parseFloat(p.salary) || 0), 0);
+                        const income = sps.filter(s => s.teamId === t.id && s.status === 'ACTIVE').reduce((a, s) => a + parseFloat(s.value), 0);
+                        b.update(db.collection('teams').doc(t.id), {
+                            balance: currentBal + income - wages
                         });
-                        u.teamId = ownerId;
-                        u.contract = 0;
-                        u.status = 'INTRANSFERIVEL';
-                    } else {
-                        const returnMsgRef = db.collection('offers').doc();
-                        b.set(returnMsgRef, {
-                            type: 'NOTIFICACAO',
-                            playerId: p.id, playerName: p.name,
-                            buyerId: ownerId, buyerName: ownerTeam?.name,
-                            sellerId: borrowingTeamName, recipientId: ownerId,
-                            status: 'PENDING',
-                            description: `🔙 **JOGADOR DE VOLTA**\nSeu jogador **${p.name}** retornou do empréstimo no **${borrowingTeamName}** e já está à disposição.\nRestam **${contractWithDonoRemaining} anos** de contrato.`,
-                            date: Date.now()
-                        });
+                    });
 
-                        u.teamId = ownerId;
-                        u.contract = contractWithDonoRemaining;
-                        u.status = 'NAO_A_VENDA';
-                        postNews(`🔙 **RETORNO**\n${p.name} voltou ao ${ownerTeam?.name} (${contractWithDonoRemaining} anos rest.).`, 'transfer');
+                    companies.forEach(c => {
+                        if (c.status === 'ACTIVE') {
+                            const currentBal = parseFloat(c.balance) || 0;
+                            const type = c.companyType || 'COMERCIO';
+                            const tax = (COMPANY_TYPES[type] || {}).tax || 50000;
+                            b.update(db.collection('companies').doc(c.id), {
+                                balance: currentBal - tax
+                            });
+                        }
+                    });
+
+                    const ds = await db.collection('debts').get();
+                    ds.docs.forEach(doc => {
+                        const d = doc.data();
+                        const buyerExists = teams.some(t => t.id === d.buyerId);
+                        const sellerExists = teams.some(t => t.id === d.sellerId);
+
+                        if (!buyerExists || !sellerExists) {
+                            b.delete(doc.ref);
+                        } else if (d.weeksRemaining > 0) {
+                            b.update(db.collection('teams').doc(d.buyerId), { balance: firebase.firestore.FieldValue.increment(-d.installmentVal) });
+                            b.update(db.collection('teams').doc(d.sellerId), { balance: firebase.firestore.FieldValue.increment(d.installmentVal) });
+                            if (d.weeksRemaining - 1 === 0) {
+                                b.delete(doc.ref);
+                                postNews(`✅ **DÍVIDA QUITADA**\n${d.buyerName} terminou de pagar ${d.playerName}.`, 'money');
+                            } else {
+                                b.update(doc.ref, { weeksRemaining: d.weeksRemaining - 1 });
+                                postNews(`💳 **PARCELA PAGA**\n${d.buyerName} pagou a parcela (${d.weeksRemaining}x) de ${d.playerName}.`, 'money-minus');
+                            }
+                        }
+                    });
+
+                    try {
+                        await b.commit();
+                        alert("Semana processada!");
+                    } catch (error) {
+                        alert("Erro: " + error.message);
                     }
-                    u.loanMeta = firebase.firestore.FieldValue.delete(); 
+                    setLoading(false);
                 }
-            } else if (nc === 0 && (!p.loanMeta || !p.loanMeta.ownerId)) {
-                if (p.preContract && teams.some(t => t.id === p.preContract.teamId)) {
-                    u.teamId = p.preContract.teamId;
-                    u.contract = 2;
-                    u.status = 'NAO_A_VENDA';
-                    u.preContract = firebase.firestore.FieldValue.delete();
-                } else {
-                    u.teamId = 'FREE';
-                    u.status = 'VENDA';
-                    u.mood = '😐';
-                    u.loanMeta = firebase.firestore.FieldValue.delete();
-                }
-            }
-            b.update(db.collection('players').doc(p.id), u);
-        });
 
-        try {
-            await b.commit();
-            alert("Temporada virada! Verifique as pendências.");
-        } catch (e) {
-            alert("Erro: " + e.message);
-        }
-        setLoading(false);
-        postNews("🌞 **NOVA TEMPORADA**\nContratos atualizados e retornos de empréstimo processados!", 'season');
-    }
-}; // FIM adminAction
+                if (act === 'SEASON') {
+                    if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos\n3. Processar Opções de Compra/Retorno\n4. Mover sem contrato para Agentes Livres")) return;
 
-const resetDatabase = async () => {
-    const senha = prompt("⚠️ PERIGO: Isso apagará TODOS os dados do jogo. Digite a senha master para confirmar:");
-    if (senha !== '2503') return; 
+                    setLoading(true);
+                    const b = db.batch();
 
-    if (!confirm("TEM CERTEZA?")) return;
+                    players.forEach(p => {
+                        let u = {};
+                        const currentLvl = p.overall || 45;
+                        const currentXP = p.xp || 0;
+                        const res = calcNewLevel(currentLvl, currentXP, 0);
+                        if (res.lvl !== currentLvl) {
+                            u.overall = res.lvl;
+                            u.xp = res.xp;
+                        }
 
-    setLoading(true);
-    const collections = ['teams', 'players', 'news', 'offers', 'sponsorships', 'sales', 'debts', 'financeRequests'];
-    
-    try {
-        for (const col of collections) {
-            const snapshot = await db.collection(col).get();
-            const batch = db.batch();
-            snapshot.docs.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
-        }
-        alert("💥 BANCO DE DADOS RESETADO!");
-        window.location.reload();
-    } catch (e) {
-        alert("Erro ao resetar: " + e.message);
-    }
-    setLoading(false);
-}; // FIM resetDatabase
+                        let nc = (parseInt(p.contract) || 0) - 1;
+                        if (nc < 0) nc = 0;
+                        u.contract = nc;
 
-// --- RENDER ---
-if (loading) return <div style={{ display: 'grid', placeItems: 'center', height: '100vh' }}>Carregando...</div>;
-if (!user) return <LoginScreen teams={teams} players={players} papers={papers} journalists={journalists} companies={companies} onLogin={login} onCreateTeam={createTeam} onCreatePaper={createNewspaper} onCreateJourno={createJournalist} onCreateCompany={createCompany} onAdmin={loginAdmin} onVisitor={() => { setUser({ type: 'VISITOR' }); setScreen('RANKING'); }} />;
-
-return (
-    <div>
-        <div className="header">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {user.type === 'USER' && user.data.logo && <img src={user.data.logo} style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid var(--primary)', objectFit: 'cover' }} />}
-                <div>
-                    <div style={{ fontWeight: '900', fontSize: 16 }}>{user.type === 'USER' ? user.data.name : user.data?.name || user.type}</div>
-                    <div className="dev-credits" style={{ textAlign: 'left', margin: 0 }}>Desenvolvido por: Nathan Reis | v1.52.3</div>
-                </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: 15, alignItems: 'center' }}>
-                {(user.type === 'USER' || user.type === 'PLAYER') && (
-                    <div onClick={() => setScreen('OFFERS')} style={{ position: 'relative', cursor: 'pointer', padding: '5px', display: 'flex', alignItems: 'center' }}>
-                        <i className="fas fa-bell" style={{ fontSize: '20px', color: (offers || []).filter(o => o.recipientId === user.data.id && o.status === 'PENDING').length > 0 ? 'var(--warning)' : '#666', transition: '0.3s' }}></i>
-                        {(offers || []).filter(o => o.recipientId === user.data.id && o.status === 'PENDING').length > 0 && (
-                            <span className="pulse" style={{ position: 'absolute', top: '2px', right: '2px', background: 'red', borderRadius: '50%', width: '10px', height: '10px', border: '2px solid var(--bg-card)' }}></span>
-                        )}
-                    </div>
-                )}
-                {(user.type === 'USER' || user.type === 'COMPANY' || user.type === 'PLAYER') && (
-                    <div style={{ color: 'var(--primary)', fontWeight: 'bold', marginLeft: 10 }}>{fmt(user.data.balance)}</div>
-                )}
-                {user.type === 'USER' && (
-                    <i className="fas fa-cog" style={{ cursor: 'pointer', marginLeft: 10 }} onClick={() => setModal({ type: 'SETTINGS', data: user.data })}></i>
-                )}
-                <i className="fas fa-sign-out-alt" style={{ cursor: 'pointer', marginLeft: 10 }} onClick={() => window.location.reload()}></i>
-            </div>
-        </div>
-
-        <div className="container">
-            {screen === 'HOME' && user.type === 'ADMIN' &&
-                <AdminPanel teams={teams} papers={papers} journalists={journalists} companies={companies} reqs={reqs} config={conf} onAct={adminAction} onPost={(t, b, tp) => postNews(`📢 **${t}**\n${b}`, tp)} onReject={(id) => db.collection('financeRequests').doc(id).delete()} onEditT={(t) => { setAdminTeam(t); setScreen('ADMIN_TEAM'); }} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam} onApprovePaper={async (id) => { db.collection('newspapers').doc(id).update({ status: 'ACTIVE' }); }} onDeletePaper={deletePaper} onDeleteJourno={deleteJournalist} onRejectPaper={(id) => db.collection('newspapers').doc(id).delete()} onConfig={(t) => setModal({ type: 'SETTINGS', data: t })} onReset={resetDatabase} onApproveComp={async (id) => { await db.collection('companies').doc(id).update({ status: 'ACTIVE' }); alert("Empresa Aprovada!"); }} onDeleteComp={async (id) => { if (confirm("Excluir Empresa?")) await db.collection('companies').doc(id).delete(); }} onUpdateCompBal={async (id, val) => { await db.collection('companies').doc(id).update({ balance: parseFloat(val) }); alert("Saldo Alterado!"); }} />
-            }
-            {screen === 'HOME' && user.type === 'USER' && <TeamDashboard team={user.data} players={players.filter(p => p.teamId === user.data.id)} isVisitor={false} onEdit={(p) => setModal({ type: 'PLAYER', data: p })} onAdd={() => setModal({ type: 'PLAYER' })} />}
-            {screen === 'HOME' && user.type === 'VISITOR' && <VisitorDashboard players={players} teams={teams} />}
-            {screen === 'PRESS_DASH' && (user.type === 'PRESS' || user.type === 'PRESS_WORKER') && (
-                <div>
-                    <h3>Painel de Imprensa ({user.data.name})</h3>
-                    <div className="card">
-                        <button className="btn btn-blue" onClick={() => setModal({ type: 'POST_NEWS' })}>ESCREVER NOTÍCIA</button>
-                        <button className="btn btn-purple" onClick={() => setModal({ type: 'MATCH_PERFORMANCE' })}>LANÇAR SÚMULA (XP)</button>
-                        <button className="btn btn-gold" onClick={() => setModal({ type: 'TEAM_TABLE' })}>EDITAR TABELA</button>
-                    </div>
-                </div>
-            )}
-            {screen === 'MARKET' && (
-                <Market me={user.data?.id} teams={teams} players={players} open={conf.marketOpen} isVis={user.type === 'VISITOR'} onNeg={(p) => setModal({ type: 'OFFER', data: p })} onPayClause={async (p) => { /* logic */ }} onPre={async (p) => { /* logic */ }} />
-            )}
-            {screen === 'SHOPPING' && <ShoppingScreen products={products} companies={companies} userTeam={user.type === 'USER' || user.type === 'PLAYER'} onBuy={buyProduct} />}
-            {screen === 'RANKING' && <Ranking teams={teams} players={players} />}
-            {screen === 'NEWS' && <div><h3>Notícias</h3>{news.map(n => <div key={n.id} className={`news-card news-${n.type}`}>{n.text}</div>)}</div>}
-            {screen === 'OFFERS' && <OffersScreen user={user} offers={offers} teams={teams} onAccept={acceptOffer} onReject={rejectOffer} onCounter={(o) => setModal({ type: 'OFFER', data: { ...players.find(p => p.id === o.playerId), oldOffer: o } })} />}
-            {screen === 'PLAYER_DASH' && user.type === 'PLAYER' && <PlayerDashboard player={players.find(p => p.id === user.data.id) || user.data} team={teams.find(t => t.id === user.data.teamId)} sales={sales || []} onAction={handlePlayerActions} onUpdatePassword={async (newP) => { await db.collection('players').doc(user.data.id).update({ password: newP }); alert("Senha alterada!"); }} />}
-        </div>
-
-        <div className="bottom-nav">
-            <div className={`nav-item ${['HOME', 'COMPANY_HOME', 'COMPANY_DASH', 'PLAYER_DASH'].includes(screen) ? 'active' : ''}`} onClick={() => { if (user.type.includes('PRESS')) setScreen('PRESS_DASH'); else if (user.type === 'COMPANY') setScreen('COMPANY_HOME'); else if (user.type === 'PLAYER') setScreen('PLAYER_DASH'); else setScreen('HOME'); }}><i className="fas fa-home"></i>INÍCIO</div>
-            {user.type !== 'COMPANY' && user.type !== 'PLAYER' && <div className={`nav-item ${screen === 'MARKET' ? 'active' : ''}`} onClick={() => setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>}
-            {user.type !== 'COMPANY' && <div className={`nav-item ${screen === 'SHOPPING' ? 'active' : ''}`} onClick={() => setScreen('SHOPPING')}><i className="fas fa-shopping-bag"></i>SHOP</div>}
-            {user.type === 'USER' && <div className={`nav-item ${screen === 'SPONSORSHIPS' ? 'active' : ''}`} onClick={() => setScreen('SPONSORSHIPS')}><i className="fas fa-handshake"></i>PATRO</div>}
-            {user.type !== 'COMPANY' && <div className={`nav-item ${screen === 'RANKING' ? 'active' : ''}`} onClick={() => setScreen('RANKING')}><i className="fas fa-trophy"></i>RANK</div>}
-            <div className={`nav-item ${screen === 'NEWS' ? 'active' : ''}`} onClick={() => { setScreen('NEWS'); setNewNews(false); localStorage.setItem('lastRead', Date.now()); }}><i className="fas fa-newspaper"></i>NEWS</div>
-        </div>
-
-        {modal && <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setModal(null)}>
-            <div className="modal-content">
-                {modal.type === 'PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={async (id) => { db.collection('players').doc(id).delete(); setModal(null); }} isAdmin={user.type === 'ADMIN'} teams={teams} onRenew={renewContract} isOwner={user.type === 'USER' && modal.data?.teamId === user.data?.id} />}
-                {modal.type === 'OFFER' && <OfferForm target={modal.data} myPlayers={players.filter(p => p.teamId === user.data.id)} onSend={sendOffer} setModal={setModal} user={user} />}
-                {modal.type === 'SETTINGS' && <SettingsForm team={modal.data || user.data} isAdmin={user.type === 'ADMIN'} onUp={(d) => { const tid = (modal.data?.id) || user.data.id; db.collection('teams').doc(tid).update(d); setModal(null); }} onUpgrade={() => { }} onReq={(t, a, d) => { db.collection('financeRequests').add({ teamId: user.data.id, teamName: user.data.name, type: t, amount: parseFloat(a), details: d, status: 'PENDING' }); setModal(null); alert("Enviado!"); }} onWithdraw={withdrawMoney} />}
-                {modal.type === 'MATCH_PERFORMANCE' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} />}
-                {modal.type === 'TEAM_TABLE' && <TeamStandingsEditor teams={teams} onUpdateTeamStats={updateTeamStats} />}
-                {modal.type === 'POST_NEWS' && <div><h3>Nova Notícia</h3><input className="input-field" placeholder="Manchete / Texto" id="news-body" /><button className="btn btn-blue" onClick={() => { postNews(`📰 **${user.data.name}:**\n${document.getElementById('news-body').value}`, 'press'); setModal(null); }}>PUBLICAR</button></div>}
-                {modal.type === 'STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
-            </div>
-        </div>}
-    </div>
-);
-// FIM DA LOGIN SCREEN E VISITOR DASHBOARD
-
-        // --- NOVO COMPONENTE: PAINEL DA EMPRESA ---
-       const CompanyDashboard = ({ company, products, sps, sales, teams, onSaveProd, onDeleteProd, onProcessSpons }) => {
-            const [tab, setTab] = useState('PRODS'); 
-            const [editP, setEditP] = useState(null); 
-            
-            return (
-                <div>
-                    <div style={{display:'flex', gap:10, marginBottom:15}}>
-                        <button className={`btn ${tab==='PRODS'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('PRODS')}>PRODUTOS</button>
-                        <button className={`btn ${tab==='FIN'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('FIN')}>FINANÇAS</button>
-                    </div>
-                    
-                    {tab==='PRODS' && <div>
-                        <button className="btn btn-green" onClick={()=>setEditP({name:'', price:'', img:'', desc:'', cat:'CHUTEIRA'})}>+ NOVO PRODUTO</button>
-                        
-                        {products.map(p => (
-                            <div key={p.id} className="card" style={{display:'flex', gap:10, textAlign:'left'}}>
-                                <img src={p.img || 'https://via.placeholder.com/100'} style={{width:80, height:80, objectFit:'cover', borderRadius:6}} />
-                                <div style={{flex:1}}>
-                                    <span style={{fontSize:10, background:'#333', padding:'2px 6px', borderRadius:4, color:'#aaa'}}>{PROD_CATS[p.cat] || p.cat}</span>
-                                    <div style={{fontWeight:'bold', marginTop:2}}>{p.name}</div>
-                                    <span style={{color:'var(--primary)', fontWeight:'bold'}}>{fmt(p.price)}</span>
-                                    <p style={{fontSize:11, color:'#aaa', margin:'5px 0'}}>{p.desc}</p>
-                                </div>
-                                <div style={{display:'flex', flexDirection:'column', gap:5}}>
-                                    <button className="btn btn-blue" style={{width:'auto', padding:'5px 10px'}} onClick={()=>setEditP(p)}>✏️</button>
-                                    <button className="btn btn-red" style={{width:'auto', padding:'5px 10px'}} onClick={()=>onDeleteProd(p.id)}>X</button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>}
-
-                    {tab==='FIN' && <div>
-                        <div className="highlight-card"><h3>Saldo: {fmt(company.balance)}</h3><small>Imposto Semanal: {fmt((COMPANY_TYPES[company.companyType] || {}).tax || 0)}</small></div>
-                        <h4 style={{marginTop:20, color:'#ddd'}}>Histórico de Vendas</h4>
-                        <div style={{maxHeight:200, overflowY:'auto', background:'rgba(0,0,0,0.3)', padding:10, borderRadius:8, marginBottom:15, border:'1px solid #333'}}>
-                            {(!sales || sales.filter(s => s.companyId === company.id).length === 0) && <p style={{color:'#666', textAlign:'center', fontSize:11, margin:0}}>Nenhuma venda recente.</p>}
-                            {(sales || []).filter(s => s.companyId === company.id).map((s, i) => (
-                                <div key={i} style={{borderBottom:'1px solid #444', padding:'8px 0', fontSize:11, textAlign:'left'}}>
-                                    <div style={{display:'flex', justifyContent:'space-between'}}><b style={{color:'var(--primary)'}}>+ {fmt(s.price)}</b><span style={{color:'#888'}}>{new Date(s.date).toLocaleDateString()}</span></div>
-                                    <div style={{marginTop:2}}>👤 <span style={{color:'#fff', fontWeight:'bold'}}>{s.buyerName}</span> comprou 1x <span style={{color:'var(--purple)'}}>{s.productName}</span></div>
-                                </div>
-                            ))}
-                        </div>
-                        <h4>Solicitações</h4>{sps.filter(s=>s.status==='PENDING').length === 0 && <p style={{color:'#666'}}>Nenhuma.</p>}{sps.filter(s=>s.status==='PENDING').map(s => (<div key={s.id} className="card"><b>{s.teamName}</b> pede patrocínio.<br/>Valor: <span style={{color:'var(--warning)'}}>{fmt(s.value)}</span><br/><div style={{display:'flex', gap:5, marginTop:5}}><button className="btn btn-green" onClick={()=>onProcessSpons(s, 'ACTIVE')}>ACEITAR</button><button className="btn btn-red" onClick={()=>onProcessSpons(s, 'REJECTED')}>RECUSAR</button></div></div>))}
-                        <h4>Contratos Ativos</h4>{sps.filter(s=>s.status==='ACTIVE').length === 0 && <p style={{color:'#666'}}>Nenhum.</p>}{sps.filter(s=>s.status==='ACTIVE').map(s => (<div key={s.id} className="card" style={{borderLeft:'4px solid var(--primary)'}}><b>{s.teamName}</b><br/>Pagamento: {fmt(s.value)}<button className="btn btn-red" style={{marginTop:5}} onClick={()=>onProcessSpons(s, 'CANCELLED')}>CANCELAR</button></div>))}
-                    </div>}
-
-                    {editP && <div className="modal-overlay"><div className="modal-content">
-                        <h3>{editP.id ? 'Editar' : 'Novo'} Produto</h3>
-                        <label>Categoria</label>
-                        <select className="input-field" value={editP.cat || 'CHUTEIRA'} onChange={e=>setEditP({...editP, cat:e.target.value})}>
-                            {Object.keys(PROD_CATS).map(key => <option key={key} value={key}>{PROD_CATS[key]}</option>)}
-                        </select>
-                        <label>Nome</label><input className="input-field" value={editP.name} onChange={e=>setEditP({...editP, name:e.target.value})} />
-                        <label>Preço</label><input className="input-field" type="number" value={editP.price} onChange={e=>setEditP({...editP, price:e.target.value})} />
-                        <label>Imagem URL</label><input className="input-field" value={editP.img} onChange={e=>setEditP({...editP, img:e.target.value})} />
-                        <label>Descrição</label><textarea className="input-field" value={editP.desc} onChange={e=>setEditP({...editP, desc:e.target.value})} />
-                        <div style={{display:'flex', gap:10}}>
-                            <button className="btn btn-green" onClick={()=>{onSaveProd(editP); setEditP(null);}}>SALVAR</button>
-                            <button className="btn" onClick={()=>setEditP(null)}>CANCELAR</button>
-                        </div>
-                    </div></div>}
-                </div>
-            );
-        };
-
-// FIM DO COMPONENTE COMPANY DASHBOARD
-
-
-        // ... continuação do código anterior
-
-        const ShoppingScreen = ({ products, companies, userTeam, onBuy }) => {
-            const [term, setTerm] = useState('');
-            const list = products.filter(p => p.name.toLowerCase().includes(term.toLowerCase()));
-            
-            return (
-                <div>
-                    <h3>Shopping Global</h3>
-                    <input className="input-field" placeholder="Buscar produto..." value={term} onChange={e=>setTerm(e.target.value)} />
-                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                        {list.map(p => { 
-                            const comp = companies.find(c => c.id === p.companyId); 
-                            if (comp?.status !== 'ACTIVE') return null; 
+                        if (nc === 0 && p.loanMeta && p.loanMeta.ownerId) {
+                            const ownerId = p.loanMeta.ownerId;
+                            const ownerTeam = teams.find(t => t.id === ownerId);
+                            const borrowingTeamName = teams.find(t => t.id === p.teamId)?.name || 'outro clube';
                             
-                            return (
-                                <div key={p.id} className="card" style={{padding:10, position:'relative'}}>
-                                    <div style={{fontSize:9, background:'var(--purple)', position:'absolute', top:5, right:5, padding:'2px 5px', borderRadius:4, zIndex:10}}>
-                                        {comp.name}
-                                    </div>
-                                    <img src={p.img || 'https://via.placeholder.com/100'} className="prod-img" style={{width:'100%', height:100, objectFit:'cover', borderRadius:4}} />
-                                    <span style={{fontSize:9, color:'#888', display:'block', marginTop:5}}>
-                                        {PROD_CATS[p.cat] || 'Item'}
-                                    </span>
-                                    <div style={{fontWeight:'bold', fontSize:13, lineHeight:'1.2em'}}>{p.name}</div>
-                                    <div style={{color:'var(--primary)', fontWeight:'900', fontSize:14}}>{fmt(p.price)}</div>
-                                    {userTeam && <button className="btn btn-green" style={{marginTop:5, fontSize:10}} onClick={()=>onBuy(p, comp)}>COMPRAR</button>}
-                                </div>
-                            ); 
-                        })}
-                    </div>
-                    {list.length === 0 && <p style={{textAlign:'center', color:'#666'}}>Nenhum produto encontrado.</p>}
-                </div>
-            );
-        };
+                            if (p.loanMeta.hasBuyOption && p.loanMeta.buyOpt > 0) {
+                                const currentTeam = teams.find(t => t.id === p.teamId);
+                                const offerRef = db.collection('offers').doc();
+                                b.set(offerRef, {
+                                    type: 'COMPRA_DEFINITIVA',
+                                    playerId: p.id, playerName: p.name,
+                                    buyerId: p.teamId, buyerName: currentTeam?.name || 'Clube Atual',
+                                    sellerId: ownerId, recipientId: p.teamId, 
+                                    value: p.loanMeta.buyOpt, status: 'PENDING',
+                                    description: `🏁 **FIM DE EMPRÉSTIMO**\nDeseja exercer a opção de compra de **${p.name}** por ${fmt(p.loanMeta.buyOpt)}?\nCaso recuse, o jogador retornará ao clube de origem.`,
+                                    date: Date.now(), isLoanOption: true 
+                                });
+                                u.status = 'INTRANSFERIVEL'; 
+                            } else {
+                                let contractWithDonoRemaining = (parseInt(p.loanMeta.originalContract) || 1) - 1;
 
-        const TeamDashboard = ({ team, players, isVisitor, onEdit, onAdd }) => {
-            const payroll = players.reduce((total, p) => total + (parseFloat(p.salary) || 0), 0);
+                                if (contractWithDonoRemaining <= 0) {
+                                    const renewalReqRef = db.collection('offers').doc();
+                                    b.set(renewalReqRef, {
+                                        type: 'RENOVACAO_URGENTE',
+                                        playerId: p.id, playerName: p.name,
+                                        buyerId: ownerId, buyerName: ownerTeam?.name || 'Clube de Origem',
+                                        sellerId: 'SISTEMA', recipientId: ownerId, status: 'PENDING',
+                                        description: `⚠️ **URGENTE: FIM DE VÍNCULO**\nO empréstimo de **${p.name}** acabou e ele não tem mais contrato com você.`,
+                                        date: Date.now()
+                                    });
+                                    u.teamId = ownerId;
+                                    u.contract = 0;
+                                    u.status = 'INTRANSFERIVEL';
+                                } else {
+                                    const returnMsgRef = db.collection('offers').doc();
+                                    b.set(returnMsgRef, {
+                                        type: 'NOTIFICACAO',
+                                        playerId: p.id, playerName: p.name,
+                                        buyerId: ownerId, buyerName: ownerTeam?.name,
+                                        sellerId: borrowingTeamName, recipientId: ownerId,
+                                        status: 'PENDING',
+                                        description: `🔙 **JOGADOR DE VOLTA**\nSeu jogador **${p.name}** retornou do empréstimo no **${borrowingTeamName}** e já está à disposição.\nRestam **${contractWithDonoRemaining} anos** de contrato.`,
+                                        date: Date.now()
+                                    });
+
+                                    u.teamId = ownerId;
+                                    u.contract = contractWithDonoRemaining;
+                                    u.status = 'NAO_A_VENDA';
+                                    postNews(`🔙 **RETORNO**\n${p.name} voltou ao ${ownerTeam?.name} (${contractWithDonoRemaining} anos rest.).`, 'transfer');
+                                }
+                                u.loanMeta = firebase.firestore.FieldValue.delete(); 
+                            }
+                        } else if (nc === 0 && (!p.loanMeta || !p.loanMeta.ownerId)) {
+                            if (p.preContract && teams.some(t => t.id === p.preContract.teamId)) {
+                                u.teamId = p.preContract.teamId;
+                                u.contract = 2;
+                                u.status = 'NAO_A_VENDA';
+                                u.preContract = firebase.firestore.FieldValue.delete();
+                            } else {
+                                u.teamId = 'FREE';
+                                u.status = 'VENDA';
+                                u.mood = '😐';
+                                u.loanMeta = firebase.firestore.FieldValue.delete();
+                            }
+                        }
+                        b.update(db.collection('players').doc(p.id), u);
+                    });
+
+                    try {
+                        await b.commit();
+                        alert("Temporada virada!");
+                    } catch (e) {
+                        alert("Erro: " + e.message);
+                    }
+                    setLoading(false);
+                }
+            };
+
+            const resetDatabase = async () => {
+                const senha = prompt("⚠️ PERIGO: Isso apagará TODOS os dados. Digite a senha master:");
+                if (senha !== '2503') return; 
+                if (!confirm("TEM CERTEZA?")) return;
+
+                setLoading(true);
+                const collections = ['teams', 'players', 'news', 'offers', 'sponsorships', 'sales', 'debts', 'financeRequests'];
+                try {
+                    for (const col of collections) {
+                        const snapshot = await db.collection(col).get();
+                        const batch = db.batch();
+                        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+                        await batch.commit();
+                    }
+                    alert("BANCO RESETADO!");
+                    window.location.reload();
+                } catch (e) {
+                    alert("Erro ao resetar: " + e.message);
+                }
+                setLoading(false);
+            };
+
+            // --- RENDER DO COMPONENTE APP ---
+            if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
             
+            // ... (Aqui entra o seu bloco de return ( <div> ... ) que você já possui)
             return (
                 <div>
-                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:15}}>
-                        <div>
-                            <h3 style={{margin:0}}>Elenco ({players.length})</h3>
-                            <small style={{color:'#ccc'}}>
-                                Folha: <span style={{color:'var(--danger)', fontWeight:'bold'}}>{fmt(payroll)}</span>/sem
-                            </small>
-                        </div>
-                        {!isVisitor && <button className="btn btn-green" style={{width:'auto', padding:'5px 15px'}} onClick={onAdd}>+ JOGADOR</button>}
-                    </div>
-
-                    {players.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Nenhum jogador contratado.</p>}
-                    
-                    {players.sort((a,b)=>b.overall-a.overall).map(p => (
-                        <div key={p.id} className="card" onClick={()=>!isVisitor && onEdit(p)} style={{cursor: isVisitor?'default':'pointer'}}>
-                            <div style={{display:'flex', justifyContent:'space-between'}}>
-                                <div>
-                                    <span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span>
-                                    <b>{p.name}</b> {p.rating > 0 && <span className="rating-badge">★ {p.rating}</span>}
-                                </div>
-                                <span className="player-ov">{p.overall}</span>
-                            </div>
-                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', fontSize:11, color:'#aaa', marginTop:5}}>
-                                <div>Sal: {fmt(p.salary)}</div>
-                                <div>Val: {fmt(p.value)}</div>
-                                <div>Con: {p.contract}</div>
-                                <div>Mul: {fmt(p.clause)}</div>
-                            </div>
-                            <div className="stats-grid">
-                                <div className="stat-item"><span className="stat-lbl">⚽</span><span className="stat-val">{p.stats?.goals||0}</span></div>
-                                <div className="stat-item"><span className="stat-lbl">👟</span><span className="stat-val">{p.stats?.assists||0}</span></div>
-                                <div className="stat-item"><span className="stat-lbl">🛡️</span><span className="stat-val">{p.stats?.tackles||0}</span></div>
-                                <div className="stat-item"><span className="stat-lbl">🧤</span><span className="stat-val">{p.stats?.saves||0}</span></div>
-                                <div className="stat-item"><span className="stat-lbl">🟨</span><span className="stat-val">{p.stats?.yellows||0}</span></div>
-                                <div className="stat-item"><span className="stat-lbl">🟥</span><span className="stat-val">{p.stats?.reds||0}</span></div>
-                            </div>
-                        </div>
-                    ))}
+                   {/* Seu código de interface vai aqui */}
                 </div>
             );
+        } // FECHA A FUNÇÃO APP
+
+        // --- COMPONENTES EXTERNOS AO APP ---
+        const StatsEditor = ({ players, teams, onSave }) => {
+            const [search, setSearch] = useState(''); const [selP, setSelP] = useState(null); const [s, setS] = useState({});
+            const filtered = players.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+            if (selP) return ( <div><h3>Editando: {selP.name}</h3><div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}><div><label>Gols</label><input className="input-field" type="number" value={s.goals} onChange={e=>setS({...s, goals:parseInt(e.target.value)})} /></div><div><label>Assistências</label><input className="input-field" type="number" value={s.assists} onChange={e=>setS({...s, assists:parseInt(e.target.value)})} /></div><div><label>Desarmes</label><input className="input-field" type="number" value={s.tackles} onChange={e=>setS({...s, tackles:parseInt(e.target.value)})} /></div><div><label>Defesas</label><input className="input-field" type="number" value={s.saves} onChange={e=>setS({...s, saves:parseInt(e.target.value)})} /></div><div><label>Amarelos</label><input className="input-field" type="number" value={s.yellows} onChange={e=>setS({...s, yellows:parseInt(e.target.value)})} /></div><div><label>Vermelhos</label><input className="input-field" type="number" value={s.reds} onChange={e=>setS({...s, reds:parseInt(e.target.value)})} /></div></div><button className="btn btn-green" onClick={()=>onSave(selP.id, s)}>SALVAR ESTATÍSTICAS</button><button className="btn" onClick={()=>setSelP(null)}>VOLTAR</button></div> );
+            return (<div><input className="input-field" placeholder="Buscar jogador..." value={search} onChange={e=>setSearch(e.target.value)} /><div style={{maxHeight:300, overflowY:'auto'}}>{search.length > 0 && filtered.map(p => (<div key={p.id} className="card" onClick={()=>{setSelP(p); setS(p.stats || {goals:0,assists:0,tackles:0,saves:0,yellows:0,reds:0})}}><b>{p.name}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small></div>))}</div></div>);
         };
 
-// FIM DO SHOPPING E TEAM DASHBOARD
+        const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams, onRenew, isOwner }) => {
+            const [f, setF] = useState(initial || {name:'', position:'ATA', overall:'', value:'', salary:'', clause:'', contract:'', mood:'😐', status:'NAO_A_VENDA', password:'', balance: 0, rating: '', stats: {goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0}});
+            
+            return (
+                <div className="modal-bg"><div className="modal-content">
+                    <h3>{initial ? 'Editar Jogador' : 'Novo Jogador'}</h3>
+                    <label>Nome</label><input className="input-field" value={f.name} onChange={e=>setF({...f, name:e.target.value})} />
+                    
+                    <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:5, marginBottom:10, border:'1px solid #444'}}>
+                        <label style={{color:'var(--secondary)'}}>🔐 Senha de Acesso</label>
+                        <input className="input-field" type="text" placeholder="Senha provisória" value={f.password || ''} onChange={e=>setF({...f, password:e.target.value})} />
+                    </div>
 
+                    {isAdmin && (
+                        <div style={{border:'1px solid var(--primary)', padding:8, borderRadius:5, marginBottom:10, background:'rgba(0,255,0,0.05)'}}>
+                            <label style={{color:'var(--primary)'}}>💰 Saldo em Conta (Admin)</label>
+                            <input className="input-field" type="number" value={f.balance||0} onChange={e=>setF({...f, balance:e.target.value})} />
+                        </div>
+                    )}
 
-
-       const StatsEditor = ({ players, teams, onSave }) => {
-            const [search, setSearch] = useState(''); const [selP, setSelP] = useState(null); const [s, setS] = useState({});
-            const filtered = players.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
-            if (selP) return ( <div><h3>Editando: {selP.name}</h3><div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}><div><label>Gols</label><input className="input-field" type="number" value={s.goals} onChange={e=>setS({...s, goals:parseInt(e.target.value)})} /></div><div><label>Assistências</label><input className="input-field" type="number" value={s.assists} onChange={e=>setS({...s, assists:parseInt(e.target.value)})} /></div><div><label>Desarmes</label><input className="input-field" type="number" value={s.tackles} onChange={e=>setS({...s, tackles:parseInt(e.target.value)})} /></div><div><label>Defesas</label><input className="input-field" type="number" value={s.saves} onChange={e=>setS({...s, saves:parseInt(e.target.value)})} /></div><div><label>Amarelos</label><input className="input-field" type="number" value={s.yellows} onChange={e=>setS({...s, yellows:parseInt(e.target.value)})} /></div><div><label>Vermelhos</label><input className="input-field" type="number" value={s.reds} onChange={e=>setS({...s, reds:parseInt(e.target.value)})} /></div></div><button className="btn btn-green" onClick={()=>onSave(selP.id, s)}>SALVAR ESTATÍSTICAS</button><button className="btn" onClick={()=>setSelP(null)}>VOLTAR</button></div> );
-            return (<div><input className="input-field" placeholder="Buscar jogador..." value={search} onChange={e=>setSearch(e.target.value)} /><div style={{maxHeight:300, overflowY:'auto'}}>{search.length > 0 && filtered.map(p => (<div key={p.id} className="card" onClick={()=>{setSelP(p); setS(p.stats || {goals:0,assists:0,tackles:0,saves:0,yellows:0,reds:0})}}><b>{p.name}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small></div>))}</div></div>);
-        };
-
-        const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams, onRenew, isOwner }) => {
-            // Adicionei 'balance' no estado inicial
-            const [f, setF] = useState(initial || {name:'', position:'ATA', overall:'', value:'', salary:'', clause:'', contract:'', mood:'😐', status:'NAO_A_VENDA', password:'', balance: 0, rating: '', stats: {goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0}});
-            
-            return (
-                <div>
-                    <div className="modal-bg"><div className="modal-content">
-                    <h3>{initial ? 'Editar Jogador' : 'Novo Jogador'}</h3>
-                    <label>Nome</label><input className="input-field" value={f.name} onChange={e=>setF({...f, name:e.target.value})} />
-                    
-                    <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:5, marginBottom:10, border:'1px solid #444'}}>
-                        <label style={{color:'var(--secondary)'}}>🔐 Senha de Acesso</label>
-                        <input className="input-field" type="text" placeholder="Crie uma senha provisória" value={f.password || ''} onChange={e=>setF({...f, password:e.target.value})} />
-                    </div>
-
-                    {/* NOVO: CAMPO DE SALDO (SÓ PARA ADMIN) */}
-                    {isAdmin && (
-                        <div style={{border:'1px solid var(--primary)', padding:8, borderRadius:5, marginBottom:10, background:'rgba(0,255,0,0.05)'}}>
-                            <label style={{color:'var(--primary)'}}>💰 Saldo em Conta (Admin)</label>
-                            <input className="input-field" type="number" value={f.balance||0} onChange={e=>setF({...f, balance:e.target.value})} />
-                        </div>
-                    )}
-
-                    <div style={{display:'flex', gap:5}}><div style={{flex:1}}><label>Posição</label><select className="input-field" value={f.position} onChange={e=>setF({...f, position:e.target.value})}>{POS.map(p=><option key={p} value={p}>{p}</option>)}</select></div><div style={{flex:1}}><label>Overall</label><input className="input-field" type="number" value={f.overall} onChange={e=>setF({...f, overall:e.target.value})} disabled={!isAdmin && initial} /></div></div>
-                    <div style={{display:'flex', gap:5}}><div style={{flex:1}}><label>Valor</label><input className="input-field" type="number" value={f.value} onChange={e=>setF({...f, value:e.target.value})} /></div><div style={{flex:1}}><label>Salário</label><input className="input-field" type="number" value={f.salary} onChange={e=>setF({...f, salary:e.target.value})} /></div></div>
-                    <div style={{display:'flex', gap:5}}><div style={{flex:1}}><label>Multa</label><input className="input-field" type="number" value={f.clause} onChange={e=>setF({...f, clause:e.target.value})} /></div><div style={{flex:1}}><label>Contrato</label><input className="input-field" type="number" value={f.contract} onChange={e=>setF({...f, contract:e.target.value})} /></div></div>
-                    <label>Status</label><select className="input-field" value={f.status} onChange={e=>setF({...f, status:e.target.value})}><option value="NAO_A_VENDA">Não Listado</option><option value="VENDA">À Venda</option><option value="EMPRESTIMO">Empréstimo</option><option value="INTRANSFERIVEL">Bloqueado</option></select>
-                    <label>Humor</label><select className="input-field" value={f.mood} onChange={e=>setF({...f, mood:e.target.value})}><option>🤩</option><option>😐</option><option>😡</option></select>
-                    
-{isAdmin && (
-                        <div style={{border:'1px solid var(--purple)', padding:8, borderRadius:5, margin:'5px 0'}}>
-                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5}}>
-                                <label style={{color:'var(--purple)', fontWeight:'bold'}}>Nota Oficial (Admin)</label>
-                                
-                                {/* AQUI: MOSTRA A MÉDIA DA IMPRENSA COMO SUGESTÃO */}
-                                {initial?.pressRatingAvg && (
-                                    <span style={{fontSize:10, background:'#333', padding:'2px 6px', borderRadius:4, border:'1px solid #555'}}>
-                                        📰 Imprensa: <span style={{color:'var(--warning)', fontWeight:'bold'}}>{initial.pressRatingAvg}</span> ({initial.pressRatingCount} jgs)
-                                    </span>
-                                )}
-                            </div>
-                            
-                            <input className="input-field" type="number" step="0.1" min="0" max="10" value={f.rating} onChange={e=>setF({...f, rating:e.target.value})} />
-                            <small style={{color:'#888', fontSize:10}}>O XP é calculado com base NESTA nota, não na da imprensa.</small>
-                        </div>
-                    )}                    
-                    {isAdmin && <div style={{border:'1px solid var(--primary)', padding:8, borderRadius:8, marginTop:10}}>
-                        <label style={{color:'var(--primary)', display:'block', marginBottom:5}}>Estatísticas (Admin)</label>
-                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:5}}>
-                            <div><span style={{fontSize:10, color:'#aaa'}}>⚽ Gols</span><input className="input-field" type="number" value={f.stats?.goals||0} onChange={e=>setF({...f, stats:{...f.stats, goals:e.target.value}})} /></div>
-                            <div><span style={{fontSize:10, color:'#aaa'}}>👟 Assis</span><input className="input-field" type="number" value={f.stats?.assists||0} onChange={e=>setF({...f, stats:{...f.stats, assists:e.target.value}})} /></div>
-                            <div><span style={{fontSize:10, color:'#aaa'}}>🛡️ Desar</span><input className="input-field" type="number" value={f.stats?.tackles||0} onChange={e=>setF({...f, stats:{...f.stats, tackles:e.target.value}})} /></div>
-                            <div><span style={{fontSize:10, color:'#aaa'}}>🧤 Defes</span><input className="input-field" type="number" value={f.stats?.saves||0} onChange={e=>setF({...f, stats:{...f.stats, saves:e.target.value}})} /></div>
-                            <div><span style={{fontSize:10, color:'#aaa'}}>🟨 Amar</span><input className="input-field" type="number" value={f.stats?.yellows||0} onChange={e=>setF({...f, stats:{...f.stats, yellows:e.target.value}})} /></div>
-                            <div><span style={{fontSize:10, color:'#aaa'}}>🟥 Verm</span><input className="input-field" type="number" value={f.stats?.reds||0} onChange={e=>setF({...f, stats:{...f.stats, reds:e.target.value}})} /></div>
-                        </div>
-                    </div>}
-
-                    {isAdmin && <div style={{border:'1px solid gold', padding:5, marginTop:5}}><label style={{color:'gold'}}>Mover Time (Adm)</label><select className="input-field" onChange={e=>setF({...f, forcedTeamId:e.target.value})}><option value="">-- Manter --</option>{teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></div>}
-                    
-                    <div style={{display:'flex', gap:10, marginTop:15}}>
-                        <button className="btn btn-green" onClick={()=>onSave(f)}>SALVAR</button>
-                        {isOwner && <button className="btn btn-blue" onClick={()=>onRenew(initial)}>RENOVAR</button>}
-                        {initial && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>X</button>}
-                        <button className="btn" onClick={()=>setF(null)}>CANCELAR</button>
-                    </div>
-                </div></div></div>
-            );
-        };
+                    <div style={{display:'flex', gap:5}}><div style={{flex:1}}><label>Posição</label><select className="input-field" value={f.position} onChange={e=>setF({...f, position:e.target.value})}>{POS.map(p=><option key={p} value={p}>{p}</option>)}</select></div><div style={{flex:1}}><label>Overall</label><input className="input-field" type="number" value={f.overall} onChange={e=>setF({...f, overall:e.target.value})} disabled={!isAdmin && initial} /></div></div>
+                    <div style={{display:'flex', gap:5}}><div style={{flex:1}}><label>Valor</label><input className="input-field" type="number" value={f.value} onChange={e=>setF({...f, value:e.target.value})} /></div><div style={{flex:1}}><label>Salário</label><input className="input-field" type="number" value={f.salary} onChange={e=>setF({...f, salary:e.target.value})} /></div></div>
+                    <div style={{display:'flex', gap:5}}><div style={{flex:1}}><label>Multa</label><input className="input-field" type="number" value={f.clause} onChange={e=>setF({...f, clause:e.target.value})} /></div><div style={{flex:1}}><label>Contrato</label><input className="input-field" type="number" value={f.contract} onChange={e=>setF({...f, contract:e.target.value})} /></div></div>
+                    <label>Status</label><select className="input-field" value={f.status} onChange={e=>setF({...f, status:e.target.value})}><option value="NAO_A_VENDA">Não Listado</option><option value="VENDA">À Venda</option><option value="EMPRESTIMO">Empréstimo</option><option value="INTRANSFERIVEL">Bloqueado</option></select>
+                    <label>Humor</label><select className="input-field" value={f.mood} onChange={e=>setF({...f, mood:e.target.value})}><option>🤩</option><option>😐</option><option>😡</option></select>
+                    
+                    {isAdmin && (
+                        <div style={{border:'1px solid var(--purple)', padding:8, borderRadius:5, margin:'5px 0'}}>
+                            <label style={{color:'var(--purple)', fontWeight:'bold'}}>Nota Oficial (Admin)</label>
+                            <input className="input-field" type="number" step="0.1" min="0" max="10" value={f.rating} onChange={e=>setF({...f, rating:e.target.value})} />
+                        </div>
+                    )}
+                    
+                    <div style={{display:'flex', gap:10, marginTop:15}}>
+                        <button className="btn btn-green" onClick={()=>onSave(f)}>SALVAR</button>
+                        {isOwner && <button className="btn btn-blue" onClick={()=>onRenew(initial)}>RENOVAR</button>}
+                        {initial && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>X</button>}
+                        <button className="btn" onClick={()=>setModal(null)}>CANCELAR</button>
+                    </div>
+                </div></div>
+            );
+        };
 
 // FIM DO STATS EDITOR E PLAYER FORM
 

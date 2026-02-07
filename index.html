@@ -628,7 +628,7 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
 
 const acceptOffer = async (o) => {
     try {
-        // --- v1.52.8: LÓGICA DE NOTIFICAÇÃO (APENAS LEITURA) ---
+        // --- v1.52.9: LÓGICA DE NOTIFICAÇÃO (APENAS LEITURA) ---
         if (o.type === 'NOTIFICACAO') {
             await db.collection('offers').doc(o.id).delete();
             alert('Confirmado!');
@@ -672,23 +672,16 @@ const acceptOffer = async (o) => {
 
         const iAmBuyer = user.type === 'USER' && user.data.id === o.buyerId;
         const iAmSeller = user.type === 'USER' && user.data.id === o.sellerId;
-        // Verifica se é o jogador logado ou se é um admin/visitante atuando como agente livre
         const iAmPlayer = user.type === 'PLAYER' || (isFreeAgent && !iAmBuyer);
 
-        // --- FASE 1: ACORDO ENTRE CLUBES (TAXA DE TRANSFERÊNCIA) ---
-        // Acontece se: Não é Agente Livre E o acordo ainda não foi selado.
-        // Quem pode aceitar: O Vendedor (proposta original) OU O Comprador (contraproposta do vendedor).
+        // --- FASE 1: ACORDO ENTRE CLUBES ---
         if (!isFreeAgent && !o.sellerAccepted && (iAmSeller || iAmBuyer)) {
-            
             if (iAmBuyer) {
-                // Se eu sou o Comprador aceitando aqui, é porque o Vendedor mandou uma contraproposta.
                 if (!confirm(`Aceitar a pedida do clube vendedor (${fmt(o.value)}) e negociar com o jogador?`)) return;
             } else {
-                // Sou o Vendedor aceitando a oferta do Comprador.
                 if (!confirm("Aceitar os valores propostos? O jogador decidirá o contrato agora.")) return;
             }
             
-            // Marca como aceito pelo vendedor e passa a bola para o JOGADOR (Fase 2)
             await db.collection('offers').doc(o.id).update({
                 recipientId: o.playerId, 
                 sellerAccepted: true,     
@@ -700,9 +693,7 @@ const acceptOffer = async (o) => {
             return;
         }
 
-        // --- FASE 2: ACORDO FINAL (CONTRATO E ASSINATURA) ---
-        // Acontece se: É Agente Livre OU (Clubes já se acertaram na Fase 1).
-        // Quem pode aceitar: O Jogador (proposta original) OU O Comprador (contraproposta de salário do jogador).
+        // --- FASE 2: ACORDO FINAL ---
         const readyForContract = isFreeAgent || o.sellerAccepted;
 
         if (readyForContract && (iAmPlayer || iAmBuyer)) {
@@ -713,12 +704,10 @@ const acceptOffer = async (o) => {
             const luvas = parseFloat(o.meta?.signingBonus) || 0;
             const custoTotalImediato = valorEntrada + luvas;
 
-            // Validação de Saldo do Comprador
             if (buy.balance < custoTotalImediato) {
                 return alert(`Saldo insuficiente no caixa do comprador!\nNecessário: ${fmt(custoTotalImediato)}`);
             }
 
-            // Confirmação Diferenciada
             if (iAmBuyer) {
                 if (!confirm(`Aceitar a pedida salarial do jogador e fechar a contratação?\nCusto Imediato: ${fmt(custoTotalImediato)}`)) return;
             } else {
@@ -728,10 +717,33 @@ const acceptOffer = async (o) => {
             // --- EXECUÇÃO DA TRANSFERÊNCIA ---
             const b = db.batch();
             
-            // 1. Paga o Clube Vendedor (se houver)
+            // 1. Paga o Clube Vendedor (se houver) E processa cláusula de revenda ANTIGA
             if (sel) {
-                b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorEntrada });
-                // Cria dívida se parcelado
+                let valorParaVendedor = valorEntrada;
+
+                // >>>> LÓGICA DE REVENDA (SELL-ON FEE) AUTOMÁTICA <<<<
+                // Se o jogador tinha uma cláusula antiga, desconta agora.
+                if (p.sellOnClause && p.sellOnClause.percentage > 0) {
+                    const beneficiaryId = p.sellOnClause.beneficiaryId;
+                    
+                    // Só executa se o beneficiário ainda existir e não for o mesmo que está comprando
+                    if (beneficiaryId && beneficiaryId !== buy.id) {
+                        const shareAmount = (valorEntrada * p.sellOnClause.percentage) / 100;
+                        
+                        // Desconta do vendedor atual
+                        valorParaVendedor -= shareAmount;
+                        
+                        // Paga ao dono original (Beneficiário)
+                        b.update(db.collection('teams').doc(beneficiaryId), { 
+                            balance: firebase.firestore.FieldValue.increment(shareAmount) 
+                        });
+                    }
+                }
+
+                // Paga o vendedor (já descontado a revenda, se houve)
+                b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + valorParaVendedor });
+
+                // Cria dívida se parcelado (Nota: A revenda incide sobre a entrada neste modelo)
                 if (o.meta?.installments > 1) {
                     const debtRef = db.collection('debts').doc();
                     b.set(debtRef, {
@@ -751,14 +763,20 @@ const acceptOffer = async (o) => {
                 b.update(db.collection('players').doc(p.id), { balance: firebase.firestore.FieldValue.increment(luvas) });
             }
 
-            // 4. Atualiza o Jogador (Move de time)
+            // 4. Atualiza o Jogador (Move de time e Grava NOVA Cláusula)
+            
+            // Prepara a NOVA cláusula se foi negociada agora
+            const newSellOnClause = (o.meta && o.meta.sellOn > 0 && sel) ? {
+                beneficiaryId: sel.id,
+                percentage: o.meta.sellOn
+            } : firebase.firestore.FieldValue.delete(); // Se não tem revenda nova, apaga a antiga
+
             b.update(db.collection('players').doc(p.id), {
                 teamId: buy.id,
                 status: 'NAO_A_VENDA',
                 contract: o.type === 'EMPRESTIMO' ? (parseInt(o.meta.loanDuration) || 1) : (parseInt(o.offerContract) || 1),
                 salary: parseFloat(o.meta?.newSalary) || p.salary,
                 role: o.meta?.role || 'ROTACAO',
-                // Salva contrato original se for empréstimo
                 loanMeta: o.type === 'EMPRESTIMO' ? { 
                     ownerId: sel?.id, 
                     salarySplit: o.meta.salarySplit || 100,
@@ -766,6 +784,8 @@ const acceptOffer = async (o) => {
                     buyOpt: o.meta.buyOpt || 0,
                     originalContract: p.contract 
                 } : null,
+                // AQUI GRAVA A NOVA CLÁUSULA NO JOGADOR
+                sellOnClause: newSellOnClause,
                 history: firebase.firestore.FieldValue.arrayUnion({ 
                     date: Date.now(), from: isFreeAgent ? 'AGENTE LIVRE' : (sel ? sel.name : 'Desconhecido'), to: buy.name, type: o.type, value: o.value 
                 })
@@ -780,6 +800,12 @@ const acceptOffer = async (o) => {
                 : `🤝 **TRANSFERÊNCIA CONCLUÍDA**\n**${p.name}** assinou com o **${buy.name}**!`;
             
             postNews(newsMsg, 'transfer');
+            
+            // Notificação extra se houve repasse de revenda
+            if (sel && p.sellOnClause && p.sellOnClause.percentage > 0) {
+                 postNews(`💸 **CLÁUSULA DE REVENDA**\nUma parte da venda de **${p.name}** (${p.sellOnClause.percentage}%) foi repassada ao seu antigo clube formador.`, 'money');
+            }
+
             alert("Negócio fechado com sucesso!");
         }
 
@@ -802,25 +828,20 @@ const rejectOffer = async (o) => {
             const b = db.batch();
             const pRef = db.collection('players').doc(p.id);
 
-            // --- CORREÇÃO DE SEGURANÇA PARA DADOS ANTIGOS (v1.52.8) ---
+            // --- CORREÇÃO DE SEGURANÇA PARA DADOS ANTIGOS ---
             let originalDuration = 0;
             
-            // Verifica se o contrato original foi salvo no momento do empréstimo
             if (p.loanMeta && p.loanMeta.originalContract) {
                 originalDuration = parseInt(p.loanMeta.originalContract);
             } else {
-                // FALLBACK: Se for um empréstimo antigo (sem dado salvo), assume 6 anos
                 console.warn("Contrato original não encontrado. Usando fallback de 6 anos.");
                 originalDuration = 6; 
             }
             
-            // Subtrai 1 temporada (o tempo que passou emprestado)
             let remainingContract = originalDuration - 1;
             if (remainingContract < 0) remainingContract = 0;
 
-            // Verifica se o contrato com o dono original acabou
             if (remainingContract <= 0) {
-                // REALMENTE ACABOU
                 const renewalReqRef = db.collection('offers').doc();
                 b.set(renewalReqRef, {
                     type: 'RENOVACAO_URGENTE',
@@ -844,7 +865,6 @@ const rejectOffer = async (o) => {
 
                 postNews(`🔙 **RETORNO CRÍTICO**\nO empréstimo de ${p.name} acabou e o contrato expirou!`, 'rumor');
             } else {
-                // AINDA TEM CONTRATO (NOTIFICAÇÃO)
                 const notifRef = db.collection('offers').doc();
                 b.set(notifRef, {
                     type: 'NOTIFICACAO',
@@ -1090,7 +1110,7 @@ const renewContract = async (p) => {
                     setLoading(false);
                 }
 
-                // --- VIRADA DE TEMPORADA (SISTEMA DE RETORNO INTELIGENTE v1.52.8) ---
+                // --- VIRADA DE TEMPORADA (SISTEMA DE RETORNO INTELIGENTE v1.52.9) ---
                 if (act === 'SEASON') {
                     if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos\n3. Processar Opções de Compra/Retorno\n4. Mover sem contrato para Agentes Livres")) return;
 
@@ -1138,7 +1158,7 @@ const renewContract = async (p) => {
                                 u.status = 'INTRANSFERIVEL'; 
                             } else {
                                 // CASO 2: SEM OPÇÃO DE COMPRA -> RETORNO AO DONO
-                                // v1.52.8: Calcula os anos restantes: (Contrato original com o dono - 1 temporada que passou)
+                                // v1.52.9: Calcula os anos restantes: (Contrato original com o dono - 1 temporada que passou)
                                 let contractWithDonoRemaining = (parseInt(p.loanMeta.originalContract) || 1) - 1;
 
                                 if (contractWithDonoRemaining <= 0) {
@@ -1246,7 +1266,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.52.8</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.52.9</div>
                             </div>
                         </div>
                         
@@ -1509,7 +1529,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.52.8</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.52.9</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2242,6 +2262,12 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                             <div className="card" style={{background: '#222', padding: '10px', marginTop: 10}}>
                                 <small>📦 PARCELAMENTO: <b>{meta.installments}x</b></small>
                                 <input type="range" min="1" max="12" value={meta.installments} onChange={e=>setMeta({...meta, installments: parseInt(e.target.value)})} style={{width:'100%'}} />
+                                
+                                <hr style={{borderColor: '#444', margin: '10px 0'}} />
+                                
+                                <small>📈 REVENDA FUTURA: <b style={{color:'gold'}}>{meta.sellOn}%</b></small>
+                                <input type="range" min="0" max="80" step="5" value={meta.sellOn} onChange={e=>setMeta({...meta, sellOn: parseInt(e.target.value)})} style={{width:'100%', accentColor: 'gold'}} />
+                                <div style={{fontSize:9, color:'#888'}}>O vendedor receberá esta % quando você vender o jogador.</div>
                             </div>
                         )}
                     </div>
@@ -2253,6 +2279,8 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                             <span>Tipo: <b>{isUrgentRenewal ? 'RENOVAÇÃO' : t}</b></span>
                             {!isUrgentRenewal && <span>Valor: <b>{fmt(v)}</b></span>}
                             {t === 'EMPRESTIMO' && <span>Duração: <b>{meta.loanDuration} Temp.</b></span>}
+                            {/* v1.52.9: Mostra a cláusula acordada */}
+                            {t === 'COMPRA' && meta.sellOn > 0 && <span style={{color:'gold'}}>Revenda: <b>{meta.sellOn}%</b></span>}
                         </div>
                     </div>
                 )}
@@ -2353,7 +2381,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         {o.description}
                     </div>
 
-                    {/* v1.52.8: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
+                    {/* v1.52.9: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
                     {o.type === 'NOTIFICACAO' ? (
                         <div style={{display:'flex', gap:5}}>
                             <button className="btn btn-green" style={{width:'100%'}} onClick={()=>onAccept(o)}>

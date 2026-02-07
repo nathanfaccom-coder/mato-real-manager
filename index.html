@@ -110,7 +110,7 @@
 
 // FIM DO BLOCO INICIAL
 
-      // --- SISTEMA DE ATRIBUTOS REALISTA (v1.53.8) ---
+      // --- SISTEMA DE ATRIBUTOS REALISTA (v1.53.9) ---
 // (Substitui o antigo Sistema de RPG)
 
 const ATTR_LABELS = {
@@ -473,7 +473,7 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
                 setLoading(false);
             }
 
-            // --- VIRADA DE TEMPORADA (ATRIBUTOS REALISTAS v1.53.8) ---
+            // --- VIRADA DE TEMPORADA (ATRIBUTOS REALISTAS v1.53.9) ---
             if (act === 'SEASON') {
                 if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Atributos (XP)\n2. Envelhecer Contratos\n3. Processar Retornos")) return;
 
@@ -1385,7 +1385,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.53.8</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.53.9</div>
                             </div>
                         </div>
                         
@@ -1585,7 +1585,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis |v1.53.8</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis |v1.53.9</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2010,8 +2010,11 @@ const renewContract = async (p) => {
         };
 
        const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams, onRenew, isOwner }) => {
+            // Verifica se é uma EDIÇÃO (tem ID) ou CRIAÇÃO (não tem ID)
+            const isEditing = initial && initial.id;
+
             const [f, setF] = useState(initial || {
-                name:'', position:'ATA', overall:60, value:'', salary:'', 
+                name:'', position:'ATA', overall:45, value:'', salary:'', 
                 clause:'', contract:'', mood:'😐', status:'NAO_A_VENDA', 
                 password:'', balance: 0, rating: '', 
                 stats: {goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0},
@@ -2019,36 +2022,39 @@ const renewContract = async (p) => {
             });
             
             const handleSave = () => {
-                // Cria uma cópia dos dados atuais do formulário
-                const dataToSave = { ...f };
-
-                // SE NÃO TIVER ATRIBUTOS (Criação ou Jogador Antigo), GERA AGORA!
-                if (!dataToSave.attributes || Object.keys(dataToSave.attributes).length === 0) {
-                    const targetOv = parseInt(dataToSave.overall) || 60;
-                    const newAttrs = generateAttributes(dataToSave.position, targetOv);
-                    
-                    // Calcula a média real
-                    const vals = Object.values(newAttrs);
-                    const realAvg = Math.round(vals.reduce((a,b)=>a+b,0) / vals.length);
-                    
-                    // Anexa os novos dados ao objeto que será salvo
-                    dataToSave.attributes = newAttrs;
-                    dataToSave.overall = realAvg;
-
-                    alert(`Atributos gerados com sucesso!\nOverall definido: ${realAvg}`);
+                // 1. Se já tem atributos (edição ou gerado), usa o que tem.
+                if (f.attributes && Object.keys(f.attributes).length > 0) {
+                    onSave(f);
+                    return;
                 }
 
-                // Envia o objeto COMPLETO (já com atributos) para a função do App
-                onSave(dataToSave);
+                // 2. Se é NOVO (não tem atributos), gera e SALVA DIRETO
+                const targetOv = parseInt(f.overall) || 60;
+                const newAttrs = generateAttributes(f.position, targetOv);
+                
+                // Calcula a média real
+                const vals = Object.values(newAttrs);
+                const realAvg = Math.round(vals.reduce((a,b)=>a+b,0) / vals.length);
+                
+                // CRIA O PACOTE PRONTO PARA SALVAR
+                const finalData = { 
+                    ...f, 
+                    attributes: newAttrs,
+                    overall: realAvg 
+                };
+
+                onSave(finalData);
+                alert(`Jogador criado! Atributos gerados com média ${realAvg}.`);
             };
 
             return (
                 <div className="modal-bg">
                     <div className="modal-content" style={{maxHeight:'90vh', overflowY:'auto'}}>
-                        <h3>{initial ? 'Ficha do Jogador' : 'Criar Jogador'}</h3>
+                        <h3>{isEditing ? 'Ficha do Jogador' : 'Criar Jogador'}</h3>
                         
                         <label>Nome</label>
-                        <input className="input-field" value={f.name} onChange={e=>setF({...f, name:e.target.value})} disabled={!isAdmin && initial} />
+                        {/* Só desabilita se não for admin E se o jogador já existir (isEditing) */}
+                        <input className="input-field" value={f.name} onChange={e=>setF({...f, name:e.target.value})} disabled={!isAdmin && isEditing} />
                         
                         <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:5, marginBottom:10, border:'1px solid #444'}}>
                             <label style={{color:'var(--secondary)'}}>🔐 Senha de Acesso</label>
@@ -2065,13 +2071,13 @@ const renewContract = async (p) => {
                         <div style={{display:'flex', gap:5}}>
                             <div style={{flex:1}}>
                                 <label>Posição</label>
-                                <select className="input-field" value={f.position} onChange={e=>setF({...f, position:e.target.value})} disabled={!isAdmin && initial}>
+                                <select className="input-field" value={f.position} onChange={e=>setF({...f, position:e.target.value})} disabled={!isAdmin && isEditing}>
                                     {POS.map(p=><option key={p} value={p}>{p}</option>)}
                                 </select>
                             </div>
                             <div style={{flex:1}}>
                                 <label>Overall (Meta)</label>
-                                <input className="input-field" type="number" value={f.overall} onChange={e=>setF({...f, overall:e.target.value})} disabled={!isAdmin && initial} />
+                                <input className="input-field" type="number" value={f.overall} onChange={e=>setF({...f, overall:e.target.value})} disabled={!isAdmin && isEditing} />
                             </div>
                         </div>
 
@@ -2141,8 +2147,11 @@ const renewContract = async (p) => {
                         
                         <div style={{display:'flex', gap:10, marginTop:15}}>
                             <button className="btn btn-green" onClick={handleSave}>SALVAR</button>
-                            {isOwner && <button className="btn btn-blue" onClick={()=>onRenew(initial)}>RENOVAR</button>}
-                            {initial && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>X</button>}
+                            
+                            {/* Botões extras só aparecem se o jogador já existe (isEditing) */}
+                            {isOwner && isEditing && <button className="btn btn-blue" onClick={()=>onRenew(initial)}>RENOVAR</button>}
+                            {isEditing && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>X</button>}
+                            
                             <button className="btn" onClick={()=>setF(null)}>CANCELAR</button>
                         </div>
                     </div>
@@ -2532,7 +2541,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         {o.description}
                     </div>
 
-                    {/*v1.53.8: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
+                    {/*v1.53.9: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
                     {o.type === 'NOTIFICACAO' ? (
                         <div style={{display:'flex', gap:5}}>
                             <button className="btn btn-green" style={{width:'100%'}} onClick={()=>onAccept(o)}>

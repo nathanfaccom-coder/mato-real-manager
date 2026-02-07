@@ -110,7 +110,7 @@
 
 // FIM DO BLOCO INICIAL
 
-      // --- SISTEMA DE ATRIBUTOS REALISTA (v1.53.4) ---
+      // --- SISTEMA DE ATRIBUTOS REALISTA (v1.53.5) ---
 // (Substitui o antigo Sistema de RPG)
 
 const ATTR_LABELS = {
@@ -473,7 +473,7 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
                 setLoading(false);
             }
 
-            // --- VIRADA DE TEMPORADA (ATRIBUTOS REALISTAS v1.53.4) ---
+            // --- VIRADA DE TEMPORADA (ATRIBUTOS REALISTAS v1.53.5) ---
             if (act === 'SEASON') {
                 if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Atributos (XP)\n2. Envelhecer Contratos\n3. Processar Retornos")) return;
 
@@ -822,65 +822,29 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
             const withdrawMoney = async (amount, reason) => { const val = parseFloat(amount.replace(',', '.')); if(isNaN(val) || val <= 0) return alert("Valor inválido!"); if(user.data.balance < val) return alert("Saldo insuficiente!"); await db.collection('teams').doc(user.data.id).update({ balance: firebase.firestore.FieldValue.increment(-val) }); postNews(`💸 **SAÍDA DE CAIXA**\nO **${user.data.name}** retirou ${fmt(val)}.\n📝 Motivo: ${reason}`, 'money-minus'); setModal(null); };
 
             // --- FUNÇÃO DE SALVAR JOGADOR (CORRIGIDA) ---
-            const savePlayer = async (d) => {
+           const savePlayer = async (p) => {
                 try {
-                    const isNew = !d.id;
-                    const ref = isNew ? db.collection('players').doc() : db.collection('players').doc(d.id);
-                    const old = isNew ? {} : (players.find(pl => pl.id === d.id) || {});
-
-                    let targetTeamId = d.teamId || old.teamId || 'FREE';
-                    if (user.type === 'USER') targetTeamId = user.data.id;
-                    if (user.type === 'ADMIN' && adminTeam) targetTeamId = adminTeam.id;
-                    if (d.forcedTeamId) targetTeamId = d.forcedTeamId;
-
-                    const data = {
-                        name: d.name || "Jogador Novo",
-                        position: d.position || "ATA",
-                        overall: Math.max(45, parseInt(d.overall) || 45),
-                        value: parseFloat(d.value) || 0,
-                        salary: parseFloat(d.salary) || 1000,
-                        clause: parseFloat(d.clause) || 1000000,
-                        contract: parseInt(d.contract) || 1,
-                        mood: d.mood || '😐',
-                        status: d.status || 'NAO_A_VENDA',
-                        teamId: targetTeamId,
-                        password: d.password || old.password || '1234',
-                        balance: parseFloat(d.balance || old.balance || 0),
-                        xp: parseInt(d.xp || old.xp || 0),
-                        energy: parseInt(d.energy || old.energy || 100),
-                        stats: d.stats || old.stats || { goals: 0, assists: 0, tackles: 0, saves: 0, yellows: 0, reds: 0 }
-                    };
-
-                    if (!isNew && data.overall !== old.overall) data.xp = 0;
-
-                    await ref.set(data, { merge: true });
-                    setModal(null);
+                    // Garante que estamos salvando o objeto completo, incluindo 'attributes'
+                    const payload = { ...p };
                     
-                    if (isNew) {
-                        const tName = teams.find(t => t.id === targetTeamId)?.name || "um clube";
-                        postNews(`🆕 **REFORÇO**\nO **${tName}** contratou **${data.name}**!`, 'transfer');
+                    if (p.id) {
+                        await db.collection('players').doc(p.id).update(payload);
                     } else {
-                        alert("Jogador atualizado!");
+                        // Se for criação e por acaso vier sem atributos, gera aqui (segurança)
+                        if (!payload.attributes) {
+                             payload.attributes = generateAttributes(payload.position || 'ATA', payload.overall || 60);
+                        }
+                        await db.collection('players').add(payload);
                     }
+                    setModal(null);
                 } catch (e) {
                     console.error(e);
-                    alert("Erro ao salvar! Verifique se digitou apenas números nos campos de valor.");
+                    alert("Erro ao salvar jogador: " + e.message);
                 }
-            };
-
-            const updateStats = async (pid, newStats) => { 
-                await db.collection('players').doc(pid).update({ stats: newStats }); 
-                alert("Stats Atualizados!"); 
-                setModal(null); 
             };
 
 // FIM DA GESTÃO ADMINISTRATIVA E SALVAR JOGADOR
 
-
-        
-           // --- SISTEMA DE NEGOCIAÇÃO E MERCADO (VERSÃO REALISTA 3.0 - REVISADA) ---
-           // --- SISTEMA DE NEGOCIAÇÃO E MERCADO (VERSÃO REALISTA 3.1 - CORRIGIDA) ---
-// --- SISTEMA DE NEGOCIAÇÃO E MERCADO (VERSÃO REALISTA 3.2 - FINAL) ---
 // --- SISTEMA DE NEGOCIAÇÃO E MERCADO (VERSÃO REALISTA 3.3 - FINAL BLINDADA) ---
 const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
     try {
@@ -1421,7 +1385,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.53.4</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.53.5</div>
                             </div>
                         </div>
                         
@@ -1700,7 +1664,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis |v1.53.4</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis |v1.53.5</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2100,7 +2064,6 @@ const renewContract = async (p) => {
                                 <div className="player-ov">{p.overall}</div>
                             </div>
 
-                            {/* Estatísticas Básicas */}
                             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:5, textAlign:'center', marginTop:10, background:'rgba(0,0,0,0.3)', padding:5, borderRadius:5}}>
                                 <div><small style={{color:'#aaa'}}>⚽ {p.stats?.goals||0}</small></div>
                                 <div><small style={{color:'#aaa'}}>👟 {p.stats?.assists||0}</small></div>
@@ -2110,7 +2073,7 @@ const renewContract = async (p) => {
                                 <div><small style={{color:'#aaa'}}>🟥 {p.stats?.reds||0}</small></div>
                             </div>
 
-                            {/* NOVO: ATRIBUTOS VISÍVEIS NO PAINEL */}
+                            {/* ATRIBUTOS VISÍVEIS NO PAINEL */}
                             <div style={{marginTop:10, paddingTop:5, borderTop:'1px dashed #444'}}>
                                  <AttributeGrid attrs={p.attributes} pendingXP={p.pendingXP} />
                             </div>
@@ -2652,7 +2615,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         {o.description}
                     </div>
 
-                    {/*v1.53.4: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
+                    {/*v1.53.5: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
                     {o.type === 'NOTIFICACAO' ? (
                         <div style={{display:'flex', gap:5}}>
                             <button className="btn btn-green" style={{width:'100%'}} onClick={()=>onAccept(o)}>

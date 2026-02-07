@@ -110,7 +110,7 @@
 
 // FIM DO BLOCO INICIAL
 
-      // --- SISTEMA DE ATRIBUTOS REALISTA (v1.53.9) ---
+      // --- SISTEMA DE ATRIBUTOS REALISTA (v1.54.0) ---
 // (Substitui o antigo Sistema de RPG)
 
 const ATTR_LABELS = {
@@ -139,17 +139,18 @@ const getAttrColor = (val) => {
 };
 
 // Gerador Inteligente de Atributos por Posição
+// Gerador Inteligente de Atributos (CORRIGIDO: Goleiros e Linha Balanceados)
 const generateAttributes = (pos, targetOv) => {
     const ov = parseInt(targetOv) || 50;
     const attrs = {};
     const keys = Object.keys(ATTR_LABELS);
 
-    // Pesos por posição (Quais atributos devem ser altos)
+    // Definição de pesos
     let primary = [], secondary = [];
 
     if (pos === 'GOL') {
         primary = ['gk', 'response', 'jump', 'longPass'];
-        secondary = ['balance', 'strength', 'mentality'];
+        secondary = ['balance', 'strength', 'mentality', 'defense'];
     } else if (pos.includes('ZAG')) {
         primary = ['defense', 'header', 'balance', 'jump', 'aggression'];
         secondary = ['stamina', 'response', 'shortPass', 'longPass'];
@@ -167,35 +168,44 @@ const generateAttributes = (pos, targetOv) => {
         secondary = ['dribble', 'agility', 'balance', 'reaction'];
     }
 
-    // Geração dos valores
-    let sum = 0;
+    // 1. Geração Base
     keys.forEach(k => {
         let base = ov;
-        // Aplica modificadores baseados na especialidade
-        if (primary.includes(k)) base += Math.floor(Math.random() * 10) + 5; // +5 a +15
-        else if (secondary.includes(k)) base += Math.floor(Math.random() * 6) - 2; // -2 a +4
-        else base -= Math.floor(Math.random() * 15) + 10; // -10 a -25 (Atributos ruins)
+        if (primary.includes(k)) base += Math.floor(Math.random() * 8) + 4; 
+        else if (secondary.includes(k)) base += Math.floor(Math.random() * 4); 
+        else base -= Math.floor(Math.random() * 12) + 8; // Reduz bastante os atributos ruins
 
-        // Ajuste especial para Goleiro (Evita atacante com GK alto e vice-versa)
-        if (pos !== 'GOL' && k === 'gk') base = 10 + Math.floor(Math.random() * 10);
-        if (pos === 'GOL' && (k === 'shot' || k === 'dribble')) base = 10 + Math.floor(Math.random() * 15);
+        // Ajustes específicos extremos
+        if (pos !== 'GOL' && k === 'gk') base = 5 + Math.floor(Math.random() * 10); // Linha tem GK horrível
+        if (pos === 'GOL' && ['shot', 'attack', 'dribble', 'curve', 'freeKick'].includes(k)) base = 5 + Math.floor(Math.random() * 15); // Goleiro tem pé ruim
 
-        // Trava entre 1 e 99
         if (base > 99) base = 99;
         if (base < 1) base = 1;
         
         attrs[k] = base;
-        sum += base;
     });
 
-    // Normalização (Força a média a ser próxima do Overall desejado)
-    const currentAvg = sum / keys.length;
+    // 2. Normalização Inteligente (A Mágica acontece aqui)
+    // Define quais atributos contam para a média final
+    const relevantKeys = keys.filter(k => {
+        if (pos === 'GOL') {
+            // Goleiro ignora atributos ofensivos na média
+            return !['shot', 'attack', 'dribble', 'curve', 'freeKick', 'weakFootAcc', 'weakFootFreq'].includes(k);
+        } else {
+            // Linha ignora atributo de goleiro
+            return k !== 'gk';
+        }
+    });
+    
+    let sum = 0;
+    relevantKeys.forEach(k => sum += attrs[k]);
+    
+    const currentAvg = sum / relevantKeys.length;
     const diff = ov - currentAvg;
     
-    // Aplica a diferença em todos (respeitando limites)
-    keys.forEach(k => {
-        if (pos !== 'GOL' && k === 'gk') return; 
-        
+    // Aplica a diferença APENAS nos atributos relevantes
+    // Os atributos irrelevantes (ex: chute do goleiro) continuam baixos
+    relevantKeys.forEach(k => {
         let newVal = attrs[k] + diff;
         if (newVal > 99) newVal = 99;
         if (newVal < 1) newVal = 1;
@@ -473,7 +483,7 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
                 setLoading(false);
             }
 
-            // --- VIRADA DE TEMPORADA (ATRIBUTOS REALISTAS v1.53.9) ---
+            // --- VIRADA DE TEMPORADA (ATRIBUTOS REALISTAS v1.54.0) ---
             if (act === 'SEASON') {
                 if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Atributos (XP)\n2. Envelhecer Contratos\n3. Processar Retornos")) return;
 
@@ -1385,7 +1395,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.53.9</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.54.0</div>
                             </div>
                         </div>
                         
@@ -1585,7 +1595,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis |v1.53.9</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis |v1.54.0</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2021,30 +2031,42 @@ const renewContract = async (p) => {
                 attributes: null 
             });
             
+            // Função auxiliar para calcular média ignorando status inúteis (Balanceamento)
+            const calculateRealOverall = (position, attrs) => {
+                let sum = 0;
+                let count = 0;
+                // Goleiro ignora atributos de linha; Linha ignora atributo de goleiro.
+                const ignoreList = position === 'GOL' 
+                    ? ['shot', 'attack', 'dribble', 'curve', 'freeKick', 'weakFootAcc', 'weakFootFreq'] 
+                    : ['gk'];
+
+                Object.entries(attrs).forEach(([key, val]) => {
+                    if (ignoreList.includes(key)) return;
+                    sum += val;
+                    count++;
+                });
+                return Math.round(sum / count);
+            };
+
             const handleSave = () => {
-                // 1. Se já tem atributos (edição ou gerado), usa o que tem.
-                if (f.attributes && Object.keys(f.attributes).length > 0) {
-                    onSave(f);
-                    return;
+                const dataToSave = { ...f };
+
+                // SE NÃO TIVER ATRIBUTOS (Criação ou Jogador Antigo), GERA AGORA!
+                if (!dataToSave.attributes || Object.keys(dataToSave.attributes).length === 0) {
+                    const targetOv = parseInt(dataToSave.overall) || 60;
+                    const newAttrs = generateAttributes(dataToSave.position, targetOv);
+                    
+                    // Calcula a média real balanceada
+                    const realAvg = calculateRealOverall(dataToSave.position, newAttrs);
+                    
+                    // Atualiza o objeto final
+                    dataToSave.attributes = newAttrs;
+                    dataToSave.overall = realAvg;
+
+                    alert(`Atributos gerados!\nOverall Real (Balanceado): ${realAvg}`);
                 }
 
-                // 2. Se é NOVO (não tem atributos), gera e SALVA DIRETO
-                const targetOv = parseInt(f.overall) || 60;
-                const newAttrs = generateAttributes(f.position, targetOv);
-                
-                // Calcula a média real
-                const vals = Object.values(newAttrs);
-                const realAvg = Math.round(vals.reduce((a,b)=>a+b,0) / vals.length);
-                
-                // CRIA O PACOTE PRONTO PARA SALVAR
-                const finalData = { 
-                    ...f, 
-                    attributes: newAttrs,
-                    overall: realAvg 
-                };
-
-                onSave(finalData);
-                alert(`Jogador criado! Atributos gerados com média ${realAvg}.`);
+                onSave(dataToSave);
             };
 
             return (
@@ -2088,7 +2110,8 @@ const renewContract = async (p) => {
                                 {isAdmin && <button className="btn btn-gold" style={{marginTop:5, fontSize:10}} onClick={()=>{
                                     if(confirm("Regerar (Admin)?")) {
                                         const n = generateAttributes(f.position, parseInt(f.overall)||60);
-                                        setF({...f, attributes:n});
+                                        const avg = calculateRealOverall(f.position, n);
+                                        setF({...f, attributes:n, overall: avg});
                                     }
                                 }}>🎲 REGERAR (ADM)</button>}
                             </div>
@@ -2541,7 +2564,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         {o.description}
                     </div>
 
-                    {/*v1.53.9: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
+                    {/*v1.54.0: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
                     {o.type === 'NOTIFICACAO' ? (
                         <div style={{display:'flex', gap:5}}>
                             <button className="btn btn-green" style={{width:'100%'}} onClick={()=>onAccept(o)}>

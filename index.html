@@ -459,6 +459,8 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
     return <div><label>Nome</label><input className="input-field" value={form.name} onChange={e=>setF({...form, name:e.target.value})} /><label>Logo</label><input className="input-field" value={form.logo} onChange={e=>setF({...form, logo:e.target.value})} />{isAdmin && <label>Saldo (ADM)</label>} {isAdmin && <input className="input-field" type="number" value={form.balance} onChange={e=>setF({...form, balance:parseFloat(e.target.value)})} />}{isAdmin && <label>Série (ADM)</label>}{isAdmin && <select className="input-field" value={form.serie} onChange={e=>setF({...form, serie:e.target.value})}>{SERIES.map(s=><option key={s} value={s}>{s}</option>)}</select>}<button className="btn btn-blue" onClick={()=>onUp(form)}>SALVAR</button><hr style={{borderColor:'#444'}}/><p>Estádio Nível {team.stadiumLevel||1}</p><button className="btn btn-purple" onClick={onUpgrade}>EVOLUIR (₣ {fmt(COSTS[team.stadiumLevel]||0).replace('₣ ','')})</button><hr style={{borderColor:'#444'}}/><button className="btn btn-green" onClick={()=>{const v=prompt("Valor");const m=prompt("Motivo"); if(v)onReq('INJECTION',v,m)}}>PEDIR INJEÇÃO</button><button className="btn btn-gold" onClick={()=>{const v=prompt("Valor");const m=prompt("Empresa"); if(v)onReq('SPONSORSHIP',v,m)}}>PEDIR PATROCÍNIO</button><button className="btn btn-red" onClick={()=>{const v=prompt("Valor a retirar:"); if(v){ const m=prompt("Motivo:"); if(m) onWithdraw(v, m); }}}>RETIRAR DINHEIRO</button></div>;
 };
             //fim
+
+            
         // ... continuação do código anterior
     const approveTeam = async (teamId, finalBalance) => { await db.collection('teams').doc(teamId).update({ status: 'ACTIVE', balance: parseFloat(finalBalance) }); const t = teams.find(x=>x.id===teamId); postNews(`🛡️ **NOVO CLUBE!**\nO **${t.name}** foi aprovado na Série ${t.serie}.`, 'infra'); alert("Aprovado!"); };
 
@@ -626,7 +628,7 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
 
 const acceptOffer = async (o) => {
     try {
-        // --- v1.52.4: LÓGICA DE NOTIFICAÇÃO (APENAS LEITURA) ---
+        // --- v1.52.5: LÓGICA DE NOTIFICAÇÃO (APENAS LEITURA) ---
         // Se for notificação, apenas deleta o aviso e encerra a execução.
         if (o.type === 'NOTIFICACAO') {
             await db.collection('offers').doc(o.id).delete();
@@ -1026,7 +1028,7 @@ const renewContract = async (p) => {
                     setLoading(false);
                 }
 
-                // --- VIRADA DE TEMPORADA (SISTEMA DE RETORNO INTELIGENTE v1.52.4) ---
+                // --- VIRADA DE TEMPORADA (SISTEMA DE RETORNO INTELIGENTE v1.52.5) ---
                 if (act === 'SEASON') {
                     if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Níveis\n2. Envelhecer Contratos\n3. Processar Opções de Compra/Retorno\n4. Mover sem contrato para Agentes Livres")) return;
 
@@ -1074,7 +1076,7 @@ const renewContract = async (p) => {
                                 u.status = 'INTRANSFERIVEL'; 
                             } else {
                                 // CASO 2: SEM OPÇÃO DE COMPRA -> RETORNO AO DONO
-                                // v1.52.4: Calcula os anos restantes: (Contrato original com o dono - 1 temporada que passou)
+                                // v1.52.5: Calcula os anos restantes: (Contrato original com o dono - 1 temporada que passou)
                                 let contractWithDonoRemaining = (parseInt(p.loanMeta.originalContract) || 1) - 1;
 
                                 if (contractWithDonoRemaining <= 0) {
@@ -1182,7 +1184,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.52.4</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.52.5</div>
                             </div>
                         </div>
                         
@@ -1445,7 +1447,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.52.4</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.52.5</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -1631,7 +1633,156 @@ const renewContract = async (p) => {
         };
 
 // FIM DO COMPONENTE COMPANY DASHBOARD
+// --- JOGADOR, MERCADO E OUTROS COMPONENTES QUE FALTARAM ---
 
+        const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction }) => {
+            const [newPass, setNewPass] = useState('');
+            const [tab, setTab] = useState('PERFIL'); 
+
+            const myItems = (sales||[]).filter(s => s.buyerName === player.name);
+            
+            // Cálculos de XP e Nível
+            const xpNeed = getXPNext(player.overall);
+            const future = calcNewLevel(player.overall, (player.xp||0), (player.pendingXP||0));
+            const diffLvl = future.lvl - player.overall;
+            const xpPerc = Math.min(100, Math.max(0, ((player.xp || 0) / xpNeed) * 100));
+            const energy = player.energy !== undefined ? player.energy : 100;
+
+            // Conquistas Simples
+            const getAchievements = () => {
+                const list = [];
+                const s = player.stats || {};
+                if (s.goals >= 1) list.push({icon:'⚽', name:'Primeiro Gol', color:'#fff'});
+                if (s.goals >= 10) list.push({icon:'🔥', name:'Artilheiro', color:'gold'});
+                if (s.assists >= 10) list.push({icon:'🎩', name:'Maestro', color:'var(--secondary)'});
+                if (s.tackles >= 10) list.push({icon:'🧱', name:'Paredão', color:'#aaa'});
+                if (player.overall >= 80) list.push({icon:'⭐', name:'Craque', color:'var(--purple)'});
+                return list;
+            };
+            const badges = getAchievements();
+
+            return (
+                <div>
+                    {/* CABEÇALHO COM BARRA DE XP */}
+                    <div className="highlight-card" style={{textAlign:'center', paddingBottom:30, position:'relative'}}>
+                        <h2 style={{margin:0}}>{player.name} <span style={{fontSize:14}}>{player.mood}</span></h2>
+                        <small style={{color:'#ccc'}}>{team?.name || 'Agente Livre'}</small>
+                        
+                        <div style={{display:'flex', justifyContent:'center', gap:30, marginTop:15}}>
+                            <div style={{textAlign:'center'}}>
+                                <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:5}}>
+                                    <div style={{fontSize:40, fontWeight:'900', color:'var(--warning)', lineHeight:1}}>{player.overall}</div>
+                                    {diffLvl !== 0 && <span style={{fontSize: 16, fontWeight: 'bold', color: diffLvl > 0 ? '#00E676' : '#FF1744', animation: 'pulse 1.5s infinite'}}>{diffLvl > 0 ? '+' : ''}{diffLvl}</span>}
+                                </div>
+                                <span style={{fontSize:10, textTransform:'uppercase', color:'#888'}}>Nível Atual</span>
+                            </div>
+                            
+                            {/* ENERGIA (APENAS VISUALIZAÇÃO) */}
+                            <div style={{textAlign:'center'}}>
+                                <div style={{fontSize:40, fontWeight:'900', color: energy > 50 ? 'var(--primary)' : 'var(--danger)', lineHeight:1}}>{energy}%</div>
+                                <span style={{fontSize:10, textTransform:'uppercase', color:'#888'}}>Energia</span>
+                            </div>
+                        </div>
+
+                        {/* Barra de Progresso */}
+                        <div style={{position:'absolute', bottom:0, left:0, right:0, height:8, background:'#333'}}>
+                            <div style={{width:`${xpPerc}%`, height:'100%', background:'linear-gradient(90deg, var(--warning), gold)', transition:'1s'}}></div>
+                        </div>
+                        <div style={{position:'absolute', bottom:10, right:5, fontSize:9, color:'#fff', textShadow:'0 1px 2px black'}}>
+                            {player.xp||0} / {xpNeed} XP
+                        </div>
+                    </div>
+
+                    <div style={{display:'flex', gap:10, marginBottom:15, overflowX:'auto'}}>
+                        <button className={`btn ${tab==='PERFIL'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('PERFIL')}>PERFIL</button>
+                        <button className={`btn ${tab==='ACOES'?'btn-red':'btn-ghost'}`} onClick={()=>setTab('ACOES')}>AÇÕES</button>
+                        <button className={`btn ${tab==='CARREIRA'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('CARREIRA')}>CARREIRA</button>
+                        <button className={`btn ${tab==='INV'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('INV')}>MOCHILA ({myItems.length})</button>
+                    </div>
+
+                    {tab==='PERFIL' && <div>
+                        <div className="card" style={{borderLeft:'4px solid var(--primary)', background:'linear-gradient(90deg, #1b2e1b, #1E1E1E)'}}>
+                            <h3 style={{marginTop:0, color:'var(--primary)'}}>🏦 {fmt(player.balance)}</h3>
+                            <small style={{color:'#aaa'}}>Salário: {fmt(player.salary)} | Passe: {fmt(player.value)}</small>
+                        </div>
+                        <div className="card">
+                            <h3>📊 Estatísticas da Temporada</h3>
+                            <div className="stats-grid" style={{gridTemplateColumns:'1fr 1fr 1fr'}}>
+                                <div className="stat-item"><span className="stat-lbl">⚽ Gols</span><span className="stat-val">{player.stats?.goals||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">👟 Assis</span><span className="stat-val">{player.stats?.assists||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🛡️ Desar</span><span className="stat-val">{player.stats?.tackles||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🧤 Defes</span><span className="stat-val">{player.stats?.saves||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🟨 Amar</span><span className="stat-val">{player.stats?.yellows||0}</span></div>
+                                <div className="stat-item"><span className="stat-lbl">🟥 Verm</span><span className="stat-val">{player.stats?.reds||0}</span></div>
+                            </div>
+                        </div>
+                    </div>}
+
+                    {tab==='ACOES' && <div>
+                        <h3>⚡ Gestão de Carreira</h3>
+                        
+                        {/* AVISO SOBRE ENERGIA */}
+                        <div className="card" style={{borderLeft:'4px solid #fff'}}>
+                            <h4>🏋️ Treino Físico</h4>
+                            <p style={{fontSize:11, color:'#aaa'}}>A gestão da tua energia e treinos é responsabilidade exclusiva da equipa técnica do {team?.name || 'clube'}.</p>
+                            <div style={{background:'#333', padding:5, borderRadius:4, fontSize:10, textAlign:'center'}}>
+                                Energia Atual: <b style={{color: energy > 50 ? 'var(--primary)' : 'var(--danger)'}}>{energy}%</b>
+                            </div>
+                        </div>
+
+                        <div className="card" style={{borderLeft:'4px solid var(--danger)'}}>
+                            <h4>📢 O Gabinete do Presidente</h4>
+                            <p style={{fontSize:11, color:'#aaa'}}>Toma decisões importantes sobre o teu futuro.</p>
+                            
+                            {team ? (
+                                <div style={{display:'flex', gap:10, flexDirection:'column'}}>
+                                    <button className="btn btn-gold" onClick={()=>onAction('ASK_RAISE', player)}>💰 PEDIR AUMENTO SALARIAL</button>
+                                    <button className="btn btn-red" onClick={()=>onAction('TRANSFER_REQUEST', player)}>😡 PEDIR TRANSFERÊNCIA</button>
+                                </div>
+                            ) : (
+                                <p style={{color:'var(--primary)', fontWeight:'bold'}}>Estás livre no mercado!</p>
+                            )}
+                        </div>
+
+                        <div className="card">
+                            <h4>🔐 Segurança</h4>
+                            <div style={{display:'flex', gap:5}}>
+                                <input className="input-field" type="password" placeholder="Nova Senha" value={newPass} onChange={e=>setNewPass(e.target.value)} style={{marginBottom:0}} />
+                                <button className="btn btn-purple" style={{width:'auto'} } onClick={()=>{ if(!newPass) return alert("Digite uma senha!"); onUpdatePassword(newPass); setNewPass(''); }}>ALTERAR</button>
+                            </div>
+                        </div>
+                    </div>}
+
+                    {tab==='CARREIRA' && <div>
+                        <div className="card">
+                            <h3>🏆 Conquistas</h3>
+                            {badges.length === 0 && <p style={{color:'#666', fontSize:11}}>Joga para desbloquear.</p>}
+                            <div style={{display:'flex', flexWrap:'wrap', gap:8}}>
+                                {badges.map((b, i) => (<div key={i} style={{background:'#333', padding:'5px 10px', borderRadius:20, display:'flex', alignItems:'center', gap:5, border:`1px solid ${b.color}`}}><span>{b.icon}</span><span style={{fontSize:11, fontWeight:'bold', color:b.color}}>{b.name}</span></div>))}
+                            </div>
+                        </div>
+                        <div className="card" style={{borderLeft:'4px solid #fff'}}>
+                            <h3>🌍 Histórico de Clubes</h3>
+                            <div style={{display:'flex', flexDirection:'column-reverse', gap:10}}>
+                                {(player.history || []).map((h, i) => (
+                                    <div key={i} style={{display:'flex', alignItems:'center', justifyContent:'space-between', background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8}}>
+                                        <span style={{fontSize:9, color:'#aaa'}}>{h.from}</span>
+                                        <div style={{textAlign:'center'}}><div style={{color:'var(--primary)', fontSize:12}}>➡</div><div style={{fontSize:9, color:'#fff'}}>{h.value > 0 ? fmt(h.value) : 'Grátis'}</div></div>
+                                        <span style={{fontSize:9, fontWeight:'bold'}}>{h.to}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>}
+
+                    {tab==='INV' && <div>
+                        <h3>🎒 Mochila</h3>
+                        {myItems.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Vazia.</p>}
+                        {myItems.map((item, index) => (<div key={index} className="card" style={{border:'1px solid #444', textAlign:'center', padding:10}}><div style={{fontSize:24}}>📦</div><div style={{fontWeight:'bold', fontSize:12}}>{item.productName}</div><div style={{fontSize:10, color:'#aaa'}}>Preço: {fmt(item.price)}</div></div>))}
+                    </div>}
+                </div>
+            );
+        };
 
         // ... continuação do código anterior
 
@@ -2140,7 +2291,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         {o.description}
                     </div>
 
-                    {/* v1.52.4: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
+                    {/* v1.52.5: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
                     {o.type === 'NOTIFICACAO' ? (
                         <div style={{display:'flex', gap:5}}>
                             <button className="btn btn-green" style={{width:'100%'}} onClick={()=>onAccept(o)}>

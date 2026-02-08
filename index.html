@@ -138,14 +138,13 @@ const getAttrColor = (val) => {
     return '#FF1744';                // Vermelho (Baixo)
 };
 
-// Gerador Inteligente de Atributos por Posição
-// Gerador Inteligente de Atributos (CORRIGIDO: Goleiros e Linha Balanceados)
+// Gerador de Atributos V3 (Realista e Contido)
 const generateAttributes = (pos, targetOv) => {
     const ov = parseInt(targetOv) || 50;
     const attrs = {};
     const keys = Object.keys(ATTR_LABELS);
 
-    // Definição de pesos
+    // Definição de prioridades
     let primary = [], secondary = [];
 
     if (pos === 'GOL') {
@@ -168,45 +167,53 @@ const generateAttributes = (pos, targetOv) => {
         secondary = ['dribble', 'agility', 'balance', 'reaction'];
     }
 
-    // 1. Geração Base
+    // 1. Geração Base Mais Conservadora
     keys.forEach(k => {
         let base = ov;
-        if (primary.includes(k)) base += Math.floor(Math.random() * 8) + 4; 
-        else if (secondary.includes(k)) base += Math.floor(Math.random() * 4); 
-        else base -= Math.floor(Math.random() * 12) + 8; // Reduz bastante os atributos ruins
+        
+        // Em vez de somar +12, somamos menos para manter perto da média real
+        if (primary.includes(k)) {
+            base += Math.floor(Math.random() * 6) + 2; // +2 a +8 (Forte, mas não absurdo)
+        } else if (secondary.includes(k)) {
+            base -= Math.floor(Math.random() * 4); // -0 a -4 (Levemente abaixo da média)
+        } else {
+            base -= Math.floor(Math.random() * 10) + 5; // -5 a -15 (Fraco, mas não inútil)
+        }
 
-        // Ajustes específicos extremos
-        if (pos !== 'GOL' && k === 'gk') base = 5 + Math.floor(Math.random() * 10); // Linha tem GK horrível
-        if (pos === 'GOL' && ['shot', 'attack', 'dribble', 'curve', 'freeKick'].includes(k)) base = 5 + Math.floor(Math.random() * 15); // Goleiro tem pé ruim
+        // Ajustes fixos para Goleiro/Linha (mantidos, mas suavizados)
+        if (pos !== 'GOL' && k === 'gk') base = 10; 
+        if (pos === 'GOL' && ['shot', 'attack', 'dribble', 'curve', 'freeKick'].includes(k)) base = Math.max(15, base - 20);
 
+        // Trava de segurança: Se o Overall for baixo (<80), evita passar de 90
+        if (ov < 80 && base > 88) base = 88;
+        
         if (base > 99) base = 99;
         if (base < 1) base = 1;
         
         attrs[k] = base;
     });
 
-    // 2. Normalização Inteligente (A Mágica acontece aqui)
-    // Define quais atributos contam para a média final
+    // 2. Normalização Precisa
     const relevantKeys = keys.filter(k => {
-        if (pos === 'GOL') {
-            // Goleiro ignora atributos ofensivos na média
-            return !['shot', 'attack', 'dribble', 'curve', 'freeKick', 'weakFootAcc', 'weakFootFreq'].includes(k);
-        } else {
-            // Linha ignora atributo de goleiro
-            return k !== 'gk';
-        }
+        if (pos === 'GOL') return !['shot', 'attack', 'dribble', 'curve', 'freeKick', 'weakFootAcc', 'weakFootFreq'].includes(k);
+        return k !== 'gk';
     });
     
     let sum = 0;
     relevantKeys.forEach(k => sum += attrs[k]);
-    
     const currentAvg = sum / relevantKeys.length;
-    const diff = ov - currentAvg;
+    const diff = ov - currentAvg; // Quanto falta para atingir o Overall
     
-    // Aplica a diferença APENAS nos atributos relevantes
-    // Os atributos irrelevantes (ex: chute do goleiro ou gk do atacante) continuam baixos e não estragam a conta
+    // Distribui a diferença
     relevantKeys.forEach(k => {
-        let newVal = attrs[k] + diff;
+        // Se a diferença for positiva (precisa aumentar), prioriza quem já é atributo primário
+        let boost = diff;
+        
+        // Se o atributo já for muito alto (>90) e o overall meta for baixo (<85), não aumenta mais
+        if (attrs[k] > 90 && ov < 85 && diff > 0) boost = 0;
+
+        let newVal = attrs[k] + boost;
+        
         if (newVal > 99) newVal = 99;
         if (newVal < 1) newVal = 1;
         attrs[k] = Math.round(newVal);

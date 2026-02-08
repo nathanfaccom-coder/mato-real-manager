@@ -520,29 +520,29 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
 // FIM DAS FUNÇÕES DE CRIAÇÃO E ACESSO ADMIN
 // --- COLE ISSO DENTRO DA FUNCTION APP(), ANTES DO RETURN ---
 // --- FUNÇÃO DE CONTRATAR TÉCNICO ---
+    // --- ENVIAR PROPOSTA PARA TÉCNICO (MERCADO) ---
     const handleHireCoach = async (coach) => {
         if (!user.data || user.type !== 'USER') return alert("Apenas presidentes podem contratar!");
         
-        if (confirm(`Contratar ${coach.name} por ${fmt(coach.salary)} semanais?`)) {
-            const team = user.data;
-            if (team.balance < coach.salary) return alert("Saldo insuficiente para o primeiro salário/luvas!");
-            
-            const b = db.batch();
-            
-            // Atualiza o Técnico (Sai de FREE para o ID do time)
-            b.update(db.collection('users').doc(coach.id), {
-                teamId: team.id
-            });
-            
-            // Debita 1ª semana do time
-            b.update(db.collection('teams').doc(team.id), {
-                balance: team.balance - coach.salary
+        const team = user.data;
+        if (team.balance < coach.salary) return alert("Saldo insuficiente para cobrir o primeiro salário!");
+        
+        if (confirm(`Enviar proposta para ${coach.name}?\nSalário Oferecido: ${fmt(coach.salary)}`)) {
+            // Cria a oferta na coleção 'offers'
+            await db.collection('offers').add({
+                type: 'COACH_OFFER',
+                recipientId: coach.id, // ID do Técnico
+                teamId: team.id,
+                teamName: team.name,
+                value: parseInt(coach.salary),
+                status: 'PENDING',
+                createdAt: Date.now()
             });
 
-            await b.commit();
-            alert(`Bem-vindo, ${coach.name}!`);
+            alert(`Proposta enviada para ${coach.name}! Aguarde ele aceitar.`);
         }
     };
+            //FIM
         const adminAction = async (act, data) => {
             if (act === 'MARKET') {
                 db.collection('config').doc('system').update({ marketOpen: data });
@@ -1065,7 +1065,65 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
                 }
             };
             // --- LÓGICA DO TÉCNICO (Cole isso dentro da function App) ---
+// --- TÉCNICO ACEITA PROPOSTA ---
+    const handleAcceptCoachOffer = async (offer) => {
+        const teamId = offer.teamId;
+        const coach = user.data;
+        
+        // Verifica se o time ainda tem dinheiro (pode ter gasto enquanto a proposta estava pendente)
+        const teamDoc = await db.collection('teams').doc(teamId).get();
+        const teamData = teamDoc.data();
+        
+        if (teamData.balance < offer.value) {
+            return alert("O time não tem mais saldo para te contratar! Proposta cancelada.");
+        }
 
+        const b = db.batch();
+
+        // 1. Se o time já tinha técnico, demite o antigo
+        const oldCoach = coaches.find(c => c.teamId === teamId && c.status === 'ACTIVE');
+        if (oldCoach) {
+            b.update(db.collection('users').doc(oldCoach.id), { teamId: 'FREE' });
+        }
+
+        // 2. Se o técnico atual já tinha time, sai do time antigo
+        if (coach.teamId && coach.teamId !== 'FREE') {
+            // Lógica opcional: Multa rescisória? Vamos simplificar e só sair.
+        }
+
+        // 3. Atualiza o Técnico (Contratado)
+        b.update(db.collection('users').doc(coach.id), { 
+            teamId: teamId,
+            salary: offer.value // Atualiza o salário para o valor da proposta
+        });
+
+        // 4. Cobra as "Luvas" (1º Salário) do time
+        b.update(db.collection('teams').doc(teamId), { 
+            balance: teamData.balance - offer.value 
+        });
+
+        // 5. Apaga a oferta (e outras ofertas pendentes desse time para técnicos, se quiser limpar)
+        b.delete(db.collection('offers').doc(offer.id));
+
+        await b.commit();
+        alert(`Parabéns! Você agora é técnico do ${offer.teamName}!`);
+    };
+
+    // --- TÉCNICO REJEITA PROPOSTA ---
+    const handleRejectCoachOffer = async (offer) => {
+        await db.collection('offers').doc(offer.id).delete();
+        alert("Proposta recusada.");
+    };
+
+    // --- TÉCNICO ATUALIZA SALÁRIO (NÍVEL 2) ---
+    const handleUpdateCoachSalary = async (newVal) => {
+        if (user.data.level < 2) return alert("Nível insuficiente!");
+        if (newVal < 1000) return alert("Salário mínimo é 1.000!");
+        
+        await db.collection('users').doc(user.data.id).update({ salary: parseInt(newVal) });
+        alert("Valor de mercado atualizado!");
+    };
+            //FIM
     const handleCoachTrain = async (playerIds, type) => {
         const currentCoach = user.data;
         const xpBase = 30; 
@@ -1670,7 +1728,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.55.8</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.55.9</div>
                             </div>
                         </div>
                         
@@ -1826,11 +1884,13 @@ const renewContract = async (p) => {
                         }
 
                         {/* --- NOVA TELA: PAINEL DO TÉCNICO --- */}
-                        {(screen === 'HOME' || screen === 'COACH_DASH') && user.type === 'COACH' && 
+                    {(screen === 'HOME' || screen === 'COACH_DASH') && user.type === 'COACH' && 
                             <CoachDashboard 
                                 coach={user.data} 
                                 team={teams.find(t => t.id === user.data.teamId)} 
                                 players={players.filter(p => p.teamId === user.data.teamId)} 
+                                offers={offers.filter(o => o.recipientId === user.data.id)} 
+                                sales={sales} 
                                 onTrain={handleCoachTrain} 
                                 onEvolvePerk={handleEvolveCoachPerk} 
                                 onAddAffinity={async (aff) => {
@@ -1840,6 +1900,9 @@ const renewContract = async (p) => {
                                     });
                                     alert("Nova afinidade desbloqueada!");
                                 }}
+                                onAcceptOffer={handleAcceptCoachOffer} 
+                                onRejectOffer={handleRejectCoachOffer} 
+                                onUpdateSalary={handleUpdateCoachSalary} 
                             />
                         }
                     </div>
@@ -1849,7 +1912,7 @@ const renewContract = async (p) => {
                             <i className="fas fa-home"></i>INÍCIO
                         </div>
                         {user.type!=='COMPANY' && user.type!=='PLAYER' && user.type!=='COACH' && <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>}
-                        {user.type!=='COMPANY' && user.type!=='COACH' && <div className={`nav-item ${screen==='SHOPPING'?'active':''}`} onClick={()=>setScreen('SHOPPING')}><i className="fas fa-shopping-bag"></i>SHOP</div>}
+                        {user.type!=='COMPANY' && <div className={`nav-item ${screen==='SHOPPING'?'active':''}`} onClick={()=>setScreen('SHOPPING')}><i className="fas fa-shopping-bag"></i>SHOP</div>}
                         {user.type==='USER' && <div className={`nav-item ${screen==='SPONSORSHIPS'?'active':''}`} onClick={()=>setScreen('SPONSORSHIPS')}><i className="fas fa-handshake"></i>PATRO</div>}
                         {user.type!=='COMPANY' && <div className={`nav-item ${screen==='RANKING'?'active':''}`} onClick={()=>setScreen('RANKING')}><i className="fas fa-trophy"></i>RANK</div>}
                         <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={()=>{setScreen('NEWS'); setNewNews(false); localStorage.setItem('lastRead', Date.now());}}><i className="fas fa-newspaper"></i>NEWS</div>
@@ -1937,7 +2000,7 @@ const CoachRegisterForm = ({ onCancel, onSave }) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.55.8</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.55.9</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2356,140 +2419,194 @@ const CoachRegisterForm = ({ onCancel, onSave }) => {
         };
 //FIM
         // --- COMPONENTE DO PAINEL DO TÉCNICO ---
-const CoachDashboard = ({ coach, team, players, onTrain, onEvolvePerk, onAddAffinity }) => {
+const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolvePerk, onAddAffinity, onAcceptOffer, onRejectOffer, onUpdateSalary }) => {
+    const [tab, setTab] = useState('TREINO'); // TREINO, CARREIRA, MOCHILA
     const [selectedPlayers, setSelectedPlayers] = useState([]);
     const [trainingType, setTrainingType] = useState('FISICO');
-    
-    // Calcula XP para o próximo nível
+    const [newSalary, setNewSalary] = useState(coach.salary);
+
+    // Cálculos de XP e Nível
     const xpNext = coach.level * 100;
     const progress = (coach.xp / xpNext) * 100;
-
-    // Lógica para ESCOLHA DE PODERES (PERKS)
+    
+    // Filtros de Perks e Afinidades
     const showPerkSelection = coach.pendingPerks > 0;
-    
-    // Filtra perks que ele AINDA NÃO TEM
     const availablePerks = COACH_PERKS.filter(p => !(coach.perks || []).some(cp => cp.id === p.id));
+    const perkOptions = React.useMemo(() => availablePerks.sort(() => 0.5 - Math.random()).slice(0, 3), [coach.pendingPerks]);
     
-    // Pega 3 aleatórios para exibir (useMemo para não ficar mudando toda hora)
-    const perkOptions = React.useMemo(() => {
-        return availablePerks.sort(() => 0.5 - Math.random()).slice(0, 3);
-    }, [coach.pendingPerks]); 
-
-    // Lógica para ESCOLHA DE AFINIDADE
     const showAffinitySelection = coach.pendingAffinity > 0;
     const availableAffinities = COACH_AFFINITIES.filter(a => !(coach.affinities || []).includes(a));
+
+    // Itens comprados
+    const myItems = (sales||[]).filter(s => s.buyerName === coach.name);
 
     const handleTogglePlayer = (pid) => {
         if (selectedPlayers.includes(pid)) setSelectedPlayers(selectedPlayers.filter(id => id !== pid));
         else if (selectedPlayers.length < 5) setSelectedPlayers([...selectedPlayers, pid]);
-        else alert("Máximo de 5 jogadores por treino!");
-    };
-
-    const executeTraining = () => {
-        if (coach.trainingsLeft <= 0) return alert("Sem treinos restantes nesta semana!");
-        if (selectedPlayers.length === 0) return alert("Selecione jogadores!");
-        onTrain(selectedPlayers, trainingType);
-        setSelectedPlayers([]);
+        else alert("Máximo de 5 jogadores!");
     };
 
     return (
         <div>
-            {/* CABEÇALHO DO TÉCNICO */}
-            <div className="highlight-card" style={{position:'relative', overflow:'hidden', textAlign:'left'}}>
-                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                    <div>
-                        <h2 style={{margin:0}}>👔 {coach.name}</h2>
-                        <small style={{color:'#aaa'}}>Nível {coach.level} | {team ? team.name : 'Sem Clube'}</small>
-                    </div>
-                    <div style={{textAlign:'right'}}>
-                        <div style={{fontSize:20, color:'gold'}}>★ {coach.level}</div>
-                        <small>Multa: {fmt(coach.clause || 0)}</small>
-                    </div>
-                </div>
-
-                {/* BARRA DE XP DO TÉCNICO */}
-                <div style={{marginTop:10, background:'#333', height:6, borderRadius:3, position:'relative'}}>
-                    <div style={{width:`${Math.min(100, progress)}%`, background:'var(--primary)', height:'100%', transition:'0.5s'}}></div>
-                </div>
-                <small style={{float:'right', fontSize:9, color:'#ccc'}}>{coach.xp}/{xpNext} XP</small>
-
-                {/* AFINIDADES E PERKS ATUAIS */}
-                <div style={{marginTop:15, display:'flex', gap:5, flexWrap:'wrap'}}>
-                    {(coach.affinities || []).map(a => <span key={a} className="badge" style={{background:'#444'}}>{a}</span>)}
-                    {(coach.perks || []).map(p => <span key={p.id} className="badge" style={{background:'var(--purple)', border:'1px solid gold'}} title={p.desc}>⚡ {p.name}</span>)}
-                </div>
-            </div>
-
-            {/* SELEÇÃO DE PODERES (ULT) - APARECE SE TIVER PENDÊNCIA */}
-            {showPerkSelection && (
-                <div className="card pulse-border" style={{background:'rgba(255, 215, 0, 0.1)'}}>
-                    <h3 style={{color:'gold', textAlign:'center'}}>✨ NOVO NÍVEL ALCANÇADO! ✨</h3>
-                    <p style={{textAlign:'center', fontSize:12}}>Escolha uma nova Habilidade Passiva:</p>
-                    <div style={{display:'grid', gap:10}}>
-                        {perkOptions.map(p => (
-                            <div key={p.id} className="card" style={{cursor:'pointer', border:'1px solid #555'}} onClick={() => onEvolvePerk(p)}>
-                                <b style={{color:'var(--primary)'}}>{p.name}</b>
-                                <div style={{fontSize:11, color:'#ccc'}}>{p.desc}</div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* SELEÇÃO DE AFINIDADE - APARECE NOS NÍVEIS 10, 20, 30 */}
-            {showAffinitySelection && (
-                <div className="card" style={{borderLeft:'4px solid var(--secondary)'}}>
-                    <h3>📚 Nova Especialização</h3>
-                    <p>Escolha uma nova posição para ter afinidade:</p>
-                    <div style={{display:'flex', gap:5, flexWrap:'wrap'}}>
-                        {availableAffinities.map(a => (
-                            <button key={a} className="btn btn-ghost" onClick={() => onAddAffinity(a)}>{a}</button>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* ÁREA DE TREINO */}
-            <div style={{marginTop:20}}>
-                <h3>📋 Prancheta de Treino <small>({coach.trainingsLeft} restantes)</small></h3>
+            {/* CABEÇALHO (Igual ao do Jogador) */}
+            <div className="highlight-card" style={{textAlign:'center', paddingBottom:20, position:'relative'}}>
+                <h2 style={{margin:0}}>👔 {coach.name}</h2>
+                <small style={{color:'#ccc'}}>{team ? team.name : 'Agente Livre'} | Nível {coach.level}</small>
                 
-                <div style={{display:'flex', gap:10, marginBottom:10}}>
-                    <select className="input-field" value={trainingType} onChange={e=>setTrainingType(e.target.value)}>
-                        <option value="FISICO">🏋️‍♂️ Físico (Resistência/Força)</option>
-                        <option value="TATICO">🧠 Tático (Posição/Visão)</option>
-                        <option value="TECNICO">⚽ Técnico (Drible/Passe)</option>
-                        <option value="DEFESA">🛡️ Defensivo (Marcação)</option>
-                        <option value="ATAQUE">🥅 Finalização (Chute/Cabeceio)</option>
-                        <option value="GOL">🧤 Específico de Goleiro</option>
-                    </select>
-                    <button className="btn btn-green" onClick={executeTraining} disabled={coach.trainingsLeft <= 0}>APLICAR</button>
+                <div style={{display:'flex', justifyContent:'center', gap:20, marginTop:15}}>
+                    <div style={{textAlign:'center'}}>
+                        <div style={{fontSize:24, fontWeight:'bold', color:'var(--primary)'}}>₣ {fmt(coach.salary)}</div>
+                        <span style={{fontSize:9, color:'#888'}}>SALÁRIO</span>
+                    </div>
+                    <div style={{textAlign:'center'}}>
+                        <div style={{fontSize:24, fontWeight:'bold', color:'gold'}}>★ {coach.affinities?.length || 1}</div>
+                        <span style={{fontSize:9, color:'#888'}}>ESPECIALIDADES</span>
+                    </div>
                 </div>
 
-                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, maxHeight:'400px', overflowY:'auto'}}>
-                    {players.map(p => (
-                        <div key={p.id} 
-                             className="card" 
-                             style={{
-                                 background: selectedPlayers.includes(p.id) ? 'rgba(0,255,0,0.1)' : 'var(--bg-card)',
-                                 border: selectedPlayers.includes(p.id) ? '1px solid var(--primary)' : '1px solid #333',
-                                 cursor: 'pointer',
-                                 padding: 8
-                             }}
-                             onClick={() => handleTogglePlayer(p.id)}
-                        >
-                            <div style={{display:'flex', justifyContent:'space-between'}}>
-                                <span>{p.name} <small>({p.position})</small></span>
-                                <b>{p.overall}</b>
-                            </div>
-                            <div style={{fontSize:10, color: p.energy < 30 ? 'red' : '#aaa'}}>Energia: {p.energy}%</div>
-                            
-                            {(coach.affinities || []).includes(p.position) && 
-                                <div style={{fontSize:9, color:'gold', marginTop:2}}>★ Afinidade</div>
-                            }
-                        </div>
-                    ))}
+                {/* Barra de XP */}
+                <div style={{position:'absolute', bottom:0, left:0, right:0, height:6, background:'#333'}}>
+                    <div style={{width:`${Math.min(100, progress)}%`, background:'linear-gradient(90deg, gold, #FF8F00)', height:'100%'}}></div>
                 </div>
             </div>
+
+            {/* BOTÕES DE NAVEGAÇÃO (ABAS) */}
+            <div style={{display:'flex', gap:10, marginBottom:15, marginTop:10}}>
+                <button className={`btn ${tab==='TREINO'?'btn-green':'btn-ghost'}`} onClick={()=>setTab('TREINO')}>PRANCHETA</button>
+                <button className={`btn ${tab==='CARREIRA'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('CARREIRA')}>CARREIRA</button>
+                <button className={`btn ${tab==='MOCHILA'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('MOCHILA')}>MOCHILA</button>
+            </div>
+
+            {/* --- ABA 1: TREINO (Lógica Antiga) --- */}
+            {tab === 'TREINO' && (
+                <div>
+                    {showPerkSelection && (
+                        <div className="card pulse-border" style={{background:'rgba(255, 215, 0, 0.1)'}}>
+                            <h3 style={{color:'gold', textAlign:'center'}}>✨ NOVO NÍVEL ALCANÇADO!</h3>
+                            <p style={{textAlign:'center', fontSize:11}}>Escolha uma nova Habilidade Passiva:</p>
+                            <div style={{display:'grid', gap:5}}>
+                                {perkOptions.map(p => (
+                                    <div key={p.id} className="card" style={{cursor:'pointer', border:'1px solid #555'}} onClick={() => onEvolvePerk(p)}>
+                                        <b style={{color:'var(--primary)'}}>{p.name}</b><br/><small>{p.desc}</small>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {showAffinitySelection && (
+                        <div className="card" style={{borderLeft:'4px solid var(--secondary)'}}>
+                            <h3>📚 Nova Especialização</h3>
+                            <div style={{display:'flex', gap:5, flexWrap:'wrap'}}>
+                                {availableAffinities.map(a => (<button key={a} className="btn btn-ghost" onClick={() => onAddAffinity(a)}>{a}</button>))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10}}>
+                        <span>Treinos Restantes: <b>{coach.trainingsLeft}</b></span>
+                        <select className="input-field" style={{width:'auto', margin:0}} value={trainingType} onChange={e=>setTrainingType(e.target.value)}>
+                            <option value="FISICO">🏋️‍♂️ Físico</option>
+                            <option value="TATICO">🧠 Tático</option>
+                            <option value="TECNICO">⚽ Técnico</option>
+                            <option value="DEFESA">🛡️ Defesa</option>
+                            <option value="ATAQUE">🥅 Ataque</option>
+                            <option value="GOL">🧤 Goleiro</option>
+                        </select>
+                    </div>
+
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                        {players.map(p => (
+                            <div key={p.id} className="card" 
+                                style={{background: selectedPlayers.includes(p.id) ? 'rgba(0,255,0,0.1)' : 'var(--bg-card)', border: selectedPlayers.includes(p.id) ? '1px solid var(--primary)' : '1px solid #333', cursor: 'pointer', padding: 8}}
+                                onClick={() => handleTogglePlayer(p.id)}
+                            >
+                                <div style={{display:'flex', justifyContent:'space-between'}}>
+                                    <span>{p.name} <small>({p.position})</small></span>
+                                    <b>{p.overall}</b>
+                                </div>
+                                <div style={{fontSize:10, color: p.energy < 30 ? 'red' : '#aaa'}}>Energia: {p.energy}%</div>
+                                {(coach.affinities || []).includes(p.position) && <div style={{fontSize:9, color:'gold'}}>★ Afinidade</div>}
+                            </div>
+                        ))}
+                    </div>
+                    
+                    <button className="btn btn-green" style={{marginTop:15}} onClick={()=>{
+                        if(coach.trainingsLeft <= 0) return alert("Sem treinos!");
+                        if(selectedPlayers.length === 0) return alert("Selecione alguém!");
+                        onTrain(selectedPlayers, trainingType);
+                        setSelectedPlayers([]);
+                    }}>APLICAR TREINO</button>
+                </div>
+            )}
+
+            {/* --- ABA 2: CARREIRA (Ofertas e Salário) --- */}
+            {tab === 'CARREIRA' && (
+                <div>
+                    {/* LISTA DE PROPOSTAS */}
+                    <div className="card" style={{borderLeft:'4px solid var(--primary)'}}>
+                        <h3>📩 Propostas de Emprego</h3>
+                        {offers.filter(o => o.type === 'COACH_OFFER' && o.status === 'PENDING').length === 0 && <p style={{color:'#666', fontSize:12}}>Nenhuma proposta no momento.</p>}
+                        
+                        {offers.filter(o => o.type === 'COACH_OFFER' && o.status === 'PENDING').map(o => (
+                            <div key={o.id} style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:5, marginBottom:10}}>
+                                <div style={{display:'flex', justifyContent:'space-between'}}>
+                                    <b>{o.teamName}</b>
+                                    <span style={{color:'lime'}}>₣ {fmt(o.value)}/sem</span>
+                                </div>
+                                <small style={{color:'#aaa'}}>A proposta expira em breve.</small>
+                                <div style={{display:'flex', gap:5, marginTop:5}}>
+                                    <button className="btn btn-green" onClick={()=>onAcceptOffer(o)}>ACEITAR</button>
+                                    <button className="btn btn-red" onClick={()=>onRejectOffer(o)}>RECUSAR</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* AJUSTE DE SALÁRIO (Nível 2+) */}
+                    <div className="card">
+                        <h3>💰 Negociação Salarial</h3>
+                        <p style={{fontSize:11, color:'#aaa'}}>Defina seu valor de mercado (quanto pede para ser contratado).</p>
+                        
+                        {coach.level >= 2 ? (
+                            <div style={{display:'flex', gap:10}}>
+                                <input className="input-field" type="number" value={newSalary} onChange={e=>setNewSalary(e.target.value)} />
+                                <button className="btn btn-gold" onClick={()=>onUpdateSalary(newSalary)}>DEFINIR</button>
+                            </div>
+                        ) : (
+                            <div style={{background:'#333', padding:10, borderRadius:5, color:'#aaa', fontSize:12, textAlign:'center'}}>
+                                🔒 Bloqueado. Chegue ao <b>Nível 2</b> para exigir seu próprio salário.
+                            </div>
+                        )}
+                    </div>
+
+                    {/* HISTÓRICO E PERKS */}
+                    <div className="card">
+                        <h3>🏆 Habilidades (Perks)</h3>
+                        <div style={{display:'flex', flexWrap:'wrap', gap:5}}>
+                            {(coach.perks || []).map(p => <span key={p.id} className="badge" style={{background:'var(--purple)'}}>{p.name}</span>)}
+                            {(coach.perks || []).length === 0 && <small>Nenhuma habilidade passiva.</small>}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- ABA 3: MOCHILA --- */}
+            {tab === 'MOCHILA' && (
+                <div>
+                    <h3>🎒 Meus Itens</h3>
+                    {myItems.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Vazia. Vá ao Shopping!</p>}
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                        {myItems.map((item, index) => (
+                            <div key={index} className="card" style={{border:'1px solid #444', textAlign:'center', padding:10}}>
+                                <div style={{fontSize:24}}>📦</div>
+                                <div style={{fontWeight:'bold', fontSize:12}}>{item.productName}</div>
+                                <div style={{fontSize:10, color:'#aaa'}}>{fmt(item.price)}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

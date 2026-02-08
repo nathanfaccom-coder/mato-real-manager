@@ -2009,7 +2009,7 @@ const CoachRegisterForm = ({ onCancel, onSave }) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.60.1</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.60.2</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2431,14 +2431,13 @@ const CoachRegisterForm = ({ onCancel, onSave }) => {
 const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolvePerk, onAddAffinity, onAcceptOffer, onRejectOffer, onUpdateSalary }) => {
     const [tab, setTab] = useState('TREINO'); 
     const [selectedPlayers, setSelectedPlayers] = useState([]);
-    // O padrão agora é mais específico
     const [trainingType, setTrainingType] = useState('FISICO_BASE'); 
     const [newSalary, setNewSalary] = useState(coach.salary);
 
     const xpNext = coach.level * 100;
     const progress = (coach.xp / xpNext) * 100;
     
-    // Filtros e Listas
+    // Filtros
     const showPerkSelection = coach.pendingPerks > 0;
     const availablePerks = COACH_PERKS.filter(p => !(coach.perks || []).some(cp => cp.id === p.id));
     const perkOptions = React.useMemo(() => availablePerks.sort(() => 0.5 - Math.random()).slice(0, 3), [coach.pendingPerks]);
@@ -2461,16 +2460,23 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                 <h2 style={{margin:0}}>👔 {coach.name}</h2>
                 <small style={{color:'#ccc'}}>{team ? team.name : 'Agente Livre'} | Nível {coach.level}</small>
                 
-                <div style={{display:'flex', justifyContent:'center', gap:20, marginTop:15}}>
+                <div style={{display:'flex', justifyContent:'center', gap:15, marginTop:15}}>
                     <div style={{textAlign:'center'}}>
-                        <div style={{fontSize:24, fontWeight:'bold', color:'var(--primary)'}}>{fmt(coach.salary)}</div>
+                        <div style={{fontSize:20, fontWeight:'bold', color:'var(--success)'}}>₣ {fmt(coach.balance || 0)}</div>
+                        <span style={{fontSize:9, color:'#888'}}>SALDO ATUAL</span>
+                    </div>
+                    <div style={{width:1, background:'#333'}}></div>
+                    <div style={{textAlign:'center'}}>
+                        <div style={{fontSize:20, fontWeight:'bold', color:'var(--primary)'}}>₣ {fmt(coach.salary)}</div>
                         <span style={{fontSize:9, color:'#888'}}>SALÁRIO</span>
                     </div>
+                    <div style={{width:1, background:'#333'}}></div>
                     <div style={{textAlign:'center'}}>
-                        <div style={{fontSize:24, fontWeight:'bold', color:'gold'}}>★ {coach.affinities?.length || 1}</div>
+                        <div style={{fontSize:20, fontWeight:'bold', color:'gold'}}>★ {coach.affinities?.length || 1}</div>
                         <span style={{fontSize:9, color:'#888'}}>ESPECIALIDADES</span>
                     </div>
                 </div>
+
                 <div style={{position:'absolute', bottom:0, left:0, right:0, height:6, background:'#333'}}>
                     <div style={{width:`${Math.min(100, progress)}%`, background:'linear-gradient(90deg, gold, #FF8F00)', height:'100%'}}></div>
                 </div>
@@ -2537,6 +2543,9 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                     </div>
 
                     {/* LISTA DE JOGADORES */}
+                    <p style={{textAlign:'center', color:'#888', fontSize:12, margin:'10px 0'}}>
+                        👉 Selecione até <b>5 jogadores</b> para o treino:
+                    </p>
                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
                         {players.map(p => (
                             <div key={p.id} className="card" 
@@ -2566,7 +2575,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                 </div>
             )}
 
-            {/* ABA CARREIRA (Mantive igual pois estava correto) */}
+            {/* ABA CARREIRA */}
             {tab === 'CARREIRA' && (
                 <div>
                     <div className="card" style={{borderLeft:'4px solid var(--primary)'}}>
@@ -2599,11 +2608,13 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
             {tab === 'MOCHILA' && (
                 <div>
                     <h3>🎒 Meus Itens</h3>
+                    {myItems.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Vazia. Vá ao Shopping!</p>}
                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
                         {myItems.map((item, index) => (
                             <div key={index} className="card" style={{border:'1px solid #444', textAlign:'center', padding:10}}>
                                 <div style={{fontSize:24}}>📦</div>
                                 <div style={{fontWeight:'bold', fontSize:12}}>{item.productName}</div>
+                                <div style={{fontSize:10, color:'#aaa'}}>{fmt(item.price)}</div>
                             </div>
                         ))}
                     </div>

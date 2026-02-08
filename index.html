@@ -1769,7 +1769,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.63.4</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.63.5</div>
                             </div>
                         </div>
                         
@@ -2062,7 +2062,7 @@ const CoachRegisterForm = ({ onCancel, onSave }) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.63.4</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.63.5</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2500,13 +2500,37 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
 
     const myItems = (sales||[]).filter(s => s.buyerId === coach.id);
 
-    // TRADUÇÃO DOS ATRIBUTOS (Abreviados para caber no card)
-    const ATTR_LABELS = {
-        balance: 'Equil', stamina: 'Resis', speed: 'Veloc', accel: 'Acel', agility: 'Agil', jump: 'Impul', condition: 'Cond',
-        attack: 'Atq', dribble: 'Drible', dribbleSpd: 'Dr.Vel', shortPass: 'P.Cur', shortPassSpd: 'PC.Vel', 
-        longPass: 'P.Lon', longPassSpd: 'PL.Vel', shot: 'Fin', shotPower: 'F.Chut', shotTech: 'T.Chut', 
-        freeKick: 'Falta', curve: 'Curva', header: 'Cabec', tech: 'Tec', weakFootAcc: 'P.Ruim', weakFootFreq: 'F.P.R', 
-        defense: 'Def', response: 'Resp', aggression: 'Agres', mentality: 'Menta', teamwork: 'Eqp', gk: 'GK'
+    // --- CONFIGURAÇÃO VISUAL IGUAL AO PERFIL DO JOGADOR ---
+    // Organizado linha por linha conforme a imagem de referência (3 Colunas)
+    const ATTR_LIST = [
+        // Linha 1
+        { k: 'weakFootAcc', l: 'Pior Pé Prec.', i: '🦶' }, { k: 'shot', l: 'Finalização', i: '🥅' }, { k: 'condition', l: 'Cond. Física', i: '💪' },
+        // Linha 2
+        { k: 'stamina', l: 'Resistência', i: '🔋' }, { k: 'header', l: 'Cabeceio', i: '🤕' }, { k: 'attack', l: 'Ataque', i: '⚔️' },
+        // Linha 3
+        { k: 'weakFootFreq', l: 'Pior Pé Freq.', i: '🔄' }, { k: 'longPassSpd', l: 'P. Longo Vel.', i: '🚀' }, { k: 'teamwork', l: 'Trabalho Eq.', i: '🤝' },
+        // Linha 4
+        { k: 'freeKick', l: 'Falta', i: '🎯' }, { k: 'aggression', l: 'Agressividade', i: '😡' }, { k: 'defense', l: 'Defesa', i: '🛡️' },
+        // Linha 5
+        { k: 'tech', l: 'Técnica', i: '✨' }, { k: 'dribbleSpd', l: 'Drib. Veloc.', i: '💨' }, { k: 'mentality', l: 'Atitude', i: '🧠' },
+        // Linha 6
+        { k: 'shotTech', l: 'Téc. Chute', i: '👟' }, { k: 'balance', l: 'Equilíbrio', i: '⚖️' }, { k: 'shortPass', l: 'Passe Curto', i: '🎯' },
+        // Linha 7
+        { k: 'longPass', l: 'Passe Longo', i: '📡' }, { k: 'shortPassSpd', l: 'P. Curto Vel.', i: '⏩' }, { k: 'accel', l: 'Aceleração', i: '🏎️' },
+        // Linha 8
+        { k: 'gk', l: 'Hab. Goleiro', i: '🧤' }, { k: 'shotPower', l: 'Força Chute', i: '💣' }, { k: 'jump', l: 'Impulsão', i: '🦘' },
+        // Linha 9
+        { k: 'speed', l: 'Veloc. Máx.', i: '⚡' }, { k: 'curve', l: 'Efeito', i: '🍌' }, { k: 'response', l: 'Resposta', i: '💡' },
+        // Linha 10 (Resto)
+        { k: 'dribble', l: 'Drible', i: '⚽' }, { k: 'agility', l: 'Agilidade', i: '🤸' }
+    ];
+
+    // Função para pegar a cor baseada no valor (Igual ao print)
+    const getAttrColor = (val) => {
+        if (!val) return '#666';
+        if (val < 50) return '#ff5e5e'; // Vermelho
+        if (val < 70) return '#ffbb33'; // Laranja/Amarelo
+        return '#00C851'; // Verde
     };
 
     const handleTogglePlayer = (pid) => {
@@ -2604,7 +2628,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                         </select>
                     </div>
 
-                    {/* LISTA DE JOGADORES (TODOS ATRIBUTOS) */}
+                    {/* LISTA DE JOGADORES (ESTILO IDÊNTICO AO PERFIL) */}
                     <p style={{textAlign:'center', color:'#888', fontSize:12, margin:'10px 0'}}>
                         👉 Selecione até <b>5 jogadores</b> para o treino:
                     </p>
@@ -2641,23 +2665,26 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                                     {(coach.affinities || []).includes(p.position) && <span style={{color:'gold'}}>★ Afinidade</span>}
                                 </div>
 
-                                {/* Linha 3: TODOS OS ATRIBUTOS (Grid Denso) */}
+                                {/* Linha 3: TODOS OS ATRIBUTOS (Grid 3 Colunas com Cores) */}
                                 {p.attributes ? (
                                     <div style={{
                                         borderTop:'1px solid #333', 
-                                        paddingTop:5, 
+                                        paddingTop:8, 
                                         fontSize:9, 
                                         color:'#aaa', 
                                         display:'grid', 
-                                        gridTemplateColumns:'1fr 1fr 1fr', // 3 Colunas
-                                        gap: '2px 5px'
+                                        gridTemplateColumns:'1fr 1fr 1fr', // 3 Colunas Exatas
+                                        gap: '4px 8px' // Espaçamento melhorado
                                     }}>
-                                        {Object.entries(p.attributes).map(([key, val]) => (
-                                            <div key={key} style={{display:'flex', justifyContent:'space-between'}}>
-                                                <span>{ATTR_LABELS[key] || key}:</span>
-                                                <b style={{color:'#fff'}}>{val}</b>
-                                            </div>
-                                        ))}
+                                        {ATTR_LIST.map((attr) => {
+                                            const val = p.attributes[attr.k];
+                                            return (
+                                                <div key={attr.k} style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                                    <span title={attr.l}>{attr.i} {attr.l.split(' ')[0]}</span>
+                                                    <b style={{color: getAttrColor(val)}}>{val || '-'}</b>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 ) : (
                                     <div style={{fontSize:9, color:'#444', textAlign:'center', marginTop:5}}>Sem atributos detalhados</div>

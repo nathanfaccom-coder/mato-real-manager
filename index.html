@@ -110,7 +110,7 @@
 
 // FIM DO BLOCO INICIAL
 
-      // --- SISTEMA DE ATRIBUTOS REALISTA (v1.54.1) ---
+      // --- SISTEMA DE ATRIBUTOS REALISTA (v1.54.2) ---
 // (Substitui o antigo Sistema de RPG)
 
 const ATTR_LABELS = {
@@ -132,24 +132,24 @@ const ATTR_LABELS = {
 };
 
 const getAttrColor = (val) => {
-    if (val >= 90) return '#2979FF'; // Azul (Craque/Lenda)
-    if (val >= 75) return '#00E676'; // Verde (Bom)
-    if (val >= 60) return '#FFC400'; // Amarelo (Médio)
-    return '#FF1744';                // Vermelho (Baixo)
+    if (val >= 90) return '#2979FF'; // Azul
+    if (val >= 75) return '#00E676'; // Verde
+    if (val >= 60) return '#FFC400'; // Amarelo
+    return '#FF1744';                // Vermelho
 };
 
-// Gerador de Atributos V3 (Realista e Contido)
+// Gerador de Atributos Balanceado e Seguro
 const generateAttributes = (pos, targetOv) => {
     const ov = parseInt(targetOv) || 50;
     const attrs = {};
     const keys = Object.keys(ATTR_LABELS);
 
-    // Definição de prioridades
+    // Definição de prioridades (Corrigido para evitar crash em GOL)
     let primary = [], secondary = [];
 
     if (pos === 'GOL') {
         primary = ['gk', 'response', 'jump', 'longPass'];
-        secondary = ['balance', 'strength', 'mentality', 'defense'];
+        secondary = ['balance', 'condition', 'mentality', 'defense']; // Troquei strength por condition
     } else if (pos.includes('ZAG')) {
         primary = ['defense', 'header', 'balance', 'jump', 'aggression'];
         secondary = ['stamina', 'response', 'shortPass', 'longPass'];
@@ -167,24 +167,24 @@ const generateAttributes = (pos, targetOv) => {
         secondary = ['dribble', 'agility', 'balance', 'reaction'];
     }
 
-    // 1. Geração Base Mais Conservadora
+    // 1. Geração Base Controlada
     keys.forEach(k => {
         let base = ov;
         
-        // Em vez de somar +12, somamos menos para manter perto da média real
+        // Aplica bônus/ônus suaves
         if (primary.includes(k)) {
-            base += Math.floor(Math.random() * 6) + 2; // +2 a +8 (Forte, mas não absurdo)
+            base += Math.floor(Math.random() * 6) + 2; // +2 a +8
         } else if (secondary.includes(k)) {
-            base -= Math.floor(Math.random() * 4); // -0 a -4 (Levemente abaixo da média)
+            base -= Math.floor(Math.random() * 4); // -0 a -4
         } else {
-            base -= Math.floor(Math.random() * 10) + 5; // -5 a -15 (Fraco, mas não inútil)
+            base -= Math.floor(Math.random() * 10) + 5; // -5 a -15 (Penaliza irrelevantes)
         }
 
-        // Ajustes fixos para Goleiro/Linha (mantidos, mas suavizados)
+        // Ajustes fixos de posição (Goleiro x Linha)
         if (pos !== 'GOL' && k === 'gk') base = 10; 
         if (pos === 'GOL' && ['shot', 'attack', 'dribble', 'curve', 'freeKick'].includes(k)) base = Math.max(15, base - 20);
 
-        // Trava de segurança: Se o Overall for baixo (<80), evita passar de 90
+        // Trava de segurança para não extrapolar em níveis baixos
         if (ov < 80 && base > 88) base = 88;
         
         if (base > 99) base = 99;
@@ -193,7 +193,8 @@ const generateAttributes = (pos, targetOv) => {
         attrs[k] = base;
     });
 
-    // 2. Normalização Precisa
+    // 2. Normalização da Média
+    // Para Goleiro, ignora atributos de ataque na conta. Para Linha, ignora GK.
     const relevantKeys = keys.filter(k => {
         if (pos === 'GOL') return !['shot', 'attack', 'dribble', 'curve', 'freeKick', 'weakFootAcc', 'weakFootFreq'].includes(k);
         return k !== 'gk';
@@ -202,14 +203,12 @@ const generateAttributes = (pos, targetOv) => {
     let sum = 0;
     relevantKeys.forEach(k => sum += attrs[k]);
     const currentAvg = sum / relevantKeys.length;
-    const diff = ov - currentAvg; // Quanto falta para atingir o Overall
+    const diff = ov - currentAvg;
     
     // Distribui a diferença
     relevantKeys.forEach(k => {
-        // Se a diferença for positiva (precisa aumentar), prioriza quem já é atributo primário
         let boost = diff;
-        
-        // Se o atributo já for muito alto (>90) e o overall meta for baixo (<85), não aumenta mais
+        // Se já for muito alto (>90) e o overall meta for baixo (<85), segura a onda
         if (attrs[k] > 90 && ov < 85 && diff > 0) boost = 0;
 
         let newVal = attrs[k] + boost;
@@ -490,7 +489,7 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
                 setLoading(false);
             }
 
-            // --- VIRADA DE TEMPORADA (ATRIBUTOS REALISTAS v1.54.1) ---
+            // --- VIRADA DE TEMPORADA (ATRIBUTOS REALISTAS v1.54.2) ---
             if (act === 'SEASON') {
                 if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Atributos (XP)\n2. Envelhecer Contratos\n3. Processar Retornos")) return;
 
@@ -1402,7 +1401,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.54.1</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.54.2</div>
                             </div>
                         </div>
                         
@@ -1602,7 +1601,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis |v1.54.1</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis |v1.54.2</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2037,11 +2036,10 @@ const renewContract = async (p) => {
                 attributes: null 
             });
             
-            // Função auxiliar para calcular média ignorando status inúteis (Balanceamento)
+            // Função para calcular média real ignorando atributos inúteis
             const calculateRealOverall = (position, attrs) => {
                 let sum = 0;
                 let count = 0;
-                // Goleiro ignora atributos de linha; Linha ignora atributo de goleiro.
                 const ignoreList = position === 'GOL' 
                     ? ['shot', 'attack', 'dribble', 'curve', 'freeKick', 'weakFootAcc', 'weakFootFreq'] 
                     : ['gk'];
@@ -2051,28 +2049,32 @@ const renewContract = async (p) => {
                     sum += val;
                     count++;
                 });
-                return Math.round(sum / count);
+                return count === 0 ? 0 : Math.round(sum / count);
             };
 
             const handleSave = () => {
-                const dataToSave = { ...f };
+                try {
+                    const dataToSave = { ...f };
 
-                // SE NÃO TIVER ATRIBUTOS (Criação ou Jogador Antigo), GERA AGORA!
-                if (!dataToSave.attributes || Object.keys(dataToSave.attributes).length === 0) {
-                    const targetOv = parseInt(dataToSave.overall) || 60;
-                    const newAttrs = generateAttributes(dataToSave.position, targetOv);
-                    
-                    // Calcula a média real balanceada
-                    const realAvg = calculateRealOverall(dataToSave.position, newAttrs);
-                    
-                    // Atualiza o objeto final
-                    dataToSave.attributes = newAttrs;
-                    dataToSave.overall = realAvg;
+                    // GERAÇÃO DE ATRIBUTOS (Novo ou Antigo sem atributos)
+                    if (!dataToSave.attributes || Object.keys(dataToSave.attributes).length === 0) {
+                        const targetOv = parseInt(dataToSave.overall) || 60;
+                        const newAttrs = generateAttributes(dataToSave.position, targetOv);
+                        
+                        // Calcula média balanceada
+                        const realAvg = calculateRealOverall(dataToSave.position, newAttrs);
+                        
+                        dataToSave.attributes = newAttrs;
+                        dataToSave.overall = realAvg;
 
-                    alert(`Atributos gerados!\nOverall Real (Balanceado): ${realAvg}`);
+                        alert(`Sucesso! Atributos gerados.\nOverall Real Calculado: ${realAvg}`);
+                    }
+
+                    onSave(dataToSave);
+                } catch (error) {
+                    console.error(error);
+                    alert("Erro ao gerar atributos: " + error.message);
                 }
-
-                onSave(dataToSave);
             };
 
             return (
@@ -2081,7 +2083,6 @@ const renewContract = async (p) => {
                         <h3>{isEditing ? 'Ficha do Jogador' : 'Criar Jogador'}</h3>
                         
                         <label>Nome</label>
-                        {/* Só desabilita se não for admin E se o jogador já existir (isEditing) */}
                         <input className="input-field" value={f.name} onChange={e=>setF({...f, name:e.target.value})} disabled={!isAdmin && isEditing} />
                         
                         <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:5, marginBottom:10, border:'1px solid #444'}}>
@@ -2109,22 +2110,24 @@ const renewContract = async (p) => {
                             </div>
                         </div>
 
-                        {/* VISUALIZAÇÃO APENAS (Read-Only) */}
+                        {/* VISUALIZAÇÃO DOS ATRIBUTOS */}
                         {f.attributes ? (
                             <div style={{border:'1px solid #444', padding:10, borderRadius:8, margin:'10px 0'}}>
                                 <AttributeGrid attrs={f.attributes} pendingXP={f.pendingXP || 0} />
                                 {isAdmin && <button className="btn btn-gold" style={{marginTop:5, fontSize:10}} onClick={()=>{
-                                    if(confirm("Regerar (Admin)?")) {
-                                        const n = generateAttributes(f.position, parseInt(f.overall)||60);
-                                        const avg = calculateRealOverall(f.position, n);
-                                        setF({...f, attributes:n, overall: avg});
+                                    if(confirm("Regerar Atributos (Admin)?")) {
+                                        try {
+                                            const n = generateAttributes(f.position, parseInt(f.overall)||60);
+                                            const avg = calculateRealOverall(f.position, n);
+                                            setF({...f, attributes:n, overall: avg});
+                                        } catch(e) { alert("Erro ao regerar: " + e.message); }
                                     }
                                 }}>🎲 REGERAR (ADM)</button>}
                             </div>
                         ) : (
                             <div style={{padding:15, textAlign:'center', color:'#aaa', border:'1px dashed #666', borderRadius:8, margin:'10px 0', background:'rgba(0,0,0,0.2)'}}>
                                 <i className="fas fa-magic" style={{fontSize:20, marginBottom:5}}></i><br/>
-                                Os atributos serão gerados e salvos<br/>automaticamente ao clicar em <b>SALVAR</b>.
+                                Os atributos serão gerados automaticamente<br/>ao clicar em <b>SALVAR</b>.
                             </div>
                         )}
 
@@ -2177,7 +2180,6 @@ const renewContract = async (p) => {
                         <div style={{display:'flex', gap:10, marginTop:15}}>
                             <button className="btn btn-green" onClick={handleSave}>SALVAR</button>
                             
-                            {/* Botões extras só aparecem se o jogador já existe (isEditing) */}
                             {isOwner && isEditing && <button className="btn btn-blue" onClick={()=>onRenew(initial)}>RENOVAR</button>}
                             {isEditing && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>X</button>}
                             
@@ -2570,7 +2572,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         {o.description}
                     </div>
 
-                    {/*v1.54.1: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
+                    {/*v1.54.2: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
                     {o.type === 'NOTIFICACAO' ? (
                         <div style={{display:'flex', gap:5}}>
                             <button className="btn btn-green" style={{width:'100%'}} onClick={()=>onAccept(o)}>

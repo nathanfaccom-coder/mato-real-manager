@@ -1967,7 +1967,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.70.1</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.70.2</div>
                             </div>
                         </div>
                         
@@ -2276,7 +2276,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.70.1</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.70.2</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2695,11 +2695,14 @@ const renewContract = async (p) => {
         };
 //FIM
         // --- COMPONENTE DO PAINEL DO TÉCNICO ---
-const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolvePerk, onAddAffinity, onAcceptOffer, onRejectOffer, onCounterOffer, onSelfAction }) => {
+const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolvePerk, onAddAffinity, onAcceptOffer, onRejectOffer, onCounterOffer, onUpdateSalary, onSelfAction }) => {
     const [tab, setTab] = useState('TREINO'); 
     const [selectedPlayers, setSelectedPlayers] = useState([]);
     const [trainingType, setTrainingType] = useState('FISICO_BASE'); 
     
+    // --- CORREÇÃO: O Estado newSalary volta aqui ---
+    const [newSalary, setNewSalary] = useState(coach.salary); 
+
     // State local para contra-proposta
     const [editingOffer, setEditingOffer] = useState(null); 
     const [counterVals, setCounterVals] = useState({ s: 0, c: 1, cl: 0 });
@@ -2907,7 +2910,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                     {coach.teamId !== 'FREE' && (
                         <div className="card" style={{border:'1px solid #444', marginBottom:15}}>
                             <h3>📝 Meu Contrato</h3>
-                            <p style={{fontSize:12}}>Clube: <b>{team?.name || 'Desconhecido'}</b></p>
+                            <p style={{fontSize:12}}>Clube: <b>{team?.name}</b></p>
                             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:5}}>
                                 <button className="btn btn-blue" onClick={()=>onSelfAction('RAISE', coach)}>💰 PEDIR AUMENTO</button>
                                 <button className="btn btn-gold" onClick={()=>onSelfAction('RESIGN_REQ', coach)}>👋 PEDIR PARA SAIR</button>
@@ -2976,8 +2979,9 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                         ))}
                     </div>
                     
-                    <div className="card">
-                        <h3>💰 Salário Pretendido</h3>
+                    {/* "Salário Pretendido" (Mantido como opção extra) */}
+                    <div className="card" style={{marginTop:15}}>
+                        <h3>💰 Atualizar Pretensão Salarial</h3>
                         {coach.level >= 2 ? (
                             <div style={{display:'flex', gap:10}}>
                                 <input className="input-field" type="number" value={newSalary} onChange={e=>setNewSalary(e.target.value)} />

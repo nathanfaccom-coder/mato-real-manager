@@ -1084,33 +1084,6 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
     };
             //FIM
             // --- FUNÇÃO PARA CONTRATAR TÉCNICO ---
-    const handleHireCoach = async (coach) => {
-        if (!user.data || user.type !== 'USER') return alert("Apenas presidentes podem contratar!");
-        
-        // Verifica se o time tem dinheiro
-        const team = user.data;
-        if (team.balance < coach.salary) return alert("Saldo insuficiente para pagar as luvas (1º salário)!");
-        
-        if (confirm(`Contratar ${coach.name}?\nCusto Imediato: ${fmt(coach.salary)}`)) {
-            const b = db.batch();
-            
-            // 1. Se o time já tiver técnico, demite o antigo (opcional, mas recomendado para não ter 2)
-            const currentCoach = coaches.find(c => c.teamId === team.id && c.status === 'ACTIVE');
-            if (currentCoach) {
-                b.update(db.collection('users').doc(currentCoach.id), { teamId: 'FREE' });
-            }
-
-            // 2. Contrata o novo
-            b.update(db.collection('users').doc(coach.id), { teamId: team.id });
-            
-            // 3. Paga o salário/luvas
-            b.update(db.collection('teams').doc(team.id), { balance: team.balance - coach.salary });
-
-            await b.commit();
-            alert(`Sucesso! ${coach.name} é o novo técnico do ${team.name}!`);
-        }
-    };
-            //FIM
 
 // FIM DA GESTÃO ADMINISTRATIVA E SALVAR JOGADOR
 

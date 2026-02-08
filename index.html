@@ -527,9 +527,32 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
             const createJournalist = async (name, pass, paperId) => { await db.collection('journalists').add({ name, password: pass, newspaperId: paperId, status: 'PENDING' }); alert("Conta criada! Aguarde seu Chefe."); };
 
 // FIM DAS FUNÇÕES DE CRIAÇÃO E ACESSO ADMIN
-// --- COLE ISSO DENTRO DA FUNCTION APP(), ANTES DO RETURN ---
-// --- FUNÇÃO DE CONTRATAR TÉCNICO ---
-    // --- ENVIAR PROPOSTA PARA TÉCNICO (MERCADO) ---
+
+            // --- DEMITIR TÉCNICO (DONO DO TIME) ---
+    const handleFireCoach = async (coach) => {
+        const team = user.data;
+        const fine = coach.salary * 4; // Multa = 4 semanas de salário
+
+        if (confirm(`Demitir ${coach.name}?\nVocê terá que pagar uma multa rescisória de ${fmt(fine)}.`)) {
+            if (team.balance < fine) return alert("Saldo insuficiente para pagar a rescisão!");
+
+            const b = db.batch();
+
+            // 1. Cobra a multa do time
+            b.update(db.collection('teams').doc(team.id), { 
+                balance: team.balance - fine 
+            });
+
+            // 2. Libera o técnico (volta para FREE)
+            b.update(db.collection('users').doc(coach.id), { 
+                teamId: 'FREE' 
+            });
+
+            await b.commit();
+            alert(`${coach.name} foi demitido.`);
+        }
+    };
+            //FIM
     const handleHireCoach = async (coach) => {
         if (!user.data || user.type !== 'USER') return alert("Apenas presidentes podem contratar!");
         
@@ -1746,7 +1769,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.63.2</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.63.3</div>
                             </div>
                         </div>
                         
@@ -1801,8 +1824,16 @@ const renewContract = async (p) => {
                             />
                         }
                         
-                        {screen === 'HOME' && user.type === 'USER' && 
-                            <TeamDashboard team={user.data} players={players.filter(p=>p.teamId===user.data.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER', data: { teamId: user.data.id } })} />
+                       {screen === 'HOME' && user.type === 'USER' && 
+                            <TeamDashboard 
+                                team={user.data} 
+                                players={players.filter(p=>p.teamId===user.data.id)} 
+                                coach={coaches.find(c => c.teamId === user.data.id && c.status === 'ACTIVE')}
+                                onFireCoach={handleFireCoach}
+                                isVisitor={false} 
+                                onEdit={(p)=>setModal({type:'PLAYER', data:p})} 
+                                onAdd={()=>setModal({type:'PLAYER', data: { teamId: user.data.id } })} 
+                            />
                         }
                         
                         {screen === 'HOME' && user.type === 'VISITOR' && <VisitorDashboard players={players} teams={teams} />}
@@ -1824,8 +1855,21 @@ const renewContract = async (p) => {
                             </div>
                         )}
                         
-                        {screen === 'ADMIN_TEAM' && adminTeam && <div><button className="btn" style={{background:'#333', marginBottom:10}} onClick={()=>{setAdminTeam(null); setScreen('HOME');}}>⬅ VOLTAR</button><h3 style={{color:'var(--purple)'}}>Editando: {adminTeam.name}</h3><TeamDashboard team={adminTeam} players={players.filter(p=>p.teamId===adminTeam.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER', data: { teamId: adminTeam.id } })} /></div>}
-                        
+{screen === 'ADMIN_TEAM' && adminTeam && 
+                            <div>
+                                <button className="btn" style={{background:'#333', marginBottom:10}} onClick={()=>{setAdminTeam(null); setScreen('HOME');}}>⬅ VOLTAR</button>
+                                <h3 style={{color:'var(--purple)'}}>Editando: {adminTeam.name}</h3>
+                                <TeamDashboard 
+                                    team={adminTeam} 
+                                    players={players.filter(p=>p.teamId===adminTeam.id)} 
+                                    coach={coaches.find(c => c.teamId === adminTeam.id && c.status === 'ACTIVE')} 
+                                    onFireCoach={handleFireCoach} 
+                                    isVisitor={false} 
+                                    onEdit={(p)=>setModal({type:'PLAYER', data:p})} 
+                                    onAdd={()=>setModal({type:'PLAYER', data: { teamId: adminTeam.id } })} 
+                                />
+                            </div>
+                        }                        
                         {screen === 'MARKET' && (
                             <Market 
                                 me={user.data?.id} 
@@ -2018,7 +2062,7 @@ const CoachRegisterForm = ({ onCancel, onSave }) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.63.2</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.63.3</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2635,19 +2679,35 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
     );
 };
         //FIM
-        const TeamDashboard = ({ team, players, isVisitor, onEdit, onAdd }) => {
-            const wageBill = players.reduce((a,p) => a + (parseFloat(p.salary)||0), 0);
+        const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireCoach }) => {
+    const [tab, setTab] = useState('ELENCO'); 
+    
+    // Calcula salários somando jogadores + técnico (se houver)
+    const wageBill = players.reduce((a,p) => a + (parseFloat(p.salary)||0), 0) + (coach ? parseFloat(coach.salary) : 0);
 
-            return (
+    return (
+        <div>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:15}}>
                 <div>
-                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:15}}>
-                        <div>
-                            <h3>Elenco ({players.length})</h3>
-                            <small style={{color:'#aaa'}}>Folha: <span style={{color:'var(--danger)', fontWeight:'bold'}}>{fmt(wageBill)}/sem</span></small>
-                        </div>
-                        {!isVisitor && <button className="btn btn-green" style={{width:'auto'}} onClick={onAdd}>+ JOGADOR</button>}
-                    </div>
+                    <h2 style={{margin:0}}>{team.name}</h2>
+                    <small style={{color:'#aaa'}}>Folha: <span style={{color:'var(--danger)', fontWeight:'bold'}}>{fmt(wageBill)}/sem</span></small>
+                </div>
+                {!isVisitor && <button className="btn btn-green" style={{width:'auto'}} onClick={onAdd}>+ JOGADOR</button>}
+            </div>
 
+            {/* ABAS DE NAVEGAÇÃO */}
+            <div style={{display:'flex', gap:10, marginBottom:15}}>
+                <button className={`btn ${tab==='ELENCO'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('ELENCO')}>ELENCO</button>
+                <button className={`btn ${tab==='STAFF'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('STAFF')}>COMISSÃO TÉCNICA</button>
+            </div>
+
+            {/* --- ABA 1: ELENCO (Código Original) --- */}
+            {tab === 'ELENCO' && (
+                <div>
+                    <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
+                        <b>Jogadores ({players.length})</b>
+                    </div>
+                    
                     {players.map(p => (
                         <div key={p.id} className="card" style={{borderLeft: `4px solid ${getPosColor(p.position)}`, marginBottom:10}}>
                             <div style={{display:'flex', justifyContent:'space-between', alignItems:'start'}}>
@@ -2673,7 +2733,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
 
                             {/* ATRIBUTOS VISÍVEIS NO PAINEL */}
                             <div style={{marginTop:10, paddingTop:5, borderTop:'1px dashed #444'}}>
-                                 <AttributeGrid attrs={p.attributes} pendingXP={p.pendingXP} />
+                                    <AttributeGrid attrs={p.attributes} pendingXP={p.pendingXP} />
                             </div>
 
                             {!isVisitor && (
@@ -2686,8 +2746,67 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                         </div>
                     ))}
                 </div>
-            );
-        };
+            )}
+
+            {/* --- ABA 2: COMISSÃO TÉCNICA (Novo) --- */}
+            {tab === 'STAFF' && (
+                <div>
+                    {!coach ? (
+                        <div className="card" style={{textAlign:'center', padding:20, border:'1px dashed #666'}}>
+                            <h3 style={{color:'#666'}}>Sem Técnico Contratado</h3>
+                            <p style={{fontSize:12, color:'#aaa'}}>Vá ao Mercado > Técnicos para contratar um comandante.</p>
+                        </div>
+                    ) : (
+                        <div className="highlight-card" style={{borderLeft:'4px solid gold'}}>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+                                <div>
+                                    <h2 style={{margin:0, color:'gold'}}>👔 {coach.name}</h2>
+                                    <span className="badge" style={{background:'var(--primary)', marginTop:5}}>Nível {coach.level}</span>
+                                </div>
+                                {!isVisitor && (
+                                    <button className="btn btn-red" style={{width:'auto', fontSize:10}} onClick={()=>onFireCoach(coach)}>DEMITIR</button>
+                                )}
+                            </div>
+                            
+                            <hr style={{borderColor:'#444', margin:'15px 0'}}/>
+                            
+                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, fontSize:12}}>
+                                <div>
+                                    <span style={{color:'#aaa'}}>Especialidade:</span><br/>
+                                    <b>{(coach.affinities || []).join(', ')}</b>
+                                </div>
+                                <div>
+                                    <span style={{color:'#aaa'}}>Salário:</span><br/>
+                                    <b>{fmt(coach.salary)}/sem</b>
+                                </div>
+                                <div>
+                                    <span style={{color:'#aaa'}}>Multa Rescisória:</span><br/>
+                                    <b style={{color:'red'}}>{fmt(coach.salary * 4)}</b>
+                                </div>
+                                <div>
+                                    <span style={{color:'#aaa'}}>Treinos na Semana:</span><br/>
+                                    <b style={{color: coach.trainingsLeft > 0 ? 'lime' : 'red'}}>{coach.trainingsLeft}/2</b>
+                                </div>
+                            </div>
+
+                            <div style={{marginTop:15, background:'rgba(0,0,0,0.3)', padding:10, borderRadius:5}}>
+                                <small style={{color:'#ccc'}}>💡 Habilidades Passivas (Buffs para o time):</small>
+                                <div style={{display:'flex', flexWrap:'wrap', gap:5, marginTop:5}}>
+                                    {(coach.perks || []).map(p => (
+                                        <span key={p.id} className="badge" style={{background:'var(--purple)', border:'1px solid gold'}} title={p.desc}>
+                                            ⚡ {p.name}
+                                        </span>
+                                    ))}
+                                    {(coach.perks || []).length === 0 && <span style={{color:'#666', fontSize:10}}>Nenhuma habilidade desbloqueada.</span>}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
 // FIM DO SHOPPING E TEAM DASHBOARD
 
 

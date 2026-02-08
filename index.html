@@ -489,7 +489,7 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
                 setLoading(false);
             }
 
-            // --- VIRADA DE TEMPORADA (ATRIBUTOS REALISTAS v1.54.2) ---
+            // --- VIRADA DE TEMPORADA (ATRIBUTOS REALISTAS v1.54.3) ---
             if (act === 'SEASON') {
                 if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Atributos (XP)\n2. Envelhecer Contratos\n3. Processar Retornos")) return;
 
@@ -1401,7 +1401,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.54.2</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.54.3</div>
                             </div>
                         </div>
                         
@@ -2025,18 +2025,24 @@ const renewContract = async (p) => {
             return (<div><input className="input-field" placeholder="Buscar jogador..." value={search} onChange={e=>setSearch(e.target.value)} /><div style={{maxHeight:300, overflowY:'auto'}}>{search.length > 0 && filtered.map(p => (<div key={p.id} className="card" onClick={()=>{setSelP(p); setS(p.stats || {goals:0,assists:0,tackles:0,saves:0,yellows:0,reds:0})}}><b>{p.name}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small></div>))}</div></div>);
         };
 
-      const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams, onRenew, isOwner }) => {
+     const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams, onRenew, isOwner }) => {
+            // Verifica se é uma EDIÇÃO REAL (tem ID gerado pelo banco)
             const isEditing = initial && initial.id;
 
-            const [f, setF] = useState(initial || {
+            // Dados Padrão (Garante que nada fique undefined)
+            const defaultState = {
                 name:'', position:'ATA', overall:45, value:'', salary:'', 
                 clause:'', contract:'', mood:'😐', status:'NAO_A_VENDA', 
                 password:'', balance: 0, rating: '', 
                 stats: {goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0},
                 attributes: null 
-            });
+            };
+
+            // MISTURA o padrão com o inicial. 
+            // Assim, se 'initial' tiver só o teamId, o resto (position, overall) pega do defaultState.
+            const [f, setF] = useState({ ...defaultState, ...initial });
             
-            // Função para calcular média real ignorando atributos inúteis
+            // Função para calcular média real ignorando status inúteis
             const calculateRealOverall = (position, attrs) => {
                 let sum = 0;
                 let count = 0;
@@ -2056,16 +2062,22 @@ const renewContract = async (p) => {
                 try {
                     const dataToSave = { ...f };
 
-                    // GERAÇÃO DE ATRIBUTOS (Novo ou Antigo sem atributos)
+                    // Garante que position tenha valor (fallback para ATA se der erro)
+                    const pos = dataToSave.position || 'ATA';
+
+                    // GERAÇÃO DE ATRIBUTOS
                     if (!dataToSave.attributes || Object.keys(dataToSave.attributes).length === 0) {
                         const targetOv = parseInt(dataToSave.overall) || 60;
-                        const newAttrs = generateAttributes(dataToSave.position, targetOv);
+                        const newAttrs = generateAttributes(pos, targetOv);
                         
-                        // Calcula média balanceada
-                        const realAvg = calculateRealOverall(dataToSave.position, newAttrs);
+                        // Calcula média
+                        const realAvg = calculateRealOverall(pos, newAttrs);
                         
                         dataToSave.attributes = newAttrs;
                         dataToSave.overall = realAvg;
+                        
+                        // Garante que salvamos a posição correta caso ela estivesse vazia antes
+                        dataToSave.position = pos;
 
                         alert(`Sucesso! Atributos gerados.\nOverall Real Calculado: ${realAvg}`);
                     }
@@ -2073,7 +2085,7 @@ const renewContract = async (p) => {
                     onSave(dataToSave);
                 } catch (error) {
                     console.error(error);
-                    alert("Erro ao gerar atributos: " + error.message);
+                    alert("Erro técnico: " + error.message);
                 }
             };
 
@@ -2110,7 +2122,6 @@ const renewContract = async (p) => {
                             </div>
                         </div>
 
-                        {/* VISUALIZAÇÃO DOS ATRIBUTOS */}
                         {f.attributes ? (
                             <div style={{border:'1px solid #444', padding:10, borderRadius:8, margin:'10px 0'}}>
                                 <AttributeGrid attrs={f.attributes} pendingXP={f.pendingXP || 0} />

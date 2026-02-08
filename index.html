@@ -1141,7 +1141,7 @@ const AdminPanel = ({ teams, papers, journalists, companies, coaches, reqs, conf
                 <button style={{...tabStyle(tab==='COACH'), background: tab==='COACH' ? 'gold' : '#333', color: tab==='COACH' ? '#000' : '#fff'}} onClick={()=>setTab('COACH')}>Técnicos</button>
             </div>
 
-            {/* ABA DE TÉCNICOS ATUALIZADA */}
+            {/* ABA DE TÉCNICOS (CORRIGIDA E INTELIGENTE) */}
             {tab === 'COACH' && (
                 <div>
                     <h3>Técnicos Pendentes</h3>
@@ -1153,7 +1153,6 @@ const AdminPanel = ({ teams, papers, journalists, companies, coaches, reqs, conf
                                 <small>Esp: {c.affinities[0]}</small>
                             </div>
                             <div style={{marginTop:10, display:'flex', gap:5}}>
-                                {/* NOTE: onHireCoach não existe aqui dentro, removi para evitar erro, pois o Admin apenas Aprova ou Rejeita se for um sistema de aprovação, ou deleta. Se quiser editar, usa os botões abaixo. */}
                                 <button className="btn btn-red" onClick={async()=>{
                                     if(confirm("Rejeitar solicitação?")) await db.collection('users').doc(c.id).delete();
                                 }}>REJEITAR / EXCLUIR</button>
@@ -1176,13 +1175,28 @@ const AdminPanel = ({ teams, papers, journalists, companies, coaches, reqs, conf
                                     {c.teamId === 'FREE' ? <span style={{color:'lime'}}>Livre</span> : 'Contratado'} | 
                                     Nível: {c.level} | $: {fmt(c.balance)}
                                 </small>
+                                <br/>
+                                <small style={{fontSize:9, color:'#888'}}>Perks: {(c.perks||[]).length} (Pend: {c.pendingPerks||0})</small>
                             </div>
                             
                             <div style={{display:'flex', gap:5}}>
-                                {/* BOTÃO EDITAR NÍVEL */}
+                                {/* BOTÃO EDITAR NÍVEL (CORRIGIDO PARA ADICIONAR PERKS) */}
                                 <button className="btn btn-blue" style={{fontSize:10, width:'auto', padding:'5px 8px'}} onClick={async()=>{
-                                    const n = prompt("Novo Nível (1-10):", c.level);
-                                    if(n) await db.collection('users').doc(c.id).update({level: parseInt(n)});
+                                    const n = prompt(`Novo Nível para ${c.name} (Atual: ${c.level}):`, c.level);
+                                    if(n) {
+                                        const newLevel = parseInt(n);
+                                        // Lógica: Se Nível 5, deve ter 4 perks totais (Nivel - 1). 
+                                        // Subtrai os que já tem para achar os pendentes.
+                                        const currentPerksCount = (c.perks || []).length;
+                                        const idealPerksCount = Math.max(0, newLevel - 1);
+                                        const newPending = Math.max(0, idealPerksCount - currentPerksCount);
+
+                                        await db.collection('users').doc(c.id).update({
+                                            level: newLevel,
+                                            pendingPerks: newPending // Atualiza automaticamente!
+                                        });
+                                        alert(`Nível alterado para ${newLevel}. Perks pendentes ajustados para: ${newPending}`);
+                                    }
                                 }}>LVL</button>
 
                                 {/* BOTÃO EDITAR SALDO */}
@@ -1993,7 +2007,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.70.3</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.70.4</div>
                             </div>
                         </div>
                         
@@ -2302,7 +2316,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.70.3</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.70.4</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

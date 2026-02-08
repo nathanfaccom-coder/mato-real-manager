@@ -1882,7 +1882,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.58</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.70.0</div>
                             </div>
                         </div>
                         
@@ -2178,7 +2178,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.63.8</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.70.0</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -3581,14 +3581,15 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
 // FIM DO COMPONENTE MARKET E OFFER FORM
 
 
-const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) => {
+const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter, onCoachAccept, onCoachReject, onCoachCounter }) => {
     // FILTRO RIGOROSO: 
     // A proposta só aparece se o usuário logado for o destinatário atual (recipientId).
     // Isso garante o fluxo: Comprador -> Vendedor -> Jogador.
     // Ao enviar uma contraproposta, o recipientId muda e ela some automaticamente daqui.
     const myOffers = offers.filter(o => 
         o.recipientId === user.data.id && 
-        o.status === 'PENDING'
+        (o.status === 'PENDING' || o.status === 'COUNTERED') && // Aceita PENDING e COUNTERED
+        o.status !== 'REJECTED'
     );
 
     return (
@@ -3608,45 +3609,82 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
             )}
             
             {myOffers.map(o => (
-                <div key={o.id} className="card" style={{borderLeft: o.type === 'NOTIFICACAO' ? '4px solid #00E676' : '4px solid gold', background: '#1e1e1e'}}>
+                <div key={o.id} className="card" style={{borderLeft: o.type.includes('URGENTE') ? '4px solid red' : o.type === 'NOTIFICACAO' ? '4px solid #00E676' : o.type === 'COACH_OFFER' ? '4px solid gold' : '4px solid var(--primary)', background: '#1e1e1e'}}>
                     
-                    {/* AVISOS DE STATUS REALISTA PARA O JOGADOR */}
-                    {o.sellerAccepted && user.type === 'PLAYER' && (
-                        <div style={{background:'rgba(0,230,118,0.2)', color:'var(--primary)', padding:'6px', borderRadius:8, fontSize:10, marginBottom:10, textAlign:'center', fontWeight:'bold', border:'1px solid var(--primary)'}}>
-                            ✅ O SEU CLUBE ACEITOU A VENDA. DEPENDE DE VOCÊ!
-                        </div>
-                    )}
+                    {/* --- CARD DE TÉCNICO (NOVO) --- */}
+                    {o.type === 'COACH_OFFER' ? (
+                        <div>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                <b>{o.status === 'COUNTERED' ? `🔄 Contra-Proposta: ${o.coachName}` : `👔 Proposta: ${o.teamName}`}</b>
+                                <small style={{color:'#aaa'}}>{new Date(o.createdAt || o.date).toLocaleDateString()}</small>
+                            </div>
+                            <div style={{fontSize:12, marginTop:10, marginBottom:10, background:'rgba(255,255,255,0.05)', padding:10, borderRadius:5}}>
+                                <div>💰 Salário: <b style={{color:'lime'}}>{fmt(o.salary)}</b></div>
+                                <div>📅 Contrato: <b>{o.contract} Temporadas</b></div>
+                                <div>🔒 Multa: <b style={{color:'red'}}>{fmt(o.clause)}</b></div>
+                            </div>
+                            
+                            <div style={{display:'flex', gap:5}}>
+                                {/* VISÃO DO DONO DO TIME (Recebendo Contra-Proposta) */}
+                                {user.type === 'USER' && o.status === 'COUNTERED' && (
+                                    <>
+                                        <button className="btn btn-green" onClick={()=>onCoachAccept(o)}>ACEITAR CONDIÇÕES</button>
+                                        <button className="btn btn-red" onClick={()=>onCoachReject(o)}>CANCELAR</button>
+                                    </>
+                                )}
 
-                    {!o.sellerAccepted && user.type === 'PLAYER' && o.sellerId !== 'FREE' && (
-                        <div style={{background:'rgba(255,196,0,0.1)', color:'var(--warning)', padding:'6px', borderRadius:8, fontSize:10, marginBottom:10, textAlign:'center', fontWeight:'bold', border:'1px solid var(--warning)'}}>
-                            ⏳ SEU CLUBE AINDA ESTÁ ANALISANDO A TAXA DE TRANSFERÊNCIA.
-                        </div>
-                    )}
-
-                    <div style={{display:'flex', justifyContent:'space-between'}}>
-                        <b style={{color:'var(--primary)', fontSize:16}}>{o.playerName}</b>
-                        <span style={{fontSize:10, background: o.type === 'NOTIFICACAO' ? '#00E676' : 'gold', color:'black', padding:'2px 5px', borderRadius:4, fontWeight:'bold'}}>{o.type}</span>
-                    </div>
-                    <small style={{display:'block', marginBottom:10, color: '#aaa'}}>
-                        {o.type === 'NOTIFICACAO' ? 'Remetente:' : 'Interessado:'} <b style={{color:'#fff'}}>{o.buyerName}</b>
-                    </small>
-                    
-                    <div style={{background:'#121212', padding:12, borderRadius:8, whiteSpace:'pre-wrap', fontSize:12, border:'1px solid #333', lineHeight:'1.5', color: '#eee', marginBottom: 10}}>
-                        {o.description}
-                    </div>
-
-                    {/*v1.54.5: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
-                    {o.type === 'NOTIFICACAO' ? (
-                        <div style={{display:'flex', gap:5}}>
-                            <button className="btn btn-green" style={{width:'100%'}} onClick={()=>onAccept(o)}>
-                                <i className="fas fa-check"></i> ENTENDIDO
-                            </button>
+                                {/* VISÃO DO TÉCNICO (Recebendo Proposta Inicial) */}
+                                {user.type === 'COACH' && o.status === 'PENDING' && (
+                                    <>
+                                        <button className="btn btn-green" onClick={()=>onCoachAccept(o)}>ACEITAR</button>
+                                        {user.data.level >= 2 && <button className="btn btn-blue" onClick={()=>onCoachCounter(o)}>NEGOCIAR</button>}
+                                        <button className="btn btn-red" onClick={()=>onCoachReject(o)}>RECUSAR</button>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     ) : (
-                        <div style={{display:'flex', gap:5}}>
-                            <button className="btn btn-green" style={{flex:1}} onClick={()=>onAccept(o)}>ACEITAR</button>
-                            <button className="btn btn-blue" style={{flex:1}} onClick={()=>onCounter(o)}>CONTRA</button>
-                            <button className="btn btn-red" style={{flex:1}} onClick={()=>onReject(o)}>RECUSAR</button>
+                        /* --- CARD DE JOGADOR (PADRÃO) --- */
+                        <div>
+                            {/* AVISOS DE STATUS REALISTA PARA O JOGADOR */}
+                            {o.sellerAccepted && user.type === 'PLAYER' && (
+                                <div style={{background:'rgba(0,230,118,0.2)', color:'var(--primary)', padding:'6px', borderRadius:8, fontSize:10, marginBottom:10, textAlign:'center', fontWeight:'bold', border:'1px solid var(--primary)'}}>
+                                    ✅ O SEU CLUBE ACEITOU A VENDA. DEPENDE DE VOCÊ!
+                                </div>
+                            )}
+
+                            {!o.sellerAccepted && user.type === 'PLAYER' && o.sellerId !== 'FREE' && (
+                                <div style={{background:'rgba(255,196,0,0.1)', color:'var(--warning)', padding:'6px', borderRadius:8, fontSize:10, marginBottom:10, textAlign:'center', fontWeight:'bold', border:'1px solid var(--warning)'}}>
+                                    ⏳ SEU CLUBE AINDA ESTÁ ANALISANDO A TAXA DE TRANSFERÊNCIA.
+                                </div>
+                            )}
+
+                            <div style={{display:'flex', justifyContent:'space-between'}}>
+                                <b style={{color:'var(--primary)', fontSize:16}}>{o.playerName}</b>
+                                <span style={{fontSize:10, background: o.type === 'NOTIFICACAO' ? '#00E676' : 'gold', color:'black', padding:'2px 5px', borderRadius:4, fontWeight:'bold'}}>{o.type}</span>
+                            </div>
+                            <small style={{display:'block', marginBottom:10, color: '#aaa'}}>
+                                {o.type === 'NOTIFICACAO' ? 'Remetente:' : 'Interessado:'} <b style={{color:'#fff'}}>{o.buyerName}</b>
+                            </small>
+                            
+                            <div style={{background:'#121212', padding:12, borderRadius:8, whiteSpace:'pre-wrap', fontSize:12, border:'1px solid #333', lineHeight:'1.5', color: '#eee', marginBottom: 10}}>
+                                {o.description}
+                            </div>
+
+                            {/*v1.54.5: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
+                            {o.type === 'NOTIFICACAO' ? (
+                                <div style={{display:'flex', gap:5}}>
+                                    <button className="btn btn-green" style={{width:'100%'}} onClick={()=>onAccept(o)}>
+                                        <i className="fas fa-check"></i> ENTENDIDO
+                                    </button>
+                                </div>
+                            ) : (
+                                <div style={{display:'flex', gap:5}}>
+                                    <button className="btn btn-green" style={{flex:1}} onClick={()=>onAccept(o)}>ACEITAR</button>
+                                    <button className="btn btn-blue" style={{flex:1}} onClick={()=>onCounter(o)}>CONTRA</button>
+                                    <button className="btn btn-red" style={{flex:1}} onClick={()=>onReject(o)}>RECUSAR</button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -3654,7 +3692,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
         </div>
     );
 };
-
+        //FIM
 
 const Ranking = ({ teams, players }) => {
             const [view, setView] = React.useState('TEAMS');

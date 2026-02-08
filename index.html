@@ -852,16 +852,27 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
 const AdminPanel = ({ teams, papers, journalists, companies, coaches, reqs, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onApprovePaper, onDeletePaper, onDeleteJourno, onRejectPaper, onConfig, onReset, onApproveComp, onDeleteComp, onUpdateCompBal, onGenAttrs }) => {
     const [tab, setTab] = useState('DASH');
 
+    // Estilo auxiliar para botão de aba
+    const tabStyle = (active) => ({
+        background: active ? 'var(--primary)' : '#333',
+        color: '#fff',
+        border: 'none',
+        padding: '10px 15px',
+        borderRadius: '5px',
+        cursor: 'pointer',
+        fontWeight: 'bold'
+    });
+
     return (
         <div>
             <h2>Painel Administrativo</h2>
-            <div style={{display:'flex', gap:10, marginBottom:20, overflowX:'auto'}}>
-                <button className="btn" onClick={()=>setTab('DASH')}>Geral</button>
-                <button className="btn" onClick={()=>setTab('TEAMS')}>Times</button>
-                <button className="btn" onClick={()=>setTab('FINANCE')}>Finanças</button>
-                <button className="btn" onClick={()=>setTab('PRESS')}>Imprensa</button>
-                <button className="btn" onClick={()=>setTab('COMP')}>Empresas</button>
-                <button className="btn" style={{border:'1px solid gold', color:'gold'}} onClick={()=>setTab('COACH')}>Técnicos</button>
+            <div style={{display:'flex', gap:10, marginBottom:20, overflowX:'auto', paddingBottom:5}}>
+                <button style={tabStyle(tab==='DASH')} onClick={()=>setTab('DASH')}>Geral</button>
+                <button style={tabStyle(tab==='TEAMS')} onClick={()=>setTab('TEAMS')}>Times</button>
+                <button style={tabStyle(tab==='FINANCE')} onClick={()=>setTab('FINANCE')}>Finanças</button>
+                <button style={tabStyle(tab==='PRESS')} onClick={()=>setTab('PRESS')}>Imprensa</button>
+                <button style={tabStyle(tab==='COMP')} onClick={()=>setTab('COMP')}>Empresas</button>
+                <button style={{...tabStyle(tab==='COACH'), background: tab==='COACH' ? 'gold' : '#333', color: tab==='COACH' ? '#000' : '#fff'}} onClick={()=>setTab('COACH')}>Técnicos</button>
             </div>
 
             {/* ABA DE TÉCNICOS (NOVO) */}
@@ -1618,8 +1629,7 @@ const renewContract = async (p) => {
      
            // --- RENDER ---
             if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
-            if(!user) return <LoginScreen teams={teams} players={players} papers={papers} journalists={journalists} companies={companies} onLogin={login} onCreateTeam={createTeam} onCreatePaper={createNewspaper} onCreateJourno={createJournalist} onCreateCompany={createCompany} onAdmin={loginAdmin} onVisitor={()=>{setUser({type:'VISITOR'}); setScreen('RANKING');}} onCreateCoach={createCoach} />;
-
+            if(!user) return <LoginScreen teams={teams} players={players} papers={papers} journalists={journalists} companies={companies} coaches={coaches} onLogin={login} onCreateTeam={createTeam} onCreatePaper={createNewspaper} onCreateJourno={createJournalist} onCreateCompany={createCompany} onAdmin={loginAdmin} onVisitor={()=>{setUser({type:'VISITOR'}); setScreen('RANKING');}} onCreateCoach={createCoach} />;
             return (
                 <div>
                     <div className="header">
@@ -1874,7 +1884,7 @@ const CoachRegisterForm = ({ onCancel, onSave }) => {
     );
 };
 // --- COMPONENTS ---
-        const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor, onCreateCoach }) => {
+        const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor, onCreateCoach }) => {
             const [tab, setTab] = useState('LOGIN'); 
             const [subTab, setSubTab] = useState('TEAM'); 
             const [f, setF] = useState({n:'', b:'10000000', s:'A', p:''}); 
@@ -1910,6 +1920,8 @@ const CoachRegisterForm = ({ onCancel, onSave }) => {
                             <button className={`btn ${subTab==='TEAM'?'btn-green':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>setSubTab('TEAM')}>TIMES</button>
                             <button className={`btn ${subTab==='PLAYER'?'btn-blue':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>{setSubTab('PLAYER'); setSelTeamForPlayer(null);}}>JOGADORES</button>
                             <button className={`btn ${subTab==='COMPANY'?'btn-purple':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>setSubTab('COMPANY')}>EMPRESAS</button>
+                            {/* NOVO BOTÃO DE LOGIN DE TÉCNICO */}
+                            <button className={`btn ${subTab==='COACH'?'btn-gold':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>setSubTab('COACH')}>TÉCNICOS</button>
                         </div>
 
                         {subTab==='TEAM' && (teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}
@@ -1953,6 +1965,19 @@ const CoachRegisterForm = ({ onCancel, onSave }) => {
 
                         {subTab==='COMPANY' && (companies||[]).filter(c=>c.status!=='PENDING').map(c=><div key={c.id} className="card" onClick={()=>setSel({...c, type:'COMPANY'})} style={{cursor:'pointer', borderLeft:'4px solid var(--purple)'}}>🏢 <b>{c.name}</b><br/><small>{(c.companyType)}</small></div>)}
                         
+                        {/* LISTA DE TÉCNICOS PARA LOGIN */}
+                        {subTab==='COACH' && (
+                            <div>
+                                <h4 style={{color:'gold'}}>Acessar como Técnico</h4>
+                                {(coaches||[]).filter(c => c.status === 'ACTIVE').length === 0 && <p style={{color:'#666'}}>Nenhum técnico ativo.</p>}
+                                {(coaches||[]).filter(c => c.status === 'ACTIVE').map(c => (
+                                    <div key={c.id} className="card" onClick={()=>setSel({...c, type:'COACH'})} style={{cursor:'pointer', borderLeft:'4px solid gold'}}>
+                                        🎓 <b>{c.name}</b>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
                         <div style={{marginTop:20}}><button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button><button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button></div>
                     </div>}
 

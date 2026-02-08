@@ -976,16 +976,7 @@ const AdminPanel = ({ teams, papers, journalists, companies, coaches, reqs, conf
         </div>
     );
 };
-// 1. Adicione o Estado dos Técnicos
-    const [coaches, setCoaches] = useState([]);
 
-    // 2. Adicione o useEffect para carregar eles (Cole logo abaixo dos outros useEffects)
-    useEffect(() => {
-        const unsub = db.collection('users').where('type', '==', 'COACH').onSnapshot(snap => {
-            setCoaches(snap.docs.map(d => d.data()));
-        });
-        return () => unsub();
-    }, []);
             //FIM 
 const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => {
     const [form, setF] = useState({name: team.name, logo: team.logo, balance: team.balance, serie: team.serie});

@@ -399,46 +399,79 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
                 });
             };
 
-            const login = (id, pwd, type) => {
-                if (type === 'TEAM') { 
-                    const t = teams.find(x => x.id === id); 
-                    if (t && t.password === pwd) { 
-                        if (t.status === 'PENDING') alert("⏳ Aguarde a aprovação da Federação."); 
-                        else { setUser({type:'USER', data:t}); setScreen('HOME'); } 
-                    } else alert("Senha ou ID incorretos!"); 
-                } 
-                else if (type === 'PAPER') { 
-                    const p = papers.find(x => x.id === id); 
-                    if (p && p.password === pwd) { 
-                        if (p.status === 'PENDING') alert("⏳ Jornal aguardando aprovação."); 
-                        else { setUser({type:'PRESS', data:p}); setScreen('PRESS_DASH'); } 
-                    } else alert("Erro no login da Imprensa!"); 
-                } 
-                else if (type === 'JOURNALIST') { 
-                    const j = journalists.find(x => x.id === id); 
-                    if (j && j.password === pwd) { 
-                        if (j.status === 'PENDING') alert("⏳ Peça ao dono do jornal para aprovar seu acesso."); 
-                        else { setUser({type:'PRESS_WORKER', data:j}); setScreen('PRESS_DASH'); } 
-                    } else alert("Erro no login do Jornalista!"); 
-                }
-                else if (type === 'COMPANY') { 
-                    const c = companies.find(x => x.id === id); 
-                    if (c && c.password === pwd) { 
-                        if (c.status === 'PENDING') alert("⏳ Empresa aguardando alvará da Federação."); 
-                        else if (c.status === 'BLOCKED') alert("🚫 Esta empresa está bloqueada."); 
-                        else { setUser({type:'COMPANY', data:c}); setScreen('COMPANY_HOME'); } 
-                    } else alert("Senha da Empresa incorreta!"); 
-                }
-                else if (type === 'PLAYER') { 
-                     const pl = players.find(x => x.id === id); 
-                     const pass = pl.password || '1234'; 
-                     if (pl && pass === pwd) { 
-                         setUser({type:'PLAYER', data:pl}); 
-                         setScreen('PLAYER_DASH'); 
-                     } else alert("Senha do Jogador incorreta!"); 
-                }
-            };
+            // --- FUNÇÃO DE LOGIN UNIVERSAL (CORRIGIDA) ---
+    const login = async (loginId, loginPass, type) => {
+        setLoading(true);
+        try {
+            let foundUser = null;
+            let foundType = '';
 
+            // 1. LOGIN VIA MODAL (Quando clica no card)
+            if (type === 'TEAM') {
+                const t = teams.find(x => x.id === loginId && x.password === loginPass);
+                if (t) { foundUser = t; foundType = 'USER'; }
+            } 
+            else if (type === 'PLAYER') {
+                const p = players.find(x => x.id === loginId && x.password === loginPass);
+                if (p) { foundUser = p; foundType = 'PLAYER'; }
+            } 
+            else if (type === 'COMPANY') {
+                const c = companies.find(x => x.id === loginId && x.password === loginPass);
+                if (c) { foundUser = c; foundType = 'COMPANY'; }
+            } 
+            else if (type === 'COACH') {
+                // Procura na lista de técnicos que carregamos
+                const c = coaches.find(x => x.id === loginId && x.password === loginPass);
+                if (c) { foundUser = c; foundType = 'COACH'; }
+            } 
+            
+            // 2. LOGIN MANUAL (Digitando ID e Senha na tela inicial)
+            else {
+                // Tenta achar em Times
+                let t = teams.find(x => x.id === loginId && x.password === loginPass);
+                if (t) { foundUser = t; foundType = 'USER'; }
+
+                // Tenta achar em Jogadores
+                if (!foundUser) {
+                    let p = players.find(x => x.id === loginId && x.password === loginPass);
+                    if (p) { foundUser = p; foundType = 'PLAYER'; }
+                }
+                
+                // Tenta achar em Técnicos
+                if (!foundUser) {
+                    let c = coaches.find(x => x.id === loginId && x.password === loginPass);
+                    if (c) { foundUser = c; foundType = 'COACH'; }
+                }
+
+                // Tenta Admin
+                if (loginId === 'admin' && loginPass === '2503') { // Ou sua senha de admin
+                    foundUser = { name: 'Admin' }; foundType = 'ADMIN';
+                }
+            }
+
+            // 3. FINALIZA O LOGIN
+            if (foundUser) {
+                if(foundUser.status === 'PENDING') {
+                     alert("Conta em análise pela Federação. Aguarde aprovação.");
+                } else {
+                    setUser({ type: foundType, data: foundUser });
+                    localStorage.setItem('user', JSON.stringify({ type: foundType, data: foundUser }));
+                    
+                    // Redireciona para a tela correta
+                    if (foundType === 'COACH') setScreen('COACH_DASH');
+                    else if (foundType === 'COMPANY') setScreen('COMPANY_DASH');
+                    else if (foundType === 'PLAYER') setScreen('PLAYER_DASH');
+                    else setScreen('HOME');
+                }
+            } else {
+                alert("ID ou Senha incorretos!");
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Erro no login: " + error.message);
+        }
+        setLoading(false);
+    };
 // FIM DA FUNÇÃO LOGIN E INÍCIO DO COMPONENTE APP
 
            // ... continuação do código anterior
@@ -1637,7 +1670,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.55.6.6</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.55.7</div>
                             </div>
                         </div>
                         
@@ -1904,7 +1937,7 @@ const CoachRegisterForm = ({ onCancel, onSave }) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.55.6.6</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.55.7</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

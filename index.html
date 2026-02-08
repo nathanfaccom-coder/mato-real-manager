@@ -1718,9 +1718,10 @@ const renewContract = async (p) => {
             
             // 3. Função Mestra do Admin (COM REGRA DE AGENTES LIVRES)
      
-           // --- RENDER ---
+          // --- RENDER ---
             if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
             if(!user) return <LoginScreen teams={teams} players={players} papers={papers} journalists={journalists} companies={companies} coaches={coaches} onLogin={login} onCreateTeam={createTeam} onCreatePaper={createNewspaper} onCreateJourno={createJournalist} onCreateCompany={createCompany} onAdmin={loginAdmin} onVisitor={()=>{setUser({type:'VISITOR'}); setScreen('RANKING');}} onCreateCoach={createCoach} />;
+
             return (
                 <div>
                     <div className="header">
@@ -1728,7 +1729,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.55.9</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.56</div>
                             </div>
                         </div>
                         
@@ -1743,8 +1744,8 @@ const renewContract = async (p) => {
                                 </div>
                             )}
 
-                            {/* SALDO EM DINHEIRO */}
-                            {(user.type === 'USER' || user.type === 'COMPANY' || user.type === 'PLAYER') && (
+                            {/* SALDO EM DINHEIRO (Adicionado COACH) */}
+                            {(user.type === 'USER' || user.type === 'COMPANY' || user.type === 'PLAYER' || user.type === 'COACH') && (
                                 <div style={{color:'var(--primary)', fontWeight:'bold', marginLeft:10}}>
                                     {fmt(user.data.balance)}
                                 </div>
@@ -1761,9 +1762,9 @@ const renewContract = async (p) => {
                     </div>
 
                     <div className="container">
-                       {screen === 'HOME' && user.type === 'ADMIN' && 
+                        {screen === 'HOME' && user.type === 'ADMIN' && 
                             <AdminPanel 
-                                teams={teams} papers={papers} journalists={journalists} companies={companies} reqs={reqs} config={conf} coaches={coaches} onAct={adminAction} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{/*Fin*/}} onReject={(id)=>db.collection('financeRequests').doc(id).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam} onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} onDeletePaper={deletePaper} onDeleteJourno={deleteJournalist} onRejectPaper={(id)=>db.collection('newspapers').doc(id).delete()} onConfig={(t)=>setModal({type:'SETTINGS', data:t})} onReset={resetDatabase} onApproveComp={async(id)=>{await db.collection('companies').doc(id).update({status:'ACTIVE'}); alert("Empresa Aprovada!");}} onDeleteComp={async(id)=>{if(confirm("Excluir Empresa?")) await db.collection('companies').doc(id).delete();}} onUpdateCompBal={async(id, val)=>{ await db.collection('companies').doc(id).update({balance: parseFloat(val)}); alert("Saldo Alterado!"); }}
+                                teams={teams} papers={papers} journalists={journalists} companies={companies} reqs={reqs} config={conf} onAct={adminAction} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{/*Fin*/}} onReject={(id)=>db.collection('financeRequests').doc(id).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam} onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} onDeletePaper={deletePaper} onDeleteJourno={deleteJournalist} onRejectPaper={(id)=>db.collection('newspapers').doc(id).delete()} onConfig={(t)=>setModal({type:'SETTINGS', data:t})} onReset={resetDatabase} onApproveComp={async(id)=>{await db.collection('companies').doc(id).update({status:'ACTIVE'}); alert("Empresa Aprovada!");}} onDeleteComp={async(id)=>{if(confirm("Excluir Empresa?")) await db.collection('companies').doc(id).delete();}} onUpdateCompBal={async(id, val)=>{ await db.collection('companies').doc(id).update({balance: parseFloat(val)}); alert("Saldo Alterado!"); }} coaches={coaches}
                                 onGenAttrs={async () => {
                                     if(!confirm("Isso vai gerar atributos para TODOS os jogadores que não têm. Continuar?")) return;
                                     setLoading(true);
@@ -1808,16 +1809,15 @@ const renewContract = async (p) => {
                         
                         {screen === 'ADMIN_TEAM' && adminTeam && <div><button className="btn" style={{background:'#333', marginBottom:10}} onClick={()=>{setAdminTeam(null); setScreen('HOME');}}>⬅ VOLTAR</button><h3 style={{color:'var(--purple)'}}>Editando: {adminTeam.name}</h3><TeamDashboard team={adminTeam} players={players.filter(p=>p.teamId===adminTeam.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER', data: { teamId: adminTeam.id } })} /></div>}
                         
-                       {screen === 'MARKET' && (
+                        {screen === 'MARKET' && (
                             <Market 
                                 me={user.data?.id} 
                                 teams={teams} 
                                 players={players} 
-                                coaches={coaches} // <--- ADICIONADO: Lista de técnicos
+                                coaches={coaches} 
                                 open={conf.marketOpen} 
                                 isVis={user.type === 'VISITOR'} 
                                 onNeg={(p) => setModal({ type: 'OFFER', data: p })} 
-                                onHireCoach={handleHireCoach} // <--- ADICIONADO: Função de contratar
                                 onPayClause={async (p) => {
                                     const buy = teams.find(t => t.id === user.data.id);
                                     const sel = teams.find(t => t.id === p.teamId);
@@ -1838,10 +1838,11 @@ const renewContract = async (p) => {
                                     postNews(`📝 **PRÉ-CONTRATO**\n**${p.name}** reforçará o **${buy.name}** na próxima temporada!`, 'transfer');
                                     alert("Pré-contrato assinado!");
                                 }}
+                                onHireCoach={handleHireCoach}
                             />
                         )}
 
-                        {screen === 'SHOPPING' && <ShoppingScreen products={products} companies={companies} userTeam={user.type==='USER' || user.type==='PLAYER'} onBuy={buyProduct} />}
+                        {screen === 'SHOPPING' && <ShoppingScreen products={products} companies={companies} userTeam={user.type==='USER' || user.type==='PLAYER' || user.type==='COACH'} onBuy={buyProduct} />}
                         
                         {screen === 'SPONSORSHIPS' && user.type === 'USER' && (
                             <div>
@@ -1883,8 +1884,8 @@ const renewContract = async (p) => {
                             <PlayerDashboard player={players.find(p=>p.id===user.data.id) || user.data} team={teams.find(t=>t.id===user.data.teamId)} sales={sales || []} onAction={handlePlayerActions} onUpdatePassword={async(newP)=>{ await db.collection('players').doc(user.data.id).update({password: newP}); alert("Senha alterada!"); }} />
                         }
 
-                        {/* --- NOVA TELA: PAINEL DO TÉCNICO --- */}
-                    {(screen === 'HOME' || screen === 'COACH_DASH') && user.type === 'COACH' && 
+                        {/* --- PAINEL DO TÉCNICO --- */}
+                        {(screen === 'HOME' || screen === 'COACH_DASH') && user.type === 'COACH' && 
                             <CoachDashboard 
                                 coach={user.data} 
                                 team={teams.find(t => t.id === user.data.teamId)} 
@@ -2000,7 +2001,7 @@ const CoachRegisterForm = ({ onCancel, onSave }) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.55.9</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.56.0</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2420,16 +2421,14 @@ const CoachRegisterForm = ({ onCancel, onSave }) => {
 //FIM
         // --- COMPONENTE DO PAINEL DO TÉCNICO ---
 const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolvePerk, onAddAffinity, onAcceptOffer, onRejectOffer, onUpdateSalary }) => {
-    const [tab, setTab] = useState('TREINO'); // TREINO, CARREIRA, MOCHILA
+    const [tab, setTab] = useState('TREINO'); 
     const [selectedPlayers, setSelectedPlayers] = useState([]);
     const [trainingType, setTrainingType] = useState('FISICO');
     const [newSalary, setNewSalary] = useState(coach.salary);
 
-    // Cálculos de XP e Nível
     const xpNext = coach.level * 100;
     const progress = (coach.xp / xpNext) * 100;
     
-    // Filtros de Perks e Afinidades
     const showPerkSelection = coach.pendingPerks > 0;
     const availablePerks = COACH_PERKS.filter(p => !(coach.perks || []).some(cp => cp.id === p.id));
     const perkOptions = React.useMemo(() => availablePerks.sort(() => 0.5 - Math.random()).slice(0, 3), [coach.pendingPerks]);
@@ -2437,8 +2436,8 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
     const showAffinitySelection = coach.pendingAffinity > 0;
     const availableAffinities = COACH_AFFINITIES.filter(a => !(coach.affinities || []).includes(a));
 
-    // Itens comprados
-    const myItems = (sales||[]).filter(s => s.buyerName === coach.name);
+    // CORREÇÃO 1: Filtra pelo ID para não pegar itens de outros "TESTE"
+    const myItems = (sales||[]).filter(s => s.buyerId === coach.id);
 
     const handleTogglePlayer = (pid) => {
         if (selectedPlayers.includes(pid)) setSelectedPlayers(selectedPlayers.filter(id => id !== pid));
@@ -2448,14 +2447,14 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
 
     return (
         <div>
-            {/* CABEÇALHO (Igual ao do Jogador) */}
             <div className="highlight-card" style={{textAlign:'center', paddingBottom:20, position:'relative'}}>
                 <h2 style={{margin:0}}>👔 {coach.name}</h2>
                 <small style={{color:'#ccc'}}>{team ? team.name : 'Agente Livre'} | Nível {coach.level}</small>
                 
                 <div style={{display:'flex', justifyContent:'center', gap:20, marginTop:15}}>
                     <div style={{textAlign:'center'}}>
-                        <div style={{fontSize:24, fontWeight:'bold', color:'var(--primary)'}}>₣ {fmt(coach.salary)}</div>
+                        {/* CORREÇÃO 2: Removi o "F" extra */}
+                        <div style={{fontSize:24, fontWeight:'bold', color:'var(--primary)'}}>{fmt(coach.salary)}</div>
                         <span style={{fontSize:9, color:'#888'}}>SALÁRIO</span>
                     </div>
                     <div style={{textAlign:'center'}}>
@@ -2464,20 +2463,17 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                     </div>
                 </div>
 
-                {/* Barra de XP */}
                 <div style={{position:'absolute', bottom:0, left:0, right:0, height:6, background:'#333'}}>
                     <div style={{width:`${Math.min(100, progress)}%`, background:'linear-gradient(90deg, gold, #FF8F00)', height:'100%'}}></div>
                 </div>
             </div>
 
-            {/* BOTÕES DE NAVEGAÇÃO (ABAS) */}
             <div style={{display:'flex', gap:10, marginBottom:15, marginTop:10}}>
                 <button className={`btn ${tab==='TREINO'?'btn-green':'btn-ghost'}`} onClick={()=>setTab('TREINO')}>PRANCHETA</button>
                 <button className={`btn ${tab==='CARREIRA'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('CARREIRA')}>CARREIRA</button>
                 <button className={`btn ${tab==='MOCHILA'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('MOCHILA')}>MOCHILA</button>
             </div>
 
-            {/* --- ABA 1: TREINO (Lógica Antiga) --- */}
             {tab === 'TREINO' && (
                 <div>
                     {showPerkSelection && (
@@ -2505,13 +2501,15 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
 
                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10}}>
                         <span>Treinos Restantes: <b>{coach.trainingsLeft}</b></span>
+                        
+                        {/* CORREÇÃO 4: Descrições detalhadas voltaram */}
                         <select className="input-field" style={{width:'auto', margin:0}} value={trainingType} onChange={e=>setTrainingType(e.target.value)}>
-                            <option value="FISICO">🏋️‍♂️ Físico</option>
-                            <option value="TATICO">🧠 Tático</option>
-                            <option value="TECNICO">⚽ Técnico</option>
-                            <option value="DEFESA">🛡️ Defesa</option>
-                            <option value="ATAQUE">🥅 Ataque</option>
-                            <option value="GOL">🧤 Goleiro</option>
+                            <option value="FISICO">🏋️‍♂️ Físico (Resistência/Força)</option>
+                            <option value="TATICO">🧠 Tático (Posição/Visão)</option>
+                            <option value="TECNICO">⚽ Técnico (Drible/Passe)</option>
+                            <option value="DEFESA">🛡️ Defesa (Desarme/Marc)</option>
+                            <option value="ATAQUE">🥅 Ataque (Fin/Cab)</option>
+                            <option value="GOL">🧤 Goleiro (Reflexos)</option>
                         </select>
                     </div>
 
@@ -2540,10 +2538,8 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                 </div>
             )}
 
-            {/* --- ABA 2: CARREIRA (Ofertas e Salário) --- */}
             {tab === 'CARREIRA' && (
                 <div>
-                    {/* LISTA DE PROPOSTAS */}
                     <div className="card" style={{borderLeft:'4px solid var(--primary)'}}>
                         <h3>📩 Propostas de Emprego</h3>
                         {offers.filter(o => o.type === 'COACH_OFFER' && o.status === 'PENDING').length === 0 && <p style={{color:'#666', fontSize:12}}>Nenhuma proposta no momento.</p>}
@@ -2554,7 +2550,6 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                                     <b>{o.teamName}</b>
                                     <span style={{color:'lime'}}>₣ {fmt(o.value)}/sem</span>
                                 </div>
-                                <small style={{color:'#aaa'}}>A proposta expira em breve.</small>
                                 <div style={{display:'flex', gap:5, marginTop:5}}>
                                     <button className="btn btn-green" onClick={()=>onAcceptOffer(o)}>ACEITAR</button>
                                     <button className="btn btn-red" onClick={()=>onRejectOffer(o)}>RECUSAR</button>
@@ -2563,10 +2558,9 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                         ))}
                     </div>
 
-                    {/* AJUSTE DE SALÁRIO (Nível 2+) */}
                     <div className="card">
                         <h3>💰 Negociação Salarial</h3>
-                        <p style={{fontSize:11, color:'#aaa'}}>Defina seu valor de mercado (quanto pede para ser contratado).</p>
+                        <p style={{fontSize:11, color:'#aaa'}}>Defina seu valor de mercado.</p>
                         
                         {coach.level >= 2 ? (
                             <div style={{display:'flex', gap:10}}>
@@ -2580,7 +2574,6 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                         )}
                     </div>
 
-                    {/* HISTÓRICO E PERKS */}
                     <div className="card">
                         <h3>🏆 Habilidades (Perks)</h3>
                         <div style={{display:'flex', flexWrap:'wrap', gap:5}}>
@@ -2591,7 +2584,6 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                 </div>
             )}
 
-            {/* --- ABA 3: MOCHILA --- */}
             {tab === 'MOCHILA' && (
                 <div>
                     <h3>🎒 Meus Itens</h3>

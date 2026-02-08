@@ -1224,6 +1224,7 @@ const buyProduct = async (prod, seller) => {
         buyerId: user.data.id, 
         buyerName: user.data.name, 
         price: prod.price, 
+        img: prod.img, 
         date: Date.now() 
     });
     
@@ -2294,7 +2295,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.70.8</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.70.9</div>
                             </div>
                         </div>
                         
@@ -2610,7 +2611,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.70.8</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.70.9</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -3068,7 +3069,11 @@ const renewContract = async (p) => {
                 <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
                     {myItems.map((item, index) => (
                         <div key={index} className="card" style={{border:'1px solid #444', textAlign:'center', padding:10}}>
-                            <div style={{fontSize:24}}>👟</div>
+                            {item.img ? (
+                                <img src={item.img} style={{width:60, height:60, objectFit:'contain', marginBottom:5, borderRadius:5}} alt={item.productName} />
+                            ) : (
+                                <div style={{fontSize:24}}>👟</div>
+                            )}
                             <div style={{fontWeight:'bold', fontSize:12}}>{item.productName}</div>
                             <div style={{fontSize:10, color:'#aaa'}}>Preço: {fmt(item.price)}</div>
                         </div>
@@ -3078,7 +3083,6 @@ const renewContract = async (p) => {
         </div>
     );
 };
-
         // ... continuação do código anterior
 
         const ShoppingScreen = ({ products, companies, userTeam, onBuy }) => {
@@ -3331,7 +3335,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                     {coach.teamId !== 'FREE' && (
                         <div className="card" style={{border:'1px solid #444', marginBottom:15}}>
                             <h3>📝 Meu Contrato</h3>
-                            <p style={{fontSize:12}}>Clube: <b>{team?.name}</b></p>
+                            <p style={{fontSize:12}}>Clube: <b>{team?.name || 'Desconhecido'}</b></p>
                             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:5}}>
                                 <button className="btn btn-blue" onClick={()=>onSelfAction('RAISE', coach)}>💰 PEDIR AUMENTO</button>
                                 <button className="btn btn-gold" onClick={()=>onSelfAction('RESIGN_REQ', coach)}>👋 PEDIR PARA SAIR</button>
@@ -3422,7 +3426,12 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
                         {myItems.map((item, index) => (
                             <div key={index} className="card" style={{border:'1px solid #444', textAlign:'center', padding:10}}>
-                                <div style={{fontSize:24}}>📦</div>
+                                {/* AQUI É A PARTE ALTERADA PARA MOSTRAR A IMAGEM */}
+                                {item.img ? (
+                                    <img src={item.img} style={{width:60, height:60, objectFit:'contain', marginBottom:5, borderRadius:5}} alt={item.productName} />
+                                ) : (
+                                    <div style={{fontSize:24}}>📦</div>
+                                )}
                                 <div style={{fontWeight:'bold', fontSize:12}}>{item.productName}</div>
                                 <div style={{fontSize:10, color:'#aaa'}}>{fmt(item.price)}</div>
                             </div>

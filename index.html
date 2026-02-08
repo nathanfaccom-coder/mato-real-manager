@@ -1769,7 +1769,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.63.3</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.63.4</div>
                             </div>
                         </div>
                         
@@ -2062,7 +2062,7 @@ const CoachRegisterForm = ({ onCancel, onSave }) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.63.3</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.63.4</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2500,6 +2500,15 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
 
     const myItems = (sales||[]).filter(s => s.buyerId === coach.id);
 
+    // TRADUÇÃO DOS ATRIBUTOS (Abreviados para caber no card)
+    const ATTR_LABELS = {
+        balance: 'Equil', stamina: 'Resis', speed: 'Veloc', accel: 'Acel', agility: 'Agil', jump: 'Impul', condition: 'Cond',
+        attack: 'Atq', dribble: 'Drible', dribbleSpd: 'Dr.Vel', shortPass: 'P.Cur', shortPassSpd: 'PC.Vel', 
+        longPass: 'P.Lon', longPassSpd: 'PL.Vel', shot: 'Fin', shotPower: 'F.Chut', shotTech: 'T.Chut', 
+        freeKick: 'Falta', curve: 'Curva', header: 'Cabec', tech: 'Tec', weakFootAcc: 'P.Ruim', weakFootFreq: 'F.P.R', 
+        defense: 'Def', response: 'Resp', aggression: 'Agres', mentality: 'Menta', teamwork: 'Eqp', gk: 'GK'
+    };
+
     const handleTogglePlayer = (pid) => {
         if (selectedPlayers.includes(pid)) setSelectedPlayers(selectedPlayers.filter(id => id !== pid));
         else if (selectedPlayers.length < 5) setSelectedPlayers([...selectedPlayers, pid]);
@@ -2515,13 +2524,11 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                 
                 <div style={{display:'flex', justifyContent:'center', gap:15, marginTop:15}}>
                     <div style={{textAlign:'center'}}>
-                        {/* CORREÇÃO: Removi o símbolo manual, deixando só o fmt() */}
                         <div style={{fontSize:20, fontWeight:'bold', color:'var(--success)'}}>{fmt(coach.balance || 0)}</div>
                         <span style={{fontSize:9, color:'#888'}}>SALDO ATUAL</span>
                     </div>
                     <div style={{width:1, background:'#333'}}></div>
                     <div style={{textAlign:'center'}}>
-                        {/* CORREÇÃO: Removi o símbolo manual */}
                         <div style={{fontSize:20, fontWeight:'bold', color:'var(--primary)'}}>{fmt(coach.salary)}</div>
                         <span style={{fontSize:9, color:'#888'}}>SALÁRIO</span>
                     </div>
@@ -2597,7 +2604,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                         </select>
                     </div>
 
-                    {/* LISTA DE JOGADORES */}
+                    {/* LISTA DE JOGADORES (TODOS ATRIBUTOS) */}
                     <p style={{textAlign:'center', color:'#888', fontSize:12, margin:'10px 0'}}>
                         👉 Selecione até <b>5 jogadores</b> para o treino:
                     </p>
@@ -2607,16 +2614,54 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                                 style={{
                                     background: selectedPlayers.includes(p.id) ? 'rgba(0,255,0,0.1)' : 'var(--bg-card)', 
                                     border: selectedPlayers.includes(p.id) ? '1px solid var(--primary)' : '1px solid #333', 
-                                    cursor: 'pointer', padding: 8
+                                    cursor: 'pointer', padding: '10px'
                                 }}
                                 onClick={() => handleTogglePlayer(p.id)}
                             >
-                                <div style={{display:'flex', justifyContent:'space-between'}}>
-                                    <span>{p.name} <small>({p.position})</small></span>
-                                    <b>{p.overall}</b>
+                                {/* Linha 1: Nome e Overall */}
+                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                    <div style={{fontWeight:'bold', fontSize:13}}>
+                                        {p.name} <span style={{fontSize:10, fontWeight:'normal', color:'#aaa'}}>({p.position})</span>
+                                    </div>
+                                    <div style={{background:'#222', padding:'2px 6px', borderRadius:4, fontSize:12, fontWeight:'bold', border:'1px solid #444', color:'white'}}>
+                                        {p.overall}
+                                    </div>
                                 </div>
-                                <div style={{fontSize:10, color: p.energy < 30 ? 'red' : '#aaa'}}>Energia: {p.energy}%</div>
-                                {(coach.affinities || []).includes(p.position) && <div style={{fontSize:9, color:'gold'}}>★ Afinidade</div>}
+
+                                {/* Linha 2: Barra de Energia */}
+                                <div style={{margin:'6px 0', background:'#222', height:4, borderRadius:2, overflow:'hidden', width:'100%'}}>
+                                    <div style={{
+                                        width:`${p.energy || 100}%`, 
+                                        height:'100%', 
+                                        background: (p.energy||100) > 70 ? 'lime' : (p.energy||100) > 30 ? 'orange' : 'red'
+                                    }}></div>
+                                </div>
+                                <div style={{fontSize:10, display:'flex', justifyContent:'space-between', color:'#ccc', marginBottom:8}}>
+                                    <span>⚡ {p.energy || 100}%</span>
+                                    {(coach.affinities || []).includes(p.position) && <span style={{color:'gold'}}>★ Afinidade</span>}
+                                </div>
+
+                                {/* Linha 3: TODOS OS ATRIBUTOS (Grid Denso) */}
+                                {p.attributes ? (
+                                    <div style={{
+                                        borderTop:'1px solid #333', 
+                                        paddingTop:5, 
+                                        fontSize:9, 
+                                        color:'#aaa', 
+                                        display:'grid', 
+                                        gridTemplateColumns:'1fr 1fr 1fr', // 3 Colunas
+                                        gap: '2px 5px'
+                                    }}>
+                                        {Object.entries(p.attributes).map(([key, val]) => (
+                                            <div key={key} style={{display:'flex', justifyContent:'space-between'}}>
+                                                <span>{ATTR_LABELS[key] || key}:</span>
+                                                <b style={{color:'#fff'}}>{val}</b>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div style={{fontSize:9, color:'#444', textAlign:'center', marginTop:5}}>Sem atributos detalhados</div>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -2630,7 +2675,6 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                 </div>
             )}
 
-            {/* ABA CARREIRA */}
             {tab === 'CARREIRA' && (
                 <div>
                     <div className="card" style={{borderLeft:'4px solid var(--primary)'}}>

@@ -334,7 +334,6 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
             db.collection('sponsorships').onSnapshot(s => setSps(s.docs.map(d => ({id:d.id, ...d.data()})))),
             db.collection('sales').orderBy('date', 'desc').limit(50).onSnapshot(s => setSales(s.docs.map(d => d.data()))),
             
-            // Adicionei a vírgula aqui no final da linha de news
             db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => { 
                 const list = s.docs.map(d => ({id:d.id, ...d.data()})); 
                 setNews(list); 
@@ -353,52 +352,62 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
         return () => unsubs.forEach(u => u());
     }, []);
 
-            useEffect(() => {
-                let unsubOffers = () => {};
+    // --- LISTENER DE OFERTAS (Para Times, Jogadores e Técnicos) ---
+    useEffect(() => {
+        if (!user || user.type === 'ADMIN' || user.type === 'VISITOR') return;
 
-                // Se for um Time (USER) ou um Jogador (PLAYER)
-                if (user?.type === 'USER' || user?.type === 'PLAYER') {
-                    // Sincroniza os dados do perfil logado (evita dados obsoletos ao trocar de tela)
-                    const me = user.type === 'USER' 
-                        ? teams.find(t => t.id === user.data.id)
-                        : players.find(p => p.id === user.data.id);
-                    
-                    if (me) setUser(prev => ({...prev, data: me}));
-                    
-                    // --- CANAL DE PROPOSTAS REAL-TIME (CORRIGIDO) ---
-                    // Escuta global de ofertas. Quando o Clube Vendedor aceita, 
-                    // o recipientId muda no banco e o sino do jogador brilha na hora.
-                    unsubOffers = db.collection('offers').onSnapshot(s => {
-                        setOffers(s.docs.map(d => ({id: d.id, ...d.data()})));
-                    }, (err) => console.error("Erro na escuta de ofertas:", err));
+        // Escuta todas as ofertas onde o destinatário sou EU (pelo ID)
+        // Isso cobre JOGADORES e TÉCNICOS que estão recebendo propostas.
+        // E também cobre TIMES se o recipientId for o ID do time (em negociações futuras)
+        const unsub = db.collection('offers')
+            .where('recipientId', '==', user.data.id)
+            .onSnapshot(snap => {
+                const myOffers = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+                setOffers(myOffers);
+            }, error => {
+                console.log("Erro ao buscar ofertas:", error);
+            });
+
+        return () => unsub();
+    }, [user]);
+
+    useEffect(() => {
+        // Sincronização de dados do usuário logado
+        if (user?.type === 'USER' || user?.type === 'PLAYER') {
+            const me = user.type === 'USER' 
+                ? teams.find(t => t.id === user.data.id)
+                : players.find(p => p.id === user.data.id);
+            
+            if (me) setUser(prev => ({...prev, data: me}));
+        }
+        
+        // Sincronização para Técnicos
+        if (user?.type === 'COACH') {
+            const me = coaches.find(c => c.id === user.data.id);
+            if (me) setUser(prev => ({...prev, data: me}));
+        }
+        
+        if (user?.type === 'COMPANY') {
+            const me = companies.find(c => c.id === user.data.id);
+            if (me) {
+                if (me.status === 'BLOCKED') { 
+                    alert("🚫 Sua empresa foi bloqueada ou faliu."); 
+                    window.location.reload(); 
+                } else {
+                    setUser(prev => ({...prev, data: me}));
                 }
-                
-                // Lógica para Empresas (COMPANY)
-                if (user?.type === 'COMPANY') {
-                    const me = companies.find(c => c.id === user.data.id);
-                    if (me) {
-                        if (me.status === 'BLOCKED') { 
-                            alert("🚫 Sua empresa foi bloqueada ou faliu."); 
-                            window.location.reload(); 
-                        } else {
-                            setUser(prev => ({...prev, data: me}));
-                        }
-                    }
-                }
+            }
+        }
+    }, [teams, players, companies, coaches, user?.data?.id, user?.type]); 
 
-                // LIMPEZA: Só desativa a escuta quando o componente App for destruído
-                return () => unsubOffers();
-            }, [teams, players, companies, user?.data?.id, user?.type]); 
-
-            // Função centralizada para postagem de notícias
-            const postNews = (text, type = 'normal') => {
-                return db.collection('news').add({ 
-                    text, 
-                    type, 
-                    date: Date.now() 
-                });
-            };
-
+    // Função centralizada para postagem de notícias
+    const postNews = (text, type = 'normal') => {
+        return db.collection('news').add({ 
+            text, 
+            type, 
+            date: Date.now() 
+        });
+    };
             // --- FUNÇÃO DE LOGIN UNIVERSAL (CORRIGIDA) ---
     const login = async (loginId, loginPass, type) => {
         setLoading(true);
@@ -1737,7 +1746,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.63.1</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.63.2</div>
                             </div>
                         </div>
                         
@@ -2009,7 +2018,7 @@ const CoachRegisterForm = ({ onCancel, onSave }) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.63.1</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.63.2</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

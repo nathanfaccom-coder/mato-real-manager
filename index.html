@@ -129,16 +129,155 @@ const COACH_AFFINITIES = [
 
 // Habilidades Passivas (Perks) - Aparecem a cada 5 níveis
 const COACH_PERKS = [
-    { id: 'PALESTRINHA', name: 'Palestrinha', desc: 'Todo o time ganha +1 em Visão e Posicionamento nos jogos.' },
-    { id: 'NUTRICIONISTA', name: 'Nutricionista', desc: 'Jogadores recuperam +5% de Energia extra no descanso semanal.' },
-    { id: 'GRITO_GUERRA', name: 'Grito de Guerra', desc: 'Jogadores começam partidas importantes com Humor "🤩".' },
-    { id: 'OLHEIRO_NATA', name: 'Olheiro Nato', desc: 'Revela o Potencial (estrelas) de jogadores jovens no mercado.' },
-    { id: 'RECUPERACAO', name: 'Mãos Mágicas', desc: 'Treinos gastam 2% a menos de energia dos jogadores.' },
-    { id: 'LIDERANCA', name: 'Liderança', desc: 'Capitão do time ganha bônus de +3 em todos os atributos.' },
-    { id: 'PARCERIA', name: 'Parceria', desc: 'Jogadores ganham +10% de entrosamento mais rápido.' },
-    { id: 'MURAGLIA', name: 'A Muralha', desc: 'Goleiros ganham +2 em Reflexo e Agilidade em jogos decisivos.' },
-    { id: 'COUNTER', name: 'Contra-Ataque', desc: 'Atacantes recebem +2 de Velocidade se o time estiver perdendo.' },
-    { id: 'RESILIENCIA', name: 'Resiliência', desc: 'O time cansa 10% menos durante o segundo tempo.' }
+    // --- GRUPO 1: ATAQUE E FINALIZAÇÃO ---
+    { 
+        id: 'SNIPER_COACH', 
+        name: '🎯 Finalizador Nato', 
+        desc: 'Treinos de Chute rendem +50% XP em Finalização e Força.',
+        type: 'TRAIN_BOOST',
+        attrs: ['shot', 'shotPower', 'shotTech'],
+        multiplier: 1.5
+    },
+    { 
+        id: 'AERIAL_THREAT', 
+        name: '✈️ Força Aérea', 
+        desc: 'Bônus massivo em treinos de Cabeceio e Impulsão.',
+        type: 'TRAIN_BOOST',
+        attrs: ['header', 'jump'],
+        multiplier: 1.5
+    },
+    { 
+        id: 'OFFENSIVE_MIND', 
+        name: '🦊 Faro de Gol', 
+        desc: 'Melhora o atributo Ataque (Posicionamento) e Resposta.',
+        type: 'TRAIN_BOOST',
+        attrs: ['attack', 'response'],
+        multiplier: 1.5
+    },
+
+    // --- GRUPO 2: TÉCNICA E CONTROLE ---
+    { 
+        id: 'DRIBBLE_WIZARD', 
+        name: '🪄 Mago do Drible', 
+        desc: 'Acelera a evolução de Drible, Agilidade e Técnica.',
+        type: 'TRAIN_BOOST',
+        attrs: ['dribble', 'agility', 'tech'],
+        multiplier: 1.5
+    },
+    { 
+        id: 'MIDFIELD_MAESTRO', 
+        name: '🎩 Maestro', 
+        desc: 'Especialista em treinar Passe Curto e Passe Longo.',
+        type: 'TRAIN_BOOST',
+        attrs: ['shortPass', 'longPass'],
+        multiplier: 1.5
+    },
+    { 
+        id: 'SET_PIECE_GURU', 
+        name: '🎱 Bola Parada', 
+        desc: 'Torna o time letal em Faltas, Pênaltis e Efeito (Curva).',
+        type: 'TRAIN_BOOST',
+        attrs: ['freeKick', 'curve'],
+        multiplier: 1.8
+    },
+
+    // --- GRUPO 3: FÍSICO E VELOCIDADE ---
+    { 
+        id: 'SPEED_DEMON', 
+        name: '⚡ Velocista', 
+        desc: 'Foco total em Velocidade Máxima e Aceleração.',
+        type: 'TRAIN_BOOST',
+        attrs: ['speed', 'accel', 'dribbleSpd'],
+        multiplier: 1.5
+    },
+    { 
+        id: 'IRON_LUNGS', 
+        name: '🫁 Pulmão de Aço', 
+        desc: 'Melhora drasticamente Resistência e Condição Física.',
+        type: 'TRAIN_BOOST',
+        attrs: ['stamina', 'condition'],
+        multiplier: 1.5
+    },
+    { 
+        id: 'BALANCE_CORE', 
+        name: '⚖️ Equilíbrio Total', 
+        desc: 'Fortalece o Equilíbrio e proteção de bola.',
+        type: 'TRAIN_BOOST',
+        attrs: ['balance', 'strength'],
+        multiplier: 1.5
+    },
+
+    // --- GRUPO 4: DEFESA E GOLEIRO ---
+    { 
+        id: 'DEFENSIVE_WALL', 
+        name: '🛡️ Muralha', 
+        desc: 'Treinos defensivos upam muito Defesa e Agressividade.',
+        type: 'TRAIN_BOOST',
+        attrs: ['defense', 'aggression'],
+        multiplier: 1.5
+    },
+    { 
+        id: 'GK_WHISPERER', 
+        name: '🧤 Paredão', 
+        desc: 'Goleiros evoluem 50% mais rápido em habilidades de GK.',
+        type: 'TRAIN_BOOST',
+        attrs: ['gk'],
+        multiplier: 1.5
+    },
+    { 
+        id: 'TACTICAL_DISCIPLINE', 
+        name: '🧠 Tático', 
+        desc: 'Foca na evolução mental: Trabalho em Equipe e Mentalidade.',
+        type: 'TRAIN_BOOST',
+        attrs: ['teamwork', 'mentality'],
+        multiplier: 1.5
+    },
+
+    // --- GRUPO 5: ESPECIAIS (Utility) ---
+    { 
+        id: 'AMBIDEXTROUS', 
+        name: '🦶 Onde a Coruja Dorme', 
+        desc: 'Treinos específicos para melhorar Pé Ruim (Freq e Precisão).',
+        type: 'TRAIN_BOOST',
+        attrs: ['weakFootAcc', 'weakFootFreq'],
+        multiplier: 2.0 // Bônus alto pois é difícil upar
+    },
+    { 
+        id: 'FITNESS_EXPERT', 
+        name: '🔋 Gestão de Energia', 
+        desc: 'Jogadores gastam 20% menos energia nos treinos.',
+        type: 'ENERGY_SAVE',
+        value: 0.8
+    },
+    { 
+        id: 'YOUTH_MENTOR', 
+        name: '👶 Base de Ouro', 
+        desc: 'Jogadores Sub-21 ganham DOBRO de XP nos treinos.',
+        type: 'YOUTH_BOOST',
+        ageLimit: 21,
+        multiplier: 2.0
+    },
+    { 
+        id: 'MOTIVATOR', 
+        name: '🔥 Palestrante', 
+        desc: 'Aumenta em 20% a chance de "Grande Evolução" (Crítico) no treino.',
+        type: 'CRIT_CHANCE',
+        value: 0.2
+    },
+    { 
+        id: 'HARD_WORKER', 
+        name: '💪 Trabalho Duro', 
+        desc: 'Garante um mínimo de XP mais alto, evitando treinos ruins.',
+        type: 'MIN_XP_BOOST',
+        value: 5 // Adiciona +5 de XP base garantido
+    },
+    { 
+        id: 'POS_SPECIALIST', 
+        name: '📍 Posicionamento', 
+        desc: 'Aumenta o bônus de afinidade quando treina a posição correta.',
+        type: 'AFFINITY_BOOST',
+        value: 5 // +5 extra se a posição bater
+    }
 ];
 
 // Níveis onde libera NOVA AFINIDADE (Além do nível 1)
@@ -1395,34 +1534,109 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
     };
             //FIM
     // --- LÓGICA DE TREINO (APENAS XP) ---
-    const handleCoachTrain = async (playerIds, type) => {
+  const handleCoachTrain = async (playerIds, type) => {
         const currentCoach = user.data;
-        const hasRec = (currentCoach.perks || []).some(p => p.id === 'RECUPERACAO');
-        const energyCost = hasRec ? 6 : 8; 
-        
+        if (!currentCoach || currentCoach.trainingsLeft <= 0) return alert("Sem treinos disponíveis!");
+
+        setLoading(true);
         const b = db.batch();
         let coachXpGain = 0;
+        let report = [];
+
+        // 1. Identificar Perks Ativos do Técnico
+        const activePerks = currentCoach.perks || [];
+        
+        // Verifica se tem Perk de Energia (FITNESS_EXPERT)
+        const energyPerk = activePerks.find(p => p.type === 'ENERGY_SAVE');
+        const energyCost = energyPerk ? Math.round(10 * energyPerk.value) : 10; // Custa 10 ou 8 se tiver o perk
+
+        // Verifica se tem Perk de Crítico (MOTIVATOR)
+        const critPerk = activePerks.find(p => p.type === 'CRIT_CHANCE');
+        const critBonus = critPerk ? critPerk.value : 0;
+
+        // Verifica se tem Perk de XP Mínimo (HARD_WORKER)
+        const minXpPerk = activePerks.find(p => p.type === 'MIN_XP_BOOST');
+        const minXpBonus = minXpPerk ? minXpPerk.value : 0;
+
+        // Verifica se tem Perk de Afinidade (POS_SPECIALIST)
+        const affPerk = activePerks.find(p => p.type === 'AFFINITY_BOOST');
+        const affBonus = affPerk ? affPerk.value : 0;
+
+        // Mapeamento dos tipos de treino para atributos reais
+        let trainedAttrs = [];
+        if(type === 'FISICO_BASE') trainedAttrs = ['stamina', 'strength', 'balance'];
+        else if(type === 'VELOCIDADE') trainedAttrs = ['speed', 'accel', 'agility'];
+        else if(type === 'IMPULSAO') trainedAttrs = ['jump', 'header', 'condition'];
+        else if(type === 'CHUTE') trainedAttrs = ['shot', 'shotPower', 'shotTech'];
+        else if(type === 'PASSE') trainedAttrs = ['shortPass', 'longPass', 'tech'];
+        else if(type === 'DRIBLE') trainedAttrs = ['dribble', 'dribbleSpd', 'agility'];
+        else if(type === 'DEFESA') trainedAttrs = ['defense', 'aggression', 'response'];
+        else if(type === 'MENTAL') trainedAttrs = ['teamwork', 'mentality'];
+        else if(type === 'BOLA_PARADA') trainedAttrs = ['freeKick', 'curve', 'penalties'];
+        else if(type === 'GOLEIRO') trainedAttrs = ['gk', 'response'];
 
         playerIds.forEach(pid => {
             const p = players.find(x => x.id === pid);
             if (!p) return;
 
-            // 1. Cálculo do XP Base
-            // Base (30) + Nível do Técnico * 2
-            let xpGain = 30 + (currentCoach.level * 2); 
-            
-            // 2. Bônus de Afinidade (Ganha +XP se for da posição especialista)
-            if ((currentCoach.affinities || []).includes(p.position)) {
-                xpGain += 15; // Bônus extra de XP
-            }
-
-            const newXp = (p.xp || 0) + xpGain;
+            // Gasto de Energia
             const newEnergy = Math.max(0, (p.energy || 100) - energyCost);
             
-            // Atualiza apenas XP e Energia
+            // Cálculo de XP Base
+            let xpGain = Math.floor(Math.random() * 5) + 5 + minXpBonus; 
+            
+            // Afinidade Posicional
+            if ((currentCoach.affinities || []).includes(p.position)) {
+                xpGain += (3 + affBonus);
+            }
+
+            // --- APLICAÇÃO DOS PERKS (TRAIN_BOOST e YOUTH_BOOST) ---
+            activePerks.forEach(perk => {
+                if (perk.type === 'TRAIN_BOOST') {
+                    // Se algum atributo do treino bate com os atributos do perk
+                    const hasSynergy = perk.attrs.some(attr => trainedAttrs.includes(attr));
+                    if (hasSynergy) {
+                        xpGain = Math.round(xpGain * perk.multiplier);
+                    }
+                }
+                if (perk.type === 'YOUTH_BOOST') {
+                    // Se for jovem e tiver o perk
+                    // Assumindo idade base 18 se não tiver
+                    const age = p.age || 18;
+                    if (age <= perk.ageLimit) {
+                        xpGain = Math.round(xpGain * perk.multiplier);
+                    }
+                }
+            });
+
+            // Chance de Crítico (Grande Evolução)
+            if (Math.random() < (0.10 + critBonus)) {
+                xpGain *= 2; // Dobra o XP no crítico
+                report.push(`🔥 ${p.name} teve uma GRANDE evolução!`);
+            }
+
+            // Atualiza Atributos Específicos (Chance de subir atributo direto)
+            let newAttrs = { ...(p.attributes || {}) };
+            trainedAttrs.forEach(attr => {
+                if((newAttrs[attr] || 50) < 99) {
+                    // Chance pequena de subir o atributo direto além do XP geral
+                    // Se o XP ganho for alto, maior a chance
+                    if(Math.random() < (xpGain / 100)) {
+                        newAttrs[attr] = (newAttrs[attr] || 50) + 1;
+                    }
+                }
+            });
+
+            // Atualiza Overall baseado nos novos atributos
+            const vals = Object.values(newAttrs);
+            const newOverall = vals.length > 0 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : (p.overall || 60);
+
+            // Atualiza Jogador
             b.update(db.collection('players').doc(pid), { 
-                xp: newXp, 
-                energy: newEnergy 
+                xp: (p.xp || 0) + xpGain, 
+                energy: newEnergy,
+                attributes: newAttrs,
+                overall: newOverall
             });
             
             coachXpGain += 15;
@@ -1438,7 +1652,9 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
         if (newCoachXp >= xpNeed && newLevel < 30) {
             newCoachXp -= xpNeed;
             newLevel++;
+            // Regra: Perk a cada 5 níveis
             if (newLevel % 5 === 0) pendingPerks++;
+            // Regra: Afinidade nos níveis 10, 20, 30
             if ([10, 20, 30].includes(newLevel)) pendingAffinity++;
             alert(`🎉 PARABÉNS! Nível ${newLevel} alcançado!`);
         }
@@ -1452,7 +1668,12 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
         });
 
         await b.commit();
-        alert("Treino realizado! XP distribuído.");
+        setLoading(false);
+        
+        // Feedback Visual
+        let msg = "Treino realizado com sucesso!";
+        if(report.length > 0) msg += "\n\n" + report.join("\n");
+        alert(msg);
     };
 
     const handleEvolveCoachPerk = async (perk) => {
@@ -2007,7 +2228,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.70.4</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.70.5</div>
                             </div>
                         </div>
                         
@@ -2316,7 +2537,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.70.4</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.70.5</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

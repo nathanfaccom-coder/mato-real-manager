@@ -575,233 +575,256 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
         }
     };
             //FIM
-        const adminAction = async (act, data) => {
-            if (act === 'MARKET') {
-                db.collection('config').doc('system').update({ marketOpen: data });
-                postNews(data ? "📢 JANELA ABERTA" : "🔒 JANELA FECHADA", 'infra');
-            }
+       const adminAction = async (act, data) => {
+                if (act === 'MARKET') {
+                    db.collection('config').doc('system').update({ marketOpen: data });
+                    postNews(data ? "📢 JANELA ABERTA" : "🔒 JANELA FECHADA", 'infra');
+                }
 
-            // --- VIRADA DE SEMANA ---
-            if (act === 'WEEK') {
-                if (!confirm("⚠️ VIRAR SEMANA?\n\n1. Pagar Salários (+)\n2. Cobrar Imposto Jogador (3%)\n3. Recuperar Energia (100%)\n4. Empresas e XP")) return;
+                // --- VIRADA DE SEMANA ---
+                if (act === 'WEEK') {
+                    if (!confirm("⚠️ VIRAR SEMANA?\n\n1. Pagar Salários (+)\n2. Cobrar Imposto Jogador (3%)\n3. Recuperar Energia (100%)\n4. Empresas, Técnicos e XP")) return;
 
-                setLoading(true);
-                const b = db.batch();
+                    setLoading(true);
+                    const b = db.batch();
 
-                players.forEach(p => {
-                    if (p.teamId && p.teamId !== 'FREE') {
-                        if (teams.some(t => t.id === p.teamId)) {
-                            const currentBal = parseFloat(p.balance) || 0;
-                            const salary = parseFloat(p.salary) || 0;
-                            const tax = currentBal * 0.03;
-                            const finalBalance = (currentBal + salary) - tax;
-                            const xpTotal = (p.xp || 0) + (p.pendingXP || 0);
+                    // 1. JOGADORES
+                    players.forEach(p => {
+                        if (p.teamId && p.teamId !== 'FREE') {
+                            if (teams.some(t => t.id === p.teamId)) {
+                                const currentBal = parseFloat(p.balance) || 0;
+                                const salary = parseFloat(p.salary) || 0;
+                                const tax = currentBal * 0.03;
+                                const finalBalance = (currentBal + salary) - tax;
+                                const xpTotal = (p.xp || 0) + (p.pendingXP || 0);
 
-                            b.update(db.collection('players').doc(p.id), {
-                                balance: finalBalance,
-                                energy: 100,
-                                xp: xpTotal,
-                                pendingXP: 0
-                            });
+                                b.update(db.collection('players').doc(p.id), {
+                                    balance: finalBalance,
+                                    energy: 100,
+                                    xp: xpTotal,
+                                    pendingXP: 0
+                                });
+                            }
                         }
-                    }
-                });
-
-                teams.forEach(t => {
-                    const currentBal = parseFloat(t.balance) || 0;
-                    const wages = players.filter(p => p.teamId === t.id).reduce((a, p) => a + (parseFloat(p.salary) || 0), 0);
-                    const income = sps.filter(s => s.teamId === t.id && s.status === 'ACTIVE').reduce((a, s) => a + parseFloat(s.value), 0);
-                    b.update(db.collection('teams').doc(t.id), {
-                        balance: currentBal + income - wages
                     });
-                });
 
-                companies.forEach(c => {
-                    if (c.status === 'ACTIVE') {
-                        const currentBal = parseFloat(c.balance) || 0;
-                        const type = c.companyType || 'COMERCIO';
-                        const tax = (COMPANY_TYPES[type] || {}).tax || 50000;
-                        b.update(db.collection('companies').doc(c.id), {
-                            balance: currentBal - tax
+                    // 2. TIMES (Salários e Patrocínios)
+                    teams.forEach(t => {
+                        const currentBal = parseFloat(t.balance) || 0;
+                        const wages = players.filter(p => p.teamId === t.id).reduce((a, p) => a + (parseFloat(p.salary) || 0), 0);
+                        const income = sps.filter(s => s.teamId === t.id && s.status === 'ACTIVE').reduce((a, s) => a + parseFloat(s.value), 0);
+                        b.update(db.collection('teams').doc(t.id), {
+                            balance: currentBal + income - wages
                         });
-                    }
-                });
+                    });
 
-                const ds = await db.collection('debts').get();
-                ds.docs.forEach(doc => {
-                    const d = doc.data();
-                    const buyerExists = teams.some(t => t.id === d.buyerId);
-                    const sellerExists = teams.some(t => t.id === d.sellerId);
-
-                    if (!buyerExists || !sellerExists) {
-                        b.delete(doc.ref);
-                    } else if (d.weeksRemaining > 0) {
-                        b.update(db.collection('teams').doc(d.buyerId), { balance: firebase.firestore.FieldValue.increment(-d.installmentVal) });
-                        b.update(db.collection('teams').doc(d.sellerId), { balance: firebase.firestore.FieldValue.increment(d.installmentVal) });
-                        if (d.weeksRemaining - 1 === 0) {
-                            b.delete(doc.ref);
-                            postNews(`✅ **DÍVIDA QUITADA**\n${d.buyerName} terminou de pagar ${d.playerName}.`, 'money');
-                        } else {
-                            b.update(doc.ref, { weeksRemaining: d.weeksRemaining - 1 });
-                            postNews(`💳 **PARCELA PAGA**\n${d.buyerName} pagou a parcela (${d.weeksRemaining}x) de ${d.playerName}.`, 'money-minus');
-                        }
-                    }
-                });
-
-                try {
-                    await b.commit();
-                    alert("Semana processada!");
-                } catch (error) {
-                    alert("Erro: " + error.message);
-                }
-                setLoading(false);
-            }
-
-            // --- VIRADA DE TEMPORADA (ATRIBUTOS REALISTAS v1.54.5) ---
-            if (act === 'SEASON') {
-                if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Atributos (XP)\n2. Envelhecer Contratos\n3. Processar Retornos")) return;
-
-                setLoading(true);
-                const b = db.batch();
-
-                players.forEach(p => {
-                    let u = {};
-
-                    // 1. SISTEMA DE EVOLUÇÃO DE ATRIBUTOS (NOVO)
-                    const totalXP = (p.xp || 0) + (p.pendingXP || 0);
-                    const pointsToDistribute = Math.floor(totalXP / 100); // 100 XP = 1 Ponto
-                    const remainderXP = totalXP % 100;
-
-                    if (p.attributes && pointsToDistribute !== 0) {
-                        let newAttrs = { ...p.attributes };
-                        const keys = Object.keys(newAttrs);
-                        const absPoints = Math.abs(pointsToDistribute);
-                        const isPositive = pointsToDistribute > 0;
-
-                        // Distribui pontos aleatoriamente
-                        for (let i = 0; i < absPoints; i++) {
-                            const randomKey = keys[Math.floor(Math.random() * keys.length)];
-                            if (isPositive) {
-                                if (newAttrs[randomKey] < 99) newAttrs[randomKey]++;
-                            } else {
-                                if (newAttrs[randomKey] > 1) newAttrs[randomKey]--;
-                            }
-                        }
-
-                        u.attributes = newAttrs;
-                        // Recalcula Overall (Média)
-                        const vals = Object.values(newAttrs);
-                        const newOverall = Math.round(vals.reduce((acc, curr) => acc + curr, 0) / vals.length);
-                        
-                        u.overall = newOverall;
-                        u.xp = remainderXP;
-                        u.pendingXP = 0;
-                    } 
-                    // Fallback para jogadores antigos sem atributos (apenas zera o XP)
-                    else {
-                        u.xp = 0;
-                        u.pendingXP = 0;
-                    }
-
-                    // 2. ENVELHECIMENTO DE CONTRATOS
-                    let nc = (parseInt(p.contract) || 0) - 1;
-                    if (nc < 0) nc = 0;
-                    u.contract = nc;
-
-                    // 3. LÓGICA DE FIM DE VÍNCULO / EMPRÉSTIMO
-                    if (nc === 0 && p.loanMeta && p.loanMeta.ownerId) {
-                        const ownerId = p.loanMeta.ownerId;
-                        const ownerTeam = teams.find(t => t.id === ownerId);
-                        
-                        if (p.loanMeta.hasBuyOption && p.loanMeta.buyOpt > 0) {
-                            // Tem opção de compra: gera oferta
-                            const currentTeam = teams.find(t => t.id === p.teamId);
-                            const offerRef = db.collection('offers').doc();
-                            b.set(offerRef, {
-                                type: 'COMPRA_DEFINITIVA',
-                                playerId: p.id,
-                                playerName: p.name,
-                                buyerId: p.teamId,
-                                buyerName: currentTeam?.name || 'Clube Atual',
-                                sellerId: ownerId,
-                                recipientId: p.teamId, 
-                                value: p.loanMeta.buyOpt,
-                                status: 'PENDING',
-                                description: `🏁 **FIM DE EMPRÉSTIMO**\nDeseja exercer a opção de compra de **${p.name}** por ${fmt(p.loanMeta.buyOpt)}?\nCaso recuse, o jogador retornará ao clube de origem.`,
-                                date: Date.now(),
-                                isLoanOption: true 
+                    // 3. EMPRESAS (Imposto)
+                    companies.forEach(c => {
+                        if (c.status === 'ACTIVE') {
+                            const currentBal = parseFloat(c.balance) || 0;
+                            const type = c.companyType || 'COMERCIO';
+                            const tax = (COMPANY_TYPES[type] || {}).tax || 50000;
+                            b.update(db.collection('companies').doc(c.id), {
+                                balance: currentBal - tax
                             });
-                            u.status = 'INTRANSFERIVEL'; 
-                        } else {
-                            // Sem opção: verifica contrato original
-                            let contractWithDonoRemaining = (parseInt(p.loanMeta.originalContract) || 1) - 1;
+                        }
+                    });
 
-                            if (contractWithDonoRemaining <= 0) {
-                                const renewalReqRef = db.collection('offers').doc();
-                                b.set(renewalReqRef, {
-                                    type: 'RENOVACAO_URGENTE',
-                                    playerId: p.id,
-                                    playerName: p.name,
-                                    buyerId: ownerId,
-                                    buyerName: ownerTeam?.name || 'Clube de Origem',
-                                    sellerId: 'SISTEMA',
-                                    recipientId: ownerId,
-                                    status: 'PENDING',
-                                    description: `⚠️ **URGENTE: FIM DE VÍNCULO**\nO empréstimo de **${p.name}** acabou e ele está sem contrato com você.`,
-                                    date: Date.now()
-                                });
-                                u.teamId = ownerId;
-                                u.contract = 0;
-                                u.status = 'INTRANSFERIVEL';
+                    // 4. TÉCNICOS (Salário e Reset de Treino) - NOVO BLOCO
+                    const coachSnap = await db.collection('users').where('type', '==', 'COACH').get();
+                    coachSnap.docs.forEach(doc => {
+                        const c = doc.data();
+                        let updates = { trainingsLeft: 2 }; // Reseta treinos para 2
+
+                        // Se tiver time, paga salário
+                        if (c.teamId && c.teamId !== 'FREE') {
+                            // Debita do Time
+                            b.update(db.collection('teams').doc(c.teamId), {
+                                balance: firebase.firestore.FieldValue.increment(-c.salary)
+                            });
+                            // Paga ao Técnico
+                            const currentCoachBal = parseFloat(c.balance) || 0;
+                            updates.balance = currentCoachBal + parseFloat(c.salary);
+                        }
+                        b.update(db.collection('users').doc(doc.id), updates);
+                    });
+
+                    // 5. DÍVIDAS
+                    const ds = await db.collection('debts').get();
+                    ds.docs.forEach(doc => {
+                        const d = doc.data();
+                        const buyerExists = teams.some(t => t.id === d.buyerId);
+                        const sellerExists = teams.some(t => t.id === d.sellerId);
+
+                        if (!buyerExists || !sellerExists) {
+                            b.delete(doc.ref);
+                        } else if (d.weeksRemaining > 0) {
+                            b.update(db.collection('teams').doc(d.buyerId), { balance: firebase.firestore.FieldValue.increment(-d.installmentVal) });
+                            b.update(db.collection('teams').doc(d.sellerId), { balance: firebase.firestore.FieldValue.increment(d.installmentVal) });
+                            if (d.weeksRemaining - 1 === 0) {
+                                b.delete(doc.ref);
+                                postNews(`✅ **DÍVIDA QUITADA**\n${d.buyerName} terminou de pagar ${d.playerName}.`, 'money');
                             } else {
-                                u.teamId = ownerId;
-                                u.contract = contractWithDonoRemaining;
-                                u.status = 'NAO_A_VENDA';
-                                
-                                const notifRef = db.collection('offers').doc();
-                                b.set(notifRef, {
-                                    type: 'NOTIFICACAO',
+                                b.update(doc.ref, { weeksRemaining: d.weeksRemaining - 1 });
+                                postNews(`💳 **PARCELA PAGA**\n${d.buyerName} pagou a parcela (${d.weeksRemaining}x) de ${d.playerName}.`, 'money-minus');
+                            }
+                        }
+                    });
+
+                    try {
+                        await b.commit();
+                        alert("Semana processada! Salários pagos e treinos resetados.");
+                    } catch (error) {
+                        alert("Erro: " + error.message);
+                    }
+                    setLoading(false);
+                }
+
+                // --- VIRADA DE TEMPORADA (ATRIBUTOS REALISTAS v1.54.5) ---
+                if (act === 'SEASON') {
+                    if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Atributos (XP)\n2. Envelhecer Contratos\n3. Processar Retornos")) return;
+
+                    setLoading(true);
+                    const b = db.batch();
+
+                    players.forEach(p => {
+                        let u = {};
+
+                        // 1. SISTEMA DE EVOLUÇÃO DE ATRIBUTOS (NOVO)
+                        const totalXP = (p.xp || 0) + (p.pendingXP || 0);
+                        const pointsToDistribute = Math.floor(totalXP / 100); // 100 XP = 1 Ponto
+                        const remainderXP = totalXP % 100;
+
+                        if (p.attributes && pointsToDistribute !== 0) {
+                            let newAttrs = { ...p.attributes };
+                            const keys = Object.keys(newAttrs);
+                            const absPoints = Math.abs(pointsToDistribute);
+                            const isPositive = pointsToDistribute > 0;
+
+                            // Distribui pontos aleatoriamente
+                            for (let i = 0; i < absPoints; i++) {
+                                const randomKey = keys[Math.floor(Math.random() * keys.length)];
+                                if (isPositive) {
+                                    if (newAttrs[randomKey] < 99) newAttrs[randomKey]++;
+                                } else {
+                                    if (newAttrs[randomKey] > 1) newAttrs[randomKey]--;
+                                }
+                            }
+
+                            u.attributes = newAttrs;
+                            // Recalcula Overall (Média)
+                            const vals = Object.values(newAttrs);
+                            const newOverall = Math.round(vals.reduce((acc, curr) => acc + curr, 0) / vals.length);
+                            
+                            u.overall = newOverall;
+                            u.xp = remainderXP;
+                            u.pendingXP = 0;
+                        } 
+                        // Fallback para jogadores antigos sem atributos (apenas zera o XP)
+                        else {
+                            u.xp = 0;
+                            u.pendingXP = 0;
+                        }
+
+                        // 2. ENVELHECIMENTO DE CONTRATOS
+                        let nc = (parseInt(p.contract) || 0) - 1;
+                        if (nc < 0) nc = 0;
+                        u.contract = nc;
+
+                        // 3. LÓGICA DE FIM DE VÍNCULO / EMPRÉSTIMO
+                        if (nc === 0 && p.loanMeta && p.loanMeta.ownerId) {
+                            const ownerId = p.loanMeta.ownerId;
+                            const ownerTeam = teams.find(t => t.id === ownerId);
+                            
+                            if (p.loanMeta.hasBuyOption && p.loanMeta.buyOpt > 0) {
+                                // Tem opção de compra: gera oferta
+                                const currentTeam = teams.find(t => t.id === p.teamId);
+                                const offerRef = db.collection('offers').doc();
+                                b.set(offerRef, {
+                                    type: 'COMPRA_DEFINITIVA',
                                     playerId: p.id,
                                     playerName: p.name,
-                                    buyerName: 'Sistema',
-                                    recipientId: ownerId,
+                                    buyerId: p.teamId,
+                                    buyerName: currentTeam?.name || 'Clube Atual',
+                                    sellerId: ownerId,
+                                    recipientId: p.teamId, 
+                                    value: p.loanMeta.buyOpt,
                                     status: 'PENDING',
-                                    description: `🔙 **RETORNO DE EMPRÉSTIMO**\nO jogador **${p.name}** retornou ao seu elenco.\n\n📄 Contrato Restante: ${contractWithDonoRemaining} temporada(s).`,
-                                    date: Date.now()
+                                    description: `🏁 **FIM DE EMPRÉSTIMO**\nDeseja exercer a opção de compra de **${p.name}** por ${fmt(p.loanMeta.buyOpt)}?\nCaso recuse, o jogador retornará ao clube de origem.`,
+                                    date: Date.now(),
+                                    isLoanOption: true 
                                 });
-                                postNews(`🔙 **RETORNO**\n${p.name} voltou ao ${ownerTeam?.name} (${contractWithDonoRemaining} anos rest.).`, 'transfer');
+                                u.status = 'INTRANSFERIVEL'; 
+                            } else {
+                                // Sem opção: verifica contrato original
+                                let contractWithDonoRemaining = (parseInt(p.loanMeta.originalContract) || 1) - 1;
+
+                                if (contractWithDonoRemaining <= 0) {
+                                    const renewalReqRef = db.collection('offers').doc();
+                                    b.set(renewalReqRef, {
+                                        type: 'RENOVACAO_URGENTE',
+                                        playerId: p.id,
+                                        playerName: p.name,
+                                        buyerId: ownerId,
+                                        buyerName: ownerTeam?.name || 'Clube de Origem',
+                                        sellerId: 'SISTEMA',
+                                        recipientId: ownerId,
+                                        status: 'PENDING',
+                                        description: `⚠️ **URGENTE: FIM DE VÍNCULO**\nO empréstimo de **${p.name}** acabou e ele está sem contrato com você.`,
+                                        date: Date.now()
+                                    });
+                                    u.teamId = ownerId;
+                                    u.contract = 0;
+                                    u.status = 'INTRANSFERIVEL';
+                                } else {
+                                    u.teamId = ownerId;
+                                    u.contract = contractWithDonoRemaining;
+                                    u.status = 'NAO_A_VENDA';
+                                    
+                                    const notifRef = db.collection('offers').doc();
+                                    b.set(notifRef, {
+                                        type: 'NOTIFICACAO',
+                                        playerId: p.id,
+                                        playerName: p.name,
+                                        buyerName: 'Sistema',
+                                        recipientId: ownerId,
+                                        status: 'PENDING',
+                                        description: `🔙 **RETORNO DE EMPRÉSTIMO**\nO jogador **${p.name}** retornou ao seu elenco.\n\n📄 Contrato Restante: ${contractWithDonoRemaining} temporada(s).`,
+                                        date: Date.now()
+                                    });
+                                    postNews(`🔙 **RETORNO**\n${p.name} voltou ao ${ownerTeam?.name} (${contractWithDonoRemaining} anos rest.).`, 'transfer');
+                                }
+                                u.loanMeta = firebase.firestore.FieldValue.delete(); 
                             }
-                            u.loanMeta = firebase.firestore.FieldValue.delete(); 
+                        } 
+                        // PRÉ-CONTRATO / AGENTE LIVRE
+                        else if (nc === 0 && (!p.loanMeta || !p.loanMeta.ownerId)) {
+                            if (p.preContract && teams.some(t => t.id === p.preContract.teamId)) {
+                                u.teamId = p.preContract.teamId;
+                                u.contract = 2;
+                                u.status = 'NAO_A_VENDA';
+                                u.preContract = firebase.firestore.FieldValue.delete();
+                            } else {
+                                u.teamId = 'FREE';
+                                u.status = 'VENDA';
+                                u.mood = '😐';
+                                u.loanMeta = firebase.firestore.FieldValue.delete();
+                            }
                         }
-                    } 
-                    // PRÉ-CONTRATO / AGENTE LIVRE
-                    else if (nc === 0 && (!p.loanMeta || !p.loanMeta.ownerId)) {
-                        if (p.preContract && teams.some(t => t.id === p.preContract.teamId)) {
-                            u.teamId = p.preContract.teamId;
-                            u.contract = 2;
-                            u.status = 'NAO_A_VENDA';
-                            u.preContract = firebase.firestore.FieldValue.delete();
-                        } else {
-                            u.teamId = 'FREE';
-                            u.status = 'VENDA';
-                            u.mood = '😐';
-                            u.loanMeta = firebase.firestore.FieldValue.delete();
-                        }
+
+                        b.update(db.collection('players').doc(p.id), u);
+                    });
+
+                    try {
+                        await b.commit();
+                        alert("Temporada virada! Atributos evoluídos.");
+                    } catch (e) {
+                        alert("Erro: " + e.message);
                     }
-
-                    b.update(db.collection('players').doc(p.id), u);
-                });
-
-                try {
-                    await b.commit();
-                    alert("Temporada virada! Atributos evoluídos.");
-                } catch (e) {
-                    alert("Erro: " + e.message);
+                    setLoading(false);
+                    postNews("💪 **PRÉ-TEMPORADA**\nOs jogadores treinaram e seus atributos foram atualizados!", 'season');
                 }
-                setLoading(false);
-                postNews("💪 **PRÉ-TEMPORADA**\nOs jogadores treinaram e seus atributos foram atualizados!", 'season');
-            }
-        };
+            };
             
             const createCompany = async (f) => {
                 if(!f.n || !f.p) return alert("Preencha tudo!");
@@ -866,8 +889,12 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
                 if (!confirm(`Comprar ${prod.name} por ${fmt(prod.price)}?`)) return;
 
                 const b = db.batch();
+                
+                // ATUALIZADO: Verifica se é JOGADOR, TÉCNICO ou TIME
                 if (user.type === 'PLAYER') {
                     b.update(db.collection('players').doc(user.data.id), { balance: currentBalance - prod.price });
+                } else if (user.type === 'COACH') { // <--- Lógica para Técnico
+                    b.update(db.collection('users').doc(user.data.id), { balance: currentBalance - prod.price });
                 } else {
                     b.update(db.collection('teams').doc(user.data.id), { balance: currentBalance - prod.price });
                 }
@@ -878,6 +905,7 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
                 b.set(saleRef, { 
                     companyId: seller.id, 
                     productName: prod.name, 
+                    buyerId: user.data.id, // Salva o ID de quem comprou para aparecer na mochila certa
                     buyerName: user.data.name, 
                     price: prod.price, 
                     date: Date.now() 
@@ -886,7 +914,8 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
                 await b.commit();
                 alert("Compra realizada com sucesso!");
             };
-// --- FUNÇÃO DE RESETAR O BANCO DE DADOS (DENTRO DO APP) ---
+
+            // --- FUNÇÃO DE RESETAR O BANCO DE DADOS (DENTRO DO APP) ---
             const resetDatabase = async () => {
                 const senha = prompt("⚠️ PERIGO: Isso apagará TODOS os dados do jogo. Digite a senha master para confirmar:");
                 if (senha !== '2503') return; 
@@ -894,7 +923,8 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
                 if (!confirm("TEM CERTEZA? Todos os times, jogadores e finanças sumirão para sempre!")) return;
 
                 setLoading(true);
-                const collections = ['teams', 'players', 'news', 'offers', 'sponsorships', 'sales', 'debts', 'financeRequests', 'products', 'companies', 'journalists', 'newspapers'];
+                // Adicionei 'users' na lista para apagar os técnicos também
+                const collections = ['teams', 'players', 'users', 'news', 'offers', 'sponsorships', 'sales', 'debts', 'financeRequests', 'products', 'companies', 'journalists', 'newspapers'];
                 
                 try {
                     for (const col of collections) {
@@ -1769,7 +1799,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.63.5</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.63.6</div>
                             </div>
                         </div>
                         
@@ -2062,7 +2092,7 @@ const CoachRegisterForm = ({ onCancel, onSave }) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.63.5</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.63.6</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

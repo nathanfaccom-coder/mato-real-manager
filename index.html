@@ -576,6 +576,91 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
     };
             //FIM
             // --- 1. ENVIAR PROPOSTA (PRESIDENTE -> TÉCNICO) ---
+            // --- FUNÇÕES DE GESTÃO DO TÉCNICO ---
+
+    // 1. RENOVAR CONTRATO (TIME -> TÉCNICO)
+    const handleRenewCoachContract = async (coach) => {
+        if (!confirm(`Renovar contrato de ${coach.name} por mais 1 temporada?\nSalário atual: ${fmt(coach.salary)}`)) return;
+        
+        // Opcional: Aumentar salário automaticamente na renovação (ex: 10%)
+        const newSalary = Math.round(coach.salary * 1.10); 
+        
+        await db.collection('users').doc(coach.id).update({
+            contract: (coach.contract || 0) + 1,
+            salary: newSalary
+        });
+        alert(`Contrato renovado! Novo salário: ${fmt(newSalary)}`);
+    };
+
+    // 2. AÇÕES DO PRÓPRIO TÉCNICO (AUMENTO, SAIR, MULTA)
+    const handleCoachSelfActions = async (action, coach) => {
+        const team = teams.find(t => t.id === coach.teamId);
+        if (!team) return;
+
+        // PEDIR AUMENTO
+        if (action === 'RAISE') {
+            const ask = prompt("Qual o novo salário semanal desejado?", coach.salary);
+            if (!ask) return;
+            const val = parseFloat(ask);
+            if (val <= coach.salary) return alert("O valor deve ser maior que o atual.");
+
+            await db.collection('offers').add({
+                type: 'COACH_RAISE',
+                recipientId: team.id, // Vai para o Dono do Time
+                senderId: coach.id,
+                teamName: team.name,
+                coachName: coach.name,
+                currentSalary: coach.salary,
+                requestedSalary: val,
+                status: 'PENDING',
+                description: `💰 **PEDIDO DE AUMENTO**\nO técnico **${coach.name}** pede um reajuste salarial.\nAtual: ${fmt(coach.salary)} ➝ Pedido: ${fmt(val)}`,
+                date: Date.now()
+            });
+            alert("Pedido de aumento enviado à diretoria!");
+        }
+
+        // PEDIR PARA SAIR (AMIGÁVEL)
+        if (action === 'RESIGN_REQ') {
+            if(!confirm("Enviar pedido de demissão amigável? O clube pode recusar.")) return;
+            await db.collection('offers').add({
+                type: 'COACH_RESIGN',
+                recipientId: team.id,
+                senderId: coach.id,
+                teamName: team.name,
+                coachName: coach.name,
+                status: 'PENDING',
+                description: `👋 **PEDIDO DE DESLIGAMENTO**\nO técnico **${coach.name}** deseja rescindir o contrato amigavelmente (sem multa).`,
+                date: Date.now()
+            });
+            alert("Pedido de desligamento enviado!");
+        }
+
+        // PAGAR MULTA (SAÍDA IMEDIATA)
+        if (action === 'BUYOUT') {
+            const clause = coach.clause || (coach.salary * 10);
+            if (coach.balance < clause) return alert(`Saldo insuficiente! Você precisa de ${fmt(clause)}.`);
+            
+            if (!confirm(`TEM CERTEZA? Você pagará ${fmt(clause)} do seu bolso para ficar livre agora.`)) return;
+
+            const b = db.batch();
+            // Tira do Técnico
+            b.update(db.collection('users').doc(coach.id), {
+                balance: coach.balance - clause,
+                teamId: 'FREE',
+                contract: 0,
+                salary: 2500 // Volta ao base
+            });
+            // Paga ao Time
+            b.update(db.collection('teams').doc(team.id), {
+                balance: team.balance + clause
+            });
+
+            await b.commit();
+            alert("Multa paga! Você está livre no mercado.");
+            window.location.reload();
+        }
+    };
+            //FIM
     const handleSendCoachOffer = async (coachId, salary, contract, clause) => {
         const coach = coaches.find(c => c.id === coachId);
         if (!coach) return;
@@ -1882,7 +1967,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.70.0</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.70.1</div>
                             </div>
                         </div>
                         
@@ -1965,6 +2050,7 @@ const renewContract = async (p) => {
                                 players={players.filter(p=>p.teamId===user.data.id)} 
                                 coach={coaches.find(c => c.teamId === user.data.id && c.status === 'ACTIVE')} 
                                 onFireCoach={handleFireCoach}
+                                onRenewCoach={handleRenewCoachContract} // CONECTADO AQUI
                                 isVisitor={false} 
                                 onEdit={(p)=>setModal({type:'PLAYER', data:p})} 
                                 onAdd={()=>setModal({type:'PLAYER', data: { teamId: user.data.id } })} 
@@ -1999,6 +2085,7 @@ const renewContract = async (p) => {
                                     players={players.filter(p=>p.teamId===adminTeam.id)} 
                                     coach={coaches.find(c => c.teamId === adminTeam.id && c.status === 'ACTIVE')} 
                                     onFireCoach={handleFireCoach}
+                                    onRenewCoach={handleRenewCoachContract} // CONECTADO AQUI
                                     isVisitor={false} 
                                     onEdit={(p)=>setModal({type:'PLAYER', data:p})} 
                                     onAdd={()=>setModal({type:'PLAYER', data: { teamId: adminTeam.id } })} 
@@ -2070,7 +2157,17 @@ const renewContract = async (p) => {
                         {screen === 'NEWS' && <div><h3>Notícias</h3>{news.map(n=><div key={n.id} className={`news-card news-${n.type}`}>{n.text}<br/><small style={{color:'#666'}}>{new Date(n.date).toLocaleString()}</small></div>)}</div>}
                         
                         {screen === 'OFFERS' && (
-                            <OffersScreen user={user} offers={offers} teams={teams} onAccept={acceptOffer} onReject={rejectOffer} onCounter={(o) => setModal({ type: 'OFFER', data: { ...players.find(p => p.id === o.playerId), oldOffer: o } })} onCoachAccept={handleFinalizeCoachContract} onCoachReject={rejectOffer} onCoachCounter={handleCounterCoachOffer} />
+                            <OffersScreen 
+                                user={user} 
+                                offers={offers} 
+                                teams={teams} 
+                                onAccept={acceptOffer} 
+                                onReject={rejectOffer} 
+                                onCounter={(o) => setModal({ type: 'OFFER', data: { ...players.find(p => p.id === o.playerId), oldOffer: o } })} 
+                                onCoachAccept={handleFinalizeCoachContract} 
+                                onCoachReject={rejectOffer} 
+                                onCoachCounter={handleCounterCoachOffer} 
+                            />
                         )}                        
                         
                         {(screen === 'COMPANY_DASH' || screen === 'COMPANY_HOME') && user.type === 'COMPANY' && 
@@ -2102,6 +2199,7 @@ const renewContract = async (p) => {
                                 onRejectOffer={rejectOffer} 
                                 onCounterOffer={handleCounterCoachOffer} 
                                 onUpdateSalary={handleUpdateCoachSalary} 
+                                onSelfAction={handleCoachSelfActions} // CONECTADO AQUI
                             />
                         }
                     </div>
@@ -2178,7 +2276,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.70.0</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.70.1</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2597,7 +2695,7 @@ const renewContract = async (p) => {
         };
 //FIM
         // --- COMPONENTE DO PAINEL DO TÉCNICO ---
-const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolvePerk, onAddAffinity, onAcceptOffer, onRejectOffer, onCounterOffer }) => {
+const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolvePerk, onAddAffinity, onAcceptOffer, onRejectOffer, onCounterOffer, onSelfAction }) => {
     const [tab, setTab] = useState('TREINO'); 
     const [selectedPlayers, setSelectedPlayers] = useState([]);
     const [trainingType, setTrainingType] = useState('FISICO_BASE'); 
@@ -2805,6 +2903,19 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
 
             {tab === 'CARREIRA' && (
                 <div>
+                    {/* --- AÇÕES DO TÉCNICO (NOVO) --- */}
+                    {coach.teamId !== 'FREE' && (
+                        <div className="card" style={{border:'1px solid #444', marginBottom:15}}>
+                            <h3>📝 Meu Contrato</h3>
+                            <p style={{fontSize:12}}>Clube: <b>{team?.name || 'Desconhecido'}</b></p>
+                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:5}}>
+                                <button className="btn btn-blue" onClick={()=>onSelfAction('RAISE', coach)}>💰 PEDIR AUMENTO</button>
+                                <button className="btn btn-gold" onClick={()=>onSelfAction('RESIGN_REQ', coach)}>👋 PEDIR PARA SAIR</button>
+                                <button className="btn btn-red" style={{gridColumn:'span 2'}} onClick={()=>onSelfAction('BUYOUT', coach)}>💸 PAGAR MULTA ({fmt(coach.clause || coach.salary*10)})</button>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="card" style={{borderLeft:'4px solid var(--primary)'}}>
                         <h3>📩 Propostas de Contrato</h3>
                         {offers.filter(o => o.type === 'COACH_OFFER' && o.recipientId === coach.id && o.status !== 'REJECTED').length === 0 && <p style={{color:'#666', fontSize:12}}>Nenhuma proposta pendente.</p>}
@@ -2864,6 +2975,18 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                             </div>
                         ))}
                     </div>
+                    
+                    <div className="card">
+                        <h3>💰 Salário Pretendido</h3>
+                        {coach.level >= 2 ? (
+                            <div style={{display:'flex', gap:10}}>
+                                <input className="input-field" type="number" value={newSalary} onChange={e=>setNewSalary(e.target.value)} />
+                                <button className="btn btn-gold" onClick={()=>onUpdateSalary(newSalary)}>DEFINIR</button>
+                            </div>
+                        ) : (
+                            <p style={{color:'#666', fontSize:11}}>Desbloqueia no Nível 2.</p>
+                        )}
+                    </div>
                 </div>
             )}
 
@@ -2886,7 +3009,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
     );
 };
         //FIM
-        const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireCoach }) => {
+       const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireCoach, onRenewCoach }) => {
     const [tab, setTab] = useState('ELENCO'); 
     
     // Calcula salários somando jogadores + técnico (se houver)
@@ -2971,7 +3094,11 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                                     <span className="badge" style={{background:'var(--primary)', marginTop:5}}>Nível {coach.level}</span>
                                 </div>
                                 {!isVisitor && (
-                                    <button className="btn btn-red" style={{width:'auto', fontSize:10}} onClick={()=>onFireCoach(coach)}>DEMITIR</button>
+                                    <div style={{display:'flex', gap:5}}>
+                                        {/* BOTÃO DE RENOVAR (NOVO) */}
+                                        <button className="btn btn-blue" style={{width:'auto', fontSize:10}} onClick={()=>onRenewCoach(coach)}>RENOVAR (+1)</button>
+                                        <button className="btn btn-red" style={{width:'auto', fontSize:10}} onClick={()=>onFireCoach(coach)}>DEMITIR</button>
+                                    </div>
                                 )}
                             </div>
                             

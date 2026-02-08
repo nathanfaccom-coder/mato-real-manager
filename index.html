@@ -575,6 +575,85 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
         }
     };
             //FIM
+            // --- 1. ENVIAR PROPOSTA (PRESIDENTE -> TÉCNICO) ---
+    const handleSendCoachOffer = async (coachId, salary, contract, clause) => {
+        const coach = coaches.find(c => c.id === coachId);
+        if (!coach) return;
+
+        await db.collection('offers').add({
+            type: 'COACH_OFFER',
+            coachId: coachId,       // ID Fixo do Técnico
+            recipientId: coachId,   // Quem deve responder agora (Técnico)
+            senderId: user.data.id, // Quem enviou (Time)
+            teamId: user.data.id,
+            teamName: user.data.name,
+            coachName: coach.name,
+            salary: parseFloat(salary),
+            contract: parseInt(contract), // Tempo em temporadas
+            clause: parseFloat(clause),   // Multa rescisória
+            status: 'PENDING',
+            createdAt: Date.now()
+        });
+        setModal(null);
+        alert(`Proposta enviada para ${coach.name}!`);
+    };
+
+    // --- 2. CONTRA-PROPOSTA (TÉCNICO -> PRESIDENTE) ---
+    const handleCounterCoachOffer = async (offer, newSalary, newContract, newClause) => {
+        // Regra: Só nível 2+ negocia
+        if (user.data.level < 2) return alert("Apenas técnicos Nível 2+ podem negociar valores!");
+
+        await db.collection('offers').doc(offer.id).update({
+            salary: parseFloat(newSalary),
+            contract: parseInt(newContract),
+            clause: parseFloat(newClause),
+            status: 'COUNTERED',        // Marca como contra-proposta
+            recipientId: offer.teamId,  // Devolve a bola para o Presidente
+            senderId: user.data.id      // Marca que foi o técnico que mandou
+        });
+        alert("Contra-proposta enviada ao clube!");
+    };
+
+    // --- 3. FINALIZAR CONTRATO (ACEITAR) ---
+    const handleFinalizeCoachContract = async (offer) => {
+        const teamId = offer.teamId;
+        // Pega o ID do técnico (garante que pega certo independente de quem aceitou)
+        const coachId = offer.coachId || (offer.recipientId === teamId ? offer.senderId : offer.recipientId);
+
+        // Verifica saldo do time
+        const teamDoc = await db.collection('teams').doc(teamId).get();
+        const teamData = teamDoc.data();
+        if (teamData.balance < offer.salary) return alert("O time não tem saldo para pagar as luvas (1º salário)!");
+
+        const b = db.batch();
+
+        // 1. Se o time já tem técnico, demite o antigo (volta pra FREE)
+        const oldCoach = coaches.find(c => c.teamId === teamId && c.status === 'ACTIVE');
+        if (oldCoach) {
+            b.update(db.collection('users').doc(oldCoach.id), { teamId: 'FREE', contract: 0 });
+        }
+
+        // 2. Se o técnico já tinha time, sai do antigo (sem multa automática aqui, assume-se fim de contrato ou acordo)
+        // (Opcional: Adicionar lógica se ele estiver saindo no meio do contrato de outro time)
+
+        // 3. Atualiza o Técnico com o NOVO CONTRATO
+        b.update(db.collection('users').doc(coachId), { 
+            teamId: teamId,
+            salary: parseFloat(offer.salary),
+            contract: parseInt(offer.contract), // Grava as temporadas
+            clause: parseFloat(offer.clause)    // Grava a multa
+        });
+
+        // 4. Paga Luvas (1º Salário) e desconta do time
+        b.update(db.collection('teams').doc(teamId), { balance: teamData.balance - offer.salary });
+
+        // 5. Apaga a oferta (negócio fechado)
+        b.delete(db.collection('offers').doc(offer.id));
+
+        await b.commit();
+        alert(`Contrato assinado! ${offer.coachName || 'O técnico'} agora comanda o ${offer.teamName}.`);
+    };
+            //FIM
        const adminAction = async (act, data) => {
                 if (act === 'MARKET') {
                     db.collection('config').doc('system').update({ marketOpen: data });
@@ -797,6 +876,32 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
                                 u.loanMeta = firebase.firestore.FieldValue.delete(); 
                             }
                         } 
+                            // ... (código dos jogadores acima) ...
+
+                    // 4. ENVELHECER CONTRATOS DE TÉCNICOS (NOVO)
+                    const coachSnap = await db.collection('users').where('type', '==', 'COACH').get();
+                    coachSnap.docs.forEach(doc => {
+                        const c = doc.data();
+                        if (c.teamId && c.teamId !== 'FREE') {
+                            const newContract = (c.contract || 1) - 1;
+                            
+                            if (newContract <= 0) {
+                                // Fim de contrato: Volta para o mercado
+                                b.update(db.collection('users').doc(doc.id), {
+                                    teamId: 'FREE',
+                                    contract: 0,
+                                    salary: 2500 // Reseta para salário base ou mantém o último
+                                });
+                                // Opcional: Criar notícia que o técnico ficou livre
+                            } else {
+                                b.update(db.collection('users').doc(doc.id), {
+                                    contract: newContract
+                                });
+                            }
+                        }
+                    });
+
+                
                         // PRÉ-CONTRATO / AGENTE LIVRE
                         else if (nc === 0 && (!p.loanMeta || !p.loanMeta.ownerId)) {
                             if (p.preContract && teams.some(t => t.id === p.preContract.teamId)) {
@@ -982,10 +1087,9 @@ const AdminPanel = ({ teams, papers, journalists, companies, coaches, reqs, conf
                                 <small>Esp: {c.affinities[0]}</small>
                             </div>
                             <div style={{marginTop:10, display:'flex', gap:5}}>
-                                <button className="btn btn-green" onClick={async()=>{
-                                    await db.collection('users').doc(c.id).update({ status: 'ACTIVE' });
-                                    alert("Técnico Aprovado!");
-                                }}>APROVAR</button>
+                               <button className="btn btn-green" style={{marginTop:5}} onClick={() => onHireCoach(c)}>
+    NEGOCIAR
+</button>
                                 <button className="btn btn-red" onClick={async()=>{
                                     if(confirm("Rejeitar?")) await db.collection('users').doc(c.id).delete();
                                 }}>REJEITAR</button>
@@ -1799,7 +1903,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.63.6</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.63.7</div>
                             </div>
                         </div>
                         
@@ -1929,7 +2033,7 @@ const renewContract = async (p) => {
                                     postNews(`📝 **PRÉ-CONTRATO**\n**${p.name}** reforçará o **${buy.name}** na próxima temporada!`, 'transfer');
                                     alert("Pré-contrato assinado!");
                                 }}
-                                onHireCoach={handleHireCoach}
+                                onHireCoach={(c) => setModal({ type: 'HIRE_COACH', data: c })}
                             />
                         )}
 
@@ -1993,7 +2097,9 @@ const renewContract = async (p) => {
                                     alert("Nova afinidade desbloqueada!");
                                 }}
                                 onAcceptOffer={handleAcceptCoachOffer} 
-                                onRejectOffer={handleRejectCoachOffer} 
+                                onRejectOffer={handleRejectCoachOffer}
+                                onAcceptOffer={handleFinalizeCoachContract} 
+                                onCounterOffer={handleCounterCoachOffer}
                                 onUpdateSalary={handleUpdateCoachSalary} 
                             />
                         }
@@ -2019,6 +2125,30 @@ const renewContract = async (p) => {
                             {modal.type==='TEAM_TABLE' && <TeamStandingsEditor teams={teams} onUpdateTeamStats={updateTeamStats} />}
                             {modal.type==='POST_NEWS' && <div><h3>Nova Notícia</h3><input className="input-field" placeholder="Manchete / Texto" id="news-body" /><button className="btn btn-blue" onClick={()=>{postNews(`📰 **${user.data.name}:**\n${document.getElementById('news-body').value}`, 'press'); setModal(null);}}>PUBLICAR</button></div>}
                             {modal.type==='STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
+                            {modal.type === 'HIRE_COACH' && (
+    <div>
+        <h3>Negociar com {modal.data.name}</h3>
+        <label>Salário Semanal (₣)</label>
+        <input className="input-field" type="number" id="c_salary" defaultValue={modal.data.salary} />
+        
+        <label>Duração (Temporadas)</label>
+        <select className="input-field" id="c_contract">
+            <option value="1">1 Temporada</option>
+            <option value="2">2 Temporadas</option>
+            <option value="3">3 Temporadas</option>
+        </select>
+
+        <label>Multa Rescisória (₣)</label>
+        <input className="input-field" type="number" id="c_clause" defaultValue={modal.data.salary * 10} />
+
+        <button className="btn btn-green" onClick={() => {
+            const s = document.getElementById('c_salary').value;
+            const c = document.getElementById('c_contract').value;
+            const cl = document.getElementById('c_clause').value;
+            handleSendCoachOffer(modal.data.id, s, c, cl);
+        }}>ENVIAR PROPOSTA</button>
+    </div>
+)}
                         </div>
                     </div>}
                 </div>
@@ -2092,7 +2222,7 @@ const CoachRegisterForm = ({ onCancel, onSave }) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.63.6</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.63.7</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2511,11 +2641,14 @@ const CoachRegisterForm = ({ onCancel, onSave }) => {
         };
 //FIM
         // --- COMPONENTE DO PAINEL DO TÉCNICO ---
-const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolvePerk, onAddAffinity, onAcceptOffer, onRejectOffer, onUpdateSalary }) => {
+const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolvePerk, onAddAffinity, onAcceptOffer, onRejectOffer, onCounterOffer }) => {
     const [tab, setTab] = useState('TREINO'); 
     const [selectedPlayers, setSelectedPlayers] = useState([]);
     const [trainingType, setTrainingType] = useState('FISICO_BASE'); 
-    const [newSalary, setNewSalary] = useState(coach.salary);
+    
+    // State local para contra-proposta
+    const [editingOffer, setEditingOffer] = useState(null); 
+    const [counterVals, setCounterVals] = useState({ s: 0, c: 1, cl: 0 });
 
     const xpNext = coach.level * 100;
     const progress = (coach.xp / xpNext) * 100;
@@ -2531,36 +2664,24 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
     const myItems = (sales||[]).filter(s => s.buyerId === coach.id);
 
     // --- CONFIGURAÇÃO VISUAL IGUAL AO PERFIL DO JOGADOR ---
-    // Organizado linha por linha conforme a imagem de referência (3 Colunas)
     const ATTR_LIST = [
-        // Linha 1
         { k: 'weakFootAcc', l: 'Pior Pé Prec.', i: '🦶' }, { k: 'shot', l: 'Finalização', i: '🥅' }, { k: 'condition', l: 'Cond. Física', i: '💪' },
-        // Linha 2
         { k: 'stamina', l: 'Resistência', i: '🔋' }, { k: 'header', l: 'Cabeceio', i: '🤕' }, { k: 'attack', l: 'Ataque', i: '⚔️' },
-        // Linha 3
         { k: 'weakFootFreq', l: 'Pior Pé Freq.', i: '🔄' }, { k: 'longPassSpd', l: 'P. Longo Vel.', i: '🚀' }, { k: 'teamwork', l: 'Trabalho Eq.', i: '🤝' },
-        // Linha 4
         { k: 'freeKick', l: 'Falta', i: '🎯' }, { k: 'aggression', l: 'Agressividade', i: '😡' }, { k: 'defense', l: 'Defesa', i: '🛡️' },
-        // Linha 5
         { k: 'tech', l: 'Técnica', i: '✨' }, { k: 'dribbleSpd', l: 'Drib. Veloc.', i: '💨' }, { k: 'mentality', l: 'Atitude', i: '🧠' },
-        // Linha 6
         { k: 'shotTech', l: 'Téc. Chute', i: '👟' }, { k: 'balance', l: 'Equilíbrio', i: '⚖️' }, { k: 'shortPass', l: 'Passe Curto', i: '🎯' },
-        // Linha 7
         { k: 'longPass', l: 'Passe Longo', i: '📡' }, { k: 'shortPassSpd', l: 'P. Curto Vel.', i: '⏩' }, { k: 'accel', l: 'Aceleração', i: '🏎️' },
-        // Linha 8
         { k: 'gk', l: 'Hab. Goleiro', i: '🧤' }, { k: 'shotPower', l: 'Força Chute', i: '💣' }, { k: 'jump', l: 'Impulsão', i: '🦘' },
-        // Linha 9
         { k: 'speed', l: 'Veloc. Máx.', i: '⚡' }, { k: 'curve', l: 'Efeito', i: '🍌' }, { k: 'response', l: 'Resposta', i: '💡' },
-        // Linha 10 (Resto)
         { k: 'dribble', l: 'Drible', i: '⚽' }, { k: 'agility', l: 'Agilidade', i: '🤸' }
     ];
 
-    // Função para pegar a cor baseada no valor (Igual ao print)
     const getAttrColor = (val) => {
         if (!val) return '#666';
-        if (val < 50) return '#ff5e5e'; // Vermelho
-        if (val < 70) return '#ffbb33'; // Laranja/Amarelo
-        return '#00C851'; // Verde
+        if (val < 50) return '#ff5e5e'; 
+        if (val < 70) return '#ffbb33'; 
+        return '#00C851'; 
     };
 
     const handleTogglePlayer = (pid) => {
@@ -2579,7 +2700,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                 <div style={{display:'flex', justifyContent:'center', gap:15, marginTop:15}}>
                     <div style={{textAlign:'center'}}>
                         <div style={{fontSize:20, fontWeight:'bold', color:'var(--success)'}}>{fmt(coach.balance || 0)}</div>
-                        <span style={{fontSize:9, color:'#888'}}>SALDO ATUAL</span>
+                        <span style={{fontSize:9, color:'#888'}}>SALDO</span>
                     </div>
                     <div style={{width:1, background:'#333'}}></div>
                     <div style={{textAlign:'center'}}>
@@ -2588,8 +2709,8 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                     </div>
                     <div style={{width:1, background:'#333'}}></div>
                     <div style={{textAlign:'center'}}>
-                        <div style={{fontSize:20, fontWeight:'bold', color:'gold'}}>★ {coach.affinities?.length || 1}</div>
-                        <span style={{fontSize:9, color:'#888'}}>ESPECIALIDADES</span>
+                        <div style={{fontSize:20, fontWeight:'bold', color:'gold'}}>{coach.contract || 0}</div>
+                        <span style={{fontSize:9, color:'#888'}}>TEMPORADAS</span>
                     </div>
                 </div>
 
@@ -2607,7 +2728,6 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
 
             {tab === 'TREINO' && (
                 <div>
-                    {/* Avisos de Level Up */}
                     {showPerkSelection && (
                         <div className="card pulse-border" style={{background:'rgba(255, 215, 0, 0.1)'}}>
                             <h3 style={{color:'gold', textAlign:'center'}}>✨ NOVO NÍVEL ALCANÇADO!</h3>
@@ -2630,7 +2750,6 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                         </div>
                     )}
 
-                    {/* SELEÇÃO DE TREINO DETALHADO */}
                     <div style={{marginBottom:15}}>
                         <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
                             <span>Foco do Treino:</span>
@@ -2658,7 +2777,6 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                         </select>
                     </div>
 
-                    {/* LISTA DE JOGADORES (ESTILO IDÊNTICO AO PERFIL) */}
                     <p style={{textAlign:'center', color:'#888', fontSize:12, margin:'10px 0'}}>
                         👉 Selecione até <b>5 jogadores</b> para o treino:
                     </p>
@@ -2672,7 +2790,6 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                                 }}
                                 onClick={() => handleTogglePlayer(p.id)}
                             >
-                                {/* Linha 1: Nome e Overall */}
                                 <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                                     <div style={{fontWeight:'bold', fontSize:13}}>
                                         {p.name} <span style={{fontSize:10, fontWeight:'normal', color:'#aaa'}}>({p.position})</span>
@@ -2682,7 +2799,6 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                                     </div>
                                 </div>
 
-                                {/* Linha 2: Barra de Energia */}
                                 <div style={{margin:'6px 0', background:'#222', height:4, borderRadius:2, overflow:'hidden', width:'100%'}}>
                                     <div style={{
                                         width:`${p.energy || 100}%`, 
@@ -2695,7 +2811,6 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                                     {(coach.affinities || []).includes(p.position) && <span style={{color:'gold'}}>★ Afinidade</span>}
                                 </div>
 
-                                {/* Linha 3: TODOS OS ATRIBUTOS (Grid 3 Colunas com Cores) */}
                                 {p.attributes ? (
                                     <div style={{
                                         borderTop:'1px solid #333', 
@@ -2703,8 +2818,8 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                                         fontSize:9, 
                                         color:'#aaa', 
                                         display:'grid', 
-                                        gridTemplateColumns:'1fr 1fr 1fr', // 3 Colunas Exatas
-                                        gap: '4px 8px' // Espaçamento melhorado
+                                        gridTemplateColumns:'1fr 1fr 1fr', 
+                                        gap: '4px 8px' 
                                     }}>
                                         {ATTR_LIST.map((attr) => {
                                             const val = p.attributes[attr.k];
@@ -2735,28 +2850,63 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
             {tab === 'CARREIRA' && (
                 <div>
                     <div className="card" style={{borderLeft:'4px solid var(--primary)'}}>
-                        <h3>📩 Propostas</h3>
-                        {offers.filter(o => o.type === 'COACH_OFFER' && o.status === 'PENDING').length === 0 && <p style={{color:'#666', fontSize:12}}>Nenhuma proposta.</p>}
-                        {offers.filter(o => o.type === 'COACH_OFFER' && o.status === 'PENDING').map(o => (
+                        <h3>📩 Propostas de Contrato</h3>
+                        {offers.filter(o => o.type === 'COACH_OFFER' && o.recipientId === coach.id && o.status !== 'REJECTED').length === 0 && <p style={{color:'#666', fontSize:12}}>Nenhuma proposta pendente.</p>}
+                        
+                        {offers.filter(o => o.type === 'COACH_OFFER' && o.recipientId === coach.id && o.status !== 'REJECTED').map(o => (
                             <div key={o.id} style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:5, marginBottom:10}}>
-                                <div><b>{o.teamName}</b> <span style={{color:'lime'}}>₣ {fmt(o.value)}/sem</span></div>
-                                <div style={{display:'flex', gap:5, marginTop:5}}>
-                                    <button className="btn btn-green" onClick={()=>onAcceptOffer(o)}>ACEITAR</button>
-                                    <button className="btn btn-red" onClick={()=>onRejectOffer(o)}>RECUSAR</button>
+                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                    <b>{o.teamName}</b>
+                                    {o.status === 'COUNTERED' && <small style={{color:'gold'}}>Aguardando Clube...</small>}
                                 </div>
+                                
+                                {editingOffer === o.id ? (
+                                    <div style={{marginTop:10, background:'#000', padding:10, borderRadius:5}}>
+                                        <label style={{fontSize:10}}>Salário (₣)</label>
+                                        <input className="input-field" type="number" value={counterVals.s} onChange={e=>setCounterVals({...counterVals, s:e.target.value})} />
+                                        
+                                        <label style={{fontSize:10}}>Contrato (Anos)</label>
+                                        <select className="input-field" value={counterVals.c} onChange={e=>setCounterVals({...counterVals, c:e.target.value})}>
+                                            <option value="1">1 Ano</option><option value="2">2 Anos</option><option value="3">3 Anos</option>
+                                        </select>
+
+                                        <label style={{fontSize:10}}>Multa (₣)</label>
+                                        <input className="input-field" type="number" value={counterVals.cl} onChange={e=>setCounterVals({...counterVals, cl:e.target.value})} />
+
+                                        <div style={{display:'flex', gap:5}}>
+                                            <button className="btn btn-gold" onClick={()=>{
+                                                onCounterOffer(o, counterVals.s, counterVals.c, counterVals.cl);
+                                                setEditingOffer(null);
+                                            }}>ENVIAR CONTRA-PROPOSTA</button>
+                                            <button className="btn btn-red" onClick={()=>setEditingOffer(null)}>CANCELAR</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div style={{fontSize:12, marginTop:5}}>
+                                        <div>💰 Salário: <span style={{color:'lime'}}>{fmt(o.salary)}</span></div>
+                                        <div>📅 Duração: <span style={{color:'white'}}>{o.contract} Temp.</span></div>
+                                        <div>🔒 Multa: <span style={{color:'red'}}>{fmt(o.clause)}</span></div>
+                                        
+                                        {o.status === 'PENDING' && (
+                                            <div style={{display:'flex', gap:5, marginTop:10}}>
+                                                <button className="btn btn-green" onClick={()=>onAcceptOffer(o)}>ACEITAR</button>
+                                                
+                                                {coach.level >= 2 ? (
+                                                    <button className="btn btn-blue" onClick={()=>{
+                                                        setCounterVals({s: o.salary, c: o.contract, cl: o.clause});
+                                                        setEditingOffer(o.id);
+                                                    }}>NEGOCIAR</button>
+                                                ) : (
+                                                    <button className="btn btn-ghost" disabled style={{opacity:0.5}}>Nív. 2 p/ Negociar</button>
+                                                )}
+
+                                                <button className="btn btn-red" onClick={()=>onRejectOffer(o)}>RECUSAR</button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         ))}
-                    </div>
-                    <div className="card">
-                        <h3>💰 Salário Pretendido</h3>
-                        {coach.level >= 2 ? (
-                            <div style={{display:'flex', gap:10}}>
-                                <input className="input-field" type="number" value={newSalary} onChange={e=>setNewSalary(e.target.value)} />
-                                <button className="btn btn-gold" onClick={()=>onUpdateSalary(newSalary)}>DEFINIR</button>
-                            </div>
-                        ) : (
-                            <p style={{color:'#666', fontSize:11}}>Desbloqueia no Nível 2.</p>
-                        )}
                     </div>
                 </div>
             )}

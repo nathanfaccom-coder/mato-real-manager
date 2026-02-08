@@ -1141,6 +1141,7 @@ const AdminPanel = ({ teams, papers, journalists, companies, coaches, reqs, conf
                 <button style={{...tabStyle(tab==='COACH'), background: tab==='COACH' ? 'gold' : '#333', color: tab==='COACH' ? '#000' : '#fff'}} onClick={()=>setTab('COACH')}>Técnicos</button>
             </div>
 
+            {/* ABA DE TÉCNICOS ATUALIZADA */}
             {tab === 'COACH' && (
                 <div>
                     <h3>Técnicos Pendentes</h3>
@@ -1152,23 +1153,49 @@ const AdminPanel = ({ teams, papers, journalists, companies, coaches, reqs, conf
                                 <small>Esp: {c.affinities[0]}</small>
                             </div>
                             <div style={{marginTop:10, display:'flex', gap:5}}>
-                               <button className="btn btn-green" style={{marginTop:5}} onClick={() => onHireCoach(c)}>
-    NEGOCIAR
-</button>
+                                {/* NOTE: onHireCoach não existe aqui dentro, removi para evitar erro, pois o Admin apenas Aprova ou Rejeita se for um sistema de aprovação, ou deleta. Se quiser editar, usa os botões abaixo. */}
                                 <button className="btn btn-red" onClick={async()=>{
-                                    if(confirm("Rejeitar?")) await db.collection('users').doc(c.id).delete();
-                                }}>REJEITAR</button>
+                                    if(confirm("Rejeitar solicitação?")) await db.collection('users').doc(c.id).delete();
+                                }}>REJEITAR / EXCLUIR</button>
+                                <button className="btn btn-green" onClick={async()=>{
+                                    await db.collection('users').doc(c.id).update({status: 'ACTIVE'});
+                                }}>APROVAR</button>
                             </div>
                         </div>
                     ))}
+                    
                     <hr style={{borderColor:'#333'}}/>
+                    
                     <h3>Técnicos Ativos</h3>
                     {(coaches||[]).filter(c => c.status === 'ACTIVE').map(c => (
-                        <div key={c.id} className="card">
-                            {c.name} - {c.teamId === 'FREE' ? <span style={{color:'lime'}}>Livre</span> : <span style={{color:'#666'}}>Contratado</span>}
-                            <button className="btn btn-red" style={{fontSize:9, width:'auto', marginLeft:10}} onClick={async()=>{
-                                if(prompt("Digite DELETE para excluir:") === "DELETE") await db.collection('users').doc(c.id).delete();
-                            }}>X</button>
+                        <div key={c.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                            <div>
+                                <span style={{fontWeight:'bold', color:'gold'}}>{c.name}</span>
+                                <br/>
+                                <small style={{color:'#ccc'}}>
+                                    {c.teamId === 'FREE' ? <span style={{color:'lime'}}>Livre</span> : 'Contratado'} | 
+                                    Nível: {c.level} | $: {fmt(c.balance)}
+                                </small>
+                            </div>
+                            
+                            <div style={{display:'flex', gap:5}}>
+                                {/* BOTÃO EDITAR NÍVEL */}
+                                <button className="btn btn-blue" style={{fontSize:10, width:'auto', padding:'5px 8px'}} onClick={async()=>{
+                                    const n = prompt("Novo Nível (1-10):", c.level);
+                                    if(n) await db.collection('users').doc(c.id).update({level: parseInt(n)});
+                                }}>LVL</button>
+
+                                {/* BOTÃO EDITAR SALDO */}
+                                <button className="btn btn-green" style={{fontSize:10, width:'auto', padding:'5px 8px'}} onClick={async()=>{
+                                    const n = prompt("Novo Saldo:", c.balance);
+                                    if(n) await db.collection('users').doc(c.id).update({balance: parseFloat(n)});
+                                }}>$</button>
+
+                                {/* BOTÃO EXCLUIR */}
+                                <button className="btn btn-red" style={{fontSize:10, width:'auto', padding:'5px 8px'}} onClick={async()=>{
+                                    if(prompt("Digite DELETE para banir este técnico:") === "DELETE") await db.collection('users').doc(c.id).delete();
+                                }}>X</button>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -1251,7 +1278,6 @@ const AdminPanel = ({ teams, papers, journalists, companies, coaches, reqs, conf
     );
 };
 
-            //FIM 
 const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => {
     const [form, setF] = useState({name: team.name, logo: team.logo, balance: team.balance, serie: team.serie});
     useEffect(() => { setF({name: team.name, logo: team.logo, balance: team.balance, serie: team.serie}); }, [team]);
@@ -1967,7 +1993,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.70.2</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.70.3</div>
                             </div>
                         </div>
                         
@@ -2276,7 +2302,7 @@ const renewContract = async (p) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.70.2</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.70.3</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

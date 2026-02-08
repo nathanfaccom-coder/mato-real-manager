@@ -555,7 +555,7 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
             let foundType = '';
 
             // 1. LOGIN VIA MODAL (Quando clica no card)
-            if (type === 'TEAM') {
+            if (type === 'TEAM' || type === 'USER') {
                 const t = teams.find(x => x.id === loginId && x.password === loginPass);
                 if (t) { foundUser = t; foundType = 'USER'; }
             } 
@@ -568,31 +568,64 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
                 if (c) { foundUser = c; foundType = 'COMPANY'; }
             } 
             else if (type === 'COACH') {
-                // Procura na lista de técnicos que carregamos
                 const c = coaches.find(x => x.id === loginId && x.password === loginPass);
                 if (c) { foundUser = c; foundType = 'COACH'; }
-            } 
+            }
+            // --- VERIFICAÇÃO DE IMPRENSA (MODAL) ---
+            else if (type === 'PRESS' || type === 'PAPER') {
+                const paper = papers.find(x => x.id === loginId && x.password === loginPass);
+                if (paper) { foundUser = paper; foundType = 'PRESS'; }
+            }
+            else if (type === 'PRESS_WORKER' || type === 'JOURNALIST') {
+                const j = journalists.find(x => x.id === loginId && x.password === loginPass);
+                if (j) {
+                    const myPaper = papers.find(p => p.id === j.newspaperId);
+                    foundUser = { ...j, paperName: myPaper?.name };
+                    foundType = 'PRESS_WORKER';
+                }
+            }
             
             // 2. LOGIN MANUAL (Digitando ID e Senha na tela inicial)
             else {
                 // Tenta achar em Times
-                let t = teams.find(x => x.id === loginId && x.password === loginPass);
+                let t = teams.find(x => (x.id === loginId || x.name === loginId) && x.password === loginPass);
                 if (t) { foundUser = t; foundType = 'USER'; }
 
                 // Tenta achar em Jogadores
                 if (!foundUser) {
-                    let p = players.find(x => x.id === loginId && x.password === loginPass);
+                    let p = players.find(x => (x.id === loginId || x.name === loginId) && x.password === loginPass);
                     if (p) { foundUser = p; foundType = 'PLAYER'; }
                 }
                 
                 // Tenta achar em Técnicos
                 if (!foundUser) {
-                    let c = coaches.find(x => x.id === loginId && x.password === loginPass);
+                    let c = coaches.find(x => (x.id === loginId || x.name === loginId) && x.password === loginPass);
                     if (c) { foundUser = c; foundType = 'COACH'; }
                 }
 
+                // Tenta achar em Empresas
+                if (!foundUser) {
+                    let c = companies.find(x => (x.id === loginId || x.name === loginId) && x.password === loginPass);
+                    if (c) { foundUser = c; foundType = 'COMPANY'; }
+                }
+
+                // --- VERIFICAÇÃO DE IMPRENSA (MANUAL) ---
+                if (!foundUser) {
+                    let paper = papers.find(x => (x.id === loginId || x.name === loginId) && x.password === loginPass);
+                    if (paper) { foundUser = paper; foundType = 'PRESS'; }
+                }
+
+                if (!foundUser) {
+                    let j = journalists.find(x => (x.id === loginId || x.name === loginId) && x.password === loginPass);
+                    if (j) {
+                        const myPaper = papers.find(p => p.id === j.newspaperId);
+                        foundUser = { ...j, paperName: myPaper?.name };
+                        foundType = 'PRESS_WORKER';
+                    }
+                }
+
                 // Tenta Admin
-                if (loginId === 'admin' && loginPass === '2503') { // Ou sua senha de admin
+                if (loginId === 'admin' && loginPass === '2503') { 
                     foundUser = { name: 'Admin' }; foundType = 'ADMIN';
                 }
             }
@@ -601,6 +634,8 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
             if (foundUser) {
                 if(foundUser.status === 'PENDING') {
                      alert("Conta em análise pela Federação. Aguarde aprovação.");
+                } else if(foundUser.status === 'BLOCKED') {
+                     alert("Conta bloqueada.");
                 } else {
                     setUser({ type: foundType, data: foundUser });
                     localStorage.setItem('user', JSON.stringify({ type: foundType, data: foundUser }));
@@ -609,6 +644,7 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
                     if (foundType === 'COACH') setScreen('COACH_DASH');
                     else if (foundType === 'COMPANY') setScreen('COMPANY_DASH');
                     else if (foundType === 'PLAYER') setScreen('PLAYER_DASH');
+                    else if (foundType === 'PRESS' || foundType === 'PRESS_WORKER') setScreen('PRESS_DASH'); // Redireciona Imprensa
                     else setScreen('HOME');
                 }
             } else {
@@ -2591,7 +2627,7 @@ const renewContract = async (p) => {
             );
         }
 // --- COMPONENTS ---
-      const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor, onCreateCoach }) => {
+     const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor, onCreateCoach }) => {
     const [tab, setTab] = useState('LOGIN'); 
     const [subTab, setSubTab] = useState('TEAM'); 
     const [f, setF] = useState({n:'', b:'10000000', s:'A', p:''}); 
@@ -2608,7 +2644,7 @@ const renewContract = async (p) => {
     
     const selectedTypeInfo = COMPANY_TYPES[fc.type] || {};
 
-    // Função Unificada de Login
+    // Função Unificada de Login (CORRIGIDA)
     const handleLoginSubmit = () => {
         if (!sel) return;
 
@@ -2617,43 +2653,44 @@ const renewContract = async (p) => {
             return alert("Senha incorreta!");
         }
         
+        // CORREÇÃO: Envia ID, SENHA e TIPO separadamente, como o App.js espera
+        
         // 1. TIMES
         if (sel.type === 'TEAM') {
             if (sel.status === 'PENDING') return alert("Aguardando aprovação.");
-            onLogin({ type: 'USER', data: sel });
+            onLogin(sel.id, lp, 'TEAM');
         }
         // 2. JOGADORES
         else if (sel.type === 'PLAYER') {
-            onLogin({ type: 'PLAYER', data: sel });
+            onLogin(sel.id, lp, 'PLAYER');
         }
         // 3. TÉCNICOS
         else if (sel.type === 'COACH') {
             if (sel.status === 'PENDING') return alert("Licença em análise.");
-            onLogin({ type: 'COACH', data: sel });
+            onLogin(sel.id, lp, 'COACH');
         }
         // 4. EMPRESAS
         else if (sel.type === 'COMPANY') {
             if (sel.status === 'PENDING') return alert("Empresa em análise.");
             if (sel.status === 'BLOCKED') return alert("Empresa bloqueada.");
-            onLogin({ type: 'COMPANY', data: sel });
+            onLogin(sel.id, lp, 'COMPANY');
         }
         // 5. JORNAIS (Donos)
         else if (sel.type === 'PAPER') {
             if (sel.status === 'PENDING') return alert("Jornal em análise.");
-            onLogin({ type: 'PRESS', data: sel });
+            onLogin(sel.id, lp, 'PAPER');
         }
         // 6. JORNALISTAS (Funcionários)
         else if (sel.type === 'JOURNALIST') {
             if (sel.status === 'PENDING') return alert("Registro em análise.");
-            const myPaper = papers.find(p => p.id === sel.newspaperId);
-            onLogin({ type: 'PRESS_WORKER', data: { ...sel, paperName: myPaper?.name } });
+            onLogin(sel.id, lp, 'JOURNALIST');
         }
     };
 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.71.2</div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.71.3</div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2808,7 +2845,6 @@ const VisitorDashboard = ({ players, teams }) => {
         </div>
     );
 };
-
 // FIM DA LOGIN SCREEN E VISITOR DASHBOARD
 
         // --- NOVO COMPONENTE: PAINEL DA EMPRESA ---

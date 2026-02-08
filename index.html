@@ -2591,7 +2591,7 @@ const renewContract = async (p) => {
             );
         }
 // --- COMPONENTS ---
-       const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor, onCreateCoach }) => {
+      const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor, onCreateCoach }) => {
     const [tab, setTab] = useState('LOGIN'); 
     const [subTab, setSubTab] = useState('TEAM'); 
     const [f, setF] = useState({n:'', b:'10000000', s:'A', p:''}); 
@@ -2611,66 +2611,49 @@ const renewContract = async (p) => {
     // Função Unificada de Login
     const handleLoginSubmit = () => {
         if (!sel) return;
+
+        // Verifica a senha localmente
+        if (String(sel.password) !== String(lp)) {
+            return alert("Senha incorreta!");
+        }
         
         // 1. TIMES
         if (sel.type === 'TEAM') {
-            if (sel.password === lp) {
-                onLogin({ type: 'USER', data: sel });
-            } else {
-                alert("Senha incorreta!");
-            }
+            if (sel.status === 'PENDING') return alert("Aguardando aprovação.");
+            onLogin({ type: 'USER', data: sel });
         }
         // 2. JOGADORES
         else if (sel.type === 'PLAYER') {
-            if (sel.password === lp) {
-                onLogin({ type: 'PLAYER', data: sel });
-            } else {
-                alert("Senha incorreta!");
-            }
+            onLogin({ type: 'PLAYER', data: sel });
         }
         // 3. TÉCNICOS
         else if (sel.type === 'COACH') {
-            if (sel.password === lp) {
-                onLogin({ type: 'COACH', data: sel });
-            } else {
-                alert("Senha incorreta!");
-            }
+            if (sel.status === 'PENDING') return alert("Licença em análise.");
+            onLogin({ type: 'COACH', data: sel });
         }
         // 4. EMPRESAS
         else if (sel.type === 'COMPANY') {
-            if (sel.password === lp) {
-                if (sel.status === 'PENDING') return alert("Empresa em análise.");
-                if (sel.status === 'BLOCKED') return alert("Empresa bloqueada.");
-                onLogin({ type: 'COMPANY', data: sel });
-            } else {
-                alert("Senha incorreta!");
-            }
+            if (sel.status === 'PENDING') return alert("Empresa em análise.");
+            if (sel.status === 'BLOCKED') return alert("Empresa bloqueada.");
+            onLogin({ type: 'COMPANY', data: sel });
         }
         // 5. JORNAIS (Donos)
         else if (sel.type === 'PAPER') {
-            if (sel.password === lp) {
-                if (sel.status === 'PENDING') return alert("Jornal em análise.");
-                onLogin({ type: 'PRESS', data: sel });
-            } else {
-                alert("Senha incorreta!");
-            }
+            if (sel.status === 'PENDING') return alert("Jornal em análise.");
+            onLogin({ type: 'PRESS', data: sel });
         }
         // 6. JORNALISTAS (Funcionários)
         else if (sel.type === 'JOURNALIST') {
-            if (sel.password === lp) {
-                if (sel.status === 'PENDING') return alert("Registro em análise.");
-                const myPaper = papers.find(p => p.id === sel.newspaperId);
-                onLogin({ type: 'PRESS_WORKER', data: { ...sel, paperName: myPaper?.name } });
-            } else {
-                alert("Senha incorreta!");
-            }
+            if (sel.status === 'PENDING') return alert("Registro em análise.");
+            const myPaper = papers.find(p => p.id === sel.newspaperId);
+            onLogin({ type: 'PRESS_WORKER', data: { ...sel, paperName: myPaper?.name } });
         }
     };
 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.71.0</div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.71.2</div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2814,18 +2797,17 @@ const renewContract = async (p) => {
         </div>
     );
 };
-        //FIM
 
-        const VisitorDashboard = ({ players, teams }) => {
-            const topScorer = players.sort((a,b)=>(b.stats?.goals||0)-(a.stats?.goals||0))[0];
-            const topAssist = players.sort((a,b)=>(b.stats?.assists||0)-(a.stats?.assists||0))[0];
-            return (
-                <div>
-                    <div className="highlight-card"><h2 style={{margin:0, color:'var(--primary)'}}>Jornal do Dia</h2><small>Resumo da Temporada</small><div style={{marginTop:15, textAlign:'left'}}><div style={{marginBottom:10}}><span style={{color:'#aaa', fontSize:10, textTransform:'uppercase'}}>Artilheiro</span><div style={{fontWeight:'bold', fontSize:16}}>⚽ {topScorer?.name || 'Ninguém'} <span style={{color:'var(--primary)'}}>{topScorer?.stats?.goals||0} Gols</span></div></div><div><span style={{color:'#aaa', fontSize:10, textTransform:'uppercase'}}>Rei das Assistências</span><div style={{fontWeight:'bold', fontSize:16}}>👟 {topAssist?.name || 'Ninguém'} <span style={{color:'var(--secondary)'}}>{topAssist?.stats?.assists||0} Assis</span></div></div></div></div>
-                    <div style={{textAlign:'center', color:'#666'}}>Use o menu abaixo para navegar.</div>
-                </div>
-            );
-        };
+const VisitorDashboard = ({ players, teams }) => {
+    const topScorer = players.sort((a,b)=>(b.stats?.goals||0)-(a.stats?.goals||0))[0];
+    const topAssist = players.sort((a,b)=>(b.stats?.assists||0)-(a.stats?.assists||0))[0];
+    return (
+        <div>
+            <div className="highlight-card"><h2 style={{margin:0, color:'var(--primary)'}}>Jornal do Dia</h2><small>Resumo da Temporada</small><div style={{marginTop:15, textAlign:'left'}}><div style={{marginBottom:10}}><span style={{color:'#aaa', fontSize:10, textTransform:'uppercase'}}>Artilheiro</span><div style={{fontWeight:'bold', fontSize:16}}>⚽ {topScorer?.name || 'Ninguém'} <span style={{color:'var(--primary)'}}>{topScorer?.stats?.goals||0} Gols</span></div></div><div><span style={{color:'#aaa', fontSize:10, textTransform:'uppercase'}}>Rei das Assistências</span><div style={{fontWeight:'bold', fontSize:16}}>👟 {topAssist?.name || 'Ninguém'} <span style={{color:'var(--secondary)'}}>{topAssist?.stats?.assists||0} Assis</span></div></div></div></div>
+            <div style={{textAlign:'center', color:'#666'}}>Use o menu abaixo para navegar.</div>
+        </div>
+    );
+};
 
 // FIM DA LOGIN SCREEN E VISITOR DASHBOARD
 

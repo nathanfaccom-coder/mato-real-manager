@@ -85,12 +85,17 @@
         const db = firebase.firestore();
         const { useState, useEffect } = React;
 
-        const POS = ['GOL', 'ZAG', 'LD', 'LE', 'VOL', 'MC', 'MEI', 'ATA'];
+        const POS = ['GOL', 'ZAG', 'LD', 'LE', 'VOL', 'MC', 'MEI', 'PTD', 'PTE', 'ATA'];
         const SERIES = ['A', 'B', 'C', 'D'];
         const COSTS = [0, 5000000, 20000000, 50000000, 100000000];
         const fmt = (v) => "₣ " + parseFloat(v||0).toLocaleString('pt-BR');
-        const getPosColor = (p) => { if(!p) return '#555'; if(p==='GOL') return '#FFD700'; if(['ZAG','LD','LE'].some(x=>p.includes(x))) return '#2979FF'; if(['VOL','MC','MEI'].some(x=>p.includes(x))) return '#00E676'; return '#FF1744'; };
-
+const getPosColor = (p) => {
+    if (p === 'GOL') return '#E65100'; // Laranja Escuro (Goleiro)
+    if (['ZAG', 'LD', 'LE'].includes(p)) return '#2979FF'; // Azul (Defesa)
+    if (['VOL', 'MC', 'MEI'].includes(p)) return '#00E676'; // Verde (Meio)
+    if (['PTD', 'PTE', 'ATA', 'SA'].includes(p)) return '#FF1744'; // Vermelho (Ataque)
+    return '#888';
+};
         // --- CONSTANTES DE EMPRESAS ---
         const COMPANY_TYPES = {
             'COMERCIO': { label: 'Comércio Local', start: 2500000, tax: 50000, desc: 'Ideal para iniciantes. Imposto baixo.' },
@@ -109,8 +114,36 @@
         };
 
 // FIM DO BLOCO INICIAL
+// --- CONFIGURAÇÕES DE TÉCNICOS ---
 
-      // --- SISTEMA DE ATRIBUTOS REALISTA (v1.54.4) ---
+// Posições de Afinidade (O técnico escolhe uma para começar)
+const COACH_AFFINITIES = [
+    'GOL', 
+    'ZAG', 
+    'LD', 'LE',   // Laterais
+    'VOL', 'MC',  // Volantes e Meias Centrais
+    'MEI',        // Meia Armador
+    'PTD', 'PTE', // Pontas (Novo!)
+    'ATA'         // Centroavante
+];
+
+// Habilidades Passivas (Perks) - Aparecem a cada 5 níveis
+const COACH_PERKS = [
+    { id: 'PALESTRINHA', name: 'Palestrinha', desc: 'Todo o time ganha +1 em Visão e Posicionamento nos jogos.' },
+    { id: 'NUTRICIONISTA', name: 'Nutricionista', desc: 'Jogadores recuperam +5% de Energia extra no descanso semanal.' },
+    { id: 'GRITO_GUERRA', name: 'Grito de Guerra', desc: 'Jogadores começam partidas importantes com Humor "🤩".' },
+    { id: 'OLHEIRO_NATA', name: 'Olheiro Nato', desc: 'Revela o Potencial (estrelas) de jogadores jovens no mercado.' },
+    { id: 'RECUPERACAO', name: 'Mãos Mágicas', desc: 'Treinos gastam 2% a menos de energia dos jogadores.' },
+    { id: 'LIDERANCA', name: 'Liderança', desc: 'Capitão do time ganha bônus de +3 em todos os atributos.' },
+    { id: 'PARCERIA', name: 'Parceria', desc: 'Jogadores ganham +10% de entrosamento mais rápido.' },
+    { id: 'MURAGLIA', name: 'A Muralha', desc: 'Goleiros ganham +2 em Reflexo e Agilidade em jogos decisivos.' },
+    { id: 'COUNTER', name: 'Contra-Ataque', desc: 'Atacantes recebem +2 de Velocidade se o time estiver perdendo.' },
+    { id: 'RESILIENCIA', name: 'Resiliência', desc: 'O time cansa 10% menos durante o segundo tempo.' }
+];
+
+// Níveis onde libera NOVA AFINIDADE (Além do nível 1)
+const AFFINITY_LEVELS = [10, 20, 30];
+      // --- SISTEMA DE ATRIBUTOS REALISTA (v1.54.5) ---
 // (Substitui o antigo Sistema de RPG)
 
 const ATTR_LABELS = {
@@ -138,18 +171,17 @@ const getAttrColor = (val) => {
     return '#FF1744';                // Vermelho
 };
 
-// Gerador de Atributos Balanceado e Seguro
+// Gerador de Atributos V3.1 (Com Pontas PTD/PTE)
 const generateAttributes = (pos, targetOv) => {
     const ov = parseInt(targetOv) || 50;
     const attrs = {};
     const keys = Object.keys(ATTR_LABELS);
 
-    // Definição de prioridades (Corrigido para evitar crash em GOL)
     let primary = [], secondary = [];
 
     if (pos === 'GOL') {
         primary = ['gk', 'response', 'jump', 'longPass'];
-        secondary = ['balance', 'condition', 'mentality', 'defense']; // Troquei strength por condition
+        secondary = ['balance', 'condition', 'mentality', 'defense'];
     } else if (pos.includes('ZAG')) {
         primary = ['defense', 'header', 'balance', 'jump', 'aggression'];
         secondary = ['stamina', 'response', 'shortPass', 'longPass'];
@@ -162,39 +194,42 @@ const generateAttributes = (pos, targetOv) => {
     } else if (pos.includes('MEI') || pos.includes('MAT')) {
         primary = ['dribble', 'shortPass', 'vision', 'tech', 'curve', 'agility'];
         secondary = ['shot', 'speed', 'attack', 'freeKick'];
+        
+    // --- NOVO BLOCO ESPECÍFICO PARA PONTAS (PTD / PTE) ---
+    } else if (pos === 'PTD' || pos === 'PTE') {
+        // Pontas precisam de muita velocidade, drible e cruzamento (curve/longPass)
+        primary = ['speed', 'accel', 'dribble', 'agility', 'curve'];
+        secondary = ['shot', 'stamina', 'longPass', 'technique'];
+
+    // --- BLOCO PARA CENTROAVANTES (ATA / SA) ---
     } else if (pos.includes('ATA') || pos.includes('SA') || pos.includes('PNT')) {
-        primary = ['shot', 'attack', 'header', 'speed', 'accel', 'shotPower'];
-        secondary = ['dribble', 'agility', 'balance', 'reaction'];
+        primary = ['shot', 'attack', 'header', 'shotPower', 'balance'];
+        secondary = ['speed', 'reaction', 'dribble', 'strength'];
     }
 
-    // 1. Geração Base Controlada
+    // 1. Geração Base
     keys.forEach(k => {
         let base = ov;
         
-        // Aplica bônus/ônus suaves
         if (primary.includes(k)) {
-            base += Math.floor(Math.random() * 6) + 2; // +2 a +8
+            base += Math.floor(Math.random() * 6) + 2; 
         } else if (secondary.includes(k)) {
-            base -= Math.floor(Math.random() * 4); // -0 a -4
+            base -= Math.floor(Math.random() * 4); 
         } else {
-            base -= Math.floor(Math.random() * 10) + 5; // -5 a -15 (Penaliza irrelevantes)
+            base -= Math.floor(Math.random() * 10) + 5; 
         }
 
-        // Ajustes fixos de posição (Goleiro x Linha)
         if (pos !== 'GOL' && k === 'gk') base = 10; 
         if (pos === 'GOL' && ['shot', 'attack', 'dribble', 'curve', 'freeKick'].includes(k)) base = Math.max(15, base - 20);
 
-        // Trava de segurança para não extrapolar em níveis baixos
         if (ov < 80 && base > 88) base = 88;
-        
         if (base > 99) base = 99;
         if (base < 1) base = 1;
         
         attrs[k] = base;
     });
 
-    // 2. Normalização da Média
-    // Para Goleiro, ignora atributos de ataque na conta. Para Linha, ignora GK.
+    // 2. Normalização
     const relevantKeys = keys.filter(k => {
         if (pos === 'GOL') return !['shot', 'attack', 'dribble', 'curve', 'freeKick', 'weakFootAcc', 'weakFootFreq'].includes(k);
         return k !== 'gk';
@@ -205,14 +240,10 @@ const generateAttributes = (pos, targetOv) => {
     const currentAvg = sum / relevantKeys.length;
     const diff = ov - currentAvg;
     
-    // Distribui a diferença
     relevantKeys.forEach(k => {
         let boost = diff;
-        // Se já for muito alto (>90) e o overall meta for baixo (<85), segura a onda
         if (attrs[k] > 90 && ov < 85 && diff > 0) boost = 0;
-
         let newVal = attrs[k] + boost;
-        
         if (newVal > 99) newVal = 99;
         if (newVal < 1) newVal = 1;
         attrs[k] = Math.round(newVal);
@@ -220,7 +251,6 @@ const generateAttributes = (pos, targetOv) => {
 
     return attrs;
 };
-
 // Componente Visualizador de Atributos
 const AttributeGrid = ({ attrs, pendingXP }) => {
     if (!attrs) return <small>Atributos não gerados.</small>;
@@ -281,6 +311,7 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
             const [companies, setCompanies] = useState([]);
             const [products, setProducts] = useState([]);
             const [sps, setSps] = useState([]);
+            const [coaches, setCoaches] = useState([]); 
             
             const [screen, setScreen] = useState('HOME');
             const [modal, setModal] = useState(null);
@@ -289,23 +320,38 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
             const [adminTeam, setAdminTeam] = useState(null); 
             const [sales, setSales] = useState([]);
 
-            useEffect(() => {
-                const unsubs = [
-                    db.collection('teams').onSnapshot(s => setTeams(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    db.collection('players').onSnapshot(s => setPlayers(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    db.collection('config').doc('system').onSnapshot(s => setConf(s.exists ? s.data() : {marketOpen:true})),
-                    db.collection('financeRequests').onSnapshot(s => setReqs(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    db.collection('newspapers').onSnapshot(s => setPapers(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    db.collection('journalists').onSnapshot(s => setJournalists(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    
-                    db.collection('companies').onSnapshot(s => setCompanies(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    db.collection('products').onSnapshot(s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    db.collection('sponsorships').onSnapshot(s => setSps(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    db.collection('sales').orderBy('date', 'desc').limit(50).onSnapshot(s => setSales(s.docs.map(d => d.data()))),
-                    db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => { const list = s.docs.map(d => ({id:d.id, ...d.data()})); setNews(list); const lastRead = localStorage.getItem('lastRead'); if (list.length && (!lastRead || list[0].date > parseInt(lastRead))) setNewNews(true); setLoading(false); })
-                ];
-                return () => unsubs.forEach(u => u());
-            }, []);
+           useEffect(() => {
+        const unsubs = [
+            db.collection('teams').onSnapshot(s => setTeams(s.docs.map(d => ({id:d.id, ...d.data()})))),
+            db.collection('players').onSnapshot(s => setPlayers(s.docs.map(d => ({id:d.id, ...d.data()})))),
+            db.collection('config').doc('system').onSnapshot(s => setConf(s.exists ? s.data() : {marketOpen:true})),
+            db.collection('financeRequests').onSnapshot(s => setReqs(s.docs.map(d => ({id:d.id, ...d.data()})))),
+            db.collection('newspapers').onSnapshot(s => setPapers(s.docs.map(d => ({id:d.id, ...d.data()})))),
+            db.collection('journalists').onSnapshot(s => setJournalists(s.docs.map(d => ({id:d.id, ...d.data()})))),
+            
+            db.collection('companies').onSnapshot(s => setCompanies(s.docs.map(d => ({id:d.id, ...d.data()})))),
+            db.collection('products').onSnapshot(s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()})))),
+            db.collection('sponsorships').onSnapshot(s => setSps(s.docs.map(d => ({id:d.id, ...d.data()})))),
+            db.collection('sales').orderBy('date', 'desc').limit(50).onSnapshot(s => setSales(s.docs.map(d => d.data()))),
+            
+            // Adicionei a vírgula aqui no final da linha de news
+            db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => { 
+                const list = s.docs.map(d => ({id:d.id, ...d.data()})); 
+                setNews(list); 
+                const lastRead = localStorage.getItem('lastRead'); 
+                if (list.length && (!lastRead || list[0].date > parseInt(lastRead))) setNewNews(true); 
+                setLoading(false); 
+            }),
+
+            // LISTENER DE TÉCNICOS (Adicionado Corretamente)
+            db.collection('users').where('type', '==', 'COACH').onSnapshot(snap => {
+                // Importante: Adicionei {id: d.id, ...} para garantir que o ID venha certo para exclusão
+                setCoaches(snap.docs.map(d => ({id: d.id, ...d.data()})));
+            })
+        ];
+
+        return () => unsubs.forEach(u => u());
+    }, []);
 
             useEffect(() => {
                 let unsubOffers = () => {};
@@ -399,14 +445,71 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
             const loginAdmin = () => { setUser({ type: 'ADMIN', data: { id: 'admin', name: 'FEDERAÇÃO (ADM)', balance: 0, logo: null, stadiumLevel: 1, serie: 'ADM' } }); setScreen('HOME'); };
 
             const createTeam = async (name, bal, serie, pass, logo) => { if(teams.find(t=>t.name.toLowerCase()===name.toLowerCase())) return alert("Nome em uso!"); await db.collection('teams').add({ name, balance: parseFloat(bal), serie, password: pass, stadiumLevel: 1, logo: logo||null, status: 'PENDING' }); alert("Criado! Aguarde aprovação."); };
+// --- FUNÇÃO PARA CRIAR TÉCNICO (App.js) ---
+    const createCoach = async (data) => {
+        setLoading(true);
+        try {
+            // Gera um ID único
+            const newId = `coach_${Date.now()}`;
+            
+            await db.collection('users').doc(newId).set({
+                id: newId,
+                name: data.name,
+                password: data.password,
+                type: 'COACH',         // Tipo específico
+                level: 1,              // Começa Nível 1
+                xp: 0,
+                salary: 2500,          // Salário base
+                affinities: [data.affinity], // Array com a 1ª afinidade
+                pendingPerks: 0,
+                pendingAffinity: 0,
+                teamId: 'FREE',        // Começa sem time
+                status: 'PENDING',     // Precisa de aprovação
+                trainingsLeft: 2,      // 2 Treinos semanais
+                clause: 50000,         // Multa rescisória base
+                perks: [],             // Lista de poderes vazia
+                createdAt: Date.now()
+            });
 
+            alert(`Licença solicitada!\nSeu ID de acesso: ${newId}\nAguarde aprovação da Federação.`);
+            window.location.reload();
+        } catch (error) {
+            console.error(error);
+            alert("Erro ao criar técnico.");
+            setLoading(false);
+        }
+    };
+            
             const createNewspaper = async (name, pass, owner) => { await db.collection('newspapers').add({ name, password: pass, ownerName: owner, status: 'PENDING' }); alert("Jornal criado! Aguarde Federação."); };
 
             const createJournalist = async (name, pass, paperId) => { await db.collection('journalists').add({ name, password: pass, newspaperId: paperId, status: 'PENDING' }); alert("Conta criada! Aguarde seu Chefe."); };
 
 // FIM DAS FUNÇÕES DE CRIAÇÃO E ACESSO ADMIN
 // --- COLE ISSO DENTRO DA FUNCTION APP(), ANTES DO RETURN ---
+// --- FUNÇÃO DE CONTRATAR TÉCNICO ---
+    const handleHireCoach = async (coach) => {
+        if (!user.data || user.type !== 'USER') return alert("Apenas presidentes podem contratar!");
+        
+        if (confirm(`Contratar ${coach.name} por ${fmt(coach.salary)} semanais?`)) {
+            const team = user.data;
+            if (team.balance < coach.salary) return alert("Saldo insuficiente para o primeiro salário/luvas!");
+            
+            const b = db.batch();
+            
+            // Atualiza o Técnico (Sai de FREE para o ID do time)
+            b.update(db.collection('users').doc(coach.id), {
+                teamId: team.id
+            });
+            
+            // Debita 1ª semana do time
+            b.update(db.collection('teams').doc(team.id), {
+                balance: team.balance - coach.salary
+            });
 
+            await b.commit();
+            alert(`Bem-vindo, ${coach.name}!`);
+        }
+    };
         const adminAction = async (act, data) => {
             if (act === 'MARKET') {
                 db.collection('config').doc('system').update({ marketOpen: data });
@@ -489,7 +592,7 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
                 setLoading(false);
             }
 
-            // --- VIRADA DE TEMPORADA (ATRIBUTOS REALISTAS v1.54.4) ---
+            // --- VIRADA DE TEMPORADA (ATRIBUTOS REALISTAS v1.54.5) ---
             if (act === 'SEASON') {
                 if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Atributos (XP)\n2. Envelhecer Contratos\n3. Processar Retornos")) return;
 
@@ -746,76 +849,144 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
 
 // --- COMPONENTS QUE FICAM FORA DO APP ---
 
-const AdminPanel = ({ onReset, onUpdateCompBal, teams, papers, journalists, companies, reqs, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onConfig, onApprovePaper, onDeletePaper, onDeleteJourno, onRejectPaper, onApproveComp, onDeleteComp, onGenAttrs }) => (
-    <div>
-        <h3>Painel Master</h3>
-        <div className="card" style={{border: '1px solid var(--danger)'}}>
-            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10}}>
-                <button className={`btn ${config.marketOpen?'btn-red':'btn-green'}`} onClick={()=>onAct('MARKET', !config.marketOpen)}>{config.marketOpen?'FECHAR MERCADO':'ABRIR MERCADO'}</button>
-                <button className="btn btn-purple" onClick={()=>onAct('WEEK')}>VIRAR SEMANA</button>
+const AdminPanel = ({ teams, papers, journalists, companies, coaches, reqs, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onApprovePaper, onDeletePaper, onDeleteJourno, onRejectPaper, onConfig, onReset, onApproveComp, onDeleteComp, onUpdateCompBal, onGenAttrs }) => {
+    const [tab, setTab] = useState('DASH');
+
+    return (
+        <div>
+            <h2>Painel Administrativo</h2>
+            <div style={{display:'flex', gap:10, marginBottom:20, overflowX:'auto'}}>
+                <button className="btn" onClick={()=>setTab('DASH')}>Geral</button>
+                <button className="btn" onClick={()=>setTab('TEAMS')}>Times</button>
+                <button className="btn" onClick={()=>setTab('FINANCE')}>Finanças</button>
+                <button className="btn" onClick={()=>setTab('PRESS')}>Imprensa</button>
+                <button className="btn" onClick={()=>setTab('COMP')}>Empresas</button>
+                <button className="btn" style={{border:'1px solid gold', color:'gold'}} onClick={()=>setTab('COACH')}>Técnicos</button>
             </div>
-            <button className="btn btn-red" onClick={()=>onAct('SEASON')}>VIRAR TEMPORADA</button>
-            <button className="btn btn-gold" onClick={()=>{ const t=prompt("Título"); const b=prompt("Texto"); if(t)onPost(t,b,'admin'); }}>COMUNICADO</button>
-            
-            {/* NOVO BOTÃO DE MANUTENÇÃO DE ATRIBUTOS */}
-            <button className="btn" style={{background:'#333', border:'1px solid #666', marginTop:10}} onClick={onGenAttrs}>
-                🎲 GERAR ATRIBUTOS (ALL)
-            </button>
-            
-            <button 
-                className="btn" 
-                style={{background: 'black', color: 'red', border: '1px solid red', marginTop: 15}} 
-                onClick={onReset}
-            >
-                <i className="fas fa-bomb"></i> RESETAR TODO O GAME
-            </button>
+
+            {/* ABA DE TÉCNICOS (NOVO) */}
+            {tab === 'COACH' && (
+                <div>
+                    <h3>Técnicos Pendentes</h3>
+                    {(coaches||[]).filter(c => c.status === 'PENDING').length === 0 && <p style={{color:'#666'}}>Nenhuma solicitação.</p>}
+                    {(coaches||[]).filter(c => c.status === 'PENDING').map(c => (
+                        <div key={c.id} className="card" style={{borderLeft:'4px solid gold'}}>
+                            <div style={{display:'flex', justifyContent:'space-between'}}>
+                                <span><b>{c.name}</b> (Nível {c.level})</span>
+                                <small>Esp: {c.affinities[0]}</small>
+                            </div>
+                            <div style={{marginTop:10, display:'flex', gap:5}}>
+                                <button className="btn btn-green" onClick={async()=>{
+                                    await db.collection('users').doc(c.id).update({ status: 'ACTIVE' });
+                                    alert("Técnico Aprovado!");
+                                }}>APROVAR</button>
+                                <button className="btn btn-red" onClick={async()=>{
+                                    if(confirm("Rejeitar?")) await db.collection('users').doc(c.id).delete();
+                                }}>REJEITAR</button>
+                            </div>
+                        </div>
+                    ))}
+                    <hr style={{borderColor:'#333'}}/>
+                    <h3>Técnicos Ativos</h3>
+                    {(coaches||[]).filter(c => c.status === 'ACTIVE').map(c => (
+                        <div key={c.id} className="card">
+                            {c.name} - {c.teamId === 'FREE' ? <span style={{color:'lime'}}>Livre</span> : <span style={{color:'#666'}}>Contratado</span>}
+                            <button className="btn btn-red" style={{fontSize:9, width:'auto', marginLeft:10}} onClick={async()=>{
+                                if(prompt("Digite DELETE para excluir:") === "DELETE") await db.collection('users').doc(c.id).delete();
+                            }}>X</button>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {tab==='DASH' && <div>
+                <div className="card" style={{border: '1px solid var(--danger)'}}>
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10}}>
+                        <button className={`btn ${config.marketOpen?'btn-red':'btn-green'}`} onClick={()=>onAct('MARKET', !config.marketOpen)}>{config.marketOpen?'FECHAR MERCADO':'ABRIR MERCADO'}</button>
+                        <button className="btn btn-purple" onClick={()=>onAct('WEEK')}>VIRAR SEMANA</button>
+                    </div>
+                    <button className="btn btn-red" onClick={()=>onAct('SEASON')}>VIRAR TEMPORADA</button>
+                    <button className="btn btn-gold" onClick={()=>{ const t=prompt("Título"); const b=prompt("Texto"); if(t)onPost(t,b,'admin'); }}>COMUNICADO</button>
+                    
+                    {/* NOVO BOTÃO DE MANUTENÇÃO DE ATRIBUTOS */}
+                    <button className="btn" style={{background:'#333', border:'1px solid #666', marginTop:10}} onClick={onGenAttrs}>
+                        🎲 GERAR ATRIBUTOS (ALL)
+                    </button>
+                    
+                    <button 
+                        className="btn" 
+                        style={{background: 'black', color: 'red', border: '1px solid red', marginTop: 15}} 
+                        onClick={onReset}
+                    >
+                        <i className="fas fa-bomb"></i> RESETAR TODO O GAME
+                    </button>
+                </div>
+            </div>}
+
+            {tab==='TEAMS' && <div>
+                {(teams||[]).some(t=>t.status==='PENDING') && <h4>Times Pendentes</h4>}
+                {(teams||[]).filter(t=>t.status==='PENDING').map(t=><div key={t.id} className="card" style={{borderLeft:'4px solid var(--warning)'}}><b>{t.name}</b><div style={{display:'flex', gap:5}}><input className="input-field" style={{marginBottom:0, width:100}} defaultValue={t.balance} id={`bal-${t.id}`} /><button className="btn btn-green" onClick={()=>onApproveTeam(t.id, document.getElementById(`bal-${t.id}`).value)}>V</button><button className="btn btn-red" onClick={()=>onDeleteTeam(t.id)}>X</button></div></div>)}
+                
+                <h4>Clubes</h4>
+                {(teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>{t.name}</span><div><button className="btn btn-ghost" style={{width:'auto', marginRight:5}} onClick={()=>onConfig(t)}><i className="fas fa-cog"></i></button><button className="btn btn-green" style={{width:'auto', marginRight:5}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button><button className="btn btn-purple" style={{width:'auto'}} onClick={()=>onEditT(t)}>ELENCO</button><button className="btn btn-red" style={{width:'auto', marginLeft:5}} onClick={()=>onDeleteTeam(t.id)}><i className="fas fa-trash"></i></button></div></div>)}
+            </div>}
+
+            {tab==='FINANCE' && <div>
+                <h4>Solicitações Financeiras</h4>
+                {(reqs||[]).filter(r=>r.status==='PENDING').map(r=><div key={r.id} className="card"><b>{r.teamName}</b>: {fmt(r.amount)} ({r.type})<br/>{r.details}<br/><button className="btn-green" style={{width:'auto', marginRight:5}} onClick={()=>onApprove(r)}>V</button><button className="btn-red" style={{width:'auto'}} onClick={()=>onReject(r.id)}>X</button></div>)}
+            </div>}
+
+            {tab==='PRESS' && <div>
+                {(papers||[]).some(p=>p.status==='PENDING') && <h4>Jornais Pendentes</h4>}
+                {(papers||[]).filter(p=>p.status==='PENDING').map(p=><div key={p.id} className="card"><b>📰 {p.name}</b><br/><small>Dono: {p.ownerName}</small><button className="btn btn-green" onClick={()=>onApprovePaper(p.id)}>APROVAR</button><button className="btn btn-red" style={{marginLeft:5}} onClick={()=>onRejectPaper(p.id)}>X</button></div>)}
+                
+                <h4>Gestão de Imprensa</h4>
+                {(papers||[]).filter(p=>p.status==='ACTIVE').map(p=><div key={p.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>📰 {p.name}</span><button className="btn btn-red" style={{width:'auto'}} onClick={()=>onDeletePaper(p.id)}>X</button></div>)}
+                {(journalists||[]).map(j=><div key={j.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>✒️ {j.name}</span><button className="btn btn-red" style={{width:'auto'}} onClick={()=>onDeleteJourno(j.id)}>X</button></div>)}
+            </div>}
+
+            {tab==='COMP' && <div>
+                {(companies||[]).some(c=>c.status==='PENDING') && <h4>Empresas Pendentes</h4>}
+                {(companies||[]).filter(c=>c.status==='PENDING').map(c => (
+                    <div key={c.id} className="card" style={{borderLeft:'4px solid var(--purple)'}}>
+                        <b>{c.name}</b> ({(COMPANY_TYPES[c.companyType] || {}).label || 'Tipo Desconhecido'})<br/>
+                        Dono: {c.owner}
+                        <div style={{display:'flex', gap:5, marginTop:5}}>
+                            <button className="btn btn-green" onClick={()=>onApproveComp(c.id)}>APROVAR</button>
+                            <button className="btn btn-red" onClick={()=>onDeleteComp(c.id)}>X</button>
+                        </div>
+                    </div>
+                ))}
+
+                <h4>Gestão de Empresas</h4>
+                {(companies||[]).filter(c=>c.status!=='PENDING').map(c => (
+                    <div key={c.id} className="card">
+                        <b>{c.name}</b> {c.status==='BLOCKED' && <span style={{color:'red'}}>(BLOQUEADA)</span>}<br/>
+                        Saldo: {fmt(c.balance)}
+                        <div style={{display:'flex', gap:5, marginTop:5}}>
+                            <button className="btn btn-green" onClick={()=>{
+                                const n = prompt("Novo Saldo da Empresa:", c.balance); 
+                                if(n !== null) onUpdateCompBal(c.id, n);
+                            }}>$</button>
+                            <button className="btn btn-red" onClick={()=>onDeleteComp(c.id)}>EXCLUIR</button>
+                        </div>
+                    </div>
+                ))}
+            </div>}
         </div>
+    );
+};
+// 1. Adicione o Estado dos Técnicos
+    const [coaches, setCoaches] = useState([]);
 
-        {(companies||[]).some(c=>c.status==='PENDING') && <h4>Empresas Pendentes</h4>}
-        {(companies||[]).filter(c=>c.status==='PENDING').map(c => (
-            <div key={c.id} className="card" style={{borderLeft:'4px solid var(--purple)'}}>
-                <b>{c.name}</b> ({(COMPANY_TYPES[c.companyType] || {}).label || 'Tipo Desconhecido'})<br/>
-                Dono: {c.owner}
-                <div style={{display:'flex', gap:5, marginTop:5}}>
-                    <button className="btn btn-green" onClick={()=>onApproveComp(c.id)}>APROVAR</button>
-                    <button className="btn btn-red" onClick={()=>onDeleteComp(c.id)}>X</button>
-                </div>
-            </div>
-        ))}
-
-        <h4>Gestão de Empresas</h4>
-        {(companies||[]).filter(c=>c.status!=='PENDING').map(c => (
-            <div key={c.id} className="card">
-                <b>{c.name}</b> {c.status==='BLOCKED' && <span style={{color:'red'}}>(BLOQUEADA)</span>}<br/>
-                Saldo: {fmt(c.balance)}
-                <div style={{display:'flex', gap:5, marginTop:5}}>
-                    <button className="btn btn-green" onClick={()=>{
-                        const n = prompt("Novo Saldo da Empresa:", c.balance); 
-                        if(n !== null) onUpdateCompBal(c.id, n);
-                    }}>$</button>
-                    <button className="btn btn-red" onClick={()=>onDeleteComp(c.id)}>EXCLUIR</button>
-                </div>
-            </div>
-        ))}
-
-        {(teams||[]).some(t=>t.status==='PENDING') && <h4>Times Pendentes</h4>}
-        {(teams||[]).filter(t=>t.status==='PENDING').map(t=><div key={t.id} className="card" style={{borderLeft:'4px solid var(--warning)'}}><b>{t.name}</b><div style={{display:'flex', gap:5}}><input className="input-field" style={{marginBottom:0, width:100}} defaultValue={t.balance} id={`bal-${t.id}`} /><button className="btn btn-green" onClick={()=>onApproveTeam(t.id, document.getElementById(`bal-${t.id}`).value)}>V</button><button className="btn btn-red" onClick={()=>onDeleteTeam(t.id)}>X</button></div></div>)}
-        
-        {(papers||[]).some(p=>p.status==='PENDING') && <h4>Jornais Pendentes</h4>}
-        {(papers||[]).filter(p=>p.status==='PENDING').map(p=><div key={p.id} className="card"><b>📰 {p.name}</b><br/><small>Dono: {p.ownerName}</small><button className="btn btn-green" onClick={()=>onApprovePaper(p.id)}>APROVAR</button><button className="btn btn-red" style={{marginLeft:5}} onClick={()=>onRejectPaper(p.id)}>X</button></div>)}
-        
-        <h4>Gestão de Imprensa</h4>
-        {(papers||[]).filter(p=>p.status==='ACTIVE').map(p=><div key={p.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>📰 {p.name}</span><button className="btn btn-red" style={{width:'auto'}} onClick={()=>onDeletePaper(p.id)}>X</button></div>)}
-        {(journalists||[]).map(j=><div key={j.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>✒️ {j.name}</span><button className="btn btn-red" style={{width:'auto'}} onClick={()=>onDeleteJourno(j.id)}>X</button></div>)}
-        
-        <h4>Solicitações Financeiras</h4>
-        {(reqs||[]).filter(r=>r.status==='PENDING').map(r=><div key={r.id} className="card"><b>{r.teamName}</b>: {fmt(r.amount)} ({r.type})<br/>{r.details}<br/><button className="btn-green" style={{width:'auto', marginRight:5}} onClick={()=>onApprove(r)}>V</button><button className="btn-red" style={{width:'auto'}} onClick={()=>onReject(r.id)}>X</button></div>)}
-        
-        <h4>Clubes</h4>
-        {(teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>{t.name}</span><div><button className="btn btn-ghost" style={{width:'auto', marginRight:5}} onClick={()=>onConfig(t)}><i className="fas fa-cog"></i></button><button className="btn btn-green" style={{width:'auto', marginRight:5}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button><button className="btn btn-purple" style={{width:'auto'}} onClick={()=>onEditT(t)}>ELENCO</button><button className="btn btn-red" style={{width:'auto', marginLeft:5}} onClick={()=>onDeleteTeam(t.id)}><i className="fas fa-trash"></i></button></div></div>)}
-    </div>
-);
-
+    // 2. Adicione o useEffect para carregar eles (Cole logo abaixo dos outros useEffects)
+    useEffect(() => {
+        const unsub = db.collection('users').where('type', '==', 'COACH').onSnapshot(snap => {
+            setCoaches(snap.docs.map(d => d.data()));
+        });
+        return () => unsub();
+    }, []);
+            //FIM 
 const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => {
     const [form, setF] = useState({name: team.name, logo: team.logo, balance: team.balance, serie: team.serie});
     useEffect(() => { setF({name: team.name, logo: team.logo, balance: team.balance, serie: team.serie}); }, [team]);
@@ -858,6 +1029,97 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
                     alert("Erro ao salvar jogador: " + e.message);
                 }
             };
+            // --- LÓGICA DO TÉCNICO (Cole isso dentro da function App) ---
+
+    const handleCoachTrain = async (playerIds, type) => {
+        const currentCoach = user.data;
+        const xpBase = 30; 
+        // Se tiver o perk RECUPERACAO, gasta menos energia
+        const hasRec = (currentCoach.perks || []).some(p => p.id === 'RECUPERACAO');
+        const energyCost = hasRec ? 6 : 8; 
+        
+        const b = db.batch();
+        let coachXpGain = 0;
+
+        playerIds.forEach(pid => {
+            const p = players.find(x => x.id === pid);
+            if (!p) return;
+
+            let xpGain = xpBase + (currentCoach.level * 2); // Base + Nível
+            
+            // Bônus de Afinidade (+10)
+            if ((currentCoach.affinities || []).includes(p.position)) xpGain += 10;
+
+            const newXp = (p.xp || 0) + xpGain;
+            const newEnergy = Math.max(0, (p.energy || 100) - energyCost);
+            
+            b.update(db.collection('players').doc(pid), { xp: newXp, energy: newEnergy });
+            coachXpGain += 15;
+        });
+
+        // Evolução do Técnico
+        let newCoachXp = (currentCoach.xp || 0) + coachXpGain;
+        let newLevel = currentCoach.level;
+        let pendingPerks = currentCoach.pendingPerks || 0;
+        let pendingAffinity = currentCoach.pendingAffinity || 0;
+        
+        const xpNeed = newLevel * 100;
+        if (newCoachXp >= xpNeed && newLevel < 30) {
+            newCoachXp -= xpNeed;
+            newLevel++;
+            if (newLevel % 5 === 0) pendingPerks++;
+            if ([10, 20, 30].includes(newLevel)) pendingAffinity++;
+            alert(`🎉 PARABÉNS! Nível ${newLevel} alcançado!`);
+        }
+
+        b.update(db.collection('users').doc(currentCoach.id), {
+            trainingsLeft: currentCoach.trainingsLeft - 1,
+            xp: newCoachXp,
+            level: newLevel,
+            pendingPerks,
+            pendingAffinity
+        });
+
+        await b.commit();
+        alert("Treino realizado!");
+    };
+
+    const handleEvolveCoachPerk = async (perk) => {
+        await db.collection('users').doc(user.data.id).update({
+            perks: firebase.firestore.FieldValue.arrayUnion(perk),
+            pendingPerks: firebase.firestore.FieldValue.increment(-1)
+        });
+        alert(`Habilidade "${perk.name}" aprendida!`);
+    };
+            //FIM
+            // --- FUNÇÃO PARA CONTRATAR TÉCNICO ---
+    const handleHireCoach = async (coach) => {
+        if (!user.data || user.type !== 'USER') return alert("Apenas presidentes podem contratar!");
+        
+        // Verifica se o time tem dinheiro
+        const team = user.data;
+        if (team.balance < coach.salary) return alert("Saldo insuficiente para pagar as luvas (1º salário)!");
+        
+        if (confirm(`Contratar ${coach.name}?\nCusto Imediato: ${fmt(coach.salary)}`)) {
+            const b = db.batch();
+            
+            // 1. Se o time já tiver técnico, demite o antigo (opcional, mas recomendado para não ter 2)
+            const currentCoach = coaches.find(c => c.teamId === team.id && c.status === 'ACTIVE');
+            if (currentCoach) {
+                b.update(db.collection('users').doc(currentCoach.id), { teamId: 'FREE' });
+            }
+
+            // 2. Contrata o novo
+            b.update(db.collection('users').doc(coach.id), { teamId: team.id });
+            
+            // 3. Paga o salário/luvas
+            b.update(db.collection('teams').doc(team.id), { balance: team.balance - coach.salary });
+
+            await b.commit();
+            alert(`Sucesso! ${coach.name} é o novo técnico do ${team.name}!`);
+        }
+    };
+            //FIM
 
 // FIM DA GESTÃO ADMINISTRATIVA E SALVAR JOGADOR
 
@@ -1389,10 +1651,10 @@ const renewContract = async (p) => {
             };
             
             // 3. Função Mestra do Admin (COM REGRA DE AGENTES LIVRES)
-     // 3. Função Mestra do Admin (COM REGRA DE AGENTES LIVRES E RETORNO CORRIGIDO)
-         // --- RENDER ---
+     
+           // --- RENDER ---
             if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
-            if(!user) return <LoginScreen teams={teams} players={players} papers={papers} journalists={journalists} companies={companies} onLogin={login} onCreateTeam={createTeam} onCreatePaper={createNewspaper} onCreateJourno={createJournalist} onCreateCompany={createCompany} onAdmin={loginAdmin} onVisitor={()=>{setUser({type:'VISITOR'}); setScreen('RANKING');}} />;
+            if(!user) return <LoginScreen teams={teams} players={players} papers={papers} journalists={journalists} companies={companies} onLogin={login} onCreateTeam={createTeam} onCreatePaper={createNewspaper} onCreateJourno={createJournalist} onCreateCompany={createCompany} onAdmin={loginAdmin} onVisitor={()=>{setUser({type:'VISITOR'}); setScreen('RANKING');}} onCreateCoach={createCoach} />;
 
             return (
                 <div>
@@ -1401,7 +1663,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.54.4</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.55</div>
                             </div>
                         </div>
                         
@@ -1434,9 +1696,9 @@ const renewContract = async (p) => {
                     </div>
 
                     <div className="container">
-                        {screen === 'HOME' && user.type === 'ADMIN' && 
+                       {screen === 'HOME' && user.type === 'ADMIN' && 
                             <AdminPanel 
-                                teams={teams} papers={papers} journalists={journalists} companies={companies} reqs={reqs} config={conf} onAct={adminAction} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{/*Fin*/}} onReject={(id)=>db.collection('financeRequests').doc(id).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam} onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} onDeletePaper={deletePaper} onDeleteJourno={deleteJournalist} onRejectPaper={(id)=>db.collection('newspapers').doc(id).delete()} onConfig={(t)=>setModal({type:'SETTINGS', data:t})} onReset={resetDatabase} onApproveComp={async(id)=>{await db.collection('companies').doc(id).update({status:'ACTIVE'}); alert("Empresa Aprovada!");}} onDeleteComp={async(id)=>{if(confirm("Excluir Empresa?")) await db.collection('companies').doc(id).delete();}} onUpdateCompBal={async(id, val)=>{ await db.collection('companies').doc(id).update({balance: parseFloat(val)}); alert("Saldo Alterado!"); }}
+                                teams={teams} papers={papers} journalists={journalists} companies={companies} reqs={reqs} config={conf} coaches={coaches} onAct={adminAction} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{/*Fin*/}} onReject={(id)=>db.collection('financeRequests').doc(id).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam} onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} onDeletePaper={deletePaper} onDeleteJourno={deleteJournalist} onRejectPaper={(id)=>db.collection('newspapers').doc(id).delete()} onConfig={(t)=>setModal({type:'SETTINGS', data:t})} onReset={resetDatabase} onApproveComp={async(id)=>{await db.collection('companies').doc(id).update({status:'ACTIVE'}); alert("Empresa Aprovada!");}} onDeleteComp={async(id)=>{if(confirm("Excluir Empresa?")) await db.collection('companies').doc(id).delete();}} onUpdateCompBal={async(id, val)=>{ await db.collection('companies').doc(id).update({balance: parseFloat(val)}); alert("Saldo Alterado!"); }}
                                 onGenAttrs={async () => {
                                     if(!confirm("Isso vai gerar atributos para TODOS os jogadores que não têm. Continuar?")) return;
                                     setLoading(true);
@@ -1481,14 +1743,16 @@ const renewContract = async (p) => {
                         
                         {screen === 'ADMIN_TEAM' && adminTeam && <div><button className="btn" style={{background:'#333', marginBottom:10}} onClick={()=>{setAdminTeam(null); setScreen('HOME');}}>⬅ VOLTAR</button><h3 style={{color:'var(--purple)'}}>Editando: {adminTeam.name}</h3><TeamDashboard team={adminTeam} players={players.filter(p=>p.teamId===adminTeam.id)} isVisitor={false} onEdit={(p)=>setModal({type:'PLAYER', data:p})} onAdd={()=>setModal({type:'PLAYER', data: { teamId: adminTeam.id } })} /></div>}
                         
-                        {screen === 'MARKET' && (
+                       {screen === 'MARKET' && (
                             <Market 
                                 me={user.data?.id} 
                                 teams={teams} 
                                 players={players} 
+                                coaches={coaches} // <--- ADICIONADO: Lista de técnicos
                                 open={conf.marketOpen} 
                                 isVis={user.type === 'VISITOR'} 
                                 onNeg={(p) => setModal({ type: 'OFFER', data: p })} 
+                                onHireCoach={handleHireCoach} // <--- ADICIONADO: Função de contratar
                                 onPayClause={async (p) => {
                                     const buy = teams.find(t => t.id === user.data.id);
                                     const sel = teams.find(t => t.id === p.teamId);
@@ -1553,14 +1817,32 @@ const renewContract = async (p) => {
                         {screen === 'PLAYER_DASH' && user.type === 'PLAYER' && 
                             <PlayerDashboard player={players.find(p=>p.id===user.data.id) || user.data} team={teams.find(t=>t.id===user.data.teamId)} sales={sales || []} onAction={handlePlayerActions} onUpdatePassword={async(newP)=>{ await db.collection('players').doc(user.data.id).update({password: newP}); alert("Senha alterada!"); }} />
                         }
+
+                        {/* --- NOVA TELA: PAINEL DO TÉCNICO --- */}
+                        {(screen === 'HOME' || screen === 'COACH_DASH') && user.type === 'COACH' && 
+                            <CoachDashboard 
+                                coach={user.data} 
+                                team={teams.find(t => t.id === user.data.teamId)} 
+                                players={players.filter(p => p.teamId === user.data.teamId)} 
+                                onTrain={handleCoachTrain} 
+                                onEvolvePerk={handleEvolveCoachPerk} 
+                                onAddAffinity={async (aff) => {
+                                    await db.collection('users').doc(user.data.id).update({
+                                        affinities: firebase.firestore.FieldValue.arrayUnion(aff),
+                                        pendingAffinity: firebase.firestore.FieldValue.increment(-1)
+                                    });
+                                    alert("Nova afinidade desbloqueada!");
+                                }}
+                            />
+                        }
                     </div>
 
                     <div className="bottom-nav">
-                        <div className={`nav-item ${['HOME','COMPANY_HOME','COMPANY_DASH','PLAYER_DASH'].includes(screen)?'active':''}`} onClick={() => { if(user.type.includes('PRESS')) setScreen('PRESS_DASH'); else if(user.type === 'COMPANY') setScreen('COMPANY_HOME'); else if(user.type === 'PLAYER') setScreen('PLAYER_DASH'); else setScreen('HOME'); }}>
+                        <div className={`nav-item ${['HOME','COMPANY_HOME','COMPANY_DASH','PLAYER_DASH','COACH_DASH'].includes(screen)?'active':''}`} onClick={() => { if(user.type.includes('PRESS')) setScreen('PRESS_DASH'); else if(user.type === 'COMPANY') setScreen('COMPANY_HOME'); else if(user.type === 'PLAYER') setScreen('PLAYER_DASH'); else if(user.type === 'COACH') setScreen('COACH_DASH'); else setScreen('HOME'); }}>
                             <i className="fas fa-home"></i>INÍCIO
                         </div>
-                        {user.type!=='COMPANY' && user.type!=='PLAYER' && <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>}
-                        {user.type!=='COMPANY' && <div className={`nav-item ${screen==='SHOPPING'?'active':''}`} onClick={()=>setScreen('SHOPPING')}><i className="fas fa-shopping-bag"></i>SHOP</div>}
+                        {user.type!=='COMPANY' && user.type!=='PLAYER' && user.type!=='COACH' && <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>}
+                        {user.type!=='COMPANY' && user.type!=='COACH' && <div className={`nav-item ${screen==='SHOPPING'?'active':''}`} onClick={()=>setScreen('SHOPPING')}><i className="fas fa-shopping-bag"></i>SHOP</div>}
                         {user.type==='USER' && <div className={`nav-item ${screen==='SPONSORSHIPS'?'active':''}`} onClick={()=>setScreen('SPONSORSHIPS')}><i className="fas fa-handshake"></i>PATRO</div>}
                         {user.type!=='COMPANY' && <div className={`nav-item ${screen==='RANKING'?'active':''}`} onClick={()=>setScreen('RANKING')}><i className="fas fa-trophy"></i>RANK</div>}
                         <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={()=>{setScreen('NEWS'); setNewNews(false); localStorage.setItem('lastRead', Date.now());}}><i className="fas fa-newspaper"></i>NEWS</div>
@@ -1581,9 +1863,54 @@ const renewContract = async (p) => {
             );
         }
 // FIM DO COMPONENTE APP
+// --- FORMULÁRIO DE CADASTRO DE TÉCNICO ---
+const CoachRegisterForm = ({ onCancel, onSave }) => {
+    const [name, setName] = useState('');
+    const [affinity, setAffinity] = useState('ATA'); // Começa com Ataque por padrão
+    const [password, setPassword] = useState('');
 
+    return (
+        <div className="modal-bg">
+            <div className="modal-content">
+                <h2 style={{color:'gold', textAlign:'center'}}>🎓 Licença de Treinador</h2>
+                <p style={{textAlign:'center', fontSize:12, color:'#ccc'}}>
+                    Comece sua carreira na beira do gramado.
+                </p>
+
+                <div className="card" style={{border:'1px solid gold', background:'rgba(255,215,0,0.05)', marginBottom:15}}>
+                    <div style={{display:'flex', justifyContent:'space-between', fontSize:12}}>
+                        <span>Nível Inicial: <b>1</b></span>
+                        <span>Salário Base: <b>{fmt(2500)}</b></span>
+                    </div>
+                </div>
+
+                <label>Nome do Técnico</label>
+                <input className="input-field" value={name} onChange={e=>setName(e.target.value)} placeholder="Ex: Guardiola do Sertão" />
+
+                <label>Senha de Acesso</label>
+                <input className="input-field" type="password" value={password} onChange={e=>setPassword(e.target.value)} />
+
+                <label>Especialidade Inicial (Afinidade)</label>
+                <p style={{fontSize:10, color:'#aaa', marginTop:-5}}>Seus treinos renderão +XP para jogadores desta posição.</p>
+                <select className="input-field" value={affinity} onChange={e=>setAffinity(e.target.value)}>
+                    {COACH_AFFINITIES.map(a => (
+                        <option key={a} value={a}>{a} - Especialista</option>
+                    ))}
+                </select>
+
+                <div style={{display:'flex', gap:10, marginTop:15}}>
+                    <button className="btn btn-gold" onClick={() => {
+                        if(!name || !password) return alert("Preencha tudo!");
+                        onSave({ name, password, affinity });
+                    }}>SOLICITAR LICENÇA</button>
+                    <button className="btn" onClick={onCancel}>CANCELAR</button>
+                </div>
+            </div>
+        </div>
+    );
+};
 // --- COMPONENTS ---
-        const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor }) => {
+        const LoginScreen = ({ teams, players, papers, journalists, companies, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor, onCreateCoach }) => {
             const [tab, setTab] = useState('LOGIN'); 
             const [subTab, setSubTab] = useState('TEAM'); 
             const [f, setF] = useState({n:'', b:'10000000', s:'A', p:''}); 
@@ -1592,22 +1919,26 @@ const renewContract = async (p) => {
             const [selPaper, setSelPaper] = useState(null); 
             const [selTeamForPlayer, setSelTeamForPlayer] = useState(null); 
             const [lp, setLp] = useState('');
+            
+            // --- NOVO: Estados para criação de técnico ---
+            const [coachData, setCoachData] = useState({ name: '', password: '', affinity: 'ATA' });
 
             const handleUpload = (e) => { const file=e.target.files[0]; const reader=new FileReader(); reader.onloadend=()=>setF({...f, l:reader.result}); if(file) reader.readAsDataURL(file); };
             
-            // Variável auxiliar para pegar os dados do tipo selecionado
             const selectedTypeInfo = COMPANY_TYPES[fc.type] || {};
 
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis |v1.54.4</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.55</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
                         <div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR TIME</div>
                         <div className={`tab ${tab==='PRESS'?'active':''}`} onClick={()=>setTab('PRESS')}>IMPRENSA</div>
                         <div className={`tab ${tab==='COMPANY'?'active':''}`} onClick={()=>setTab('COMPANY')}>EMPRESAS</div>
+                        {/* NOVO: Aba de Técnico */}
+                        <div className={`tab ${tab==='COACH'?'active':''}`} onClick={()=>setTab('COACH')}>TÉCNICO</div>
                     </div>
 
                     {tab==='LOGIN' && <div>
@@ -1620,43 +1951,41 @@ const renewContract = async (p) => {
                         {subTab==='TEAM' && (teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}
                         
                         {subTab==='PLAYER' && !selTeamForPlayer && <div>
-    <p style={{color:'#aaa'}}>Selecione o clube onde você joga ou acesse como livre:</p>
-    
-    {/* BOTÃO PARA AGENTES LIVRES (FREE) */}
-    <div 
-        className="card" 
-        onClick={() => setSelTeamForPlayer({ id: 'FREE', name: 'Agentes Livres' })} 
-        style={{cursor:'pointer', border: '1px solid var(--warning)', background: 'rgba(255, 196, 0, 0.1)'}}
-    >
-        <b style={{color: 'var(--warning)'}}>🆓 BUSCAR MEU PERFIL (AGENTE LIVRE)</b>
-    </div>
+                            <p style={{color:'#aaa'}}>Selecione o clube onde você joga ou acesse como livre:</p>
+                            
+                            <div 
+                                className="card" 
+                                onClick={() => setSelTeamForPlayer({ id: 'FREE', name: 'Agentes Livres' })} 
+                                style={{cursor:'pointer', border: '1px solid var(--warning)', background: 'rgba(255, 196, 0, 0.1)'}}
+                            >
+                                <b style={{color: 'var(--warning)'}}>🆓 BUSCAR MEU PERFIL (AGENTE LIVRE)</b>
+                            </div>
 
-    <hr style={{borderColor: '#333', margin: '15px 0'}} />
+                            <hr style={{borderColor: '#333', margin: '15px 0'}} />
 
-    {(teams||[]).filter(t=>t.status!=='PENDING').map(t=>(
-        <div key={t.id} className="card" onClick={()=>setSelTeamForPlayer(t)} style={{cursor:'pointer'}}>
-            <b>{t.name}</b>
-        </div>
-    ))}
-</div>}
+                            {(teams||[]).filter(t=>t.status!=='PENDING').map(t=>(
+                                <div key={t.id} className="card" onClick={()=>setSelTeamForPlayer(t)} style={{cursor:'pointer'}}>
+                                    <b>{t.name}</b>
+                                </div>
+                            ))}
+                        </div>}
 
-{subTab==='PLAYER' && selTeamForPlayer && <div>
-    <button className="btn" style={{marginBottom:10, background:'#333'}} onClick={()=>setSelTeamForPlayer(null)}>
-        ⬅ VOLTAR
-    </button>
-    <h4 style={{color:'var(--secondary)'}}>Jogadores - {selTeamForPlayer.name}:</h4>
-    
-    {/* Lista os jogadores do time selecionado OU os Agentes Livres */}
-    {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).length === 0 && 
-        <p style={{color:'#666'}}>Nenhum jogador encontrado aqui.</p>
-    }
-    
-    {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).map(p => (
-        <div key={p.id} className="card" onClick={()=>setSel({...p, type:'PLAYER'})} style={{cursor:'pointer', borderLeft:'4px solid var(--secondary)'}}>
-            👟 <b>{p.name}</b>
-        </div>
-    ))}
-</div>}
+                        {subTab==='PLAYER' && selTeamForPlayer && <div>
+                            <button className="btn" style={{marginBottom:10, background:'#333'}} onClick={()=>setSelTeamForPlayer(null)}>
+                                ⬅ VOLTAR
+                            </button>
+                            <h4 style={{color:'var(--secondary)'}}>Jogadores - {selTeamForPlayer.name}:</h4>
+                            
+                            {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).length === 0 && 
+                                <p style={{color:'#666'}}>Nenhum jogador encontrado aqui.</p>
+                            }
+                            
+                            {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).map(p => (
+                                <div key={p.id} className="card" onClick={()=>setSel({...p, type:'PLAYER'})} style={{cursor:'pointer', borderLeft:'4px solid var(--secondary)'}}>
+                                    👟 <b>{p.name}</b>
+                                </div>
+                            ))}
+                        </div>}
 
                         {subTab==='COMPANY' && (companies||[]).filter(c=>c.status!=='PENDING').map(c=><div key={c.id} className="card" onClick={()=>setSel({...c, type:'COMPANY'})} style={{cursor:'pointer', borderLeft:'4px solid var(--purple)'}}>🏢 <b>{c.name}</b><br/><small>{(c.companyType)}</small></div>)}
                         
@@ -1700,11 +2029,37 @@ const renewContract = async (p) => {
                         <input className="input-field" type="number" placeholder="Senha de Acesso" value={fc.p} onChange={e=>setFC({...fc, p:e.target.value})} />
                         <button className="btn btn-purple" onClick={()=>onCreateCompany(fc)}>SOLICITAR ABERTURA</button>
                     </div>}
+
+                    {/* --- NOVO BLOCO: ABA TÉCNICO --- */}
+                    {tab==='COACH' && <div>
+                        <h3 style={{color:'gold'}}>🎓 Licença de Treinador</h3>
+                        <p style={{fontSize:12, color:'#aaa'}}>Inicie sua carreira como técnico de futebol.</p>
+                        
+                        <div className="card" style={{border:'1px solid gold', background:'rgba(255,215,0,0.05)', marginBottom:15}}>
+                            <div style={{display:'flex', justifyContent:'space-between', fontSize:12}}>
+                                <span>Nível Inicial: <b>1</b></span>
+                                <span>Salário Base: <b>{fmt(2500)}</b></span>
+                            </div>
+                        </div>
+
+                        <input className="input-field" value={coachData.name} onChange={e=>setCoachData({...coachData, name:e.target.value})} placeholder="Nome do Técnico" />
+                        <input className="input-field" type="password" value={coachData.password} onChange={e=>setCoachData({...coachData, password:e.target.value})} placeholder="Senha de Acesso" />
+
+                        <label style={{textAlign:'left', display:'block', color:'#aaa', fontSize:12}}>Especialidade Inicial</label>
+                        <select className="input-field" value={coachData.affinity} onChange={e=>setCoachData({...coachData, affinity:e.target.value})}>
+                            {COACH_AFFINITIES.map(a => (
+                                <option key={a} value={a}>{a} - Especialista</option>
+                            ))}
+                        </select>
+
+                        <button className="btn btn-gold" onClick={() => onCreateCoach(coachData)}>SOLICITAR LICENÇA</button>
+                    </div>}
                     
                     {sel && <div className="modal-overlay"><div className="modal-content"><h3>{sel.name}</h3><input className="input-field" type="password" placeholder="Senha" value={lp} onChange={e=>setLp(e.target.value)} /><button className="btn btn-green" onClick={()=>onLogin(sel.id, lp, sel.type)}>ENTRAR</button><button className="btn" onClick={()=>setSel(null)}>CANCELAR</button></div></div>}
                 </div>
             );
         };
+        //FIM
 
         const VisitorDashboard = ({ players, teams }) => {
             const topScorer = players.sort((a,b)=>(b.stats?.goals||0)-(a.stats?.goals||0))[0];
@@ -2225,11 +2580,26 @@ const renewContract = async (p) => {
         };
 // FIM DO STATS EDITOR E PLAYER FORM
 
-const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) => {
+const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, onPre, onHireCoach }) => {
     const [view, setView] = useState('MENU'); 
     const [serie, setSerie] = useState('A'); 
     const [selT, setSelT] = useState(null); 
     const [filt, setFilt] = useState('VENDA');
+
+    // Filtros de jogadores
+    let list = []; 
+    if(view==='GLOBAL') {
+        if(filt === 'FREE') {
+            list = players.filter(p => p.teamId === 'FREE' || !p.teamId).sort((a,b)=>b.overall-a.overall);
+        } else {
+            list = players.filter(p => p.status === filt && p.teamId !== me && p.teamId !== 'FREE').sort((a,b)=>b.overall-a.overall);
+        }
+    } else if(view==='TEAM' && selT) {
+        list = players.filter(p => p.teamId === selT.id).sort((a,b)=>b.overall-a.overall);
+    }
+    
+    // Filtro de técnicos livres
+    const availableCoaches = (coaches || []).filter(c => c.status === 'ACTIVE' && c.teamId === 'FREE');
 
     if(view==='MENU') return (
         <div>
@@ -2252,9 +2622,15 @@ const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) 
                 </div>
             </div>
 
+            {/* BOTÃO PARA TÉCNICOS */}
+            <div className="card" style={{textAlign:'center', cursor:'pointer', border:'2px solid gold', background:'rgba(255,215,0,0.1)', marginBottom:15}} onClick={()=>{setView('COACHES');}}>
+                <i className="fas fa-user-tie" style={{fontSize:20, marginBottom:5, color:'gold'}}></i><br/>
+                <span style={{fontSize:10, fontWeight:'bold'}}>CONTRATAR TÉCNICOS</span>
+            </div>
+
             <h4>Navegar por Séries</h4>
             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                {SERIES.map(s=>(
+                {['A','B','C','D'].map(s=>(
                     <div key={s} className="card" style={{textAlign:'center', cursor:'pointer', borderLeft:`4px solid var(--secondary)`}} onClick={()=>{setSerie(s); setView('LIST');}}>
                         <b>SÉRIE {s}</b>
                     </div>
@@ -2262,17 +2638,6 @@ const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) 
             </div>
         </div>
     );
-
-    let list = []; 
-    if(view==='GLOBAL') {
-        if(filt === 'FREE') {
-            list = players.filter(p => p.teamId === 'FREE' || !p.teamId).sort((a,b)=>b.overall-a.overall);
-        } else {
-            list = players.filter(p => p.status === filt && p.teamId !== me && p.teamId !== 'FREE').sort((a,b)=>b.overall-a.overall);
-        }
-    } else if(view==='TEAM') {
-        list = players.filter(p => p.teamId === selT.id).sort((a,b)=>b.overall-a.overall);
-    }
 
     if(view==='LIST') return (
         <div>
@@ -2290,6 +2655,42 @@ const Market = ({ me, teams, players, open, isVis, onNeg, onPayClause, onPre }) 
         </div>
     );
 
+    // --- VIEW DE TÉCNICOS ---
+    if(view==='COACHES') return (
+        <div>
+            <button className="btn btn-ghost" style={{marginBottom:15, width:'auto'}} onClick={()=>setView('MENU')}>
+                <i className="fas fa-chevron-left"></i> VOLTAR
+            </button>
+            <h3>Técnicos Livres</h3>
+            
+            {availableCoaches.length === 0 && <p style={{textAlign:'center', color:'#666'}}>Nenhum técnico disponível no momento.</p>}
+
+            <div style={{display:'grid', gridTemplateColumns:'1fr', gap:10}}>
+                {availableCoaches.map(c => (
+                    <div key={c.id} className="card" style={{borderLeft:'4px solid gold'}}>
+                        <div style={{display:'flex', justifyContent:'space-between'}}>
+                            <b>{c.name}</b>
+                            <span style={{color:'gold', fontWeight:'bold'}}>★ Nível {c.level}</span>
+                        </div>
+                        <div style={{fontSize:12, color:'#aaa', margin:'5px 0'}}>
+                            Especialidade: <b style={{color:'#fff'}}>{c.affinities[0]}</b>
+                        </div>
+                        <div style={{fontSize:12, fontWeight:'bold', color:'var(--primary)', marginBottom:10}}>
+                            Salário Semanal: {fmt(c.salary)}
+                        </div>
+                        
+                        {!isVis && me && (
+                            <button className="btn btn-green" onClick={() => onHireCoach(c)}>
+                                CONTRATAR TÉCNICO
+                            </button>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+
+    // --- VIEW DE JOGADORES (GLOBAL ou TEAM) ---
     return (
         <div>
             <button className="btn btn-ghost" style={{marginBottom:15, width:'auto'}} onClick={()=>view==='GLOBAL' ? setView('MENU') : setView('LIST')}>
@@ -2606,7 +3007,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter }) =>
                         {o.description}
                     </div>
 
-                    {/*v1.54.4: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
+                    {/*v1.54.5: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
                     {o.type === 'NOTIFICACAO' ? (
                         <div style={{display:'flex', gap:5}}>
                             <button className="btn btn-green" style={{width:'100%'}} onClick={()=>onAccept(o)}>

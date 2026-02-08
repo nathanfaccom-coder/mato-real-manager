@@ -1737,7 +1737,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.56</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.63.1</div>
                             </div>
                         </div>
                         
@@ -2009,7 +2009,7 @@ const CoachRegisterForm = ({ onCancel, onSave }) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.60.2</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.63.1</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2462,12 +2462,14 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                 
                 <div style={{display:'flex', justifyContent:'center', gap:15, marginTop:15}}>
                     <div style={{textAlign:'center'}}>
-                        <div style={{fontSize:20, fontWeight:'bold', color:'var(--success)'}}>₣ {fmt(coach.balance || 0)}</div>
+                        {/* CORREÇÃO: Removi o símbolo manual, deixando só o fmt() */}
+                        <div style={{fontSize:20, fontWeight:'bold', color:'var(--success)'}}>{fmt(coach.balance || 0)}</div>
                         <span style={{fontSize:9, color:'#888'}}>SALDO ATUAL</span>
                     </div>
                     <div style={{width:1, background:'#333'}}></div>
                     <div style={{textAlign:'center'}}>
-                        <div style={{fontSize:20, fontWeight:'bold', color:'var(--primary)'}}>₣ {fmt(coach.salary)}</div>
+                        {/* CORREÇÃO: Removi o símbolo manual */}
+                        <div style={{fontSize:20, fontWeight:'bold', color:'var(--primary)'}}>{fmt(coach.salary)}</div>
                         <span style={{fontSize:9, color:'#888'}}>SALÁRIO</span>
                     </div>
                     <div style={{width:1, background:'#333'}}></div>

@@ -2026,10 +2026,7 @@ const renewContract = async (p) => {
         };
 
      const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams, onRenew, isOwner }) => {
-            // Verifica se é uma EDIÇÃO REAL (tem ID gerado pelo banco)
-            const isEditing = initial && initial.id;
-
-            // Dados Padrão (Garante que nada fique undefined)
+            // 1. Definição dos dados padrão (Isso garante que 'position' nunca seja vazio)
             const defaultState = {
                 name:'', position:'ATA', overall:45, value:'', salary:'', 
                 clause:'', contract:'', mood:'😐', status:'NAO_A_VENDA', 
@@ -2038,15 +2035,21 @@ const renewContract = async (p) => {
                 attributes: null 
             };
 
-            // MISTURA o padrão com o inicial. 
-            // Assim, se 'initial' tiver só o teamId, o resto (position, overall) pega do defaultState.
-            const [f, setF] = useState({ ...defaultState, ...initial });
+            // 2. MISTURA os dados (Correção do Erro)
+            // Se 'initial' tiver só o teamId, ele mantém o resto do defaultState (como position: 'ATA')
+            const [f, setF] = useState({ ...defaultState, ...(initial || {}) });
+
+            // Verifica se é edição real (tem ID gerado pelo banco)
+            const isEditing = f.id ? true : false;
             
-            // Função para calcular média real ignorando status inúteis
+            // Função auxiliar para calcular média ignorando status inúteis
             const calculateRealOverall = (position, attrs) => {
                 let sum = 0;
                 let count = 0;
-                const ignoreList = position === 'GOL' 
+                // Garante que position tenha valor
+                const safePos = position || 'ATA'; 
+                
+                const ignoreList = safePos === 'GOL' 
                     ? ['shot', 'attack', 'dribble', 'curve', 'freeKick', 'weakFootAcc', 'weakFootFreq'] 
                     : ['gk'];
 
@@ -2061,31 +2064,30 @@ const renewContract = async (p) => {
             const handleSave = () => {
                 try {
                     const dataToSave = { ...f };
+                    
+                    // SEGURANÇA EXTRA: Garante que existe uma posição definida antes de gerar
+                    const safePos = dataToSave.position || 'ATA'; 
 
-                    // Garante que position tenha valor (fallback para ATA se der erro)
-                    const pos = dataToSave.position || 'ATA';
-
-                    // GERAÇÃO DE ATRIBUTOS
+                    // SE NÃO TIVER ATRIBUTOS (Criação ou Jogador Antigo), GERA AGORA!
                     if (!dataToSave.attributes || Object.keys(dataToSave.attributes).length === 0) {
                         const targetOv = parseInt(dataToSave.overall) || 60;
-                        const newAttrs = generateAttributes(pos, targetOv);
+                        const newAttrs = generateAttributes(safePos, targetOv);
                         
-                        // Calcula média
-                        const realAvg = calculateRealOverall(pos, newAttrs);
+                        // Calcula a média real balanceada
+                        const realAvg = calculateRealOverall(safePos, newAttrs);
                         
+                        // Atualiza o objeto final
                         dataToSave.attributes = newAttrs;
                         dataToSave.overall = realAvg;
-                        
-                        // Garante que salvamos a posição correta caso ela estivesse vazia antes
-                        dataToSave.position = pos;
+                        dataToSave.position = safePos; // Garante que salva a posição usada
 
-                        alert(`Sucesso! Atributos gerados.\nOverall Real Calculado: ${realAvg}`);
+                        alert(`Atributos gerados com sucesso!\nOverall Real: ${realAvg}`);
                     }
 
                     onSave(dataToSave);
                 } catch (error) {
                     console.error(error);
-                    alert("Erro técnico: " + error.message);
+                    alert("Erro ao salvar: " + error.message);
                 }
             };
 
@@ -2095,6 +2097,7 @@ const renewContract = async (p) => {
                         <h3>{isEditing ? 'Ficha do Jogador' : 'Criar Jogador'}</h3>
                         
                         <label>Nome</label>
+                        {/* Só desabilita se não for admin E se o jogador já existir (isEditing) */}
                         <input className="input-field" value={f.name} onChange={e=>setF({...f, name:e.target.value})} disabled={!isAdmin && isEditing} />
                         
                         <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:5, marginBottom:10, border:'1px solid #444'}}>
@@ -2122,23 +2125,25 @@ const renewContract = async (p) => {
                             </div>
                         </div>
 
+                        {/* VISUALIZAÇÃO APENAS (Read-Only) */}
                         {f.attributes ? (
                             <div style={{border:'1px solid #444', padding:10, borderRadius:8, margin:'10px 0'}}>
                                 <AttributeGrid attrs={f.attributes} pendingXP={f.pendingXP || 0} />
                                 {isAdmin && <button className="btn btn-gold" style={{marginTop:5, fontSize:10}} onClick={()=>{
-                                    if(confirm("Regerar Atributos (Admin)?")) {
+                                    if(confirm("Regerar (Admin)?")) {
                                         try {
-                                            const n = generateAttributes(f.position, parseInt(f.overall)||60);
-                                            const avg = calculateRealOverall(f.position, n);
+                                            const pos = f.position || 'ATA';
+                                            const n = generateAttributes(pos, parseInt(f.overall)||60);
+                                            const avg = calculateRealOverall(pos, n);
                                             setF({...f, attributes:n, overall: avg});
-                                        } catch(e) { alert("Erro ao regerar: " + e.message); }
+                                        } catch(e) { alert("Erro: " + e.message); }
                                     }
                                 }}>🎲 REGERAR (ADM)</button>}
                             </div>
                         ) : (
                             <div style={{padding:15, textAlign:'center', color:'#aaa', border:'1px dashed #666', borderRadius:8, margin:'10px 0', background:'rgba(0,0,0,0.2)'}}>
                                 <i className="fas fa-magic" style={{fontSize:20, marginBottom:5}}></i><br/>
-                                Os atributos serão gerados automaticamente<br/>ao clicar em <b>SALVAR</b>.
+                                Os atributos serão gerados e salvos<br/>automaticamente ao clicar em <b>SALVAR</b>.
                             </div>
                         )}
 
@@ -2191,6 +2196,7 @@ const renewContract = async (p) => {
                         <div style={{display:'flex', gap:10, marginTop:15}}>
                             <button className="btn btn-green" onClick={handleSave}>SALVAR</button>
                             
+                            {/* Botões extras só aparecem se o jogador já existe (isEditing) */}
                             {isOwner && isEditing && <button className="btn btn-blue" onClick={()=>onRenew(initial)}>RENOVAR</button>}
                             {isEditing && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>X</button>}
                             

@@ -489,7 +489,7 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
                 setLoading(false);
             }
 
-            // --- VIRADA DE TEMPORADA (ATRIBUTOS REALISTAS v1.54.3) ---
+            // --- VIRADA DE TEMPORADA (ATRIBUTOS REALISTAS v1.54.4) ---
             if (act === 'SEASON') {
                 if (!confirm("⚠️ VIRAR TEMPORADA?\n\n1. Evoluir Atributos (XP)\n2. Envelhecer Contratos\n3. Processar Retornos")) return;
 
@@ -1401,7 +1401,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.54.3</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis |  v1.54.4</div>
                             </div>
                         </div>
                         
@@ -1789,18 +1789,23 @@ const renewContract = async (p) => {
 // FIM DO COMPONENTE COMPANY DASHBOARD
 // --- JOGADOR, MERCADO E OUTROS COMPONENTES QUE FALTARAM ---
 
-        const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction }) => {
+       const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction }) => {
             const [newPass, setNewPass] = useState('');
             const [tab, setTab] = useState('PERFIL'); 
 
             const myItems = (sales||[]).filter(s => s.buyerName === player.name);
             
-            // --- CÁLCULO DE XP ATUALIZADO (SISTEMA DE ATRIBUTOS) ---
-            // A cada 100 XP, o jogador ganha 1 ponto de atributo na virada.
+            // --- CÁLCULO DE XP (ATUALIZADO) ---
             const xpCurrent = (player.xp || 0) + (player.pendingXP || 0);
-            const pointsToGain = Math.floor(xpCurrent / 100);
-            const xpRest = xpCurrent % 100; // O que falta para o próximo ponto (0 a 99)
+            const pointsToGain = Math.floor(xpCurrent / 100); // Pontos de atributo disponíveis
+            const xpRest = xpCurrent % 100; 
             
+            // --- CÁLCULO DA ESTIMATIVA DE OVERALL ---
+            // Conta quantos atributos existem (aprox. 30).
+            // Para subir 1 de Overall, precisa subir +1 em todos os atributos (ou +30 no total).
+            const attrCount = player.attributes ? Object.keys(player.attributes).length : 30;
+            const projectedOvIncrease = Math.floor(pointsToGain / attrCount);
+
             const energy = player.energy !== undefined ? player.energy : 100;
 
             const badges = [];
@@ -1822,7 +1827,13 @@ const renewContract = async (p) => {
                             <div style={{textAlign:'center'}}>
                                 <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:5}}>
                                     <div style={{fontSize:40, fontWeight:'900', color:'var(--warning)', lineHeight:1}}>{player.overall}</div>
-                                    {pointsToGain > 0 && <span className="pulse" style={{fontSize:14, color:'#00E676', fontWeight:'bold'}}>+{pointsToGain} pts</span>}
+                                    
+                                    {/* AQUI ESTÁ A MUDANÇA: Só mostra se for aumentar pelo menos +1 de Overall */}
+                                    {projectedOvIncrease > 0 && (
+                                        <span className="pulse" style={{fontSize:16, color:'#00E676', fontWeight:'bold', display:'flex', alignItems:'center'}}>
+                                            <i className="fas fa-arrow-up" style={{fontSize:12, marginRight:2}}></i>{projectedOvIncrease}
+                                        </span>
+                                    )}
                                 </div>
                                 <span style={{fontSize:10, textTransform:'uppercase', color:'#888'}}>Overall</span>
                             </div>
@@ -1833,7 +1844,7 @@ const renewContract = async (p) => {
                             </div>
                         </div>
 
-                        {/* Barra de Progresso (Ciclo de 100 XP) */}
+                        {/* Barra de Progresso */}
                         <div style={{position:'absolute', bottom:0, left:0, right:0, height:8, background:'#333'}}>
                             <div style={{width:`${xpRest}%`, height:'100%', background:'linear-gradient(90deg, var(--warning), gold)', transition:'1s'}}></div>
                         </div>
@@ -1855,9 +1866,15 @@ const renewContract = async (p) => {
                             <small style={{color:'#aaa'}}>Salário: {fmt(player.salary)} | Passe: {fmt(player.value)}</small>
                         </div>
                         
-                        {/* ATRIBUTOS DETALHADOS NO PAINEL DO JOGADOR */}
                         <div className="card">
                             <AttributeGrid attrs={player.attributes} pendingXP={xpCurrent} />
+                            
+                            {/* Explicação detalhada movida para cá, onde faz mais sentido */}
+                            {pointsToGain > 0 && (
+                                <div style={{marginTop:10, fontSize:10, color:'#aaa', textAlign:'right'}}>
+                                    Pontos para distribuir na virada: <span style={{color:'#00E676', fontWeight:'bold'}}>+{pointsToGain} pts</span>
+                                </div>
+                            )}
                         </div>
 
                         <div className="card">

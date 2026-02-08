@@ -1882,22 +1882,27 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.63.7</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.58</div>
                             </div>
                         </div>
                         
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
-                            {/* ÍCONE DE NOTIFICAÇÃO (SINO) */}
-                            {(user.type === 'USER' || user.type === 'PLAYER') && (
+                            {/* ÍCONE DE NOTIFICAÇÃO (SINO) - CORRIGIDO PARA ACEITAR CONTRA-PROPOSTAS */}
+                            {(user.type === 'USER' || user.type === 'PLAYER' || user.type === 'COACH') && (
                                 <div onClick={() => setScreen('OFFERS')} style={{ position: 'relative', cursor: 'pointer', padding: '5px', display: 'flex', alignItems: 'center' }}>
-                                    <i className="fas fa-bell" style={{ fontSize: '20px', color: (offers || []).filter(o => o.recipientId === user.data.id && o.status === 'PENDING').length > 0 ? 'var(--warning)' : '#666', transition: '0.3s' }}></i>
-                                    {(offers || []).filter(o => o.recipientId === user.data.id && o.status === 'PENDING').length > 0 && (
+                                    <i className="fas fa-bell" style={{ 
+                                        fontSize: '20px', 
+                                        // AGORA VERIFICA SE É PENDING OU COUNTERED
+                                        color: (offers || []).some(o => o.recipientId === user.data.id && (o.status === 'PENDING' || o.status === 'COUNTERED')) ? 'var(--warning)' : '#666', 
+                                        transition: '0.3s' 
+                                    }}></i>
+                                    {(offers || []).some(o => o.recipientId === user.data.id && (o.status === 'PENDING' || o.status === 'COUNTERED')) && (
                                         <span className="pulse" style={{ position: 'absolute', top: '2px', right: '2px', background: 'red', borderRadius: '50%', width: '10px', height: '10px', border: '2px solid var(--bg-card)' }}></span>
                                     )}
                                 </div>
                             )}
 
-                            {/* SALDO EM DINHEIRO (Adicionado COACH) */}
+                            {/* SALDO EM DINHEIRO */}
                             {(user.type === 'USER' || user.type === 'COMPANY' || user.type === 'PLAYER' || user.type === 'COACH') && (
                                 <div style={{color:'var(--primary)', fontWeight:'bold', marginLeft:10}}>
                                     {fmt(user.data.balance)}
@@ -1917,7 +1922,24 @@ const renewContract = async (p) => {
                     <div className="container">
                         {screen === 'HOME' && user.type === 'ADMIN' && 
                             <AdminPanel 
-                                teams={teams} papers={papers} journalists={journalists} companies={companies} reqs={reqs} config={conf} onAct={adminAction} onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} onApprove={async(r)=>{/*Fin*/}} onReject={(id)=>db.collection('financeRequests').doc(id).delete()} onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} onApproveTeam={approveTeam} onUpdateBal={updateBalance} onDeleteTeam={deleteTeam} onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} onDeletePaper={deletePaper} onDeleteJourno={deleteJournalist} onRejectPaper={(id)=>db.collection('newspapers').doc(id).delete()} onConfig={(t)=>setModal({type:'SETTINGS', data:t})} onReset={resetDatabase} onApproveComp={async(id)=>{await db.collection('companies').doc(id).update({status:'ACTIVE'}); alert("Empresa Aprovada!");}} onDeleteComp={async(id)=>{if(confirm("Excluir Empresa?")) await db.collection('companies').doc(id).delete();}} onUpdateCompBal={async(id, val)=>{ await db.collection('companies').doc(id).update({balance: parseFloat(val)}); alert("Saldo Alterado!"); }} coaches={coaches}
+                                teams={teams} papers={papers} journalists={journalists} companies={companies} reqs={reqs} config={conf} coaches={coaches} 
+                                onAct={adminAction} 
+                                onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} 
+                                onApprove={async(r)=>{/*Fin*/}} 
+                                onReject={(id)=>db.collection('financeRequests').doc(id).delete()} 
+                                onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} 
+                                onApproveTeam={approveTeam} 
+                                onUpdateBal={updateBalance} 
+                                onDeleteTeam={deleteTeam} 
+                                onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} 
+                                onDeletePaper={deletePaper} 
+                                onDeleteJourno={deleteJournalist} 
+                                onRejectPaper={(id)=>db.collection('newspapers').doc(id).delete()} 
+                                onConfig={(t)=>setModal({type:'SETTINGS', data:t})} 
+                                onReset={resetDatabase} 
+                                onApproveComp={async(id)=>{await db.collection('companies').doc(id).update({status:'ACTIVE'}); alert("Empresa Aprovada!");}} 
+                                onDeleteComp={async(id)=>{if(confirm("Excluir Empresa?")) await db.collection('companies').doc(id).delete();}} 
+                                onUpdateCompBal={async(id, val)=>{ await db.collection('companies').doc(id).update({balance: parseFloat(val)}); alert("Saldo Alterado!"); }}
                                 onGenAttrs={async () => {
                                     if(!confirm("Isso vai gerar atributos para TODOS os jogadores que não têm. Continuar?")) return;
                                     setLoading(true);
@@ -1937,11 +1959,11 @@ const renewContract = async (p) => {
                             />
                         }
                         
-                       {screen === 'HOME' && user.type === 'USER' && 
+                        {screen === 'HOME' && user.type === 'USER' && 
                             <TeamDashboard 
                                 team={user.data} 
                                 players={players.filter(p=>p.teamId===user.data.id)} 
-                                coach={coaches.find(c => c.teamId === user.data.id && c.status === 'ACTIVE')}
+                                coach={coaches.find(c => c.teamId === user.data.id && c.status === 'ACTIVE')} 
                                 onFireCoach={handleFireCoach}
                                 isVisitor={false} 
                                 onEdit={(p)=>setModal({type:'PLAYER', data:p})} 
@@ -1968,7 +1990,7 @@ const renewContract = async (p) => {
                             </div>
                         )}
                         
-{screen === 'ADMIN_TEAM' && adminTeam && 
+                        {screen === 'ADMIN_TEAM' && adminTeam && 
                             <div>
                                 <button className="btn" style={{background:'#333', marginBottom:10}} onClick={()=>{setAdminTeam(null); setScreen('HOME');}}>⬅ VOLTAR</button>
                                 <h3 style={{color:'var(--purple)'}}>Editando: {adminTeam.name}</h3>
@@ -1976,13 +1998,14 @@ const renewContract = async (p) => {
                                     team={adminTeam} 
                                     players={players.filter(p=>p.teamId===adminTeam.id)} 
                                     coach={coaches.find(c => c.teamId === adminTeam.id && c.status === 'ACTIVE')} 
-                                    onFireCoach={handleFireCoach} 
+                                    onFireCoach={handleFireCoach}
                                     isVisitor={false} 
                                     onEdit={(p)=>setModal({type:'PLAYER', data:p})} 
                                     onAdd={()=>setModal({type:'PLAYER', data: { teamId: adminTeam.id } })} 
                                 />
                             </div>
-                        }                        
+                        }
+                        
                         {screen === 'MARKET' && (
                             <Market 
                                 me={user.data?.id} 
@@ -2047,7 +2070,7 @@ const renewContract = async (p) => {
                         {screen === 'NEWS' && <div><h3>Notícias</h3>{news.map(n=><div key={n.id} className={`news-card news-${n.type}`}>{n.text}<br/><small style={{color:'#666'}}>{new Date(n.date).toLocaleString()}</small></div>)}</div>}
                         
                         {screen === 'OFFERS' && (
-                            <OffersScreen user={user} offers={offers} teams={teams} onAccept={acceptOffer} onReject={rejectOffer} onCounter={(o) => setModal({ type: 'OFFER', data: { ...players.find(p => p.id === o.playerId), oldOffer: o } })} />
+                            <OffersScreen user={user} offers={offers} teams={teams} onAccept={acceptOffer} onReject={rejectOffer} onCounter={(o) => setModal({ type: 'OFFER', data: { ...players.find(p => p.id === o.playerId), oldOffer: o } })} onCoachAccept={handleFinalizeCoachContract} onCoachReject={rejectOffer} onCoachCounter={handleCounterCoachOffer} />
                         )}                        
                         
                         {(screen === 'COMPANY_DASH' || screen === 'COMPANY_HOME') && user.type === 'COMPANY' && 
@@ -2064,7 +2087,7 @@ const renewContract = async (p) => {
                                 coach={user.data} 
                                 team={teams.find(t => t.id === user.data.teamId)} 
                                 players={players.filter(p => p.teamId === user.data.teamId)} 
-                                offers={offers.filter(o => o.recipientId === user.data.id)} 
+                                offers={offers} 
                                 sales={sales} 
                                 onTrain={handleCoachTrain} 
                                 onEvolvePerk={handleEvolveCoachPerk} 
@@ -2075,10 +2098,9 @@ const renewContract = async (p) => {
                                     });
                                     alert("Nova afinidade desbloqueada!");
                                 }}
-                                onAcceptOffer={handleAcceptCoachOffer} 
-                                onRejectOffer={handleRejectCoachOffer}
                                 onAcceptOffer={handleFinalizeCoachContract} 
-                                onCounterOffer={handleCounterCoachOffer}
+                                onRejectOffer={rejectOffer} 
+                                onCounterOffer={handleCounterCoachOffer} 
                                 onUpdateSalary={handleUpdateCoachSalary} 
                             />
                         }
@@ -2104,82 +2126,37 @@ const renewContract = async (p) => {
                             {modal.type==='TEAM_TABLE' && <TeamStandingsEditor teams={teams} onUpdateTeamStats={updateTeamStats} />}
                             {modal.type==='POST_NEWS' && <div><h3>Nova Notícia</h3><input className="input-field" placeholder="Manchete / Texto" id="news-body" /><button className="btn btn-blue" onClick={()=>{postNews(`📰 **${user.data.name}:**\n${document.getElementById('news-body').value}`, 'press'); setModal(null);}}>PUBLICAR</button></div>}
                             {modal.type==='STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
+                            
+                            {/* MODAL DE CONTRATAR TÉCNICO (NOVO) */}
                             {modal.type === 'HIRE_COACH' && (
-    <div>
-        <h3>Negociar com {modal.data.name}</h3>
-        <label>Salário Semanal (₣)</label>
-        <input className="input-field" type="number" id="c_salary" defaultValue={modal.data.salary} />
-        
-        <label>Duração (Temporadas)</label>
-        <select className="input-field" id="c_contract">
-            <option value="1">1 Temporada</option>
-            <option value="2">2 Temporadas</option>
-            <option value="3">3 Temporadas</option>
-        </select>
+                                <div>
+                                    <h3>Negociar com {modal.data.name}</h3>
+                                    <label>Salário Semanal (₣)</label>
+                                    <input className="input-field" type="number" id="c_salary" defaultValue={modal.data.salary} />
+                                    
+                                    <label>Duração (Temporadas)</label>
+                                    <select className="input-field" id="c_contract">
+                                        <option value="1">1 Temporada</option>
+                                        <option value="2">2 Temporadas</option>
+                                        <option value="3">3 Temporadas</option>
+                                    </select>
 
-        <label>Multa Rescisória (₣)</label>
-        <input className="input-field" type="number" id="c_clause" defaultValue={modal.data.salary * 10} />
+                                    <label>Multa Rescisória (₣)</label>
+                                    <input className="input-field" type="number" id="c_clause" defaultValue={modal.data.salary * 10} />
 
-        <button className="btn btn-green" onClick={() => {
-            const s = document.getElementById('c_salary').value;
-            const c = document.getElementById('c_contract').value;
-            const cl = document.getElementById('c_clause').value;
-            handleSendCoachOffer(modal.data.id, s, c, cl);
-        }}>ENVIAR PROPOSTA</button>
-    </div>
-)}
+                                    <button className="btn btn-green" onClick={() => {
+                                        const s = document.getElementById('c_salary').value;
+                                        const c = document.getElementById('c_contract').value;
+                                        const cl = document.getElementById('c_clause').value;
+                                        handleSendCoachOffer(modal.data.id, s, c, cl);
+                                    }}>ENVIAR PROPOSTA</button>
+                                </div>
+                            )}
                         </div>
                     </div>}
                 </div>
             );
         }
-// FIM DO COMPONENTE APP
-// --- FORMULÁRIO DE CADASTRO DE TÉCNICO ---
-const CoachRegisterForm = ({ onCancel, onSave }) => {
-    const [name, setName] = useState('');
-    const [affinity, setAffinity] = useState('ATA'); // Começa com Ataque por padrão
-    const [password, setPassword] = useState('');
-
-    return (
-        <div className="modal-bg">
-            <div className="modal-content">
-                <h2 style={{color:'gold', textAlign:'center'}}>🎓 Licença de Treinador</h2>
-                <p style={{textAlign:'center', fontSize:12, color:'#ccc'}}>
-                    Comece sua carreira na beira do gramado.
-                </p>
-
-                <div className="card" style={{border:'1px solid gold', background:'rgba(255,215,0,0.05)', marginBottom:15}}>
-                    <div style={{display:'flex', justifyContent:'space-between', fontSize:12}}>
-                        <span>Nível Inicial: <b>1</b></span>
-                        <span>Salário Base: <b>{fmt(2500)}</b></span>
-                    </div>
-                </div>
-
-                <label>Nome do Técnico</label>
-                <input className="input-field" value={name} onChange={e=>setName(e.target.value)} placeholder="Ex: Guardiola do Sertão" />
-
-                <label>Senha de Acesso</label>
-                <input className="input-field" type="password" value={password} onChange={e=>setPassword(e.target.value)} />
-
-                <label>Especialidade Inicial (Afinidade)</label>
-                <p style={{fontSize:10, color:'#aaa', marginTop:-5}}>Seus treinos renderão +XP para jogadores desta posição.</p>
-                <select className="input-field" value={affinity} onChange={e=>setAffinity(e.target.value)}>
-                    {COACH_AFFINITIES.map(a => (
-                        <option key={a} value={a}>{a} - Especialista</option>
-                    ))}
-                </select>
-
-                <div style={{display:'flex', gap:10, marginTop:15}}>
-                    <button className="btn btn-gold" onClick={() => {
-                        if(!name || !password) return alert("Preencha tudo!");
-                        onSave({ name, password, affinity });
-                    }}>SOLICITAR LICENÇA</button>
-                    <button className="btn" onClick={onCancel}>CANCELAR</button>
-                </div>
-            </div>
-        </div>
-    );
-};
 // --- COMPONENTS ---
         const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor, onCreateCoach }) => {
             const [tab, setTab] = useState('LOGIN'); 
@@ -2201,7 +2178,7 @@ const CoachRegisterForm = ({ onCancel, onSave }) => {
             return (
                 <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
                     <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.63.7</div>
+                    <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.63.8</div>
                     
                     <div className="login-tabs">
                         <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

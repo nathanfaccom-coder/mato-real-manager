@@ -2375,7 +2375,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.72.1</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.72.2</div>
                             </div>
                         </div>
                         
@@ -2635,7 +2635,7 @@ const renewContract = async (p) => {
                             {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={async(id)=>{db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} onRenew={renewContract} isOwner={user.type==='USER' && modal.data?.teamId===user.data?.id} />}
                             {modal.type==='OFFER' && <OfferForm target={modal.data} myPlayers={players.filter(p => p.teamId === user.data.id)} onSend={sendOffer} setModal={setModal} user={user} />}
                             {modal.type==='SETTINGS' && <SettingsForm team={modal.data || user.data} isAdmin={user.type==='ADMIN'} onUp={(d)=>{const tid=(modal.data?.id)||user.data.id; db.collection('teams').doc(tid).update(d); setModal(null);}} onUpgrade={()=>{/*Up*/}} onReq={(t,a,d)=>{db.collection('financeRequests').add({teamId:user.data.id, teamName:user.data.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!");}} onWithdraw={withdrawMoney} />}
-                            {modal.type==='MATCH_PERFORMANCE' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} />}
+                            {modal.type==='MATCH_PERFORMANCE' && < players={players} teams={teams} onSaveStats={saveMatchStats} />}
                             {modal.type==='TEAM_TABLE' && <TeamStandingsEditor teams={teams} onUpdateTeamStats={updateTeamStats} />}
                             {modal.type==='POST_NEWS' && <div><h3>Nova Notícia</h3><input className="input-field" placeholder="Manchete / Texto" id="news-body" /><button className="btn btn-blue" onClick={()=>{postNews(`📰 **${user.data.name}:**\n${document.getElementById('news-body').value}`, 'press'); setModal(null);}}>PUBLICAR</button></div>}
                             {modal.type==='STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
@@ -4453,13 +4453,13 @@ const Ranking = ({ teams, players }) => {
 
 // --- COMPONENTES QUE FALTAVAM (Súmula e Tabela) ---
 
-        const MatchPerformanceForm = ({ players, teams, onSaveStats }) => {
-            const [mode, setMode] = useState('TEAM'); // 'TEAM' (Rápido) ou 'SEARCH' (Individual)
+       const MatchPerformanceForm = ({ players, teams, onSaveStats }) => {
+            const [mode, setMode] = useState('TEAM'); 
             
             // --- ESTADOS DO MODO SÚMULA RÁPIDA (TIME) ---
             const [selTeamId, setSelTeamId] = useState('');
             const [teamResult, setTeamResult] = useState('NENHUM');
-            const [batchStats, setBatchStats] = useState({}); // Armazena dados de múltiplos jogadores
+            const [batchStats, setBatchStats] = useState({}); 
 
             // --- ESTADOS DO MODO INDIVIDUAL (ANTIGO) ---
             const [selP, setSelP] = useState(null);
@@ -4492,7 +4492,7 @@ const Ranking = ({ teams, players }) => {
                                 yellows: parseInt(s.yellows || 0),
                                 reds: parseInt(s.reds || 0),
                                 rating: parseFloat(s.rating),
-                                result: teamResult // Aplica o resultado do time para todos
+                                result: teamResult 
                             }
                         });
                     }
@@ -4501,10 +4501,11 @@ const Ranking = ({ teams, players }) => {
                 if (payload.length === 0) return alert("Preencha a NOTA de pelo menos um jogador para salvar.");
                 
                 if (confirm(`Confirmar súmula para ${payload.length} jogadores?`)) {
-                    // Envia array para a função principal (que deve estar preparada para receber array)
                     onSaveStats(payload); 
                 }
             };
+
+            const filtered = players.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
 
             // --- RENDERIZAÇÃO ---
             return (
@@ -4516,7 +4517,7 @@ const Ranking = ({ teams, players }) => {
                         <button className={`btn ${mode==='SEARCH'?'btn-purple':'btn-ghost'}`} onClick={()=>setMode('SEARCH')}>BUSCA INDIVIDUAL</button>
                     </div>
 
-                    {/* === MODO 1: SÚMULA POR TIME (TABELA RÁPIDA) === */}
+                    {/* === MODO 1: SÚMULA POR TIME (TABELA DETALHADA) === */}
                     {mode === 'TEAM' && (
                         <div>
                             <div style={{display:'flex', gap:10, marginBottom:10}}>
@@ -4541,63 +4542,84 @@ const Ranking = ({ teams, players }) => {
                             {selTeamId && (
                                 <div>
                                     <div style={{maxHeight:'350px', overflowY:'auto', border:'1px solid #333', borderRadius:5}}>
-                                        <table style={{width:'100%', borderCollapse:'collapse', fontSize:11}}>
+                                        <table style={{width:'100%', borderCollapse:'collapse', fontSize:10}}>
                                             <thead style={{background:'#222', position:'sticky', top:0, zIndex:2}}>
                                                 <tr>
-                                                    <th style={{padding:8, textAlign:'left'}}>Jogador</th>
-                                                    <th style={{padding:5, width:45, textAlign:'center'}}>Nota</th>
-                                                    <th style={{padding:5, width:35, textAlign:'center'}}>G</th>
-                                                    <th style={{padding:5, width:35, textAlign:'center'}}>A</th>
-                                                    <th style={{padding:5, width:35, textAlign:'center'}}>D/D</th>
-                                                    <th style={{padding:5, width:50, textAlign:'center'}}>Cart</th>
+                                                    <th style={{padding:5, textAlign:'left'}}>Jogador</th>
+                                                    <th style={{padding:2, width:35, textAlign:'center', color:'gold'}}>Nota</th>
+                                                    <th style={{padding:2, width:30, textAlign:'center'}}>GOL</th>
+                                                    <th style={{padding:2, width:30, textAlign:'center'}}>ASS</th>
+                                                    <th style={{padding:2, width:30, textAlign:'center', color:'orange'}}>DES</th>
+                                                    <th style={{padding:2, width:30, textAlign:'center', color:'cyan'}}>DEF</th>
+                                                    <th style={{padding:2, width:30, textAlign:'center', color:'yellow'}}>AMA</th>
+                                                    <th style={{padding:2, width:30, textAlign:'center', color:'red'}}>VER</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {players.filter(p => p.teamId === selTeamId).map(p => {
                                                     const s = batchStats[p.id] || {};
                                                     const hasData = s.rating && s.rating !== '';
+                                                    const isGK = p.position === 'GOL';
+
                                                     return (
                                                         <tr key={p.id} style={{background: hasData ? 'rgba(0,255,0,0.08)' : 'transparent', borderBottom:'1px solid #333'}}>
-                                                            <td style={{padding:8}}>
+                                                            <td style={{padding:5}}>
                                                                 <b>{p.name}</b><br/>
                                                                 <span style={{color:'#888', fontSize:9}}>{p.position}</span>
                                                             </td>
+                                                            {/* NOTA */}
                                                             <td style={{padding:2}}>
-                                                                <input className="input-field" type="number" step="0.1" style={{marginBottom:0, padding:5, textAlign:'center', borderColor: hasData ? 'lime' : '#444'}} 
+                                                                <input className="input-field" type="number" step="0.1" style={{marginBottom:0, padding:2, textAlign:'center', height:25, borderColor: hasData ? 'lime' : '#444'}} 
                                                                     placeholder="-" 
                                                                     value={s.rating || ''}
                                                                     onChange={e=>handleBatchChange(p.id, 'rating', e.target.value)}
                                                                 />
                                                             </td>
+                                                            {/* GOLS */}
                                                             <td style={{padding:2}}>
-                                                                <input className="input-field" type="number" style={{marginBottom:0, padding:5, textAlign:'center'}} 
+                                                                <input className="input-field" type="number" style={{marginBottom:0, padding:2, textAlign:'center', height:25}} 
                                                                     placeholder="0"
                                                                     onChange={e=>handleBatchChange(p.id, 'goals', e.target.value)}
                                                                 />
                                                             </td>
+                                                            {/* ASSISTENCIAS */}
                                                             <td style={{padding:2}}>
-                                                                <input className="input-field" type="number" style={{marginBottom:0, padding:5, textAlign:'center'}} 
+                                                                <input className="input-field" type="number" style={{marginBottom:0, padding:2, textAlign:'center', height:25}} 
                                                                     placeholder="0"
                                                                     onChange={e=>handleBatchChange(p.id, 'assists', e.target.value)}
                                                                 />
                                                             </td>
+                                                            {/* DESARMES (Bloqueado se for Goleiro) */}
                                                             <td style={{padding:2}}>
-                                                                {p.position === 'GOL' ? (
-                                                                    <input className="input-field" type="number" title="Defesas" style={{marginBottom:0, padding:5, textAlign:'center', color:'cyan'}} placeholder="0" onChange={e=>handleBatchChange(p.id, 'saves', e.target.value)} />
-                                                                ) : (
-                                                                    <input className="input-field" type="number" title="Desarmes" style={{marginBottom:0, padding:5, textAlign:'center', color:'orange'}} placeholder="0" onChange={e=>handleBatchChange(p.id, 'tackles', e.target.value)} />
-                                                                )}
+                                                                <input className="input-field" type="number" 
+                                                                    style={{marginBottom:0, padding:2, textAlign:'center', height:25, background: isGK ? '#111' : 'var(--bg-input)', color:'orange', opacity: isGK ? 0.3 : 1}} 
+                                                                    placeholder="0" 
+                                                                    disabled={isGK}
+                                                                    onChange={e=>handleBatchChange(p.id, 'tackles', e.target.value)} 
+                                                                />
                                                             </td>
+                                                            {/* DEFESAS (Bloqueado se NÃO for Goleiro) */}
                                                             <td style={{padding:2}}>
-                                                                <select className="input-field" style={{marginBottom:0, padding:2, fontSize:10, height:30}} onChange={e=> {
-                                                                    const val = e.target.value;
-                                                                    handleBatchChange(p.id, 'yellows', val==='Y'?1:0);
-                                                                    handleBatchChange(p.id, 'reds', val==='R'?1:0);
-                                                                }}>
-                                                                    <option value="">-</option>
-                                                                    <option value="Y">🟨</option>
-                                                                    <option value="R">🟥</option>
-                                                                </select>
+                                                                <input className="input-field" type="number" 
+                                                                    style={{marginBottom:0, padding:2, textAlign:'center', height:25, background: !isGK ? '#111' : 'var(--bg-input)', color:'cyan', opacity: !isGK ? 0.3 : 1}} 
+                                                                    placeholder="0" 
+                                                                    disabled={!isGK}
+                                                                    onChange={e=>handleBatchChange(p.id, 'saves', e.target.value)} 
+                                                                />
+                                                            </td>
+                                                            {/* AMARELOS (Numérico) */}
+                                                            <td style={{padding:2}}>
+                                                                <input className="input-field" type="number" style={{marginBottom:0, padding:2, textAlign:'center', height:25, color:'yellow'}} 
+                                                                    placeholder="0"
+                                                                    onChange={e=>handleBatchChange(p.id, 'yellows', e.target.value)}
+                                                                />
+                                                            </td>
+                                                            {/* VERMELHOS (Numérico) */}
+                                                            <td style={{padding:2}}>
+                                                                <input className="input-field" type="number" style={{marginBottom:0, padding:2, textAlign:'center', height:25, color:'red'}} 
+                                                                    placeholder="0"
+                                                                    onChange={e=>handleBatchChange(p.id, 'reds', e.target.value)}
+                                                                />
                                                             </td>
                                                         </tr>
                                                     );
@@ -4613,7 +4635,7 @@ const Ranking = ({ teams, players }) => {
                         </div>
                     )}
 
-                    {/* === MODO 2: BUSCA INDIVIDUAL (LEGADO) === */}
+                    {/* === MODO 2: BUSCA INDIVIDUAL (Mantido como Backup) === */}
                     {mode === 'SEARCH' && (
                         <div>
                             {!selP ? (
@@ -4662,7 +4684,6 @@ const Ranking = ({ teams, players }) => {
                 </div>
             );
         };
-
 // FIM DO COMPONENTE MATCH PERFORMANCE FORM
 
 

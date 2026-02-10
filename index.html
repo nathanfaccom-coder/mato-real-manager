@@ -2750,7 +2750,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.71.4 CORREÇÃO DE TREINOS</div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.71.5 CORREÇÃO DE TREINOS</div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -3586,6 +3586,24 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
     // Calcula salários somando jogadores + técnico (se houver)
     const wageBill = players.reduce((a,p) => a + (parseFloat(p.salary)||0), 0) + (coach ? parseFloat(coach.salary) : 0);
 
+    // --- LÓGICA DE ORDENAÇÃO POR POSIÇÃO (NOVO) ---
+    const POS_ORDER = {
+        'GOL': 1,
+        'ZAG': 2, 'LD': 3, 'LE': 4,
+        'VOL': 5, 'MC': 6, 'MEI': 7,
+        'PTD': 8, 'PTE': 9, 'ATA': 10
+    };
+
+    const sortedPlayers = [...players].sort((a, b) => {
+        // 1. Ordena por Posição (Goleiro primeiro, Ataque último)
+        const posA = POS_ORDER[a.position] || 99;
+        const posB = POS_ORDER[b.position] || 99;
+        if (posA !== posB) return posA - posB;
+        
+        // 2. Desempate por Overall (Maior primeiro)
+        return (b.overall || 0) - (a.overall || 0);
+    });
+
     return (
         <div>
             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:15}}>
@@ -3602,14 +3620,15 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                 <button className={`btn ${tab==='STAFF'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('STAFF')}>COMISSÃO TÉCNICA</button>
             </div>
 
-            {/* --- ABA 1: ELENCO (Código Original) --- */}
+            {/* --- ABA 1: ELENCO (AGORA ORDENADO) --- */}
             {tab === 'ELENCO' && (
                 <div>
                     <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
-                        <b>Jogadores ({players.length})</b>
+                        <b>Jogadores ({sortedPlayers.length})</b>
                     </div>
                     
-                    {players.map(p => (
+                    {/* LISTA DE JOGADORES ORDENADA */}
+                    {sortedPlayers.map(p => (
                         <div key={p.id} className="card" style={{borderLeft: `4px solid ${getPosColor(p.position)}`, marginBottom:10}}>
                             <div style={{display:'flex', justifyContent:'space-between', alignItems:'start'}}>
                                 <div>
@@ -3649,7 +3668,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                 </div>
             )}
 
-            {/* --- ABA 2: COMISSÃO TÉCNICA (Novo) --- */}
+            {/* --- ABA 2: COMISSÃO TÉCNICA --- */}
             {tab === 'STAFF' && (
                 <div>
                     {!coach ? (
@@ -3666,7 +3685,6 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                                 </div>
                                 {!isVisitor && (
                                     <div style={{display:'flex', gap:5}}>
-                                        {/* BOTÃO DE RENOVAR (NOVO) */}
                                         <button className="btn btn-blue" style={{width:'auto', fontSize:10}} onClick={()=>onRenewCoach(coach)}>RENOVAR (+1)</button>
                                         <button className="btn btn-red" style={{width:'auto', fontSize:10}} onClick={()=>onFireCoach(coach)}>DEMITIR</button>
                                     </div>

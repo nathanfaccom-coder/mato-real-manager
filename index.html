@@ -1663,16 +1663,20 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
                 }
             });
 
-            // Atualiza Overall baseado nos novos atributos
-            const vals = Object.values(newAttrs);
-            const newOverall = vals.length > 0 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : (p.overall || 60);
+            // --- CORREÇÃO: Cálculo Inteligente do Overall (Trava de Queda) ---
+            const vals = Object.values(newAttrs).filter(v => typeof v === 'number');
+            const rawAvg = vals.length > 0 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : (p.overall || 60);
+            
+            // AQUI ESTÁ A TRAVA: O novo Overall será o MAIOR entre o atual e a nova média.
+            // Isso impede que o Overall caia se a média matemática for menor que o Overall manual.
+            const finalOverall = Math.max(p.overall || 60, rawAvg);
 
             // Atualiza Jogador
             b.update(db.collection('players').doc(pid), { 
                 xp: (p.xp || 0) + xpGain, 
                 energy: newEnergy,
                 attributes: newAttrs,
-                overall: newOverall
+                overall: finalOverall
             });
             
             coachXpGain += 15;
@@ -2278,7 +2282,7 @@ const renewContract = async (p) => {
 
 // FIM DA LÓGICA DE IMPRENSA E SÚMULAS
             // --- TREINO SOLO DO JOGADOR ---
-    const handlePlayerSoloTrain = async (player, type) => {
+   const handlePlayerSoloTrain = async (player, type) => {
         // 1. Verifica Energia (Custo alto: 15)
         if ((player.energy || 100) < 35) {
             return alert("Você está exausto! Precisa de pelo menos 35% de energia.");
@@ -2317,13 +2321,21 @@ const renewContract = async (p) => {
             }
         });
 
-        // 5. Salva no Banco
+        // 5. Cálculo Inteligente do Overall (Trava de Queda)
+        let finalOverall = player.overall || 60;
+        if (evolved) {
+            const vals = Object.values(newAttrs).filter(v => typeof v === 'number');
+            const rawAvg = vals.length > 0 ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : 60;
+            // Garante que o Overall nunca diminui, apenas mantém ou sobe
+            finalOverall = Math.max(player.overall, rawAvg);
+        }
+
+        // 6. Salva no Banco
         b.update(db.collection('players').doc(player.id), {
             xp: (player.xp || 0) + xpGain,
             energy: newEnergy,
             attributes: newAttrs,
-            // Recalcula Overall simples se houve evolução
-            overall: evolved ? Math.round(Object.values(newAttrs).reduce((a,b)=>a+b,0)/Object.values(newAttrs).length) : (player.overall || 60)
+            overall: finalOverall
         });
 
         await b.commit();
@@ -2738,7 +2750,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.71.3</div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.71.4 CORREÇÃO DE TREINOS</div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -4389,17 +4401,42 @@ const Ranking = ({ teams, players }) => {
             const renderTeams = () => teams
                 .filter(t => t.status !== 'PENDING')
                 .map(t => {
+                    // Calcula o valor total do elenco somando o 'value' de cada jogador
                     const squadValue = validPlayers.filter(p => p.teamId === t.id).reduce((a, b) => a + (parseFloat(b.value) || 0), 0);
-                    return { ...t, totalWealth: (parseFloat(t.balance) || 0) + squadValue, squadValue };
+                    // Pega o saldo em caixa
+                    const balance = parseFloat(t.balance) || 0;
+                    // Soma tudo
+                    return { ...t, balance, squadValue, totalWealth: balance + squadValue };
                 })
                 .sort((a, b) => b.totalWealth - a.totalWealth)
                 .map((t, i) => (
                     <div key={t.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <b style={{ fontSize: 20, color: '#555', width: 30 }}>{i + 1}</b>
+                        <b style={{ fontSize: 20, color: '#555', width: 30, textAlign:'center' }}>{i + 1}</b>
                         {t.logo ? <img src={t.logo} style={{ width: 35, height: 35, borderRadius: '50%', objectFit: 'cover' }} /> : <div style={{ width: 35 }}></div>}
+                        
                         <div style={{ flex: 1 }}>
-                            <b>{t.name}</b><br />
-                            <small style={{ color: 'var(--primary)', fontWeight: 'bold' }}>Patrimônio: {fmt(t.totalWealth)}</small>
+                            <div style={{marginBottom: 5}}><b>{t.name}</b></div>
+                            
+                            {/* EXIBIÇÃO DETALHADA DO PATRIMÔNIO */}
+                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5}}>
+                                {/* 1. Saldo em Caixa */}
+                                <div style={{background: 'rgba(0, 230, 118, 0.1)', padding: 4, borderRadius: 4, textAlign: 'center', border: '1px solid rgba(0, 230, 118, 0.2)'}}>
+                                    <div style={{fontSize: 8, color: '#aaa', textTransform: 'uppercase'}}>Saldo</div>
+                                    <div style={{fontSize: 10, fontWeight: 'bold', color: '#00E676'}}>{fmt(t.balance)}</div>
+                                </div>
+
+                                {/* 2. Valor do Elenco */}
+                                <div style={{background: 'rgba(41, 121, 255, 0.1)', padding: 4, borderRadius: 4, textAlign: 'center', border: '1px solid rgba(41, 121, 255, 0.2)'}}>
+                                    <div style={{fontSize: 8, color: '#aaa', textTransform: 'uppercase'}}>Elenco</div>
+                                    <div style={{fontSize: 10, fontWeight: 'bold', color: '#2979FF'}}>{fmt(t.squadValue)}</div>
+                                </div>
+
+                                {/* 3. Total Geral */}
+                                <div style={{background: 'rgba(255, 215, 0, 0.1)', padding: 4, borderRadius: 4, textAlign: 'center', border: '1px solid rgba(255, 215, 0, 0.2)'}}>
+                                    <div style={{fontSize: 8, color: '#aaa', textTransform: 'uppercase'}}>Total</div>
+                                    <div style={{fontSize: 10, fontWeight: 'bold', color: 'gold'}}>{fmt(t.totalWealth)}</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 ));

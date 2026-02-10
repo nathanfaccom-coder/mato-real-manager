@@ -2377,7 +2377,7 @@ const renewContract = async (p) => {
             // 3. Função Mestra do Admin (COM REGRA DE AGENTES LIVRES)
      
           // --- RENDER ---
-            if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
+           if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
             if(!user) return <LoginScreen teams={teams} players={players} papers={papers} journalists={journalists} companies={companies} coaches={coaches} onLogin={login} onCreateTeam={createTeam} onCreatePaper={createNewspaper} onCreateJourno={createJournalist} onCreateCompany={createCompany} onAdmin={loginAdmin} onVisitor={()=>{setUser({type:'VISITOR'}); setScreen('RANKING');}} onCreateCoach={createCoach} />;
 
             return (
@@ -2387,17 +2387,16 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.72.2</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.73.1</div>
                             </div>
                         </div>
                         
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
-                            {/* ÍCONE DE NOTIFICAÇÃO (SINO) - CORRIGIDO PARA ACEITAR CONTRA-PROPOSTAS */}
+                            {/* ÍCONE DE NOTIFICAÇÃO (SINO) */}
                             {(user.type === 'USER' || user.type === 'PLAYER' || user.type === 'COACH') && (
                                 <div onClick={() => setScreen('OFFERS')} style={{ position: 'relative', cursor: 'pointer', padding: '5px', display: 'flex', alignItems: 'center' }}>
                                     <i className="fas fa-bell" style={{ 
                                         fontSize: '20px', 
-                                        // AGORA VERIFICA SE É PENDING OU COUNTERED
                                         color: (offers || []).some(o => o.recipientId === user.data.id && (o.status === 'PENDING' || o.status === 'COUNTERED')) ? 'var(--warning)' : '#666', 
                                         transition: '0.3s' 
                                     }}></i>
@@ -2470,7 +2469,7 @@ const renewContract = async (p) => {
                                 players={players.filter(p=>p.teamId===user.data.id)} 
                                 coach={coaches.find(c => c.teamId === user.data.id && c.status === 'ACTIVE')} 
                                 onFireCoach={handleFireCoach}
-                                onRenewCoach={handleRenewCoachContract} // CONECTADO AQUI
+                                onRenewCoach={handleRenewCoachContract} 
                                 isVisitor={false} 
                                 onEdit={(p)=>setModal({type:'PLAYER', data:p})} 
                                 onAdd={()=>setModal({type:'PLAYER', data: { teamId: user.data.id } })} 
@@ -2505,7 +2504,7 @@ const renewContract = async (p) => {
                                     players={players.filter(p=>p.teamId===adminTeam.id)} 
                                     coach={coaches.find(c => c.teamId === adminTeam.id && c.status === 'ACTIVE')} 
                                     onFireCoach={handleFireCoach}
-                                    onRenewCoach={handleRenewCoachContract} // CONECTADO AQUI
+                                    onRenewCoach={handleRenewCoachContract} 
                                     isVisitor={false} 
                                     onEdit={(p)=>setModal({type:'PLAYER', data:p})} 
                                     onAdd={()=>setModal({type:'PLAYER', data: { teamId: adminTeam.id } })} 
@@ -2520,7 +2519,8 @@ const renewContract = async (p) => {
                                 players={players} 
                                 coaches={coaches} 
                                 open={conf.marketOpen} 
-                                isVis={user.type === 'VISITOR'} 
+                                // ATUALIZADO: TÉCNICOS TAMBÉM ENTRAM COMO VISITANTES (SÓ VEM, NÃO COMPRAM)
+                                isVis={user.type === 'VISITOR' || user.type === 'COACH'} 
                                 onNeg={(p) => setModal({ type: 'OFFER', data: p })} 
                                 onPayClause={async (p) => {
                                     const buy = teams.find(t => t.id === user.data.id);
@@ -2626,7 +2626,7 @@ const renewContract = async (p) => {
                                 onRejectOffer={rejectOffer} 
                                 onCounterOffer={handleCounterCoachOffer} 
                                 onUpdateSalary={handleUpdateCoachSalary} 
-                                onSelfAction={handleCoachSelfActions} // CONECTADO AQUI
+                                onSelfAction={handleCoachSelfActions} 
                             />
                         }
                     </div>
@@ -2635,22 +2635,22 @@ const renewContract = async (p) => {
                         <div className={`nav-item ${['HOME','COMPANY_HOME','COMPANY_DASH','PLAYER_DASH','COACH_DASH'].includes(screen)?'active':''}`} onClick={() => { if(user.type.includes('PRESS')) setScreen('PRESS_DASH'); else if(user.type === 'COMPANY') setScreen('COMPANY_HOME'); else if(user.type === 'PLAYER') setScreen('PLAYER_DASH'); else if(user.type === 'COACH') setScreen('COACH_DASH'); else setScreen('HOME'); }}>
                             <i className="fas fa-home"></i>INÍCIO
                         </div>
-                        {user.type!=='COMPANY' && user.type!=='PLAYER' && user.type!=='COACH' && <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>}
+                        
+                        {/* ATUALIZADO: Agora Técnico também vê o Mercado */}
+                        {user.type!=='COMPANY' && user.type!=='PLAYER' && <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>}
+                        
                         {user.type!=='COMPANY' && <div className={`nav-item ${screen==='SHOPPING'?'active':''}`} onClick={()=>setScreen('SHOPPING')}><i className="fas fa-shopping-bag"></i>SHOP</div>}
                         {user.type==='USER' && <div className={`nav-item ${screen==='SPONSORSHIPS'?'active':''}`} onClick={()=>setScreen('SPONSORSHIPS')}><i className="fas fa-handshake"></i>PATRO</div>}
                         {user.type!=='COMPANY' && <div className={`nav-item ${screen==='RANKING'?'active':''}`} onClick={()=>setScreen('RANKING')}><i className="fas fa-trophy"></i>RANK</div>}
                         <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={()=>{setScreen('NEWS'); setNewNews(false); localStorage.setItem('lastRead', Date.now());}}><i className="fas fa-newspaper"></i>NEWS</div>
                     </div>
 
-                  {modal && <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget && setModal(null)}>
+                    {modal && <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget && setModal(null)}>
                         <div className="modal-content">
                             {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={async(id)=>{db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} onRenew={renewContract} isOwner={user.type==='USER' && modal.data?.teamId===user.data?.id} />}
                             {modal.type==='OFFER' && <OfferForm target={modal.data} myPlayers={players.filter(p => p.teamId === user.data.id)} onSend={sendOffer} setModal={setModal} user={user} />}
                             {modal.type==='SETTINGS' && <SettingsForm team={modal.data || user.data} isAdmin={user.type==='ADMIN'} onUp={(d)=>{const tid=(modal.data?.id)||user.data.id; db.collection('teams').doc(tid).update(d); setModal(null);}} onUpgrade={()=>{/*Up*/}} onReq={(t,a,d)=>{db.collection('financeRequests').add({teamId:user.data.id, teamName:user.data.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!");}} onWithdraw={withdrawMoney} />}
-                            
-                            {/* CORREÇÃO AQUI: Componente MatchPerformanceForm chamado corretamente */}
                             {modal.type==='MATCH_PERFORMANCE' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} />}
-                            
                             {modal.type==='TEAM_TABLE' && <TeamStandingsEditor teams={teams} onUpdateTeamStats={updateTeamStats} />}
                             {modal.type==='POST_NEWS' && <div><h3>Nova Notícia</h3><input className="input-field" placeholder="Manchete / Texto" id="news-body" /><button className="btn btn-blue" onClick={()=>{postNews(`📰 **${user.data.name}:**\n${document.getElementById('news-body').value}`, 'press'); setModal(null);}}>PUBLICAR</button></div>}
                             {modal.type==='STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
@@ -2750,7 +2750,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.71.5 CORREÇÃO DE TREINOS</div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.71.6 REMOÇÃO MULTA RESCISSORIA </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -4062,12 +4062,10 @@ const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, 
                         <div>Contrato: <b style={{color: p.contract === 0 ? 'var(--danger)' : (p.contract === 1 ? 'var(--warning)' : '#fff')}}>{p.contract} Temporada{p.contract !== 1 ? 's' : ''}</b></div>
                     </div>
 
-                    {/* --- MOSTRA OS ATRIBUTOS NO MERCADO --- */}
                     <div style={{marginTop:8, borderTop:'1px dashed #444', paddingTop:5}}>
                         <AttributeGrid attrs={p.attributes} />
                     </div>
 
-                    {/* AVISO DE PRÉ-CONTRATO ASSINADO */}
                     {p.preContract && (
                         <div style={{marginTop:10, background:'rgba(0,0,0,0.5)', padding:5, borderRadius:4, textAlign:'center', border:'1px solid var(--secondary)'}}>
                             <small style={{color:'var(--secondary)', fontWeight:'bold'}}>📝 JÁ ASSINOU PRÉ-CONTRATO</small><br/>
@@ -4078,34 +4076,29 @@ const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, 
                     {!isVis && !p.preContract && (
                         <div style={{marginTop:12, display:'flex', gap:8}}>
                             
-                            {/* BOTÃO NORMAL DE NEGOCIAÇÃO */}
                             {(open || p.teamId === 'FREE') && p.status !== 'INTRANSFERIVEL' && (
                                 <button className="btn btn-purple" style={{flex:1, marginBottom:0}} onClick={()=>onNeg(p)}>
                                     <i className="fas fa-handshake"></i> {p.teamId === 'FREE' ? 'CONTRATAR' : 'NEGOCIAR'}
                                 </button>
                             )}
 
-                            {/* BOTÃO PRÉ-CONTRATO (SÓ APARECE SE TIVER 1 ANO DE CONTRATO) */}
                             {p.contract === 1 && p.teamId !== 'FREE' && p.status !== 'INTRANSFERIVEL' && (
                                 <button className="btn btn-blue" style={{flex:1, marginBottom:0}} onClick={()=>{
-                                    // Abre a modal já setando o tipo para PRE_CONTRATO na oferta
                                     const dummyOffer = { type: 'PRE_CONTRATO', value: 0 };
-                                    // Passamos dummyOffer dentro do objeto target para o OfferForm ler
                                     onNeg({...p, oldOffer: dummyOffer});
                                 }}>
                                     <i className="fas fa-file-signature"></i> PRÉ-CONTRATO
                                 </button>
                             )}
                             
-                            {/* BOTÃO DE FECHADO (se não se encaixar nos de cima) */}
                             {!open && p.teamId !== 'FREE' && p.contract !== 1 && (
                                 <button className="btn btn-ghost" style={{flex:1, marginBottom:0, opacity:0.5}} disabled>
                                     <i className="fas fa-lock"></i> FECHADO
                                 </button>
                             )}
                             
-                            {/* BOTÃO DE MULTA */}
-                            {p.teamId !== 'FREE' && parseFloat(p.clause) > 0 && (
+                            {/* BOTÃO DE MULTA INVISÍVEL (false && ...) PARA EVITAR BUGS */}
+                            {false && p.teamId !== 'FREE' && parseFloat(p.clause) > 0 && (
                                 <button className="btn btn-gold" style={{width:'auto', marginBottom:0}} onClick={()=>onPayClause(p)}>
                                     <i className="fas fa-gavel"></i> MULTA
                                 </button>

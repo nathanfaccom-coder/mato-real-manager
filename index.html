@@ -2750,7 +2750,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.71.6 REMOÇÃO MULTA RESCISSORIA </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.71.7 ADIÇÃO DE FOTO DOS JOGADORES </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2977,25 +2977,42 @@ const VisitorDashboard = ({ players, teams }) => {
 // FIM DO COMPONENTE COMPANY DASHBOARD
 // --- JOGADOR, MERCADO E OUTROS COMPONENTES QUE FALTARAM ---
 
-      const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTrainSolo }) => {
+const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTrainSolo }) => {
     const [newPass, setNewPass] = useState('');
     const [tab, setTab] = useState('PERFIL');
-    const [trainType, setTrainType] = useState('FISICO_BASE'); // Estado para o tipo de treino
+    const [trainType, setTrainType] = useState('FISICO_BASE'); 
 
     const myItems = (sales||[]).filter(s => s.buyerId === player.id);
     
-    // --- CÁLCULO DE XP (ATUALIZADO) ---
+    // --- CÁLCULO DE XP ---
     const xpCurrent = (player.xp || 0) + (player.pendingXP || 0);
-    const pointsToGain = Math.floor(xpCurrent / 100); // Pontos de atributo disponíveis
+    const pointsToGain = Math.floor(xpCurrent / 100); 
     const xpRest = xpCurrent % 100; 
     
     // --- CÁLCULO DA ESTIMATIVA DE OVERALL ---
-    // Conta quantos atributos existem (aprox. 30).
-    // Para subir 1 de Overall, precisa subir +1 em todos os atributos (ou +30 no total).
     const attrCount = player.attributes ? Object.keys(player.attributes).length : 30;
     const projectedOvIncrease = Math.floor(pointsToGain / attrCount);
 
     const energy = player.energy !== undefined ? player.energy : 100;
+
+    // --- FUNÇÃO PARA UPLOAD DE ROSTO (NOVO) ---
+    const handleFaceUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        // Limite de tamanho (ex: 2MB) para não pesar o banco
+        if (file.size > 2 * 1024 * 1024) return alert("A imagem deve ter no máximo 2MB.");
+
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+            if (confirm("Salvar esta foto como seu perfil?")) {
+                await db.collection('players').doc(player.id).update({ face: reader.result });
+                alert("Foto atualizada com sucesso!");
+                window.location.reload(); 
+            }
+        };
+        reader.readAsDataURL(file);
+    };
 
     // --- CONFIGURAÇÃO VISUAL IGUAL AO COACH ---
     const ATTR_LIST = [
@@ -3028,8 +3045,39 @@ const VisitorDashboard = ({ players, teams }) => {
 
     return (
         <div>
-            {/* CABEÇALHO COM BARRA DE XP */}
+            {/* CABEÇALHO COM BARRA DE XP E FOTO */}
             <div className="highlight-card" style={{textAlign:'center', paddingBottom:30, position:'relative'}}>
+                
+                {/* --- ÁREA DA FOTO DO JOGADOR --- */}
+                <div style={{position: 'relative', width: 80, height: 80, margin: '0 auto 10px auto'}}>
+                    {player.face ? (
+                        <img src={player.face} style={{
+                            width: '100%', height: '100%', borderRadius: '50%', 
+                            objectFit: 'cover', objectPosition: 'top', // Garante enquadramento do rosto
+                            border: '3px solid var(--primary)'
+                        }} />
+                    ) : (
+                        <div style={{
+                            width: '100%', height: '100%', borderRadius: '50%', 
+                            background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 30, border: '3px solid #555'
+                        }}>
+                            👤
+                        </div>
+                    )}
+                    {/* Botão de Upload */}
+                    <label style={{
+                        position: 'absolute', bottom: 0, right: 0, 
+                        background: 'var(--blue)', color: 'white', 
+                        borderRadius: '50%', width: 25, height: 25, 
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                        fontSize: 12, border: '2px solid #121212'
+                    }}>
+                        📷
+                        <input type="file" style={{display:'none'}} accept="image/*" onChange={handleFaceUpload} />
+                    </label>
+                </div>
+
                 <h2 style={{margin:0}}>{player.name} <span style={{fontSize:14}}>{player.mood}</span></h2>
                 <small style={{color:'#ccc'}}>{team?.name || 'Agente Livre'}</small>
                 
@@ -3037,8 +3085,6 @@ const VisitorDashboard = ({ players, teams }) => {
                     <div style={{textAlign:'center'}}>
                         <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:5}}>
                             <div style={{fontSize:40, fontWeight:'900', color:'var(--warning)', lineHeight:1}}>{player.overall}</div>
-                            
-                            {/* AQUI ESTÁ A MUDANÇA: Só mostra se for aumentar pelo menos +1 de Overall */}
                             {projectedOvIncrease > 0 && (
                                 <span className="pulse" style={{fontSize:16, color:'#00E676', fontWeight:'bold', display:'flex', alignItems:'center'}}>
                                     <i className="fas fa-arrow-up" style={{fontSize:12, marginRight:2}}></i>{projectedOvIncrease}
@@ -3122,7 +3168,6 @@ const VisitorDashboard = ({ players, teams }) => {
             </div>}
 
             {tab==='ACOES' && <div>
-                {/* CARD DE TREINO SOLO (NOVO) */}
                 <div className="card" style={{borderLeft:'4px solid cyan', marginBottom:15}}>
                     <h3>🏋️‍♂️ Treino Individual</h3>
                     <p style={{fontSize:11, color:'#aaa', marginBottom:10}}>
@@ -3580,7 +3625,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
     );
 };
         //FIM
-       const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireCoach, onRenewCoach }) => {
+const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireCoach, onRenewCoach }) => {
     const [tab, setTab] = useState('ELENCO'); 
     
     // Calcula salários somando jogadores + técnico (se houver)
@@ -4047,11 +4092,19 @@ const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, 
             {list.map(p => (
                 <div key={p.id} className="card" style={{borderLeft: `4px solid ${getPosColor(p.position)}`, opacity: p.preContract ? 0.7 : 1}}>
                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'start'}}>
-                        <div>
-                            <span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span>
-                            <b style={{fontSize:16}}>{p.name}</b>
-                            <div style={{fontSize:10, color:'#888', marginTop:2}}>
-                                {p.teamId === 'FREE' ? <b style={{color:'var(--warning)'}}><i className="fas fa-unlock"></i> PASSE LIVRE</b> : <span><i className="fas fa-tshirt"></i> {teams.find(t=>t.id===p.teamId)?.name}</span>}
+                        <div style={{display:'flex', gap: 10, alignItems:'center'}}>
+                            {/* FOTO DO JOGADOR NO MERCADO */}
+                            {p.face ? (
+                                <img src={p.face} style={{width: 45, height: 45, borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border:'2px solid #444'}} />
+                            ) : (
+                                <span className="badge-pos" style={{background:getPosColor(p.position), width: 40, height: 40, display:'flex', alignItems:'center', justifyContent:'center', fontSize: 12}}>{p.position}</span>
+                            )}
+                            
+                            <div>
+                                <b style={{fontSize:16}}>{p.name}</b>
+                                <div style={{fontSize:10, color:'#888', marginTop:2}}>
+                                    {p.teamId === 'FREE' ? <b style={{color:'var(--warning)'}}><i className="fas fa-unlock"></i> PASSE LIVRE</b> : <span><i className="fas fa-tshirt"></i> {teams.find(t=>t.id===p.teamId)?.name}</span>}
+                                </div>
                             </div>
                         </div>
                         <span className="player-ov">{p.overall}</span>
@@ -4404,103 +4457,110 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter, onCo
         //FIM
 
 const Ranking = ({ teams, players }) => {
-            const [view, setView] = React.useState('TEAMS');
+    const [view, setView] = React.useState('TEAMS');
 
-            // Filtra para não mostrar jogadores bugados (sem time)
-            const validPlayers = players.filter(p => p.teamId && p.teamId !== 'FREE' && p.name);
+    // Filtra para não mostrar jogadores bugados (sem time)
+    const validPlayers = players.filter(p => p.teamId && p.teamId !== 'FREE' && p.name);
 
-            const renderTeams = () => teams
-                .filter(t => t.status !== 'PENDING')
-                .map(t => {
-                    // Calcula o valor total do elenco somando o 'value' de cada jogador
-                    const squadValue = validPlayers.filter(p => p.teamId === t.id).reduce((a, b) => a + (parseFloat(b.value) || 0), 0);
-                    // Pega o saldo em caixa
-                    const balance = parseFloat(t.balance) || 0;
-                    // Soma tudo
-                    return { ...t, balance, squadValue, totalWealth: balance + squadValue };
-                })
-                .sort((a, b) => b.totalWealth - a.totalWealth)
-                .map((t, i) => (
-                    <div key={t.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <b style={{ fontSize: 20, color: '#555', width: 30, textAlign:'center' }}>{i + 1}</b>
-                        {t.logo ? <img src={t.logo} style={{ width: 35, height: 35, borderRadius: '50%', objectFit: 'cover' }} /> : <div style={{ width: 35 }}></div>}
-                        
-                        <div style={{ flex: 1 }}>
-                            <div style={{marginBottom: 5}}><b>{t.name}</b></div>
-                            
-                            {/* EXIBIÇÃO DETALHADA DO PATRIMÔNIO */}
-                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5}}>
-                                {/* 1. Saldo em Caixa */}
-                                <div style={{background: 'rgba(0, 230, 118, 0.1)', padding: 4, borderRadius: 4, textAlign: 'center', border: '1px solid rgba(0, 230, 118, 0.2)'}}>
-                                    <div style={{fontSize: 8, color: '#aaa', textTransform: 'uppercase'}}>Saldo</div>
-                                    <div style={{fontSize: 10, fontWeight: 'bold', color: '#00E676'}}>{fmt(t.balance)}</div>
-                                </div>
-
-                                {/* 2. Valor do Elenco */}
-                                <div style={{background: 'rgba(41, 121, 255, 0.1)', padding: 4, borderRadius: 4, textAlign: 'center', border: '1px solid rgba(41, 121, 255, 0.2)'}}>
-                                    <div style={{fontSize: 8, color: '#aaa', textTransform: 'uppercase'}}>Elenco</div>
-                                    <div style={{fontSize: 10, fontWeight: 'bold', color: '#2979FF'}}>{fmt(t.squadValue)}</div>
-                                </div>
-
-                                {/* 3. Total Geral */}
-                                <div style={{background: 'rgba(255, 215, 0, 0.1)', padding: 4, borderRadius: 4, textAlign: 'center', border: '1px solid rgba(255, 215, 0, 0.2)'}}>
-                                    <div style={{fontSize: 8, color: '#aaa', textTransform: 'uppercase'}}>Total</div>
-                                    <div style={{fontSize: 10, fontWeight: 'bold', color: 'gold'}}>{fmt(t.totalWealth)}</div>
-                                </div>
-                            </div>
+    const renderTeams = () => teams
+        .filter(t => t.status !== 'PENDING')
+        .map(t => {
+            // Calcula o valor total do elenco somando o 'value' de cada jogador
+            const squadValue = validPlayers.filter(p => p.teamId === t.id).reduce((a, b) => a + (parseFloat(b.value) || 0), 0);
+            // Pega o saldo em caixa
+            const balance = parseFloat(t.balance) || 0;
+            // Soma tudo
+            return { ...t, balance, squadValue, totalWealth: balance + squadValue };
+        })
+        .sort((a, b) => b.totalWealth - a.totalWealth)
+        .map((t, i) => (
+            <div key={t.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px' }}>
+                <b style={{ fontSize: 20, color: '#555', width: 30, textAlign:'center' }}>{i + 1}</b>
+                {t.logo ? <img src={t.logo} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '2px solid #333' }} /> : <div style={{ width: 40 }}></div>}
+                
+                <div style={{ flex: 1 }}>
+                    <div style={{marginBottom: 5, fontWeight: 'bold'}}>{t.name}</div>
+                    
+                    {/* EXIBIÇÃO DETALHADA DO PATRIMÔNIO (3 Colunas) */}
+                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5}}>
+                        {/* 1. Saldo em Caixa */}
+                        <div style={{background: 'rgba(0, 230, 118, 0.1)', padding: 4, borderRadius: 4, textAlign: 'center', border: '1px solid rgba(0, 230, 118, 0.2)'}}>
+                            <div style={{fontSize: 8, color: '#aaa', textTransform: 'uppercase'}}>Saldo</div>
+                            <div style={{fontSize: 10, fontWeight: 'bold', color: '#00E676'}}>{fmt(t.balance)}</div>
                         </div>
-                    </div>
-                ));
 
-            const renderPlayers = (sortKey, label, color, isStat = true) => {
-                let sorted = [];
-                if (isStat) {
-                    sorted = validPlayers.filter(p => p.stats && p.stats[sortKey] > 0).sort((a, b) => (b.stats[sortKey] || 0) - (a.stats[sortKey] || 0));
-                } else {
-                    sorted = [...validPlayers].sort((a, b) => (parseFloat(b[sortKey]) || 0) - (parseFloat(a[sortKey]) || 0));
-                }
-
-                return sorted.slice(0, 20).map((p, i) => (
-                    <div key={p.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <b style={{ fontSize: 20, color: '#555', width: 30 }}>{i + 1}</b>
-                        <div style={{ flex: 1 }}>
-                            <b>{p.name}</b> <small>({teams.find(t => t.id === p.teamId)?.name})</small>
+                        {/* 2. Valor do Elenco */}
+                        <div style={{background: 'rgba(41, 121, 255, 0.1)', padding: 4, borderRadius: 4, textAlign: 'center', border: '1px solid rgba(41, 121, 255, 0.2)'}}>
+                            <div style={{fontSize: 8, color: '#aaa', textTransform: 'uppercase'}}>Elenco</div>
+                            <div style={{fontSize: 10, fontWeight: 'bold', color: '#2979FF'}}>{fmt(t.squadValue)}</div>
                         </div>
-                        <div style={{ fontWeight: 'bold', fontSize: 14, color: color }}>
-                            {label} {isStat ? p.stats[sortKey] : (sortKey === 'salary' ? fmt(p[sortKey]) : p[sortKey])}
+
+                        {/* 3. Total Geral */}
+                        <div style={{background: 'rgba(255, 215, 0, 0.1)', padding: 4, borderRadius: 4, textAlign: 'center', border: '1px solid rgba(255, 215, 0, 0.2)'}}>
+                            <div style={{fontSize: 8, color: '#aaa', textTransform: 'uppercase'}}>Total</div>
+                            <div style={{fontSize: 10, fontWeight: 'bold', color: 'gold'}}>{fmt(t.totalWealth)}</div>
                         </div>
-                    </div>
-                ));
-            };
-
-            return (
-                <div>
-                    <h3>Ranking e Estatísticas</h3>
-                    <div className="rank-tabs">
-                        <div className={`rank-tab ${view === 'TEAMS' ? 'active' : ''}`} onClick={() => setView('TEAMS')}>💰 Clubes</div>
-                        <div className={`rank-tab ${view === 'OVERALL' ? 'active' : ''}`} onClick={() => setView('OVERALL')}>⭐ Craques</div>
-                        <div className={`rank-tab ${view === 'SALARY' ? 'active' : ''}`} onClick={() => setView('SALARY')}>💸 Salários</div>
-                        <div className={`rank-tab ${view === 'GOALS' ? 'active' : ''}`} onClick={() => setView('GOALS')}>⚽ Gols</div>
-                        <div className={`rank-tab ${view === 'ASSIST' ? 'active' : ''}`} onClick={() => setView('ASSIST')}>👟 Assis</div>
-                        <div className={`rank-tab ${view === 'SAVES' ? 'active' : ''}`} onClick={() => setView('SAVES')}>🧤 Defesas</div>
-                        <div className={`rank-tab ${view === 'YEL' ? 'active' : ''}`} onClick={() => setView('YEL')}>🟨 Amarelos</div>
-                        <div className={`rank-tab ${view === 'RED' ? 'active' : ''}`} onClick={() => setView('RED')}>🟥 Vermelhos</div>
-                    </div>
-
-                    <div style={{ marginTop: 10 }}>
-                        {view === 'TEAMS' && renderTeams()}
-                        {view === 'OVERALL' && renderPlayers('overall', 'Ov:', 'var(--warning)', false)}
-                        {view === 'SALARY' && renderPlayers('salary', '', 'var(--primary)', false)}
-                        {view === 'GOALS' && renderPlayers('goals', '⚽', '#fff')}
-                        {view === 'ASSIST' && renderPlayers('assists', '👟', '#fff')}
-                        {view === 'SAVES' && renderPlayers('saves', '🧤', '#fff')}
-                        {view === 'YEL' && renderPlayers('yellows', '🟨', 'yellow')}
-                        {view === 'RED' && renderPlayers('reds', '🟥', 'red')}
                     </div>
                 </div>
-            );
-        };
+            </div>
+        ));
 
+    const renderPlayers = (sortKey, label, color, isStat = true) => {
+        let sorted = [];
+        if (isStat) {
+            sorted = validPlayers.filter(p => p.stats && p.stats[sortKey] > 0).sort((a, b) => (b.stats[sortKey] || 0) - (a.stats[sortKey] || 0));
+        } else {
+            sorted = [...validPlayers].sort((a, b) => (parseFloat(b[sortKey]) || 0) - (parseFloat(a[sortKey]) || 0));
+        }
+
+        return sorted.slice(0, 20).map((p, i) => (
+            <div key={p.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <b style={{ fontSize: 20, color: '#555', width: 30, textAlign: 'center' }}>{i + 1}</b>
+                
+                {/* FOTO DO JOGADOR NO RANKING */}
+                {p.face ? (
+                    <img src={p.face} style={{ width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border: '1px solid #444' }} />
+                ) : (
+                    <div style={{ width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>👤</div>
+                )}
+
+                <div style={{ flex: 1 }}>
+                    <b>{p.name}</b> <small>({teams.find(t => t.id === p.teamId)?.name})</small>
+                </div>
+                <div style={{ fontWeight: 'bold', fontSize: 14, color: color }}>
+                    {label} {isStat ? p.stats[sortKey] : (sortKey === 'salary' ? fmt(p[sortKey]) : p[sortKey])}
+                </div>
+            </div>
+        ));
+    };
+
+    return (
+        <div>
+            <h3>Ranking e Estatísticas</h3>
+            <div className="rank-tabs">
+                <div className={`rank-tab ${view === 'TEAMS' ? 'active' : ''}`} onClick={() => setView('TEAMS')}>💰 Clubes</div>
+                <div className={`rank-tab ${view === 'OVERALL' ? 'active' : ''}`} onClick={() => setView('OVERALL')}>⭐ Craques</div>
+                <div className={`rank-tab ${view === 'SALARY' ? 'active' : ''}`} onClick={() => setView('SALARY')}>💸 Salários</div>
+                <div className={`rank-tab ${view === 'GOALS' ? 'active' : ''}`} onClick={() => setView('GOALS')}>⚽ Gols</div>
+                <div className={`rank-tab ${view === 'ASSIST' ? 'active' : ''}`} onClick={() => setView('ASSIST')}>👟 Assis</div>
+                <div className={`rank-tab ${view === 'SAVES' ? 'active' : ''}`} onClick={() => setView('SAVES')}>🧤 Defesas</div>
+                <div className={`rank-tab ${view === 'YEL' ? 'active' : ''}`} onClick={() => setView('YEL')}>🟨 Amarelos</div>
+                <div className={`rank-tab ${view === 'RED' ? 'active' : ''}`} onClick={() => setView('RED')}>🟥 Vermelhos</div>
+            </div>
+
+            <div style={{ marginTop: 10 }}>
+                {view === 'TEAMS' && renderTeams()}
+                {view === 'OVERALL' && renderPlayers('overall', 'Ov:', 'var(--warning)', false)}
+                {view === 'SALARY' && renderPlayers('salary', '', 'var(--primary)', false)}
+                {view === 'GOALS' && renderPlayers('goals', '⚽', '#fff')}
+                {view === 'ASSIST' && renderPlayers('assists', '👟', '#fff')}
+                {view === 'SAVES' && renderPlayers('saves', '🧤', '#fff')}
+                {view === 'YEL' && renderPlayers('yellows', '🟨', 'yellow')}
+                {view === 'RED' && renderPlayers('reds', '🟥', 'red')}
+            </div>
+        </div>
+    );
+};
 // FIM DO COMPONENTE RANKING
 
 // --- COMPONENTES QUE FALTAVAM (Súmula e Tabela) ---

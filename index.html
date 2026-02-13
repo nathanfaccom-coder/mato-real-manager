@@ -2750,7 +2750,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.71.7 ADIÇÃO DE FOTO DOS JOGADORES </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.71.8 ADIÇÃO DE FOTO DOS JOGADORES </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -2984,37 +2984,74 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
 
     const myItems = (sales||[]).filter(s => s.buyerId === player.id);
     
-    // --- CÁLCULO DE XP ---
     const xpCurrent = (player.xp || 0) + (player.pendingXP || 0);
     const pointsToGain = Math.floor(xpCurrent / 100); 
     const xpRest = xpCurrent % 100; 
     
-    // --- CÁLCULO DA ESTIMATIVA DE OVERALL ---
     const attrCount = player.attributes ? Object.keys(player.attributes).length : 30;
     const projectedOvIncrease = Math.floor(pointsToGain / attrCount);
 
     const energy = player.energy !== undefined ? player.energy : 100;
 
-    // --- FUNÇÃO PARA UPLOAD DE ROSTO (NOVO) ---
+    // --- FUNÇÃO PARA UPLOAD DE ROSTO (COM COMPRESSÃO) ---
     const handleFaceUpload = (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        
-        // Limite de tamanho (ex: 2MB) para não pesar o banco
-        if (file.size > 2 * 1024 * 1024) return alert("A imagem deve ter no máximo 2MB.");
 
+        // 1. Lê o arquivo
         const reader = new FileReader();
-        reader.onloadend = async () => {
-            if (confirm("Salvar esta foto como seu perfil?")) {
-                await db.collection('players').doc(player.id).update({ face: reader.result });
-                alert("Foto atualizada com sucesso!");
-                window.location.reload(); 
-            }
-        };
         reader.readAsDataURL(file);
+        
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            
+            img.onload = async () => {
+                // 2. Cria um Canvas para redimensionar (Compressão)
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Define tamanho máximo para ícone (200px é perfeito e leve)
+                const MAX_SIZE = 200;
+                let width = img.width;
+                let height = img.height;
+
+                // Redimensiona mantendo a proporção
+                if (width > height) {
+                    if (width > MAX_SIZE) {
+                        height *= MAX_SIZE / width;
+                        width = MAX_SIZE;
+                    }
+                } else {
+                    if (height > MAX_SIZE) {
+                        width *= MAX_SIZE / height;
+                        height = MAX_SIZE;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                
+                // Desenha a imagem redimensionada no canvas
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // 3. Converte para Texto Base64 leve (JPEG qualidade 0.8)
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+                if (confirm("Salvar esta foto de perfil?")) {
+                    try {
+                        await db.collection('players').doc(player.id).update({ face: dataUrl });
+                        alert("Foto atualizada com sucesso!");
+                        // O onSnapshot do App.js vai atualizar a tela automaticamente
+                    } catch (error) {
+                        console.error(error);
+                        alert("Erro ao salvar: " + error.message);
+                    }
+                }
+            };
+        };
     };
 
-    // --- CONFIGURAÇÃO VISUAL IGUAL AO COACH ---
     const ATTR_LIST = [
         { k: 'weakFootAcc', l: 'Pior Pé Prec.', i: '🦶' }, { k: 'shot', l: 'Finalização', i: '🥅' }, { k: 'condition', l: 'Cond. Física', i: '💪' },
         { k: 'stamina', l: 'Resistência', i: '🔋' }, { k: 'header', l: 'Cabeceio', i: '🤕' }, { k: 'attack', l: 'Ataque', i: '⚔️' },
@@ -3045,15 +3082,15 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
 
     return (
         <div>
-            {/* CABEÇALHO COM BARRA DE XP E FOTO */}
+            {/* CABEÇALHO COM BARRA DE XP */}
             <div className="highlight-card" style={{textAlign:'center', paddingBottom:30, position:'relative'}}>
                 
-                {/* --- ÁREA DA FOTO DO JOGADOR --- */}
+                {/* --- FOTO DO JOGADOR (COM BOTÃO DE UPLOAD) --- */}
                 <div style={{position: 'relative', width: 80, height: 80, margin: '0 auto 10px auto'}}>
                     {player.face ? (
                         <img src={player.face} style={{
                             width: '100%', height: '100%', borderRadius: '50%', 
-                            objectFit: 'cover', objectPosition: 'top', // Garante enquadramento do rosto
+                            objectFit: 'cover', objectPosition: 'top', 
                             border: '3px solid var(--primary)'
                         }} />
                     ) : (
@@ -3065,7 +3102,6 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                             👤
                         </div>
                     )}
-                    {/* Botão de Upload */}
                     <label style={{
                         position: 'absolute', bottom: 0, right: 0, 
                         background: 'var(--blue)', color: 'white', 
@@ -3100,7 +3136,6 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                     </div>
                 </div>
 
-                {/* Barra de Progresso */}
                 <div style={{position:'absolute', bottom:0, left:0, right:0, height:8, background:'#333'}}>
                     <div style={{width:`${xpRest}%`, height:'100%', background:'linear-gradient(90deg, var(--warning), gold)', transition:'1s'}}></div>
                 </div>

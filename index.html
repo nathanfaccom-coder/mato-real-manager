@@ -2795,7 +2795,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.74.7  </div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.74.8  </div>
                             </div>
                         </div>
                         
@@ -2874,26 +2874,42 @@ const renewContract = async (p) => {
                         }
                         
                        {screen === 'HOME' && user.type === 'USER' && (
-                            <div>
-                                <TeamDashboard 
-                                    team={user.data} 
-                                    players={players.filter(p=>p.teamId===user.data.id)} 
-                                    coach={coaches.find(c => c.teamId === user.data.id && c.status === 'ACTIVE')} 
-                                    onFireCoach={handleFireCoach}
-                                    onRenewCoach={handleRenewCoachContract} 
-                                    isVisitor={false} 
-                                    onEdit={(p)=>setModal({type:'PLAYER', data:p})} 
-                                    onAdd={()=>setModal({type:'PLAYER', data: { teamId: user.data.id } })} 
-                                />
-                                <div style={{marginTop:20}}>
-                                    <h3>Classificação</h3>
-                                    <LeagueTable teams={teams} serie="A" />
-                                    <div style={{marginTop:10}}><LeagueTable teams={teams} serie="B" /></div>
-                                    <div style={{marginTop:10}}><LeagueTable teams={teams} serie="C" /></div>
-                                    <div style={{marginTop:10}}><LeagueTable teams={teams} serie="D" /></div>
-                                </div>
-                            </div>
-                        )}
+    <div key="user-home-container">
+        <TeamDashboard 
+            team={user.data} 
+            players={players.filter(p=>p.teamId===user.data.id)} 
+            coach={coaches.find(c => c.teamId === user.data.id && c.status === 'ACTIVE')} 
+            onFireCoach={handleFireCoach}
+            onRenewCoach={handleRenewCoachContract} 
+            isVisitor={false} 
+            onEdit={(p)=>setModal({type:'PLAYER', data:p})} 
+            onAdd={()=>setModal({type:'PLAYER', data: { teamId: user.data.id } })} 
+        />
+        
+        <div style={{marginTop:30, borderTop: '2px solid #333', paddingTop: 20}}>
+            <h2 style={{color: 'var(--primary)', textAlign: 'center'}}><i className="fas fa-list-ol"></i> Classificação Oficial</h2>
+            
+            {/* Tabela da Série do Time logado */}
+            <LeagueTable teams={teams} serie={user.data.serie || 'A'} />
+
+            {/* Central de Jogos para ver os confrontos da rodada */}
+            <div style={{marginTop: 25}}>
+                <h3 style={{textAlign: 'center'}}><i className="fas fa-calendar-alt"></i> Próximos Jogos</h3>
+                <MatchCenter matches={matches} teams={teams} onReportMatch={() => alert("Apenas jornalistas podem lançar súmulas.")} />
+            </div>
+
+            {/* Outras Séries para acompanhamento */}
+            <details style={{marginTop: 20, background: 'rgba(255,255,255,0.05)', padding: 10, borderRadius: 8}}>
+                <summary style={{cursor: 'pointer', fontSize: 12, color: '#aaa'}}>Ver outras divisões</summary>
+                <div style={{marginTop: 10, display: 'grid', gap: 15}}>
+                    {['A','B','C','D'].filter(s => s !== user.data.serie).map(s => (
+                        <LeagueTable key={s} teams={teams} serie={s} />
+                    ))}
+                </div>
+            </details>
+        </div>
+    </div>
+)}
                         
                         {screen === 'HOME' && user.type === 'VISITOR' && <VisitorDashboard players={players} teams={teams} />}
                         
@@ -3169,7 +3185,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.74.7 ATUALIZAÇÃO DAS EMPRESSAS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.74.8 CLASSIFICAÇÃO E JOGOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

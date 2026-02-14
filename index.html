@@ -2486,7 +2486,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.74.1 </div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.74.2 </div>
                             </div>
                         </div>
                         
@@ -4933,7 +4933,7 @@ const Ranking = ({ teams, players }) => {
 // FIM DO COMPONENTE MATCH PERFORMANCE FORM
 
 
-   const TeamStandingsEditor = ({ teams, onUpdateTeamStats }) => {
+  const TeamStandingsEditor = ({ teams, onUpdateTeamStats }) => {
             return (
                 <div>
                     <h3>Editar Tabela (Jornalista)</h3>
@@ -4971,8 +4971,35 @@ const Ranking = ({ teams, players }) => {
         <button onclick="window.location.reload()" style="padding: 10px 20px; background: #00E676; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 20px;">TENTAR RECONECTAR</button>
     </div>
 
+    <div id="ios-install-prompt" style="display: none; position: fixed; bottom: 40px; left: 5%; right: 5%; background: rgba(30, 30, 30, 0.95); border: 1px solid #00E676; padding: 20px; border-radius: 15px; z-index: 99999; box-shadow: 0 10px 30px rgba(0,0,0,0.8); text-align: center; color: white; font-family: sans-serif; backdrop-filter: blur(10px);">
+        
+        <button onclick="document.getElementById('ios-install-prompt').style.display='none'" style="position: absolute; top: 10px; right: 15px; background: transparent; border: none; color: #666; font-size: 24px; cursor: pointer;">&times;</button>
+        
+        <div style="font-size: 40px; margin-bottom: 10px;">📲</div>
+        <p style="margin: 0 0 5px 0; font-size: 16px; font-weight: bold; color: #00E676;">Instalar no iPhone</p>
+        <p style="font-size: 13px; color: #ccc; margin-bottom: 20px; line-height: 1.4;">Para ter o app em tela cheia, você precisa adicionar manualmente:</p>
+        
+        <div style="text-align: left; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; font-size: 13px;">
+            <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">1.</span> 
+                <span>Toque no botão <b>Compartilhar</b> <span style="font-size: 18px;">⎋</span> (abaixo)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">2.</span> 
+                <span>Selecione <b>"Adicionar à Tela de Início"</b> <span style="font-size: 18px;">⊞</span></span>
+            </div>
+        </div>
+
+        <div style="position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 10px solid #00E676;"></div>
+        <div style="font-size: 20px; position: absolute; bottom: -35px; left: 50%; transform: translateX(-50%); color: #00E676; animation: bounce 1s infinite;">⬇</div>
+    </div>
+
+    <style>
+        @keyframes bounce { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, 5px); } }
+    </style>
+
     <script>
-        // 1. Registrar o Service Worker (Para o botão de instalar funcionar)
+        // 1. Registrar o Service Worker (Para o botão de instalar funcionar no Android/PC)
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register('service-worker.js').then(function(registration) {
@@ -4998,6 +5025,19 @@ const Ranking = ({ teams, players }) => {
         
         // Verifica assim que abre
         checkInternet();
+
+        // 3. Lógica para iPhone (iOS)
+        const isIos = () => {
+            const userAgent = window.navigator.userAgent.toLowerCase();
+            return /iphone|ipad|ipod/.test(userAgent);
+        }
+        // Verifica se já está em modo tela cheia (instalado)
+        const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
+
+        // Mostra o aviso apenas se for iOS e não estiver instalado
+        if (isIos() && !isInStandaloneMode()) {
+            document.getElementById('ios-install-prompt').style.display = 'block';
+        }
     </script>
 </body>
 </html>

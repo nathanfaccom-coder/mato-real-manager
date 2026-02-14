@@ -4959,7 +4959,7 @@ const Ranking = ({ teams, players }) => {
             );
         };
 //fim
-        const root = ReactDOM.createRoot(document.getElementById('root'));
+       const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<ErrorBoundary><App /></ErrorBoundary>);
 
     </script>
@@ -4967,91 +4967,63 @@ const Ranking = ({ teams, players }) => {
     <div id="offline-blocker" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 999999; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
         <div style="font-size: 50px;">📡</div>
         <h2 style="color: white; font-family: sans-serif; margin: 20px 0;">Sem Conexão</h2>
-        <p style="color: #888; font-family: sans-serif;">O Mato Real precisa de internet para sincronizar os dados.</p>
+        <p style="color: #888; font-family: sans-serif;">O Mato Real precisa de internet para funcionar.</p>
         <button onclick="window.location.reload()" style="padding: 10px 20px; background: #00E676; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 20px;">TENTAR RECONECTAR</button>
     </div>
 
     <div id="ios-install-prompt" style="display: none; position: fixed; bottom: 40px; left: 5%; right: 5%; background: rgba(30, 30, 30, 0.95); border: 1px solid #00E676; padding: 20px; border-radius: 15px; z-index: 99999; box-shadow: 0 10px 30px rgba(0,0,0,0.8); text-align: center; color: white; font-family: sans-serif; backdrop-filter: blur(10px);">
-        
         <button onclick="document.getElementById('ios-install-prompt').style.display='none'" style="position: absolute; top: 10px; right: 15px; background: transparent; border: none; color: #666; font-size: 24px; cursor: pointer;">&times;</button>
-        
         <div style="font-size: 40px; margin-bottom: 10px;">📲</div>
-        <p style="margin: 0 0 5px 0; font-size: 16px; font-weight: bold; color: #00E676;">Instalar no iPhone</p>
-        <p style="font-size: 13px; color: #ccc; margin-bottom: 20px; line-height: 1.4;">Para ter o app em tela cheia, você precisa adicionar manualmente:</p>
-        
+        <p style="margin: 0 0 5px 0; font-size: 16px; font-weight: bold; color: #00E676;">Instalar App</p>
+        <p style="font-size: 13px; color: #ccc; margin-bottom: 20px; line-height: 1.4;">Instale para jogar em tela cheia:</p>
         <div style="text-align: left; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; font-size: 13px;">
             <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 20px;">1.</span> 
-                <span>Toque no botão <b>Compartilhar</b> <span style="font-size: 18px;">⎋</span> (abaixo)</span>
+                <span style="font-size: 20px;">1.</span> <span>Toque em <b>Compartilhar</b> <span style="font-size: 18px;">⎋</span></span>
             </div>
             <div style="display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 20px;">2.</span> 
-                <span>Selecione <b>"Adicionar à Tela de Início"</b> <span style="font-size: 18px;">⊞</span></span>
+                <span style="font-size: 20px;">2.</span> <span><b>"Adicionar à Tela de Início"</b> <span style="font-size: 18px;">⊞</span></span>
             </div>
         </div>
-
         <div style="position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 10px solid #00E676;"></div>
         <div style="font-size: 20px; position: absolute; bottom: -35px; left: 50%; transform: translateX(-50%); color: #00E676; animation: bounce 1s infinite;">⬇</div>
     </div>
-
-    <style>
-        @keyframes bounce { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, 5px); } }
-    </style>
+    <style>@keyframes bounce { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, 5px); } }</style>
 
     <script>
-        // 1. Registrar o Service Worker com ATUALIZAÇÃO AUTOMÁTICA
+        // 1. REGISTRA O "MOTOR DE LIMPEZA" (Garante que está online)
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
-                navigator.serviceWorker.register('service-worker.js').then(function(registration) {
-                    console.log('App registrado: ', registration.scope);
-
-                    // Detecta se existe uma nova versão
-                    registration.onupdatefound = function() {
-                        const installingWorker = registration.installing;
-                        installingWorker.onstatechange = function() {
-                            if (installingWorker.state === 'installed') {
-                                if (navigator.serviceWorker.controller) {
-                                    console.log('Nova versão disponível! Atualizando...');
-                                    window.location.reload(); // Força o refresh para pegar a versão nova
-                                }
-                            }
-                        };
-                    };
-                }, function(err) {
-                    console.log('Falha ao registrar App: ', err);
+                // Força o navegador a buscar o novo arquivo no servidor
+                navigator.serviceWorker.register('service-worker.js', { scope: './' })
+                .then(registration => {
+                    // Tenta atualizar imediatamente
+                    registration.update(); 
+                    console.log('App Online Registrado');
                 });
             });
-
-            // Recarrega a página quando o novo Service Worker assumir o controle
-            let refreshing;
-            navigator.serviceWorker.addEventListener('controllerchange', function() {
-                if (refreshing) return;
+            
+            // Recarrega a página automaticamente se uma nova versão assumir o controle
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
                 window.location.reload();
-                refreshing = true;
             });
         }
 
-        // 2. Trava de Segurança (Bloqueia se cair a net)
+        // 2. DETECTOR DE INTERNET (TRAVA)
         function checkInternet() {
             const blocker = document.getElementById('offline-blocker');
             if (!navigator.onLine) {
-                blocker.style.display = 'flex'; // Mostra a tela preta
+                blocker.style.display = 'flex';
             } else {
-                blocker.style.display = 'none'; // Esconde e libera o jogo
+                blocker.style.display = 'none';
             }
         }
-
         window.addEventListener('offline', checkInternet);
         window.addEventListener('online', checkInternet);
         checkInternet();
 
-        // 3. Lógica para iPhone (iOS)
-        const isIos = () => {
-            const userAgent = window.navigator.userAgent.toLowerCase();
-            return /iphone|ipad|ipod/.test(userAgent);
-        }
+        // 3. LÓGICA IPHONE
+        const isIos = () => /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
         const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
-
         if (isIos() && !isInStandaloneMode()) {
             document.getElementById('ios-install-prompt').style.display = 'block';
         }

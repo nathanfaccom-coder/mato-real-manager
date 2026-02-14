@@ -454,9 +454,14 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
     return details.join('\n');
 };
 // FIM DO SISTEMA DE RPG E FORMATADOR DE OFERTAS
+        
+// --- CORREÇÃO: Tabela que aceita times antigos (sem série definida) ---
 const LeagueTable = ({ teams, serie }) => {
-    // Filtra e ordena
-    const list = teams.filter(t => t.serie === serie).sort((a, b) => {
+    // Se o time não tem série, assumimos que é Série A para não sumir
+    const list = teams.filter(t => {
+        const timeSerie = t.serie || 'A'; // Fallback para 'A'
+        return timeSerie === serie && t.status !== 'PENDING';
+    }).sort((a, b) => {
         const sA = a.stats || {}, sB = b.stats || {};
         const pA = (sA.pts||0), pB = (sB.pts||0);
         if (pA !== pB) return pB - pA;
@@ -467,11 +472,13 @@ const LeagueTable = ({ teams, serie }) => {
         return (sA.cards||0) - (sB.cards||0);
     });
 
+    if (list.length === 0) return <div className="card" style={{padding:15, textAlign:'center', color:'#666'}}>Nenhum time nesta série.</div>;
+
     return (
         <div className="card" style={{padding:0, overflow:'hidden'}}>
             <div style={{padding:10, background:'var(--primary)', color:'#000', fontWeight:'bold', display:'flex', justifyContent:'space-between'}}>
                 <span>SÉRIE {serie}</span>
-                <small>Top 2 Sobe | Bottom 2 Cai</small>
+                <small>G4 Sobe | Z4 Cai</small>
             </div>
             <table style={{width:'100%', borderCollapse:'collapse', fontSize:11}}>
                 <thead style={{background:'#222', color:'#888'}}>
@@ -480,16 +487,15 @@ const LeagueTable = ({ teams, serie }) => {
                         <th title="Pontos">P</th>
                         <th title="Jogos">J</th>
                         <th title="Vitórias">V</th>
-                        <th title="Saldo Gols">SG</th>
-                        <th title="Cartões">CA</th>
+                        <th title="Saldo">SG</th>
                     </tr>
                 </thead>
                 <tbody>
                     {list.map((t, i) => {
                         const s = t.stats || {};
                         let rowColor = 'transparent';
-                        if (i < 2 && serie !== 'A') rowColor = 'rgba(0, 230, 118, 0.1)'; // Zona de Acesso
-                        if (i >= 6 && serie !== 'E') rowColor = 'rgba(255, 23, 68, 0.1)'; // Zona de Rebaixamento
+                        if (i < 4 && serie !== 'A') rowColor = 'rgba(0, 230, 118, 0.1)'; 
+                        if (i >= list.length - 4 && list.length > 4) rowColor = 'rgba(255, 23, 68, 0.1)'; 
                         
                         return (
                             <tr key={t.id} style={{borderBottom:'1px solid #333', background: rowColor}}>
@@ -502,7 +508,6 @@ const LeagueTable = ({ teams, serie }) => {
                                 <td style={{textAlign:'center'}}>{(s.wins||0)+(s.draws||0)+(s.losses||0)}</td>
                                 <td style={{textAlign:'center'}}>{s.wins||0}</td>
                                 <td style={{textAlign:'center'}}>{(s.gf||0)-(s.ga||0)}</td>
-                                <td style={{textAlign:'center', color:'yellow'}}>{s.cards||0}</td>
                             </tr>
                         );
                     })}
@@ -512,11 +517,14 @@ const LeagueTable = ({ teams, serie }) => {
     );
 };
         //FIM
+        
+// --- CORREÇÃO: MatchCenter que não quebra se faltar série ---
 const MatchCenter = ({ matches, teams, onReportMatch }) => {
     const [serie, setSerie] = useState('A');
     const [round, setRound] = useState(1);
 
-    const games = matches.filter(m => m.serie === serie && m.round === parseInt(round));
+    // Filtra jogos mesmo se a série não estiver salva no match (assume A)
+    const games = matches.filter(m => (m.serie || 'A') === serie && parseInt(m.round) === parseInt(round));
 
     return (
         <div>
@@ -526,29 +534,29 @@ const MatchCenter = ({ matches, teams, onReportMatch }) => {
                     {['A','B','C','D'].map(s=><option key={s} value={s}>Série {s}</option>)}
                 </select>
                 <select className="input-field" value={round} onChange={e=>setRound(e.target.value)}>
-                    {[...Array(14).keys()].map(i=><option key={i+1} value={i+1}>Rodada {i+1}</option>)}
+                    {[...Array(38).keys()].map(i=><option key={i+1} value={i+1}>Rodada {i+1}</option>)}
                 </select>
             </div>
 
-            {games.length === 0 && <p style={{color:'#666'}}>Nenhum jogo agendado.</p>}
+            {games.length === 0 && <div className="card" style={{padding:15, textAlign:'center', color:'#666'}}>Nenhum jogo encontrado para Série {serie} - Rodada {round}.</div>}
 
             {games.map(m => (
                 <div key={m.id} className="card" style={{borderLeft: m.status==='FINISHED' ? '4px solid #444' : '4px solid var(--primary)'}}>
                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5}}>
                         <div style={{textAlign:'center', width:'40%'}}>
-                            <b>{m.homeName}</b>
-                            {m.status==='FINISHED' && <div style={{fontSize:18}}>{m.scoreHome}</div>}
+                            <b style={{fontSize:13}}>{m.homeName}</b>
+                            {m.status==='FINISHED' && <div style={{fontSize:18, fontWeight:'bold'}}>{m.scoreHome}</div>}
                         </div>
                         <div style={{fontSize:12, color:'#aaa'}}>X</div>
                         <div style={{textAlign:'center', width:'40%'}}>
-                            <b>{m.awayName}</b>
-                            {m.status==='FINISHED' && <div style={{fontSize:18}}>{m.scoreAway}</div>}
+                            <b style={{fontSize:13}}>{m.awayName}</b>
+                            {m.status==='FINISHED' && <div style={{fontSize:18, fontWeight:'bold'}}>{m.scoreAway}</div>}
                         </div>
                     </div>
                     
                     {m.status !== 'FINISHED' && (
                         <button className="btn btn-green" onClick={() => onReportMatch(m)}>
-                            📝 LANÇAR SÚMULA
+                            📝 SÚMULA
                         </button>
                     )}
                 </div>
@@ -2992,7 +3000,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.0  </div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.1  </div>
                             </div>
                         </div>
                         
@@ -3407,7 +3415,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.0 CLASSIFICAÇÃO E JOGOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.1 CLASSIFICAÇÃO E JOGOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

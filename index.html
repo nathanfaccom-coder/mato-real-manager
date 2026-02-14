@@ -108,7 +108,9 @@ const getPosColor = (p) => {
             'MEDIA': { label: 'Média Empresa', start: 20000000, tax: 350000, desc: 'Poder moderado. Imposto médio.' },
             'GRANDE': { label: 'Grande Empresa', start: 100000000, tax: 2000000, desc: 'Gigante do mercado. Imposto alto.' }
         };
-       // --- CATEGORIAS E FÓRMULAS ECONÔMICAS (ATUALIZADO) ---
+       // FIM
+        
+       // --- CATEGORIAS E FÓRMULAS ECONÔMICAS (ATUALIZADO V2) ---
         const PROD_CATS = {
             'SAUDE': '💊 Saúde (+Energia)',
             'CONSUMIVEL': '⚡ Consumível (+Energia)',
@@ -120,9 +122,12 @@ const getPosColor = (p) => {
             'LUXO': '💎 Luxo/Moda (+Fama)'
         };
 
-        // Função que calcula o Custo de Produção (Blindado)
+        // Função que calcula o Custo de Produção (Permite 0)
         const getProdCost = (cat, power) => {
-            const p = parseInt(power) || 1;
+            const p = parseInt(power); 
+            // Se for 0 ou inválido, custo é zero
+            if (!p || p <= 0) return 0; 
+
             if (['SAUDE', 'CONSUMIVEL'].includes(cat)) return p * 7000;
             if (['CHUTEIRA', 'LUVAS'].includes(cat)) return p * 12000;
             // Luxo, Veículo, Imóvel, Tech
@@ -2582,7 +2587,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.74.3  </div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.74.4  </div>
                             </div>
                         </div>
                         
@@ -2945,7 +2950,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.74.3 ATUALIZAÇÃO DAS EMPRESSAS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.74.4 ATUALIZAÇÃO DAS EMPRESSAS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -3103,9 +3108,9 @@ const VisitorDashboard = ({ players, teams }) => {
 // FIM DA LOGIN SCREEN E VISITOR DASHBOARD
 
         // --- NOVO COMPONENTE: PAINEL DA EMPRESA ---
-       const CompanyDashboard = ({ company, products, sps, sales, teams, onSaveProd, onDeleteProd, onProcessSpons }) => {
+      const CompanyDashboard = ({ company, products, sps, sales, teams, onSaveProd, onDeleteProd, onProcessSpons }) => {
             const [tab, setTab] = useState('PRODS'); 
-            // Estado do Produto em Edição (Com Power 1-100)
+            // Estado do Produto em Edição (Inicia com Power 0)
             const [editP, setEditP] = useState(null); 
 
             // Função de Upload de Logo da Empresa
@@ -3154,7 +3159,7 @@ const VisitorDashboard = ({ players, teams }) => {
                     </div>
                     
                     {tab==='PRODS' && <div>
-                        <button className="btn btn-green" onClick={()=>setEditP({name:'', price:'', img:'', desc:'', cat:'CHUTEIRA', power: 10})}>+ NOVO PRODUTO</button>
+                        <button className="btn btn-green" onClick={()=>setEditP({name:'', price:'', img:'', desc:'', cat:'CHUTEIRA', power: 0})}>+ NOVO PRODUTO</button>
                         
                         {products.map(p => (
                             <div key={p.id} className="card" style={{display:'flex', gap:10, textAlign:'left'}}>
@@ -3162,7 +3167,12 @@ const VisitorDashboard = ({ players, teams }) => {
                                 <div style={{flex:1}}>
                                     <span style={{fontSize:10, background:'#333', padding:'2px 6px', borderRadius:4, color:'#aaa'}}>{PROD_CATS[p.cat] || p.cat}</span>
                                     <div style={{fontWeight:'bold', marginTop:2}}>{p.name}</div>
-                                    <div style={{fontSize:11, color:'gold'}}>Poder: {p.power || 1}</div>
+                                    
+                                    {/* VISUALIZAÇÃO NA LISTA DE PRODUTOS */}
+                                    <div style={{fontSize:11, color: (p.power > 0 ? 'gold' : '#888')}}>
+                                        {p.power > 0 ? `Poder: ${p.power}` : '✨ Sem Efeito (Decorativo)'}
+                                    </div>
+                                    
                                     <span style={{color:'var(--primary)', fontWeight:'bold'}}>{fmt(p.price)}</span>
                                 </div>
                                 <div style={{display:'flex', flexDirection:'column', gap:5}}>
@@ -3200,15 +3210,24 @@ const VisitorDashboard = ({ players, teams }) => {
                         </select>
                         
                         <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8, marginBottom:10, border:'1px solid #444'}}>
-                            <label style={{color:'gold'}}>⚡ Poder / Intensidade: {editP.power || 1}</label>
-                            <input type="range" min="1" max="100" className="input-field" value={editP.power || 1} onChange={e=>setEditP({...editP, power: parseInt(e.target.value)})} style={{marginBottom:5}} />
+                            <label style={{color: editP.power > 0 ? 'gold' : '#aaa'}}>
+                                {editP.power > 0 ? `⚡ Poder / Intensidade: ${editP.power}` : '✨ Sem Efeito Especial'}
+                            </label>
+                            
+                            {/* SLIDER AGORA COMEÇA EM 0 */}
+                            <input type="range" min="0" max="100" className="input-field" value={editP.power || 0} onChange={e=>setEditP({...editP, power: parseInt(e.target.value)})} style={{marginBottom:5}} />
+                            
                             <small style={{color:'#aaa', display:'block'}}>
-                                {['SAUDE','CONSUMIVEL'].includes(editP.cat) ? `Recupera ${editP.power}% Energia` : 
+                                {editP.power === 0 ? '🚫 Item Decorativo (Grátis para produzir)' :
+                                 ['SAUDE','CONSUMIVEL'].includes(editP.cat) ? `Recupera ${editP.power}% Energia` : 
                                  ['CHUTEIRA','LUVAS'].includes(editP.cat) ? `Bônus de +${editP.power}% XP no treino` : 
-                                 `Gera +${(editP.power||1)*100} Fama`}
+                                 `Gera +${(editP.power||0)*100} Fama`}
                             </small>
+                            
                             <div style={{marginTop:5, fontSize:12}}>
-                                🏭 Custo de Produção (Fixo): <b style={{color:'var(--danger)'}}>{fmt(getProdCost(editP.cat, editP.power))}</b>
+                                🏭 Custo de Produção (Fixo): <b style={{color: getProdCost(editP.cat, editP.power) > 0 ? 'var(--danger)' : '#aaa'}}>
+                                    {getProdCost(editP.cat, editP.power) > 0 ? fmt(getProdCost(editP.cat, editP.power)) : 'Grátis'}
+                                </b>
                             </div>
                         </div>
 
@@ -3218,7 +3237,8 @@ const VisitorDashboard = ({ players, teams }) => {
                         <label>Descrição</label><textarea className="input-field" value={editP.desc} onChange={e=>setEditP({...editP, desc:e.target.value})} />
                         <div style={{display:'flex', gap:10}}>
                             <button className="btn btn-green" onClick={()=>{
-                                if(parseFloat(editP.price) < getProdCost(editP.cat, editP.power)) {
+                                const cost = getProdCost(editP.cat, editP.power);
+                                if(cost > 0 && parseFloat(editP.price) < cost) {
                                     if(!confirm("⚠️ AVISO: O preço de venda é menor que o custo de produção! Você terá prejuízo. Continuar?")) return;
                                 }
                                 onSaveProd(editP); setEditP(null);

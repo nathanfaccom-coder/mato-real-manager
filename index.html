@@ -100,21 +100,33 @@ const getPosColor = (p) => {
     if (['PTD', 'PTE', 'ATA', 'SA'].includes(p)) return '#FF1744'; // Vermelho (Ataque)
     return '#888';
 };
+        //FIM
+        
         // --- CONSTANTES DE EMPRESAS ---
         const COMPANY_TYPES = {
             'COMERCIO': { label: 'Comércio Local', start: 2500000, tax: 50000, desc: 'Ideal para iniciantes. Imposto baixo.' },
             'MEDIA': { label: 'Média Empresa', start: 20000000, tax: 350000, desc: 'Poder moderado. Imposto médio.' },
             'GRANDE': { label: 'Grande Empresa', start: 100000000, tax: 2000000, desc: 'Gigante do mercado. Imposto alto.' }
         };
+       // --- CATEGORIAS E FÓRMULAS ECONÔMICAS (ATUALIZADO) ---
         const PROD_CATS = {
-            'CHUTEIRA': '👟 Chuteira',
-            'LUVAS': '🧤 Luvas/Acessórios',
-            'CONSUMIVEL': '⚡ Consumível/Energia',
-            'VEICULO': '🚗 Veículo',
-            'IMOVEL': '🏠 Imóvel',
-            'TECNOLOGIA': '📱 Tecnologia',
-            'LUXO': '💎 Luxo/Moda',
-            'SAUDE': '💊 Saúde'
+            'SAUDE': '💊 Saúde (+Energia)',
+            'CONSUMIVEL': '⚡ Consumível (+Energia)',
+            'CHUTEIRA': '👟 Chuteira (+XP Treino)',
+            'LUVAS': '🧤 Luvas (+XP Treino)',
+            'VEICULO': '🚗 Veículo (+Fama)',
+            'IMOVEL': '🏠 Imóvel (+Fama)',
+            'TECNOLOGIA': '📱 Tecnologia (+Fama)',
+            'LUXO': '💎 Luxo/Moda (+Fama)'
+        };
+
+        // Função que calcula o Custo de Produção (Blindado)
+        const getProdCost = (cat, power) => {
+            const p = parseInt(power) || 1;
+            if (['SAUDE', 'CONSUMIVEL'].includes(cat)) return p * 7000;
+            if (['CHUTEIRA', 'LUVAS'].includes(cat)) return p * 12000;
+            // Luxo, Veículo, Imóvel, Tech
+            return p * 15000;
         };
 
 // FIM DO BLOCO INICIAL
@@ -1241,37 +1253,105 @@ const processSponsorship = async (s, status) => {
 };
 
 const buyProduct = async (prod, seller) => {
-    const currentBalance = user.data.balance || 0;
-    if (currentBalance < prod.price) return alert("Saldo insuficiente!");
-    if (!confirm(`Comprar ${prod.name} por ${fmt(prod.price)}?`)) return;
+        const currentBalance = user.data.balance || 0;
+        if (currentBalance < prod.price) return alert("Saldo insuficiente!");
+        if (!confirm(`Comprar ${prod.name} por ${fmt(prod.price)}?`)) return;
 
-    const b = db.batch();
-    
-    if (user.type === 'PLAYER') {
-        b.update(db.collection('players').doc(user.data.id), { balance: currentBalance - prod.price });
-    } else if (user.type === 'COACH') { 
-        b.update(db.collection('users').doc(user.data.id), { balance: currentBalance - prod.price });
-    } else {
-        b.update(db.collection('teams').doc(user.data.id), { balance: currentBalance - prod.price });
-    }
+        // --- CÁLCULO DO CUSTO DE PRODUÇÃO (Segurança para garantir que funcione) ---
+        const getLocalCost = (c, p) => {
+            const pow = parseInt(p) || 1;
+            if (['SAUDE', 'CONSUMIVEL'].includes(c)) return pow * 7000;
+            if (['CHUTEIRA', 'LUVAS'].includes(c)) return pow * 12000;
+            return pow * 15000; // Veículo, Imóvel, Luxo, Tecnologia
+        };
 
-    b.update(db.collection('companies').doc(seller.id), { balance: seller.balance + prod.price });
+        const productionCost = getLocalCost(prod.cat, prod.power || 1);
+        const profit = prod.price - productionCost;
 
-    const saleRef = db.collection('sales').doc();
-    b.set(saleRef, { 
-        companyId: seller.id, 
-        productName: prod.name, 
-        buyerId: user.data.id, 
-        buyerName: user.data.name, 
-        price: prod.price, 
-        img: prod.img, 
-        date: Date.now() 
-    });
-    
-    await b.commit();
-    alert("Compra realizada com sucesso!");
-};
+        const b = db.batch();
+        
+        // 1. Desconta do Comprador
+        if (user.type === 'PLAYER') {
+            b.update(db.collection('players').doc(user.data.id), { balance: currentBalance - prod.price });
+        } else if (user.type === 'COACH') { 
+            b.update(db.collection('users').doc(user.data.id), { balance: currentBalance - prod.price });
+        } else {
+            b.update(db.collection('teams').doc(user.data.id), { balance: currentBalance - prod.price });
+        }
 
+        // 2. Atualiza a Empresa (Recebe o LUCRO: Preço - Custo)
+        b.update(db.collection('companies').doc(seller.id), { balance: seller.balance + profit });
+
+        // 3. Verifica FAMA (Se for item de Luxo/Status)
+        let fameBonus = 0;
+        if (['VEICULO', 'IMOVEL', 'TECNOLOGIA', 'LUXO'].includes(prod.cat)) {
+            fameBonus = (prod.power || 1) * 100; // Ex: Poder 10 = 1000 Fama
+            if (user.type === 'PLAYER') {
+                b.update(db.collection('players').doc(user.data.id), { fame: (user.data.fame || 0) + fameBonus });
+            }
+        }
+
+        // 4. Registra a Venda e Cria o Item na Mochila
+        const saleRef = db.collection('sales').doc();
+        b.set(saleRef, { 
+            companyId: seller.id, 
+            productName: prod.name, 
+            buyerId: user.data.id, 
+            buyerName: user.data.name, 
+            price: prod.price, 
+            cost: productionCost, // Guarda quanto custou fabricar
+            img: prod.img, 
+            cat: prod.cat,
+            power: prod.power || 1, // Guarda o poder para usar depois
+            fameGained: fameBonus,
+            date: Date.now() 
+        });
+        
+        await b.commit();
+        
+        // Mensagem de Feedback
+        let msg = `Compra realizada!`;
+        if (fameBonus > 0) msg += `\n🌟 FAMA +${fameBonus}`;
+        if (profit < 0) msg += `\n(Nota: A empresa teve prejuízo nesta venda)`;
+        alert(msg);
+    };
+            //FIM
+            const handleUseItem = async (item, action) => {
+        if (!user.data || user.type !== 'PLAYER') return;
+        
+        const b = db.batch();
+        const itemRef = db.collection('sales').doc(item.id); // O item na mochila é um documento de 'sales'
+
+        // AÇÃO 1: CONSUMIR (Energia)
+        if (action === 'CONSUME') {
+            const energyGain = item.power || 1;
+            const currentEnergy = user.data.energy || 0;
+            const newEnergy = Math.min(100, currentEnergy + energyGain);
+            
+            b.update(db.collection('players').doc(user.data.id), { energy: newEnergy });
+            b.delete(itemRef); // Remove da mochila
+            
+            await b.commit();
+            alert(`⚡ Energia recuperada: +${energyGain}% (Total: ${newEnergy}%)`);
+        }
+
+        // AÇÃO 2: EQUIPAR (XP Boost)
+        if (action === 'EQUIP') {
+            // Define este item como o equipado no perfil do jogador
+            b.update(db.collection('players').doc(user.data.id), { 
+                equippedItem: {
+                    id: item.id,
+                    name: item.productName,
+                    cat: item.cat,
+                    power: item.power,
+                    img: item.img
+                }
+            });
+            await b.commit();
+            alert(`🛡️ Item equipado: ${item.productName}\nBônus de +${item.power}% XP no próximo treino!`);
+        }
+    };
+            //FIM
 const resetDatabase = async () => {
     const senha = prompt("⚠️ PERIGO: Isso apagará TODOS os dados do jogo. Digite a senha master para confirmar:");
     if (senha !== '2503') return; 
@@ -1668,6 +1748,7 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
         alert("Valor de mercado atualizado!");
     };
             //FIM
+            
     // --- LÓGICA DE TREINO (APENAS XP) ---
   const handleCoachTrain = async (playerIds, type) => {
         const currentCoach = user.data;
@@ -1723,6 +1804,20 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
             // Afinidade Posicional
             if ((currentCoach.affinities || []).includes(p.position)) {
                 xpGain += (3 + affBonus);
+            }
+
+            // --- NOVO: BÔNUS DE ITEM EQUIPADO (CHUTEIRA/LUVA) ---
+            if (p.equippedItem) {
+                const itemBonusPercent = p.equippedItem.power || 0; // Ex: 10 (= 10%)
+                const bonusAmount = Math.ceil(xpGain * (itemBonusPercent / 100));
+                xpGain += bonusAmount;
+                report.push(`👟 ${p.name} usou ${p.equippedItem.name} (+${bonusAmount} XP) e o item quebrou.`);
+                
+                // O item é consumido (quebra) após o uso no treino
+                // Removemos o item da mochila (collection sales) e do equippedItem
+                const itemRef = db.collection('sales').doc(p.equippedItem.id);
+                b.delete(itemRef);
+                b.update(db.collection('players').doc(pid), { equippedItem: firebase.firestore.FieldValue.delete() });
             }
 
             // --- APLICAÇÃO DOS PERKS (TRAIN_BOOST e YOUTH_BOOST) ---
@@ -1814,7 +1909,8 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
         if(report.length > 0) msg += "\n\n" + report.join("\n");
         alert(msg);
     };
-
+            //FIM
+            
     const handleEvolveCoachPerk = async (perk) => {
         // Atualiza no Banco de Dados
         await db.collection('users').doc(user.data.id).update({
@@ -2486,7 +2582,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.74.2 </div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.74.3  </div>
                             </div>
                         </div>
                         
@@ -2849,7 +2945,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.74.2 ADIÇÃO DE FOTO DOS JOGADORES </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.74.3 ATUALIZAÇÃO DAS EMPRESSAS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -3009,17 +3105,56 @@ const VisitorDashboard = ({ players, teams }) => {
         // --- NOVO COMPONENTE: PAINEL DA EMPRESA ---
        const CompanyDashboard = ({ company, products, sps, sales, teams, onSaveProd, onDeleteProd, onProcessSpons }) => {
             const [tab, setTab] = useState('PRODS'); 
+            // Estado do Produto em Edição (Com Power 1-100)
             const [editP, setEditP] = useState(null); 
+
+            // Função de Upload de Logo da Empresa
+            const handleLogoUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = async () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        const MAX_SIZE = 200;
+                        let width = img.width, height = img.height;
+                        if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } 
+                        else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
+                        canvas.width = width; canvas.height = height;
+                        ctx.drawImage(img, 0, 0, width, height);
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                        
+                        if(confirm("Atualizar logo da empresa?")) {
+                            await db.collection('companies').doc(company.id).update({ logo: dataUrl });
+                            alert("Logo atualizado!");
+                        }
+                    };
+                };
+            };
             
             return (
                 <div>
+                    <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:15, background:'rgba(0,0,0,0.2)', padding:10, borderRadius:8}}>
+                        {company.logo ? <img src={company.logo} style={{width:50, height:50, borderRadius:'50%', objectFit:'cover', border:'2px solid var(--purple)'}} /> : <div style={{width:50, height:50, background:'#333', borderRadius:'50%', display:'grid', placeItems:'center'}}>🏢</div>}
+                        <div style={{flex:1}}>
+                            <h3 style={{margin:0}}>{company.name}</h3>
+                            <label className="btn btn-ghost" style={{fontSize:9, padding:'2px 5px', width:'auto', display:'inline-block', margin:0}}>
+                                📷 ALTERAR LOGO <input type="file" style={{display:'none'}} accept="image/*" onChange={handleLogoUpload} />
+                            </label>
+                        </div>
+                    </div>
+
                     <div style={{display:'flex', gap:10, marginBottom:15}}>
                         <button className={`btn ${tab==='PRODS'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('PRODS')}>PRODUTOS</button>
                         <button className={`btn ${tab==='FIN'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('FIN')}>FINANÇAS</button>
                     </div>
                     
                     {tab==='PRODS' && <div>
-                        <button className="btn btn-green" onClick={()=>setEditP({name:'', price:'', img:'', desc:'', cat:'CHUTEIRA'})}>+ NOVO PRODUTO</button>
+                        <button className="btn btn-green" onClick={()=>setEditP({name:'', price:'', img:'', desc:'', cat:'CHUTEIRA', power: 10})}>+ NOVO PRODUTO</button>
                         
                         {products.map(p => (
                             <div key={p.id} className="card" style={{display:'flex', gap:10, textAlign:'left'}}>
@@ -3027,8 +3162,8 @@ const VisitorDashboard = ({ players, teams }) => {
                                 <div style={{flex:1}}>
                                     <span style={{fontSize:10, background:'#333', padding:'2px 6px', borderRadius:4, color:'#aaa'}}>{PROD_CATS[p.cat] || p.cat}</span>
                                     <div style={{fontWeight:'bold', marginTop:2}}>{p.name}</div>
+                                    <div style={{fontSize:11, color:'gold'}}>Poder: {p.power || 1}</div>
                                     <span style={{color:'var(--primary)', fontWeight:'bold'}}>{fmt(p.price)}</span>
-                                    <p style={{fontSize:11, color:'#aaa', margin:'5px 0'}}>{p.desc}</p>
                                 </div>
                                 <div style={{display:'flex', flexDirection:'column', gap:5}}>
                                     <button className="btn btn-blue" style={{width:'auto', padding:'5px 10px'}} onClick={()=>setEditP(p)}>✏️</button>
@@ -3046,6 +3181,9 @@ const VisitorDashboard = ({ players, teams }) => {
                             {(sales || []).filter(s => s.companyId === company.id).map((s, i) => (
                                 <div key={i} style={{borderBottom:'1px solid #444', padding:'8px 0', fontSize:11, textAlign:'left'}}>
                                     <div style={{display:'flex', justifyContent:'space-between'}}><b style={{color:'var(--primary)'}}>+ {fmt(s.price)}</b><span style={{color:'#888'}}>{new Date(s.date).toLocaleDateString()}</span></div>
+                                    <div style={{marginTop:2}}>
+                                        Custo: <span style={{color:'var(--danger)'}}>-{fmt(s.cost || 0)}</span> | Lucro: <span style={{color:'lime'}}>{fmt(s.price - (s.cost||0))}</span>
+                                    </div>
                                     <div style={{marginTop:2}}>👤 <span style={{color:'#fff', fontWeight:'bold'}}>{s.buyerName}</span> comprou 1x <span style={{color:'var(--purple)'}}>{s.productName}</span></div>
                                 </div>
                             ))}
@@ -3060,27 +3198,46 @@ const VisitorDashboard = ({ players, teams }) => {
                         <select className="input-field" value={editP.cat || 'CHUTEIRA'} onChange={e=>setEditP({...editP, cat:e.target.value})}>
                             {Object.keys(PROD_CATS).map(key => <option key={key} value={key}>{PROD_CATS[key]}</option>)}
                         </select>
+                        
+                        <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8, marginBottom:10, border:'1px solid #444'}}>
+                            <label style={{color:'gold'}}>⚡ Poder / Intensidade: {editP.power || 1}</label>
+                            <input type="range" min="1" max="100" className="input-field" value={editP.power || 1} onChange={e=>setEditP({...editP, power: parseInt(e.target.value)})} style={{marginBottom:5}} />
+                            <small style={{color:'#aaa', display:'block'}}>
+                                {['SAUDE','CONSUMIVEL'].includes(editP.cat) ? `Recupera ${editP.power}% Energia` : 
+                                 ['CHUTEIRA','LUVAS'].includes(editP.cat) ? `Bônus de +${editP.power}% XP no treino` : 
+                                 `Gera +${(editP.power||1)*100} Fama`}
+                            </small>
+                            <div style={{marginTop:5, fontSize:12}}>
+                                🏭 Custo de Produção (Fixo): <b style={{color:'var(--danger)'}}>{fmt(getProdCost(editP.cat, editP.power))}</b>
+                            </div>
+                        </div>
+
                         <label>Nome</label><input className="input-field" value={editP.name} onChange={e=>setEditP({...editP, name:e.target.value})} />
-                        <label>Preço</label><input className="input-field" type="number" value={editP.price} onChange={e=>setEditP({...editP, price:e.target.value})} />
+                        <label>Preço de Venda (₣)</label><input className="input-field" type="number" value={editP.price} onChange={e=>setEditP({...editP, price:e.target.value})} />
                         <label>Imagem URL</label><input className="input-field" value={editP.img} onChange={e=>setEditP({...editP, img:e.target.value})} />
                         <label>Descrição</label><textarea className="input-field" value={editP.desc} onChange={e=>setEditP({...editP, desc:e.target.value})} />
                         <div style={{display:'flex', gap:10}}>
-                            <button className="btn btn-green" onClick={()=>{onSaveProd(editP); setEditP(null);}}>SALVAR</button>
+                            <button className="btn btn-green" onClick={()=>{
+                                if(parseFloat(editP.price) < getProdCost(editP.cat, editP.power)) {
+                                    if(!confirm("⚠️ AVISO: O preço de venda é menor que o custo de produção! Você terá prejuízo. Continuar?")) return;
+                                }
+                                onSaveProd(editP); setEditP(null);
+                            }}>SALVAR</button>
                             <button className="btn" onClick={()=>setEditP(null)}>CANCELAR</button>
                         </div>
                     </div></div>}
                 </div>
             );
         };
-
 // FIM DO COMPONENTE COMPANY DASHBOARD
 // --- JOGADOR, MERCADO E OUTROS COMPONENTES QUE FALTARAM ---
 
-const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTrainSolo }) => {
+const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTrainSolo, onUseItem }) => {
     const [newPass, setNewPass] = useState('');
     const [tab, setTab] = useState('PERFIL');
     const [trainType, setTrainType] = useState('FISICO_BASE'); 
 
+    // Itens na Mochila (filtra sales onde eu sou comprador)
     const myItems = (sales||[]).filter(s => s.buyerId === player.id);
     
     const xpCurrent = (player.xp || 0) + (player.pendingXP || 0);
@@ -3141,7 +3298,6 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                     try {
                         await db.collection('players').doc(player.id).update({ face: dataUrl });
                         alert("Foto atualizada com sucesso!");
-                        // O onSnapshot do App.js vai atualizar a tela automaticamente
                     } catch (error) {
                         console.error(error);
                         alert("Erro ao salvar: " + error.message);
@@ -3215,6 +3371,11 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
 
                 <h2 style={{margin:0}}>{player.name} <span style={{fontSize:14}}>{player.mood}</span></h2>
                 <small style={{color:'#ccc'}}>{team?.name || 'Agente Livre'}</small>
+                
+                {/* MOSTRADOR DE FAMA */}
+                <div style={{background:'rgba(0,0,0,0.3)', display:'inline-block', padding:'5px 15px', borderRadius:20, marginTop:5, border:'1px solid gold'}}>
+                    <span style={{color:'gold', fontWeight:'bold', fontSize:12}}>💎 FAMA: {player.fame || 0}</span>
+                </div>
                 
                 <div style={{display:'flex', justifyContent:'center', gap:30, marginTop:15}}>
                     <div style={{textAlign:'center'}}>
@@ -3381,19 +3542,58 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
 
             {tab==='INV' && <div>
                 <h3>🎒 Mochila</h3>
-                {myItems.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Vazia.</p>}
-                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                    {myItems.map((item, index) => (
-                        <div key={index} className="card" style={{border:'1px solid #444', textAlign:'center', padding:10}}>
-                            {item.img ? (
-                                <img src={item.img} style={{width:60, height:60, objectFit:'contain', marginBottom:5, borderRadius:5}} alt={item.productName} />
-                            ) : (
-                                <div style={{fontSize:24}}>👟</div>
-                            )}
-                            <div style={{fontWeight:'bold', fontSize:12}}>{item.productName}</div>
-                            <div style={{fontSize:10, color:'#aaa'}}>Preço: {fmt(item.price)}</div>
+                
+                {/* MOSTRA O ITEM EQUIPADO ATUALMENTE */}
+                {player.equippedItem && (
+                    <div className="card" style={{border:'1px solid lime', background:'rgba(0,255,0,0.05)', marginBottom:15, display:'flex', alignItems:'center', gap:10}}>
+                        <div style={{fontSize:24}}>🛡️</div>
+                        <div>
+                            <span style={{fontSize:10, color:'lime', fontWeight:'bold'}}>EQUIPADO</span>
+                            <div style={{fontWeight:'bold'}}>{player.equippedItem.name}</div>
+                            <small style={{color:'#ccc'}}>Bônus: +{player.equippedItem.power}% XP no próximo treino</small>
                         </div>
-                    ))}
+                    </div>
+                )}
+
+                {myItems.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Vazia. Vá ao Shopping!</p>}
+                
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                    {myItems.map((item, index) => {
+                        const isConsumable = ['SAUDE', 'CONSUMIVEL'].includes(item.cat);
+                        const isEquippable = ['CHUTEIRA', 'LUVAS'].includes(item.cat);
+                        const isLuxury = ['VEICULO', 'IMOVEL', 'TECNOLOGIA', 'LUXO'].includes(item.cat);
+
+                        return (
+                            <div key={index} className="card" style={{border:'1px solid #444', textAlign:'center', padding:10, position:'relative'}}>
+                                <div style={{position:'absolute', top:5, left:5, fontSize:9, background:'#333', padding:'2px 5px', borderRadius:3}}>{item.cat}</div>
+                                
+                                {item.img ? (
+                                    <img src={item.img} style={{width:60, height:60, objectFit:'contain', marginBottom:5, borderRadius:5}} />
+                                ) : (
+                                    <div style={{fontSize:24}}>📦</div>
+                                )}
+                                
+                                <div style={{fontWeight:'bold', fontSize:12, height:30, overflow:'hidden'}}>{item.productName}</div>
+                                
+                                <div style={{fontSize:10, color:'gold', margin:'5px 0'}}>
+                                    {isConsumable && `⚡ Rec. ${item.power}%`}
+                                    {isEquippable && `⚔️ XP +${item.power}%`}
+                                    {isLuxury && `💎 Fama +${item.fameGained}`}
+                                </div>
+
+                                {/* BOTÕES DE AÇÃO */}
+                                {isConsumable && (
+                                    <button className="btn btn-green" style={{fontSize:10, padding:5, margin:0}} onClick={() => onUseItem(item, 'CONSUME')}>USAR AGORA</button>
+                                )}
+                                {isEquippable && (
+                                    <button className="btn btn-blue" style={{fontSize:10, padding:5, margin:0}} onClick={() => onUseItem(item, 'EQUIP')}>EQUIPAR</button>
+                                )}
+                                {isLuxury && (
+                                    <div style={{fontSize:9, color:'#666', fontStyle:'italic'}}>Item de Coleção</div>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             </div>}
         </div>
@@ -3402,35 +3602,64 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
         // ... continuação do código anterior
 
         const ShoppingScreen = ({ products, companies, userTeam, onBuy }) => {
-            const [term, setTerm] = useState('');
-            const list = products.filter(p => p.name.toLowerCase().includes(term.toLowerCase()));
+            const [view, setView] = useState('MALL'); // MALL ou STORE
+            const [selComp, setSelComp] = useState(null);
             
+            // --- VISÃO GERAL (SHOPPING CENTER - LISTA DE LOJAS) ---
+            if (view === 'MALL') return (
+                <div>
+                    <h3>Shopping Center</h3>
+                    <p style={{color:'#aaa', fontSize:12, marginBottom:15}}>Escolha uma loja para ver os produtos.</p>
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                        {companies.filter(c => c.status === 'ACTIVE').map(c => (
+                            <div key={c.id} className="card" onClick={()=>{setSelComp(c); setView('STORE');}} style={{cursor:'pointer', textAlign:'center', borderLeft:'4px solid var(--purple)', padding:'15px 5px'}}>
+                                {c.logo ? <img src={c.logo} style={{width:60, height:60, borderRadius:'50%', objectFit:'cover', marginBottom:10, border:'2px solid #444'}} /> : <div style={{fontSize:30, marginBottom:10}}>🏢</div>}
+                                <div style={{fontWeight:'bold', fontSize:14}}>{c.name}</div>
+                                <small style={{color:'#888'}}>{(COMPANY_TYPES[c.companyType] || {}).label}</small>
+                            </div>
+                        ))}
+                    </div>
+                    {companies.filter(c => c.status === 'ACTIVE').length === 0 && <p style={{textAlign:'center', color:'#666'}}>Nenhuma loja aberta.</p>}
+                </div>
+            );
+
+            // --- VISÃO DA LOJA ESPECÍFICA (VITRINE) ---
+            const storeProducts = products.filter(p => p.companyId === selComp.id);
+
             return (
                 <div>
-                    <h3>Shopping Global</h3>
-                    <input className="input-field" placeholder="Buscar produto..." value={term} onChange={e=>setTerm(e.target.value)} />
-                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                        {list.map(p => { 
-                            const comp = companies.find(c => c.id === p.companyId); 
-                            if (comp?.status !== 'ACTIVE') return null; 
-                            
-                            return (
-                                <div key={p.id} className="card" style={{padding:10, position:'relative'}}>
-                                    <div style={{fontSize:9, background:'var(--purple)', position:'absolute', top:5, right:5, padding:'2px 5px', borderRadius:4, zIndex:10}}>
-                                        {comp.name}
-                                    </div>
-                                    <img src={p.img || 'https://via.placeholder.com/100'} className="prod-img" style={{width:'100%', height:100, objectFit:'cover', borderRadius:4}} />
-                                    <span style={{fontSize:9, color:'#888', display:'block', marginTop:5}}>
-                                        {PROD_CATS[p.cat] || 'Item'}
-                                    </span>
-                                    <div style={{fontWeight:'bold', fontSize:13, lineHeight:'1.2em'}}>{p.name}</div>
-                                    <div style={{color:'var(--primary)', fontWeight:'900', fontSize:14}}>{fmt(p.price)}</div>
-                                    {userTeam && <button className="btn btn-green" style={{marginTop:5, fontSize:10}} onClick={()=>onBuy(p, comp)}>COMPRAR</button>}
-                                </div>
-                            ); 
-                        })}
+                    <button className="btn" style={{background:'#333', marginBottom:10, width:'auto'}} onClick={()=>{setView('MALL'); setSelComp(null);}}>⬅ VOLTAR AO SHOPPING</button>
+                    
+                    <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:20, background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8}}>
+                        {selComp.logo && <img src={selComp.logo} style={{width:50, height:50, borderRadius:'50%', objectFit:'cover'}} />}
+                        <div>
+                            <h2 style={{margin:0}}>{selComp.name}</h2>
+                            <small style={{color:'var(--purple)'}}>Vitrine Oficial</small>
+                        </div>
                     </div>
-                    {list.length === 0 && <p style={{textAlign:'center', color:'#666'}}>Nenhum produto encontrado.</p>}
+
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                        {storeProducts.map(p => (
+                            <div key={p.id} className="card" style={{padding:10, position:'relative'}}>
+                                <img src={p.img || 'https://via.placeholder.com/100'} style={{width:'100%', height:100, objectFit:'cover', borderRadius:4}} />
+                                <span style={{fontSize:9, color:'#888', display:'block', marginTop:5}}>
+                                    {PROD_CATS[p.cat] || 'Item'}
+                                </span>
+                                <div style={{fontWeight:'bold', fontSize:13, lineHeight:'1.2em'}}>{p.name}</div>
+                                
+                                {/* EXIBE O PODER DO ITEM NA LOJA */}
+                                <div style={{fontSize:10, color:'gold', margin:'2px 0'}}>
+                                    {['SAUDE','CONSUMIVEL'].includes(p.cat) ? `⚡ Rec. ${p.power}%` : 
+                                     ['CHUTEIRA','LUVAS'].includes(p.cat) ? `⚔️ XP +${p.power}%` : 
+                                     `💎 Fama +${(p.power||1)*100}`}
+                                </div>
+
+                                <div style={{color:'var(--primary)', fontWeight:'900', fontSize:14}}>{fmt(p.price)}</div>
+                                {userTeam && <button className="btn btn-green" style={{marginTop:5, fontSize:10}} onClick={()=>onBuy(p, selComp)}>COMPRAR</button>}
+                            </div>
+                        ))}
+                    </div>
+                    {storeProducts.length === 0 && <p style={{textAlign:'center', color:'#666'}}>Esta loja está vazia.</p>}
                 </div>
             );
         };
@@ -4673,6 +4902,7 @@ const Ranking = ({ teams, players }) => {
             <h3>Ranking e Estatísticas</h3>
             <div className="rank-tabs">
                 <div className={`rank-tab ${view === 'TEAMS' ? 'active' : ''}`} onClick={() => setView('TEAMS')}>💰 Clubes</div>
+                <div className={`rank-tab ${view === 'FAME' ? 'active' : ''}`} onClick={() => setView('FAME')}>💎 Celebridades</div>
                 <div className={`rank-tab ${view === 'OVERALL' ? 'active' : ''}`} onClick={() => setView('OVERALL')}>⭐ Craques</div>
                 <div className={`rank-tab ${view === 'SALARY' ? 'active' : ''}`} onClick={() => setView('SALARY')}>💸 Salários</div>
                 <div className={`rank-tab ${view === 'GOALS' ? 'active' : ''}`} onClick={() => setView('GOALS')}>⚽ Gols</div>
@@ -4684,6 +4914,7 @@ const Ranking = ({ teams, players }) => {
 
             <div style={{ marginTop: 10 }}>
                 {view === 'TEAMS' && renderTeams()}
+                {view === 'FAME' && renderPlayers('fame', 'Fama:', 'var(--purple)', false)}
                 {view === 'OVERALL' && renderPlayers('overall', 'Ov:', 'var(--warning)', false)}
                 {view === 'SALARY' && renderPlayers('salary', '', 'var(--primary)', false)}
                 {view === 'GOALS' && renderPlayers('goals', '⚽', '#fff')}

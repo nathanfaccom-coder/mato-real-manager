@@ -506,7 +506,7 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
             db.collection('users').where('type', '==', 'COACH').onSnapshot(snap => {
                 // Importante: Adicionei {id: d.id, ...} para garantir que o ID venha certo para exclusão
                 setCoaches(snap.docs.map(d => ({id: d.id, ...d.data()})));
-            })
+            }),
             db.collection('matches').onSnapshot(s => setMatches(s.docs.map(d => ({id:d.id, ...d.data()}))))
         ];
 

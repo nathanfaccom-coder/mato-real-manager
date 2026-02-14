@@ -4958,7 +4958,7 @@ const Ranking = ({ teams, players }) => {
                 </div>
             );
         };
-
+//fim
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<ErrorBoundary><App /></ErrorBoundary>);
 
@@ -4999,14 +4999,35 @@ const Ranking = ({ teams, players }) => {
     </style>
 
     <script>
-        // 1. Registrar o Service Worker (Para o botão de instalar funcionar no Android/PC)
+        // 1. Registrar o Service Worker com ATUALIZAÇÃO AUTOMÁTICA
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register('service-worker.js').then(function(registration) {
                     console.log('App registrado: ', registration.scope);
+
+                    // Detecta se existe uma nova versão
+                    registration.onupdatefound = function() {
+                        const installingWorker = registration.installing;
+                        installingWorker.onstatechange = function() {
+                            if (installingWorker.state === 'installed') {
+                                if (navigator.serviceWorker.controller) {
+                                    console.log('Nova versão disponível! Atualizando...');
+                                    window.location.reload(); // Força o refresh para pegar a versão nova
+                                }
+                            }
+                        };
+                    };
                 }, function(err) {
                     console.log('Falha ao registrar App: ', err);
                 });
+            });
+
+            // Recarrega a página quando o novo Service Worker assumir o controle
+            let refreshing;
+            navigator.serviceWorker.addEventListener('controllerchange', function() {
+                if (refreshing) return;
+                window.location.reload();
+                refreshing = true;
             });
         }
 
@@ -5022,8 +5043,6 @@ const Ranking = ({ teams, players }) => {
 
         window.addEventListener('offline', checkInternet);
         window.addEventListener('online', checkInternet);
-        
-        // Verifica assim que abre
         checkInternet();
 
         // 3. Lógica para iPhone (iOS)
@@ -5031,10 +5050,8 @@ const Ranking = ({ teams, players }) => {
             const userAgent = window.navigator.userAgent.toLowerCase();
             return /iphone|ipad|ipod/.test(userAgent);
         }
-        // Verifica se já está em modo tela cheia (instalado)
         const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
 
-        // Mostra o aviso apenas se for iOS e não estiver instalado
         if (isIos() && !isInStandaloneMode()) {
             document.getElementById('ios-install-prompt').style.display = 'block';
         }

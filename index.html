@@ -2795,7 +2795,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.74.8  </div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.74.9  </div>
                             </div>
                         </div>
                         
@@ -2873,45 +2873,51 @@ const renewContract = async (p) => {
                             />
                         }
                         
-                       {screen === 'HOME' && user.type === 'USER' && (
-    <div key="user-home-container">
-        <TeamDashboard 
-            team={user.data} 
-            players={players.filter(p=>p.teamId===user.data.id)} 
-            coach={coaches.find(c => c.teamId === user.data.id && c.status === 'ACTIVE')} 
-            onFireCoach={handleFireCoach}
-            onRenewCoach={handleRenewCoachContract} 
-            isVisitor={false} 
-            onEdit={(p)=>setModal({type:'PLAYER', data:p})} 
-            onAdd={()=>setModal({type:'PLAYER', data: { teamId: user.data.id } })} 
-        />
-        
-        <div style={{marginTop:30, borderTop: '2px solid #333', paddingTop: 20}}>
-            <h2 style={{color: 'var(--primary)', textAlign: 'center'}}><i className="fas fa-list-ol"></i> Classificação Oficial</h2>
-            
-            {/* Tabela da Série do Time logado */}
-            <LeagueTable teams={teams} serie={user.data.serie || 'A'} />
-
-            {/* Central de Jogos para ver os confrontos da rodada */}
-            <div style={{marginTop: 25}}>
-                <h3 style={{textAlign: 'center'}}><i className="fas fa-calendar-alt"></i> Próximos Jogos</h3>
-                <MatchCenter matches={matches} teams={teams} onReportMatch={() => alert("Apenas jornalistas podem lançar súmulas.")} />
-            </div>
-
-            {/* Outras Séries para acompanhamento */}
-            <details style={{marginTop: 20, background: 'rgba(255,255,255,0.05)', padding: 10, borderRadius: 8}}>
-                <summary style={{cursor: 'pointer', fontSize: 12, color: '#aaa'}}>Ver outras divisões</summary>
-                <div style={{marginTop: 10, display: 'grid', gap: 15}}>
-                    {['A','B','C','D'].filter(s => s !== user.data.serie).map(s => (
-                        <LeagueTable key={s} teams={teams} serie={s} />
-                    ))}
-                </div>
-            </details>
-        </div>
-    </div>
-)}
+                        {screen === 'HOME' && user.type === 'USER' && (
+                            <div key="user-home-view">
+                                <TeamDashboard 
+                                    team={user.data} 
+                                    players={players.filter(p=>p.teamId===user.data.id)} 
+                                    coach={coaches.find(c => c.teamId === user.data.id && c.status === 'ACTIVE')} 
+                                    onFireCoach={handleFireCoach}
+                                    onRenewCoach={handleRenewCoachContract} 
+                                    isVisitor={false} 
+                                    onEdit={(p)=>setModal({type:'PLAYER', data:p})} 
+                                    onAdd={()=>setModal({type:'PLAYER', data: { teamId: user.data.id } })} 
+                                />
+                                <div style={{marginTop:30, borderTop: '2px solid #333', paddingTop: 20}}>
+                                    <h2 style={{color: 'var(--primary)', textAlign: 'center'}}><i className="fas fa-list-ol"></i> Classificação Oficial</h2>
+                                    <LeagueTable teams={teams} serie={user.data.serie || 'A'} />
+                                    <div style={{marginTop: 25}}>
+                                        <h3 style={{textAlign: 'center'}}><i className="fas fa-calendar-alt"></i> Próximos Jogos</h3>
+                                        <MatchCenter matches={matches} teams={teams} onReportMatch={() => alert("Apenas jornalistas podem lançar súmulas.")} />
+                                    </div>
+                                    <details style={{marginTop: 20, background: 'rgba(255,255,255,0.05)', padding: 10, borderRadius: 8}}>
+                                        <summary style={{cursor: 'pointer', fontSize: 12, color: '#aaa'}}>Ver outras divisões</summary>
+                                        <div style={{marginTop: 10, display: 'grid', gap: 15}}>
+                                            {['A','B','C','D'].filter(s => s !== user.data.serie).map(s => (
+                                                <LeagueTable key={s} teams={teams} serie={s} />
+                                            ))}
+                                        </div>
+                                    </details>
+                                </div>
+                            </div>
+                        )}
                         
-                        {screen === 'HOME' && user.type === 'VISITOR' && <VisitorDashboard players={players} teams={teams} />}
+                        {screen === 'HOME' && user.type === 'VISITOR' && (
+                            <div>
+                                <VisitorDashboard players={players} teams={teams} />
+                                <div style={{marginTop:30}}>
+                                    <h3 style={{textAlign:'center'}}>Tabela de Classificação</h3>
+                                    <LeagueTable teams={teams} serie="A" />
+                                    <div style={{marginTop:10}}><LeagueTable teams={teams} serie="B" /></div>
+                                    <div style={{marginTop:20}}>
+                                        <h3 style={{textAlign: 'center'}}>Calendário de Jogos</h3>
+                                        <MatchCenter matches={matches} teams={teams} onReportMatch={() => {}} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         
                         {screen === 'PRESS_DASH' && (user.type==='PRESS' || user.type==='PRESS_WORKER') && (
                             <div>
@@ -2920,6 +2926,10 @@ const renewContract = async (p) => {
                                     <button className="btn btn-blue" onClick={()=>setModal({type:'POST_NEWS'})}>ESCREVER NOTÍCIA</button>
                                     <button className="btn btn-purple" onClick={()=>setModal({type:'MATCH_PERFORMANCE'})}>LANÇAR SÚMULA (XP)</button>
                                     <button className="btn btn-gold" onClick={()=>setModal({type:'TEAM_TABLE'})}>EDITAR TABELA</button>
+                                </div>
+                                <div style={{marginTop:20}}>
+                                    <LeagueTable teams={teams} serie="A" />
+                                    <MatchCenter matches={matches} teams={teams} onReportMatch={(m) => setModal({type:'MATCH_REPORT', data: m})} />
                                 </div>
                                 {user.type==='PRESS' && journalists.filter(j=>j.newspaperId===user.data.id && j.status==='PENDING').map(j=>(
                                     <div key={j.id} className="card">
@@ -2954,7 +2964,6 @@ const renewContract = async (p) => {
                                 players={players} 
                                 coaches={coaches} 
                                 open={conf.marketOpen} 
-                                // ATUALIZADO: TÉCNICOS TAMBÉM ENTRAM COMO VISITANTES (SÓ VEM, NÃO COMPRAM)
                                 isVis={user.type === 'VISITOR' || user.type === 'COACH'} 
                                 onNeg={(p) => setModal({ type: 'OFFER', data: p })} 
                                 onPayClause={async (p) => {
@@ -3030,39 +3039,57 @@ const renewContract = async (p) => {
                         }
                         
                         {screen === 'PLAYER_DASH' && user.type === 'PLAYER' && 
-                            <PlayerDashboard 
-                                player={players.find(p=>p.id===user.data.id) || user.data} 
-                                team={teams.find(t=>t.id===user.data.teamId)} 
-                                sales={sales || []} 
-                                onAction={handlePlayerActions} 
-                                onUpdatePassword={async(newP)=>{ await db.collection('players').doc(user.data.id).update({password: newP}); alert("Senha alterada!"); }} 
-                                onTrainSolo={handlePlayerSoloTrain} 
-                            />
+                            <div key="player-dash-container">
+                                <PlayerDashboard 
+                                    player={players.find(p=>p.id===user.data.id) || user.data} 
+                                    team={teams.find(t=>t.id===user.data.teamId)} 
+                                    sales={sales || []} 
+                                    onAction={handlePlayerActions} 
+                                    onUpdatePassword={async(newP)=>{ await db.collection('players').doc(user.data.id).update({password: newP}); alert("Senha alterada!"); }} 
+                                    onTrainSolo={handlePlayerSoloTrain} 
+                                    onUseItem={handleUseItem}
+                                />
+                                <div style={{marginTop:30, borderTop: '2px solid #333', paddingTop: 20}}>
+                                    <h3 style={{textAlign:'center'}}>Tabela de Classificação</h3>
+                                    <LeagueTable teams={teams} serie={user.data.teamId !== 'FREE' ? (teams.find(t=>t.id===user.data.teamId)?.serie || 'A') : 'A'} />
+                                    <div style={{marginTop:20}}>
+                                        <MatchCenter matches={matches} teams={teams} onReportMatch={() => {}} />
+                                    </div>
+                                </div>
+                            </div>
                         }
 
                         {/* --- PAINEL DO TÉCNICO --- */}
                         {(screen === 'HOME' || screen === 'COACH_DASH') && user.type === 'COACH' && 
-                            <CoachDashboard 
-                                coach={user.data} 
-                                team={teams.find(t => t.id === user.data.teamId)} 
-                                players={players.filter(p => p.teamId === user.data.teamId)} 
-                                offers={offers} 
-                                sales={sales} 
-                                onTrain={handleCoachTrain} 
-                                onEvolvePerk={handleEvolveCoachPerk} 
-                                onAddAffinity={async (aff) => {
-                                    await db.collection('users').doc(user.data.id).update({
-                                        affinities: firebase.firestore.FieldValue.arrayUnion(aff),
-                                        pendingAffinity: firebase.firestore.FieldValue.increment(-1)
-                                    });
-                                    alert("Nova afinidade desbloqueada!");
-                                }}
-                                onAcceptOffer={handleFinalizeCoachContract} 
-                                onRejectOffer={rejectOffer} 
-                                onCounterOffer={handleCounterCoachOffer} 
-                                onUpdateSalary={handleUpdateCoachSalary} 
-                                onSelfAction={handleCoachSelfActions} 
-                            />
+                            <div key="coach-home-container">
+                                <CoachDashboard 
+                                    coach={user.data} 
+                                    team={teams.find(t => t.id === user.data.teamId)} 
+                                    players={players.filter(p => p.teamId === user.data.teamId)} 
+                                    offers={offers} 
+                                    sales={sales} 
+                                    onTrain={handleCoachTrain} 
+                                    onEvolvePerk={handleEvolveCoachPerk} 
+                                    onAddAffinity={async (aff) => {
+                                        await db.collection('users').doc(user.data.id).update({
+                                            affinities: firebase.firestore.FieldValue.arrayUnion(aff),
+                                            pendingAffinity: firebase.firestore.FieldValue.increment(-1)
+                                        });
+                                        alert("Nova afinidade desbloqueada!");
+                                    }}
+                                    onAcceptOffer={handleFinalizeCoachContract} 
+                                    onRejectOffer={rejectOffer} 
+                                    onCounterOffer={handleCounterCoachOffer} 
+                                    onUpdateSalary={handleUpdateCoachSalary} 
+                                    onSelfAction={handleCoachSelfActions} 
+                                />
+                                <div style={{marginTop:30, borderTop: '2px solid #333', paddingTop: 20}}>
+                                    <LeagueTable teams={teams} serie={user.data.teamId !== 'FREE' ? (teams.find(t=>t.id===user.data.teamId)?.serie || 'A') : 'A'} />
+                                    <div style={{marginTop:20}}>
+                                        <MatchCenter matches={matches} teams={teams} onReportMatch={() => {}} />
+                                    </div>
+                                </div>
+                            </div>
                         }
                     </div>
 
@@ -3071,7 +3098,6 @@ const renewContract = async (p) => {
                             <i className="fas fa-home"></i>INÍCIO
                         </div>
                         
-                        {/* ATUALIZADO: Agora Técnico também vê o Mercado */}
                         {user.type!=='COMPANY' && user.type!=='PLAYER' && <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>}
                         
                         {user.type!=='COMPANY' && <div className={`nav-item ${screen==='SHOPPING'?'active':''}`} onClick={()=>setScreen('SHOPPING')}><i className="fas fa-shopping-bag"></i>SHOP</div>}
@@ -3090,7 +3116,6 @@ const renewContract = async (p) => {
                             {modal.type==='POST_NEWS' && <div><h3>Nova Notícia</h3><input className="input-field" placeholder="Manchete / Texto" id="news-body" /><button className="btn btn-blue" onClick={()=>{postNews(`📰 **${user.data.name}:**\n${document.getElementById('news-body').value}`, 'press'); setModal(null);}}>PUBLICAR</button></div>}
                             {modal.type==='STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
                             
-                            {/* MODAL DE CONTRATAR TÉCNICO */}
                             {modal.type === 'HIRE_COACH' && (
                                 <div>
                                     <h3>Negociar com {modal.data.name}</h3>
@@ -3119,7 +3144,6 @@ const renewContract = async (p) => {
                     </div>}
                 </div>
             );
-        }
         
 // --- COMPONENTS ---
      const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor, onCreateCoach }) => {
@@ -3185,7 +3209,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.74.8 CLASSIFICAÇÃO E JOGOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.74.9 CLASSIFICAÇÃO E JOGOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

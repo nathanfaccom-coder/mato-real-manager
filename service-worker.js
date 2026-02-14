@@ -1,4 +1,4 @@
-const CACHE_NAME = 'matoreal-v2';
+const CACHE_NAME = 'matoreal-v3';
 const urlsToCache = [
   './',
   './index.html',

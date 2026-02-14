@@ -1,27 +1,35 @@
-const CACHE_NAME = 'matoreal-online-v5'; // Mudei a versão para forçar a atualização
+const CACHE_NAME = 'matoreal-FORCE-ONLINE-v6'; // Mudei para v5 para garantir
 
-// 1. Instalação: Força o novo motor a assumir imediatamente
+// 1. INSTALAÇÃO: Pula a espera e assume o controle AGORA
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
 
-// 2. Ativação: LIMPEZA TOTAL (Apaga qualquer versão antiga salva no celular)
+// 2. ATIVAÇÃO: Destrói qualquer cache que exista no navegador
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((cacheNames) => {
             return Promise.all(
                 cacheNames.map((cacheName) => {
-                    console.log('Apagando cache antigo:', cacheName);
+                    console.log('DESTRUINDO CACHE:', cacheName);
                     return caches.delete(cacheName);
                 })
             );
         })
     );
-    self.clients.claim();
+    // Toma o controle de todas as abas abertas imediatamente
+    return self.clients.claim();
 });
 
-// 3. Busca: MODO ONLINE APENAS
-// Não salva nada. Se tiver internet, carrega. Se não, dá erro (que seu HTML vai tratar).
+// 3. BUSCA: Ignora o cache e vai direto para a rede (ONLINE ONLY)
 self.addEventListener('fetch', (event) => {
-    event.respondWith(fetch(event.request));
+    // Tenta buscar na rede. Se falhar, não retorna nada (o HTML vai mostrar a tela de erro)
+    event.respondWith(
+        fetch(event.request, {cache: 'no-store'})
+            .catch(() => {
+                // Se a internet cair, não retorna cache antigo.
+                // O navegador vai falhar e o seu script no index.html vai mostrar a tela preta.
+                return new Response("Sem conexão", { status: 503, statusText: "Offline" });
+            })
+    );
 });

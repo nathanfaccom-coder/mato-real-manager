@@ -1,4 +1,4 @@
-const CACHE_NAME = 'matoreal-online-v4'; // Mudei a versão para forçar a atualização
+const CACHE_NAME = 'matoreal-online-v5'; // Mudei a versão para forçar a atualização
 
 // 1. Instalação: Força o novo motor a assumir imediatamente
 self.addEventListener('install', (event) => {

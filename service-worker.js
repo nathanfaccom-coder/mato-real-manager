@@ -1,28 +1,27 @@
-const CACHE_NAME = 'matoreal-v6';
-const urlsToCache = [
-  './',
-  './index.html',
-  './icon.png',
-  './manifest.json'
-];
+const CACHE_NAME = 'matoreal-online-v4'; // Mudei a versão para forçar a atualização
 
-self.addEventListener('install', function(event) {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(function(cache) {
-        return cache.addAll(urlsToCache);
-      })
-  );
+// 1. Instalação: Força o novo motor a assumir imediatamente
+self.addEventListener('install', (event) => {
+    self.skipWaiting();
 });
 
-self.addEventListener('fetch', function(event) {
-  event.respondWith(
-    caches.match(event.request)
-      .then(function(response) {
-        if (response) {
-          return response;
-        }
-        return fetch(event.request);
-      })
-  );
+// 2. Ativação: LIMPEZA TOTAL (Apaga qualquer versão antiga salva no celular)
+self.addEventListener('activate', (event) => {
+    event.waitUntil(
+        caches.keys().then((cacheNames) => {
+            return Promise.all(
+                cacheNames.map((cacheName) => {
+                    console.log('Apagando cache antigo:', cacheName);
+                    return caches.delete(cacheName);
+                })
+            );
+        })
+    );
+    self.clients.claim();
+});
+
+// 3. Busca: MODO ONLINE APENAS
+// Não salva nada. Se tiver internet, carrega. Se não, dá erro (que seu HTML vai tratar).
+self.addEventListener('fetch', (event) => {
+    event.respondWith(fetch(event.request));
 });

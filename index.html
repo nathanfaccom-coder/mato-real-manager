@@ -2387,7 +2387,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.73.1</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.71.9 </div>
                             </div>
                         </div>
                         
@@ -2750,7 +2750,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.71.8 ADIÇÃO DE FOTO DOS JOGADORES </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.71.9 ADIÇÃO DE FOTO DOS JOGADORES </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -4834,7 +4834,7 @@ const Ranking = ({ teams, players }) => {
 // FIM DO COMPONENTE MATCH PERFORMANCE FORM
 
 
-       const TeamStandingsEditor = ({ teams, onUpdateTeamStats }) => {
+   const TeamStandingsEditor = ({ teams, onUpdateTeamStats }) => {
             return (
                 <div>
                     <h3>Editar Tabela (Jornalista)</h3>
@@ -4860,12 +4860,45 @@ const Ranking = ({ teams, players }) => {
             );
         };
 
-// FIM DO COMPONENTE TEAM STANDINGS EDITOR
-
-        
-const root = ReactDOM.createRoot(document.getElementById('root'));
+        const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<ErrorBoundary><App /></ErrorBoundary>);
 
+    </script>
+
+    <div id="offline-blocker" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 999999; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+        <div style="font-size: 50px;">📡</div>
+        <h2 style="color: white; font-family: sans-serif; margin: 20px 0;">Sem Conexão</h2>
+        <p style="color: #888; font-family: sans-serif;">O Mato Real precisa de internet para sincronizar os dados.</p>
+        <button onclick="window.location.reload()" style="padding: 10px 20px; background: #00E676; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 20px;">TENTAR RECONECTAR</button>
+    </div>
+
+    <script>
+        // 1. Registrar o Service Worker (Para o botão de instalar funcionar)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('service-worker.js').then(function(registration) {
+                    console.log('App registrado: ', registration.scope);
+                }, function(err) {
+                    console.log('Falha ao registrar App: ', err);
+                });
+            });
+        }
+
+        // 2. Trava de Segurança (Bloqueia se cair a net)
+        function checkInternet() {
+            const blocker = document.getElementById('offline-blocker');
+            if (!navigator.onLine) {
+                blocker.style.display = 'flex'; // Mostra a tela preta
+            } else {
+                blocker.style.display = 'none'; // Esconde e libera o jogo
+            }
+        }
+
+        window.addEventListener('offline', checkInternet);
+        window.addEventListener('online', checkInternet);
+        
+        // Verifica assim que abre
+        checkInternet();
     </script>
 </body>
 </html>

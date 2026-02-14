@@ -454,9 +454,262 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
     return details.join('\n');
 };
 // FIM DO SISTEMA DE RPG E FORMATADOR DE OFERTAS
+const LeagueTable = ({ teams, serie }) => {
+    // Filtra e ordena
+    const list = teams.filter(t => t.serie === serie).sort((a, b) => {
+        const sA = a.stats || {}, sB = b.stats || {};
+        const pA = (sA.pts||0), pB = (sB.pts||0);
+        if (pA !== pB) return pB - pA;
+        const vA = (sA.wins||0), vB = (sB.wins||0);
+        if (vA !== vB) return vB - vA;
+        const sgA = (sA.gf||0)-(sA.ga||0), sgB = (sB.gf||0)-(sB.ga||0);
+        if (sgA !== sgB) return sgB - sgA;
+        return (sA.cards||0) - (sB.cards||0);
+    });
 
+    return (
+        <div className="card" style={{padding:0, overflow:'hidden'}}>
+            <div style={{padding:10, background:'var(--primary)', color:'#000', fontWeight:'bold', display:'flex', justifyContent:'space-between'}}>
+                <span>SÉRIE {serie}</span>
+                <small>Top 2 Sobe | Bottom 2 Cai</small>
+            </div>
+            <table style={{width:'100%', borderCollapse:'collapse', fontSize:11}}>
+                <thead style={{background:'#222', color:'#888'}}>
+                    <tr>
+                        <th style={{padding:5, textAlign:'left'}}># Time</th>
+                        <th title="Pontos">P</th>
+                        <th title="Jogos">J</th>
+                        <th title="Vitórias">V</th>
+                        <th title="Saldo Gols">SG</th>
+                        <th title="Cartões">CA</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {list.map((t, i) => {
+                        const s = t.stats || {};
+                        let rowColor = 'transparent';
+                        if (i < 2 && serie !== 'A') rowColor = 'rgba(0, 230, 118, 0.1)'; // Zona de Acesso
+                        if (i >= 6 && serie !== 'E') rowColor = 'rgba(255, 23, 68, 0.1)'; // Zona de Rebaixamento
+                        
+                        return (
+                            <tr key={t.id} style={{borderBottom:'1px solid #333', background: rowColor}}>
+                                <td style={{padding:'8px 5px', display:'flex', alignItems:'center', gap:5}}>
+                                    <span style={{color:'#666', width:15}}>{i+1}</span>
+                                    {t.logo && <img src={t.logo} style={{width:20, height:20, borderRadius:'50%'}} />}
+                                    <b>{t.name}</b>
+                                </td>
+                                <td style={{textAlign:'center', fontWeight:'bold'}}>{s.pts||0}</td>
+                                <td style={{textAlign:'center'}}>{(s.wins||0)+(s.draws||0)+(s.losses||0)}</td>
+                                <td style={{textAlign:'center'}}>{s.wins||0}</td>
+                                <td style={{textAlign:'center'}}>{(s.gf||0)-(s.ga||0)}</td>
+                                <td style={{textAlign:'center', color:'yellow'}}>{s.cards||0}</td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
+        </div>
+    );
+};
+        //FIM
+const MatchCenter = ({ matches, teams, onReportMatch }) => {
+    const [serie, setSerie] = useState('A');
+    const [round, setRound] = useState(1);
 
+    const games = matches.filter(m => m.serie === serie && m.round === parseInt(round));
 
+    return (
+        <div>
+            <h3>Central de Jogos</h3>
+            <div style={{display:'flex', gap:10, marginBottom:10}}>
+                <select className="input-field" value={serie} onChange={e=>setSerie(e.target.value)}>
+                    {['A','B','C','D'].map(s=><option key={s} value={s}>Série {s}</option>)}
+                </select>
+                <select className="input-field" value={round} onChange={e=>setRound(e.target.value)}>
+                    {[...Array(14).keys()].map(i=><option key={i+1} value={i+1}>Rodada {i+1}</option>)}
+                </select>
+            </div>
+
+            {games.length === 0 && <p style={{color:'#666'}}>Nenhum jogo agendado.</p>}
+
+            {games.map(m => (
+                <div key={m.id} className="card" style={{borderLeft: m.status==='FINISHED' ? '4px solid #444' : '4px solid var(--primary)'}}>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5}}>
+                        <div style={{textAlign:'center', width:'40%'}}>
+                            <b>{m.homeName}</b>
+                            {m.status==='FINISHED' && <div style={{fontSize:18}}>{m.scoreHome}</div>}
+                        </div>
+                        <div style={{fontSize:12, color:'#aaa'}}>X</div>
+                        <div style={{textAlign:'center', width:'40%'}}>
+                            <b>{m.awayName}</b>
+                            {m.status==='FINISHED' && <div style={{fontSize:18}}>{m.scoreAway}</div>}
+                        </div>
+                    </div>
+                    
+                    {m.status !== 'FINISHED' && (
+                        <button className="btn btn-green" onClick={() => onReportMatch(m)}>
+                            📝 LANÇAR SÚMULA
+                        </button>
+                    )}
+                </div>
+            ))}
+        </div>
+    );
+};
+        //FIM
+const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireCoach, onRenewCoach }) => {
+    const [tab, setTab] = useState('ELENCO'); 
+    
+    // Calcula salários somando jogadores + técnico (se houver)
+    const wageBill = players.reduce((a,p) => a + (parseFloat(p.salary)||0), 0) + (coach ? parseFloat(coach.salary) : 0);
+
+    // --- LÓGICA DE ORDENAÇÃO POR POSIÇÃO (NOVO) ---
+    const POS_ORDER = {
+        'GOL': 1,
+        'ZAG': 2, 'LD': 3, 'LE': 4,
+        'VOL': 5, 'MC': 6, 'MEI': 7,
+        'PTD': 8, 'PTE': 9, 'ATA': 10
+    };
+
+    const sortedPlayers = [...players].sort((a, b) => {
+        // 1. Ordena por Posição (Goleiro primeiro, Ataque último)
+        const posA = POS_ORDER[a.position] || 99;
+        const posB = POS_ORDER[b.position] || 99;
+        if (posA !== posB) return posA - posB;
+        
+        // 2. Desempate por Overall (Maior primeiro)
+        return (b.overall || 0) - (a.overall || 0);
+    });
+
+    return (
+        <div>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:15}}>
+                <div>
+                    <h2 style={{margin:0}}>{team.name}</h2>
+                    <small style={{color:'#aaa'}}>Folha: <span style={{color:'var(--danger)', fontWeight:'bold'}}>{fmt(wageBill)}/sem</span></small>
+                </div>
+                {!isVisitor && <button className="btn btn-green" style={{width:'auto'}} onClick={onAdd}>+ JOGADOR</button>}
+            </div>
+
+            {/* ABAS DE NAVEGAÇÃO */}
+            <div style={{display:'flex', gap:10, marginBottom:15}}>
+                <button className={`btn ${tab==='ELENCO'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('ELENCO')}>ELENCO</button>
+                <button className={`btn ${tab==='STAFF'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('STAFF')}>COMISSÃO TÉCNICA</button>
+            </div>
+
+            {/* --- ABA 1: ELENCO (AGORA ORDENADO) --- */}
+            {tab === 'ELENCO' && (
+                <div>
+                    <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
+                        <b>Jogadores ({sortedPlayers.length})</b>
+                    </div>
+                    
+                    {/* LISTA DE JOGADORES ORDENADA */}
+                    {sortedPlayers.map(p => (
+                        <div key={p.id} className="card" style={{borderLeft: `4px solid ${getPosColor(p.position)}`, marginBottom:10}}>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'start'}}>
+                                <div>
+                                    <span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span>
+                                    <b style={{fontSize:16, marginLeft:8}}>{p.name}</b>
+                                    <div style={{fontSize:11, color:'#888', marginTop:4}}>
+                                        Sal: {fmt(p.salary)} <span style={{margin:'0 5px'}}>|</span> Con: {p.contract}
+                                        {p.status === 'VENDA' && <span style={{color:'var(--primary)', marginLeft:5}}> (À VENDA)</span>}
+                                    </div>
+                                </div>
+                                <div className="player-ov">{p.overall}</div>
+                            </div>
+
+                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:5, textAlign:'center', marginTop:10, background:'rgba(0,0,0,0.3)', padding:5, borderRadius:5}}>
+                                <div><small style={{color:'#aaa'}}>⚽ {p.stats?.goals||0}</small></div>
+                                <div><small style={{color:'#aaa'}}>👟 {p.stats?.assists||0}</small></div>
+                                <div><small style={{color:'#aaa'}}>🛡️ {p.stats?.tackles||0}</small></div>
+                                <div><small style={{color:'#aaa'}}>🧤 {p.stats?.saves||0}</small></div>
+                                <div><small style={{color:'#aaa'}}>🟨 {p.stats?.yellows||0}</small></div>
+                                <div><small style={{color:'#aaa'}}>🟥 {p.stats?.reds||0}</small></div>
+                            </div>
+
+                            {/* ATRIBUTOS VISÍVEIS NO PAINEL */}
+                            <div style={{marginTop:10, paddingTop:5, borderTop:'1px dashed #444'}}>
+                                    <AttributeGrid attrs={p.attributes} pendingXP={p.pendingXP} />
+                            </div>
+
+                            {!isVisitor && (
+                                <div style={{marginTop:10, display:'flex', justifyContent:'flex-end'}}>
+                                    <button className="btn btn-ghost" style={{width:'auto', fontSize:12}} onClick={()=>onEdit(p)}>
+                                        <i className="fas fa-edit"></i> EDITAR
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* --- ABA 2: COMISSÃO TÉCNICA --- */}
+            {tab === 'STAFF' && (
+                <div>
+                    {!coach ? (
+                        <div className="card" style={{textAlign:'center', padding:20, border:'1px dashed #666'}}>
+                            <h3 style={{color:'#666'}}>Sem Técnico Contratado</h3>
+                            <p style={{fontSize:12, color:'#aaa'}}>Vá ao Mercado > Técnicos para contratar um comandante.</p>
+                        </div>
+                    ) : (
+                        <div className="highlight-card" style={{borderLeft:'4px solid gold'}}>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+                                <div>
+                                    <h2 style={{margin:0, color:'gold'}}>👔 {coach.name}</h2>
+                                    <span className="badge" style={{background:'var(--primary)', marginTop:5}}>Nível {coach.level}</span>
+                                </div>
+                                {!isVisitor && (
+                                    <div style={{display:'flex', gap:5}}>
+                                        <button className="btn btn-blue" style={{width:'auto', fontSize:10}} onClick={()=>onRenewCoach(coach)}>RENOVAR (+1)</button>
+                                        <button className="btn btn-red" style={{width:'auto', fontSize:10}} onClick={()=>onFireCoach(coach)}>DEMITIR</button>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <hr style={{borderColor:'#444', margin:'15px 0'}}/>
+                            
+                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, fontSize:12}}>
+                                <div>
+                                    <span style={{color:'#aaa'}}>Especialidade:</span><br/>
+                                    <b>{(coach.affinities || []).join(', ')}</b>
+                                </div>
+                                <div>
+                                    <span style={{color:'#aaa'}}>Salário:</span><br/>
+                                    <b>{fmt(coach.salary)}/sem</b>
+                                </div>
+                                <div>
+                                    <span style={{color:'#aaa'}}>Multa Rescisória:</span><br/>
+                                    <b style={{color:'red'}}>{fmt(coach.salary * 4)}</b>
+                                </div>
+                                <div>
+                                    <span style={{color:'#aaa'}}>Treinos na Semana:</span><br/>
+                                    <b style={{color: coach.trainingsLeft > 0 ? 'lime' : 'red'}}>{coach.trainingsLeft}/2</b>
+                                </div>
+                            </div>
+
+                            <div style={{marginTop:15, background:'rgba(0,0,0,0.3)', padding:10, borderRadius:5}}>
+                                <small style={{color:'#ccc'}}>💡 Habilidades Passivas (Buffs para o time):</small>
+                                <div style={{display:'flex', flexWrap:'wrap', gap:5, marginTop:5}}>
+                                    {(coach.perks || []).map(p => (
+                                        <span key={p.id} className="badge" style={{background:'var(--purple)', border:'1px solid gold'}} title={p.desc}>
+                                            ⚡ {p.name}
+                                        </span>
+                                    ))}
+                                    {(coach.perks || []).length === 0 && <span style={{color:'#666', fontSize:10}}>Nenhuma habilidade desbloqueada.</span>}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+// FIM DO SHOPPING E TEAM DASHBOARD
+
+        
        // ... continuação do código anterior
         function App() {
             const [user, setUser] = useState(null); 
@@ -1469,63 +1722,7 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
         alert(msg);
     };
             //FIM
-const LeagueTable = ({ teams, serie }) => {
-    // Filtra e ordena
-    const list = teams.filter(t => t.serie === serie).sort((a, b) => {
-        const sA = a.stats || {}, sB = b.stats || {};
-        const pA = (sA.pts||0), pB = (sB.pts||0);
-        if (pA !== pB) return pB - pA;
-        const vA = (sA.wins||0), vB = (sB.wins||0);
-        if (vA !== vB) return vB - vA;
-        const sgA = (sA.gf||0)-(sA.ga||0), sgB = (sB.gf||0)-(sB.ga||0);
-        if (sgA !== sgB) return sgB - sgA;
-        return (sA.cards||0) - (sB.cards||0);
-    });
 
-    return (
-        <div className="card" style={{padding:0, overflow:'hidden'}}>
-            <div style={{padding:10, background:'var(--primary)', color:'#000', fontWeight:'bold', display:'flex', justifyContent:'space-between'}}>
-                <span>SÉRIE {serie}</span>
-                <small>Top 2 Sobe | Bottom 2 Cai</small>
-            </div>
-            <table style={{width:'100%', borderCollapse:'collapse', fontSize:11}}>
-                <thead style={{background:'#222', color:'#888'}}>
-                    <tr>
-                        <th style={{padding:5, textAlign:'left'}}># Time</th>
-                        <th title="Pontos">P</th>
-                        <th title="Jogos">J</th>
-                        <th title="Vitórias">V</th>
-                        <th title="Saldo Gols">SG</th>
-                        <th title="Cartões">CA</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {list.map((t, i) => {
-                        const s = t.stats || {};
-                        let rowColor = 'transparent';
-                        if (i < 2 && serie !== 'A') rowColor = 'rgba(0, 230, 118, 0.1)'; // Zona de Acesso
-                        if (i >= 6 && serie !== 'E') rowColor = 'rgba(255, 23, 68, 0.1)'; // Zona de Rebaixamento
-                        
-                        return (
-                            <tr key={t.id} style={{borderBottom:'1px solid #333', background: rowColor}}>
-                                <td style={{padding:'8px 5px', display:'flex', alignItems:'center', gap:5}}>
-                                    <span style={{color:'#666', width:15}}>{i+1}</span>
-                                    {t.logo && <img src={t.logo} style={{width:20, height:20, borderRadius:'50%'}} />}
-                                    <b>{t.name}</b>
-                                </td>
-                                <td style={{textAlign:'center', fontWeight:'bold'}}>{s.pts||0}</td>
-                                <td style={{textAlign:'center'}}>{(s.wins||0)+(s.draws||0)+(s.losses||0)}</td>
-                                <td style={{textAlign:'center'}}>{s.wins||0}</td>
-                                <td style={{textAlign:'center'}}>{(s.gf||0)-(s.ga||0)}</td>
-                                <td style={{textAlign:'center', color:'yellow'}}>{s.cards||0}</td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-        </div>
-    );
-};
             //FIM
 
             
@@ -2795,7 +2992,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.74.9  </div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.0  </div>
                             </div>
                         </div>
                         
@@ -3210,7 +3407,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.74.9 CLASSIFICAÇÃO E JOGOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.0 CLASSIFICAÇÃO E JOGOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -4309,158 +4506,6 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
     );
 };
         //FIM
-const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireCoach, onRenewCoach }) => {
-    const [tab, setTab] = useState('ELENCO'); 
-    
-    // Calcula salários somando jogadores + técnico (se houver)
-    const wageBill = players.reduce((a,p) => a + (parseFloat(p.salary)||0), 0) + (coach ? parseFloat(coach.salary) : 0);
-
-    // --- LÓGICA DE ORDENAÇÃO POR POSIÇÃO (NOVO) ---
-    const POS_ORDER = {
-        'GOL': 1,
-        'ZAG': 2, 'LD': 3, 'LE': 4,
-        'VOL': 5, 'MC': 6, 'MEI': 7,
-        'PTD': 8, 'PTE': 9, 'ATA': 10
-    };
-
-    const sortedPlayers = [...players].sort((a, b) => {
-        // 1. Ordena por Posição (Goleiro primeiro, Ataque último)
-        const posA = POS_ORDER[a.position] || 99;
-        const posB = POS_ORDER[b.position] || 99;
-        if (posA !== posB) return posA - posB;
-        
-        // 2. Desempate por Overall (Maior primeiro)
-        return (b.overall || 0) - (a.overall || 0);
-    });
-
-    return (
-        <div>
-            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:15}}>
-                <div>
-                    <h2 style={{margin:0}}>{team.name}</h2>
-                    <small style={{color:'#aaa'}}>Folha: <span style={{color:'var(--danger)', fontWeight:'bold'}}>{fmt(wageBill)}/sem</span></small>
-                </div>
-                {!isVisitor && <button className="btn btn-green" style={{width:'auto'}} onClick={onAdd}>+ JOGADOR</button>}
-            </div>
-
-            {/* ABAS DE NAVEGAÇÃO */}
-            <div style={{display:'flex', gap:10, marginBottom:15}}>
-                <button className={`btn ${tab==='ELENCO'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('ELENCO')}>ELENCO</button>
-                <button className={`btn ${tab==='STAFF'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('STAFF')}>COMISSÃO TÉCNICA</button>
-            </div>
-
-            {/* --- ABA 1: ELENCO (AGORA ORDENADO) --- */}
-            {tab === 'ELENCO' && (
-                <div>
-                    <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
-                        <b>Jogadores ({sortedPlayers.length})</b>
-                    </div>
-                    
-                    {/* LISTA DE JOGADORES ORDENADA */}
-                    {sortedPlayers.map(p => (
-                        <div key={p.id} className="card" style={{borderLeft: `4px solid ${getPosColor(p.position)}`, marginBottom:10}}>
-                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'start'}}>
-                                <div>
-                                    <span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span>
-                                    <b style={{fontSize:16, marginLeft:8}}>{p.name}</b>
-                                    <div style={{fontSize:11, color:'#888', marginTop:4}}>
-                                        Sal: {fmt(p.salary)} <span style={{margin:'0 5px'}}>|</span> Con: {p.contract}
-                                        {p.status === 'VENDA' && <span style={{color:'var(--primary)', marginLeft:5}}> (À VENDA)</span>}
-                                    </div>
-                                </div>
-                                <div className="player-ov">{p.overall}</div>
-                            </div>
-
-                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:5, textAlign:'center', marginTop:10, background:'rgba(0,0,0,0.3)', padding:5, borderRadius:5}}>
-                                <div><small style={{color:'#aaa'}}>⚽ {p.stats?.goals||0}</small></div>
-                                <div><small style={{color:'#aaa'}}>👟 {p.stats?.assists||0}</small></div>
-                                <div><small style={{color:'#aaa'}}>🛡️ {p.stats?.tackles||0}</small></div>
-                                <div><small style={{color:'#aaa'}}>🧤 {p.stats?.saves||0}</small></div>
-                                <div><small style={{color:'#aaa'}}>🟨 {p.stats?.yellows||0}</small></div>
-                                <div><small style={{color:'#aaa'}}>🟥 {p.stats?.reds||0}</small></div>
-                            </div>
-
-                            {/* ATRIBUTOS VISÍVEIS NO PAINEL */}
-                            <div style={{marginTop:10, paddingTop:5, borderTop:'1px dashed #444'}}>
-                                    <AttributeGrid attrs={p.attributes} pendingXP={p.pendingXP} />
-                            </div>
-
-                            {!isVisitor && (
-                                <div style={{marginTop:10, display:'flex', justifyContent:'flex-end'}}>
-                                    <button className="btn btn-ghost" style={{width:'auto', fontSize:12}} onClick={()=>onEdit(p)}>
-                                        <i className="fas fa-edit"></i> EDITAR
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {/* --- ABA 2: COMISSÃO TÉCNICA --- */}
-            {tab === 'STAFF' && (
-                <div>
-                    {!coach ? (
-                        <div className="card" style={{textAlign:'center', padding:20, border:'1px dashed #666'}}>
-                            <h3 style={{color:'#666'}}>Sem Técnico Contratado</h3>
-                            <p style={{fontSize:12, color:'#aaa'}}>Vá ao Mercado > Técnicos para contratar um comandante.</p>
-                        </div>
-                    ) : (
-                        <div className="highlight-card" style={{borderLeft:'4px solid gold'}}>
-                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
-                                <div>
-                                    <h2 style={{margin:0, color:'gold'}}>👔 {coach.name}</h2>
-                                    <span className="badge" style={{background:'var(--primary)', marginTop:5}}>Nível {coach.level}</span>
-                                </div>
-                                {!isVisitor && (
-                                    <div style={{display:'flex', gap:5}}>
-                                        <button className="btn btn-blue" style={{width:'auto', fontSize:10}} onClick={()=>onRenewCoach(coach)}>RENOVAR (+1)</button>
-                                        <button className="btn btn-red" style={{width:'auto', fontSize:10}} onClick={()=>onFireCoach(coach)}>DEMITIR</button>
-                                    </div>
-                                )}
-                            </div>
-                            
-                            <hr style={{borderColor:'#444', margin:'15px 0'}}/>
-                            
-                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, fontSize:12}}>
-                                <div>
-                                    <span style={{color:'#aaa'}}>Especialidade:</span><br/>
-                                    <b>{(coach.affinities || []).join(', ')}</b>
-                                </div>
-                                <div>
-                                    <span style={{color:'#aaa'}}>Salário:</span><br/>
-                                    <b>{fmt(coach.salary)}/sem</b>
-                                </div>
-                                <div>
-                                    <span style={{color:'#aaa'}}>Multa Rescisória:</span><br/>
-                                    <b style={{color:'red'}}>{fmt(coach.salary * 4)}</b>
-                                </div>
-                                <div>
-                                    <span style={{color:'#aaa'}}>Treinos na Semana:</span><br/>
-                                    <b style={{color: coach.trainingsLeft > 0 ? 'lime' : 'red'}}>{coach.trainingsLeft}/2</b>
-                                </div>
-                            </div>
-
-                            <div style={{marginTop:15, background:'rgba(0,0,0,0.3)', padding:10, borderRadius:5}}>
-                                <small style={{color:'#ccc'}}>💡 Habilidades Passivas (Buffs para o time):</small>
-                                <div style={{display:'flex', flexWrap:'wrap', gap:5, marginTop:5}}>
-                                    {(coach.perks || []).map(p => (
-                                        <span key={p.id} className="badge" style={{background:'var(--purple)', border:'1px solid gold'}} title={p.desc}>
-                                            ⚡ {p.name}
-                                        </span>
-                                    ))}
-                                    {(coach.perks || []).length === 0 && <span style={{color:'#666', fontSize:10}}>Nenhuma habilidade desbloqueada.</span>}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-};
-// FIM DO SHOPPING E TEAM DASHBOARD
-
 
 
        const StatsEditor = ({ players, teams, onSave }) => {
@@ -5248,51 +5293,7 @@ const Ranking = ({ teams, players }) => {
     );
 };
 // FIM DO COMPONENTE RANKING
-const MatchCenter = ({ matches, teams, onReportMatch }) => {
-    const [serie, setSerie] = useState('A');
-    const [round, setRound] = useState(1);
 
-    const games = matches.filter(m => m.serie === serie && m.round === parseInt(round));
-
-    return (
-        <div>
-            <h3>Central de Jogos</h3>
-            <div style={{display:'flex', gap:10, marginBottom:10}}>
-                <select className="input-field" value={serie} onChange={e=>setSerie(e.target.value)}>
-                    {['A','B','C','D'].map(s=><option key={s} value={s}>Série {s}</option>)}
-                </select>
-                <select className="input-field" value={round} onChange={e=>setRound(e.target.value)}>
-                    {[...Array(14).keys()].map(i=><option key={i+1} value={i+1}>Rodada {i+1}</option>)}
-                </select>
-            </div>
-
-            {games.length === 0 && <p style={{color:'#666'}}>Nenhum jogo agendado.</p>}
-
-            {games.map(m => (
-                <div key={m.id} className="card" style={{borderLeft: m.status==='FINISHED' ? '4px solid #444' : '4px solid var(--primary)'}}>
-                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5}}>
-                        <div style={{textAlign:'center', width:'40%'}}>
-                            <b>{m.homeName}</b>
-                            {m.status==='FINISHED' && <div style={{fontSize:18}}>{m.scoreHome}</div>}
-                        </div>
-                        <div style={{fontSize:12, color:'#aaa'}}>X</div>
-                        <div style={{textAlign:'center', width:'40%'}}>
-                            <b>{m.awayName}</b>
-                            {m.status==='FINISHED' && <div style={{fontSize:18}}>{m.scoreAway}</div>}
-                        </div>
-                    </div>
-                    
-                    {m.status !== 'FINISHED' && (
-                        <button className="btn btn-green" onClick={() => onReportMatch(m)}>
-                            📝 LANÇAR SÚMULA
-                        </button>
-                    )}
-                </div>
-            ))}
-        </div>
-    );
-};
-        //FIM
 // --- COMPONENTES QUE FALTAVAM (Súmula e Tabela) ---
 
        const MatchPerformanceForm = ({ players, teams, onSaveStats }) => {

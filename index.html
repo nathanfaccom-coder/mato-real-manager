@@ -455,30 +455,25 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
 };
 // FIM DO SISTEMA DE RPG E FORMATADOR DE OFERTAS
         
-// --- CORREÇÃO: Tabela que aceita times antigos (sem série definida) ---
+// --- ATUALIZADO: Tabela com Regra G2/Z2 ---
 const LeagueTable = ({ teams, serie }) => {
-    // Se o time não tem série, assumimos que é Série A para não sumir
     const list = teams.filter(t => {
-        const timeSerie = t.serie || 'A'; // Fallback para 'A'
+        const timeSerie = t.serie || 'A'; 
         return timeSerie === serie && t.status !== 'PENDING';
     }).sort((a, b) => {
         const sA = a.stats || {}, sB = b.stats || {};
-        const pA = (sA.pts||0), pB = (sB.pts||0);
-        if (pA !== pB) return pB - pA;
-        const vA = (sA.wins||0), vB = (sB.wins||0);
-        if (vA !== vB) return vB - vA;
-        const sgA = (sA.gf||0)-(sA.ga||0), sgB = (sB.gf||0)-(sB.ga||0);
-        if (sgA !== sgB) return sgB - sgA;
-        return (sA.cards||0) - (sB.cards||0);
+        if ((sA.pts||0) !== (sB.pts||0)) return (sB.pts||0) - (sA.pts||0);
+        if ((sA.wins||0) !== (sB.wins||0)) return (sB.wins||0) - (sA.wins||0);
+        return ((sB.gf||0)-(sB.ga||0)) - ((sA.gf||0)-(sA.ga||0));
     });
 
-    if (list.length === 0) return <div className="card" style={{padding:15, textAlign:'center', color:'#666'}}>Nenhum time nesta série.</div>;
+    if (list.length === 0) return <div className="card" style={{padding:15, textAlign:'center', color:'#666'}}>Sem times na Série {serie}.</div>;
 
     return (
         <div className="card" style={{padding:0, overflow:'hidden'}}>
             <div style={{padding:10, background:'var(--primary)', color:'#000', fontWeight:'bold', display:'flex', justifyContent:'space-between'}}>
                 <span>SÉRIE {serie}</span>
-                <small>G4 Sobe | Z4 Cai</small>
+                <small>G2 Sobe | Z2 Cai</small> {/* TEXTO ATUALIZADO */}
             </div>
             <table style={{width:'100%', borderCollapse:'collapse', fontSize:11}}>
                 <thead style={{background:'#222', color:'#888'}}>
@@ -494,8 +489,9 @@ const LeagueTable = ({ teams, serie }) => {
                     {list.map((t, i) => {
                         const s = t.stats || {};
                         let rowColor = 'transparent';
-                        if (i < 4 && serie !== 'A') rowColor = 'rgba(0, 230, 118, 0.1)'; 
-                        if (i >= list.length - 4 && list.length > 4) rowColor = 'rgba(255, 23, 68, 0.1)'; 
+                        // REGRA ATUALIZADA: Top 2 e Bottom 2
+                        if (i < 2 && serie !== 'A') rowColor = 'rgba(0, 230, 118, 0.1)'; 
+                        if (i >= list.length - 2 && list.length >= 8 && serie !== 'E') rowColor = 'rgba(255, 23, 68, 0.1)'; 
                         
                         return (
                             <tr key={t.id} style={{borderBottom:'1px solid #333', background: rowColor}}>
@@ -518,12 +514,11 @@ const LeagueTable = ({ teams, serie }) => {
 };
         //FIM
         
-// --- CORREÇÃO: MatchCenter que não quebra se faltar série ---
+// --- ATUALIZADO: MatchCenter com 14 Rodadas ---
 const MatchCenter = ({ matches, teams, onReportMatch }) => {
     const [serie, setSerie] = useState('A');
     const [round, setRound] = useState(1);
 
-    // Filtra jogos mesmo se a série não estiver salva no match (assume A)
     const games = matches.filter(m => (m.serie || 'A') === serie && parseInt(m.round) === parseInt(round));
 
     return (
@@ -534,11 +529,12 @@ const MatchCenter = ({ matches, teams, onReportMatch }) => {
                     {['A','B','C','D'].map(s=><option key={s} value={s}>Série {s}</option>)}
                 </select>
                 <select className="input-field" value={round} onChange={e=>setRound(e.target.value)}>
-                    {[...Array(38).keys()].map(i=><option key={i+1} value={i+1}>Rodada {i+1}</option>)}
+                    {/* ATUALIZADO: Array de 14 rodadas */}
+                    {[...Array(14).keys()].map(i=><option key={i+1} value={i+1}>Rodada {i+1}</option>)}
                 </select>
             </div>
 
-            {games.length === 0 && <div className="card" style={{padding:15, textAlign:'center', color:'#666'}}>Nenhum jogo encontrado para Série {serie} - Rodada {round}.</div>}
+            {games.length === 0 && <div className="card" style={{padding:15, textAlign:'center', color:'#666'}}>Nenhum jogo encontrado.</div>}
 
             {games.map(m => (
                 <div key={m.id} className="card" style={{borderLeft: m.status==='FINISHED' ? '4px solid #444' : '4px solid var(--primary)'}}>
@@ -555,9 +551,7 @@ const MatchCenter = ({ matches, teams, onReportMatch }) => {
                     </div>
                     
                     {m.status !== 'FINISHED' && (
-                        <button className="btn btn-green" onClick={() => onReportMatch(m)}>
-                            📝 SÚMULA
-                        </button>
+                        <button className="btn btn-green" onClick={() => onReportMatch(m)}>📝 SÚMULA</button>
                     )}
                 </div>
             ))}
@@ -571,7 +565,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     // Calcula salários somando jogadores + técnico (se houver)
     const wageBill = players.reduce((a,p) => a + (parseFloat(p.salary)||0), 0) + (coach ? parseFloat(coach.salary) : 0);
 
-    // --- LÓGICA DE ORDENAÇÃO POR POSIÇÃO (NOVO) ---
+    // --- LÓGICA DE ORDENAÇÃO POR POSIÇÃO ---
     const POS_ORDER = {
         'GOL': 1,
         'ZAG': 2, 'LD': 3, 'LE': 4,
@@ -605,7 +599,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                 <button className={`btn ${tab==='STAFF'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('STAFF')}>COMISSÃO TÉCNICA</button>
             </div>
 
-            {/* --- ABA 1: ELENCO (AGORA ORDENADO) --- */}
+            {/* --- ABA 1: ELENCO (ORDENADO) --- */}
             {tab === 'ELENCO' && (
                 <div>
                     <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
@@ -2990,7 +2984,7 @@ const renewContract = async (p) => {
             // 3. Função Mestra do Admin (COM REGRA DE AGENTES LIVRES)
      
           // --- RENDER ---
-           if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
+          if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
             if(!user) return <LoginScreen teams={teams} players={players} papers={papers} journalists={journalists} companies={companies} coaches={coaches} onLogin={login} onCreateTeam={createTeam} onCreatePaper={createNewspaper} onCreateJourno={createJournalist} onCreateCompany={createCompany} onAdmin={loginAdmin} onVisitor={()=>{setUser({type:'VISITOR'}); setScreen('RANKING');}} onCreateCoach={createCoach} />;
 
             return (
@@ -3000,7 +2994,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.1  </div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.2</div>
                             </div>
                         </div>
                         
@@ -3090,21 +3084,8 @@ const renewContract = async (p) => {
                                     onEdit={(p)=>setModal({type:'PLAYER', data:p})} 
                                     onAdd={()=>setModal({type:'PLAYER', data: { teamId: user.data.id } })} 
                                 />
-                                <div style={{marginTop:30, borderTop: '2px solid #333', paddingTop: 20}}>
-                                    <h2 style={{color: 'var(--primary)', textAlign: 'center'}}><i className="fas fa-list-ol"></i> Classificação Oficial</h2>
-                                    <LeagueTable teams={teams} serie={user.data.serie || 'A'} />
-                                    <div style={{marginTop: 25}}>
-                                        <h3 style={{textAlign: 'center'}}><i className="fas fa-calendar-alt"></i> Próximos Jogos</h3>
-                                        <MatchCenter matches={matches} teams={teams} onReportMatch={() => alert("Apenas jornalistas podem lançar súmulas.")} />
-                                    </div>
-                                    <details style={{marginTop: 20, background: 'rgba(255,255,255,0.05)', padding: 10, borderRadius: 8}}>
-                                        <summary style={{cursor: 'pointer', fontSize: 12, color: '#aaa'}}>Ver outras divisões</summary>
-                                        <div style={{marginTop: 10, display: 'grid', gap: 15}}>
-                                            {['A','B','C','D'].filter(s => s !== user.data.serie).map(s => (
-                                                <LeagueTable key={s} teams={teams} serie={s} />
-                                            ))}
-                                        </div>
-                                    </details>
+                                <div style={{marginTop: 20, textAlign:'center', color:'#666', fontSize:12}}>
+                                    <i>Acesse a aba <b>JOGOS</b> para ver a tabela e partidas.</i>
                                 </div>
                             </div>
                         )}
@@ -3112,15 +3093,6 @@ const renewContract = async (p) => {
                         {screen === 'HOME' && user.type === 'VISITOR' && (
                             <div>
                                 <VisitorDashboard players={players} teams={teams} />
-                                <div style={{marginTop:30}}>
-                                    <h3 style={{textAlign:'center'}}>Tabela de Classificação</h3>
-                                    <LeagueTable teams={teams} serie="A" />
-                                    <div style={{marginTop:10}}><LeagueTable teams={teams} serie="B" /></div>
-                                    <div style={{marginTop:20}}>
-                                        <h3 style={{textAlign: 'center'}}>Calendário de Jogos</h3>
-                                        <MatchCenter matches={matches} teams={teams} onReportMatch={() => {}} />
-                                    </div>
-                                </div>
                             </div>
                         )}
                         
@@ -3132,10 +3104,7 @@ const renewContract = async (p) => {
                                     <button className="btn btn-purple" onClick={()=>setModal({type:'MATCH_PERFORMANCE'})}>LANÇAR SÚMULA (XP)</button>
                                     <button className="btn btn-gold" onClick={()=>setModal({type:'TEAM_TABLE'})}>EDITAR TABELA</button>
                                 </div>
-                                <div style={{marginTop:20}}>
-                                    <LeagueTable teams={teams} serie="A" />
-                                    <MatchCenter matches={matches} teams={teams} onReportMatch={(m) => setModal({type:'MATCH_REPORT', data: m})} />
-                                </div>
+                                
                                 {user.type==='PRESS' && journalists.filter(j=>j.newspaperId===user.data.id && j.status==='PENDING').map(j=>(
                                     <div key={j.id} className="card">
                                         {j.name}
@@ -3145,6 +3114,42 @@ const renewContract = async (p) => {
                             </div>
                         )}
                         
+                        {/* --- NOVA TELA: JOGOS E CLASSIFICAÇÃO (ACESSÍVEL A TODOS) --- */}
+                        {screen === 'MATCHES' && (
+                            <div style={{paddingBottom: 60}}>
+                                <h2 style={{color:'var(--primary)', textAlign:'center'}}>Campeonato Mato Real</h2>
+                                
+                                {/* Renderiza as Tabelas de A a D */}
+                                <div style={{display:'flex', flexDirection:'column', gap:20, marginBottom:30}}>
+                                    <LeagueTable teams={teams} serie="A" />
+                                    <details>
+                                        <summary style={{padding:10, background:'#333', borderRadius:5, cursor:'pointer', fontWeight:'bold'}}>Ver Séries B, C e D</summary>
+                                        <div style={{marginTop:10, display:'grid', gap:15}}>
+                                            <LeagueTable teams={teams} serie="B" />
+                                            <LeagueTable teams={teams} serie="C" />
+                                            <LeagueTable teams={teams} serie="D" />
+                                        </div>
+                                    </details>
+                                </div>
+
+                                <hr style={{borderColor:'#333', margin:'20px 0'}}/>
+                                
+                                {/* Renderiza o MatchCenter */}
+                                <MatchCenter 
+                                    matches={matches} 
+                                    teams={teams} 
+                                    onReportMatch={(m) => {
+                                        if(user.type.includes('PRESS') || user.type === 'ADMIN') {
+                                            setModal({type:'MATCH_REPORT', data: m}); // Usa lógica antiga de modal para compatibilidade ou troca para MATCH_PERFORMANCE se preferir o novo
+                                            // Se quiser usar o novo direto: setModal({type:'MATCH_PERFORMANCE', data: m});
+                                        } else {
+                                            alert("Apenas imprensa/admin lança súmula.");
+                                        }
+                                    }} 
+                                />
+                            </div>
+                        )}
+
                         {screen === 'ADMIN_TEAM' && adminTeam && 
                             <div>
                                 <button className="btn" style={{background:'#333', marginBottom:10}} onClick={()=>{setAdminTeam(null); setScreen('HOME');}}>⬅ VOLTAR</button>
@@ -3254,12 +3259,8 @@ const renewContract = async (p) => {
                                     onTrainSolo={handlePlayerSoloTrain} 
                                     onUseItem={handleUseItem}
                                 />
-                                <div style={{marginTop:30, borderTop: '2px solid #333', paddingTop: 20}}>
-                                    <h3 style={{textAlign:'center'}}>Tabela de Classificação</h3>
-                                    <LeagueTable teams={teams} serie={user.data.teamId !== 'FREE' ? (teams.find(t=>t.id===user.data.teamId)?.serie || 'A') : 'A'} />
-                                    <div style={{marginTop:20}}>
-                                        <MatchCenter matches={matches} teams={teams} onReportMatch={() => {}} />
-                                    </div>
+                                <div style={{marginTop: 20, textAlign:'center', color:'#666', fontSize:12}}>
+                                    <i>Acesse a aba <b>JOGOS</b> para ver a tabela e partidas.</i>
                                 </div>
                             </div>
                         }
@@ -3288,29 +3289,58 @@ const renewContract = async (p) => {
                                     onUpdateSalary={handleUpdateCoachSalary} 
                                     onSelfAction={handleCoachSelfActions} 
                                 />
-                                <div style={{marginTop:30, borderTop: '2px solid #333', paddingTop: 20}}>
-                                    <LeagueTable teams={teams} serie={user.data.teamId !== 'FREE' ? (teams.find(t=>t.id===user.data.teamId)?.serie || 'A') : 'A'} />
-                                    <div style={{marginTop:20}}>
-                                        <MatchCenter matches={matches} teams={teams} onReportMatch={() => {}} />
-                                    </div>
+                                <div style={{marginTop: 20, textAlign:'center', color:'#666', fontSize:12}}>
+                                    <i>Acesse a aba <b>JOGOS</b> para ver a tabela e partidas.</i>
                                 </div>
                             </div>
                         }
                     </div>
 
-                    <div className="bottom-nav">
-                        <div className={`nav-item ${['HOME','COMPANY_HOME','COMPANY_DASH','PLAYER_DASH','COACH_DASH'].includes(screen)?'active':''}`} onClick={() => { if(user.type.includes('PRESS')) setScreen('PRESS_DASH'); else if(user.type === 'COMPANY') setScreen('COMPANY_HOME'); else if(user.type === 'PLAYER') setScreen('PLAYER_DASH'); else if(user.type === 'COACH') setScreen('COACH_DASH'); else setScreen('HOME'); }}>
-                            <i className="fas fa-home"></i>INÍCIO
-                        </div>
-                        
-                        {user.type!=='COMPANY' && user.type!=='PLAYER' && <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}><i className="fas fa-globe"></i>MERCADO</div>}
-                        
-                        {user.type!=='COMPANY' && <div className={`nav-item ${screen==='SHOPPING'?'active':''}`} onClick={()=>setScreen('SHOPPING')}><i className="fas fa-shopping-bag"></i>SHOP</div>}
-                        {user.type==='USER' && <div className={`nav-item ${screen==='SPONSORSHIPS'?'active':''}`} onClick={()=>setScreen('SPONSORSHIPS')}><i className="fas fa-handshake"></i>PATRO</div>}
-                        {user.type!=='COMPANY' && <div className={`nav-item ${screen==='RANKING'?'active':''}`} onClick={()=>setScreen('RANKING')}><i className="fas fa-trophy"></i>RANK</div>}
-                        <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={()=>{setScreen('NEWS'); setNewNews(false); localStorage.setItem('lastRead', Date.now());}}><i className="fas fa-newspaper"></i>NEWS</div>
-                    </div>
+                   <div className="bottom-nav">
+    {/* 1. HOME */}
+    <div className={`nav-item ${['HOME','COMPANY_HOME','COMPANY_DASH','PLAYER_DASH','COACH_DASH','PRESS_DASH'].includes(screen)?'active':''}`} 
+         onClick={() => { 
+             // Lógica de retorno para a home correta
+             if(user.type.includes('PRESS')) setScreen('PRESS_DASH'); 
+             else if(user.type === 'COMPANY') setScreen('COMPANY_HOME'); 
+             else if(user.type === 'PLAYER') setScreen('PLAYER_DASH'); 
+             else if(user.type === 'COACH') setScreen('COACH_DASH'); 
+             else setScreen('HOME'); 
+         }}>
+        <i className="fas fa-home"></i>INÍCIO
+    </div>
+    
+    {/* 2. JOGOS (NOVO - PARA TODOS) */}
+    <div className={`nav-item ${screen==='MATCHES'?'active':''}`} onClick={()=>setScreen('MATCHES')}>
+        <i className="fas fa-futbol"></i>JOGOS
+    </div>
+    
+    {/* 3. MERCADO (Esconde para empresas) */}
+    {user.type!=='COMPANY' && 
+        <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}>
+            <i className="fas fa-globe"></i>MERCADO
+        </div>
+    }
+    
+    {/* 4. SHOP (Esconde para empresas) */}
+    {user.type!=='COMPANY' && 
+        <div className={`nav-item ${screen==='SHOPPING'?'active':''}`} onClick={()=>setScreen('SHOPPING')}>
+            <i className="fas fa-shopping-bag"></i>SHOP
+        </div>
+    }
 
+    {/* 5. PATROCINIO (Só times) */}
+    {user.type==='USER' && 
+        <div className={`nav-item ${screen==='SPONSORSHIPS'?'active':''}`} onClick={()=>setScreen('SPONSORSHIPS')}>
+            <i className="fas fa-handshake"></i>PATRO
+        </div>
+    }
+
+    {/* 6. NEWS (Todos) */}
+    <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={()=>{setScreen('NEWS'); setNewNews(false); localStorage.setItem('lastRead', Date.now());}}>
+        <i className="fas fa-newspaper"></i>NEWS
+    </div>
+</div>
                     {modal && <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget && setModal(null)}>
                         <div className="modal-content">
                             {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={async(id)=>{db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} onRenew={renewContract} isOwner={user.type==='USER' && modal.data?.teamId===user.data?.id} />}
@@ -3320,6 +3350,8 @@ const renewContract = async (p) => {
                             {modal.type==='TEAM_TABLE' && <TeamStandingsEditor teams={teams} onUpdateTeamStats={updateTeamStats} />}
                             {modal.type==='POST_NEWS' && <div><h3>Nova Notícia</h3><input className="input-field" placeholder="Manchete / Texto" id="news-body" /><button className="btn btn-blue" onClick={()=>{postNews(`📰 **${user.data.name}:**\n${document.getElementById('news-body').value}`, 'press'); setModal(null);}}>PUBLICAR</button></div>}
                             {modal.type==='STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
+                            {/* Modal de Relatório da Tela de Jogos usa MATCH_REPORT, se quiser reutilizar MATCH_PERFORMANCE mude acima no MatchCenter */}
+                            {modal.type==='MATCH_REPORT' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} />}
                             
                             {modal.type === 'HIRE_COACH' && (
                                 <div>
@@ -3349,7 +3381,6 @@ const renewContract = async (p) => {
                     </div>}
                 </div>
             );
-              }
         
 // --- COMPONENTS ---
      const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor, onCreateCoach }) => {
@@ -3415,7 +3446,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.1 CLASSIFICAÇÃO E JOGOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.2 CLASSIFICAÇÃO E JOGOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -3561,12 +3592,33 @@ const renewContract = async (p) => {
 };
 
 const VisitorDashboard = ({ players, teams }) => {
-    const topScorer = players.sort((a,b)=>(b.stats?.goals||0)-(a.stats?.goals||0))[0];
-    const topAssist = players.sort((a,b)=>(b.stats?.assists||0)-(a.stats?.assists||0))[0];
+    // Adicionado [...players] para criar uma cópia segura antes de ordenar, evitando bugs na lista original
+    const topScorer = [...players].sort((a,b)=>(b.stats?.goals||0)-(a.stats?.goals||0))[0];
+    const topAssist = [...players].sort((a,b)=>(b.stats?.assists||0)-(a.stats?.assists||0))[0];
+    
     return (
         <div>
-            <div className="highlight-card"><h2 style={{margin:0, color:'var(--primary)'}}>Jornal do Dia</h2><small>Resumo da Temporada</small><div style={{marginTop:15, textAlign:'left'}}><div style={{marginBottom:10}}><span style={{color:'#aaa', fontSize:10, textTransform:'uppercase'}}>Artilheiro</span><div style={{fontWeight:'bold', fontSize:16}}>⚽ {topScorer?.name || 'Ninguém'} <span style={{color:'var(--primary)'}}>{topScorer?.stats?.goals||0} Gols</span></div></div><div><span style={{color:'#aaa', fontSize:10, textTransform:'uppercase'}}>Rei das Assistências</span><div style={{fontWeight:'bold', fontSize:16}}>👟 {topAssist?.name || 'Ninguém'} <span style={{color:'var(--secondary)'}}>{topAssist?.stats?.assists||0} Assis</span></div></div></div></div>
-            <div style={{textAlign:'center', color:'#666'}}>Use o menu abaixo para navegar.</div>
+            <div className="highlight-card">
+                <h2 style={{margin:0, color:'var(--primary)'}}>Jornal do Dia</h2>
+                <small>Resumo da Temporada</small>
+                <div style={{marginTop:15, textAlign:'left'}}>
+                    <div style={{marginBottom:10}}>
+                        <span style={{color:'#aaa', fontSize:10, textTransform:'uppercase'}}>Artilheiro</span>
+                        <div style={{fontWeight:'bold', fontSize:16}}>
+                            ⚽ {topScorer?.name || 'Ninguém'} <span style={{color:'var(--primary)'}}>{topScorer?.stats?.goals||0} Gols</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span style={{color:'#aaa', fontSize:10, textTransform:'uppercase'}}>Rei das Assistências</span>
+                        <div style={{fontWeight:'bold', fontSize:16}}>
+                            👟 {topAssist?.name || 'Ninguém'} <span style={{color:'var(--secondary)'}}>{topAssist?.stats?.assists||0} Assis</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div style={{textAlign:'center', color:'#666', marginTop: 15, fontSize: 12}}>
+                Acesse a aba <b>JOGOS</b> abaixo para ver a Classificação.
+            </div>
         </div>
     );
 };

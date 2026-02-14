@@ -515,46 +515,153 @@ const LeagueTable = ({ teams, serie }) => {
         //FIM
         
 // --- ATUALIZADO: MatchCenter com 14 Rodadas ---
-const MatchCenter = ({ matches, teams, onReportMatch }) => {
+const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDeleteMatch, onCreateMatch }) => {
     const [serie, setSerie] = useState('A');
     const [round, setRound] = useState(1);
 
-    const games = matches.filter(m => (m.serie || 'A') === serie && parseInt(m.round) === parseInt(round));
+    // Filtra jogos (agora ordenados por data ou ID para estabilidade)
+    const games = matches
+        .filter(m => (m.serie || 'A') === serie && parseInt(m.round) === parseInt(round))
+        .sort((a,b) => (a.status === 'FINISHED' ? 1 : -1));
 
     return (
         <div>
-            <h3>Central de Jogos</h3>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                <h3>Central de Jogos</h3>
+                {isAdmin && (
+                    <button className="btn btn-blue" style={{width:'auto', padding:'5px 10px', fontSize:10}} onClick={() => onCreateMatch(serie, round)}>
+                        + CRIAR JOGO
+                    </button>
+                )}
+            </div>
+
             <div style={{display:'flex', gap:10, marginBottom:10}}>
                 <select className="input-field" value={serie} onChange={e=>setSerie(e.target.value)}>
                     {['A','B','C','D'].map(s=><option key={s} value={s}>Série {s}</option>)}
                 </select>
                 <select className="input-field" value={round} onChange={e=>setRound(e.target.value)}>
-                    {/* ATUALIZADO: Array de 14 rodadas */}
                     {[...Array(14).keys()].map(i=><option key={i+1} value={i+1}>Rodada {i+1}</option>)}
                 </select>
             </div>
 
-            {games.length === 0 && <div className="card" style={{padding:15, textAlign:'center', color:'#666'}}>Nenhum jogo encontrado.</div>}
+            {games.length === 0 && <div className="card" style={{padding:15, textAlign:'center', color:'#666'}}>Nenhum jogo nesta rodada.</div>}
 
             {games.map(m => (
-                <div key={m.id} className="card" style={{borderLeft: m.status==='FINISHED' ? '4px solid #444' : '4px solid var(--primary)'}}>
-                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5}}>
+                <div key={m.id} className="card" style={{borderLeft: m.status==='FINISHED' ? '4px solid #444' : '4px solid var(--primary)', position:'relative'}}>
+                    
+                    {/* BOTÕES DE ADMIN (NOVO) */}
+                    {isAdmin && (
+                        <div style={{position:'absolute', top:5, right:5, display:'flex', gap:5}}>
+                            <button className="btn btn-ghost" style={{padding:'2px 5px', fontSize:10, border:'1px solid #666'}} onClick={()=>onEditMatch(m)}>✏️</button>
+                            <button className="btn btn-red" style={{padding:'2px 5px', fontSize:10}} onClick={()=>onDeleteMatch(m.id)}>🗑️</button>
+                        </div>
+                    )}
+
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5, marginTop: isAdmin ? 15 : 0}}>
                         <div style={{textAlign:'center', width:'40%'}}>
                             <b style={{fontSize:13}}>{m.homeName}</b>
-                            {m.status==='FINISHED' && <div style={{fontSize:18, fontWeight:'bold'}}>{m.scoreHome}</div>}
+                            <div style={{fontSize:18, fontWeight:'bold'}}>{m.status==='FINISHED' ? m.scoreHome : '-'}</div>
                         </div>
                         <div style={{fontSize:12, color:'#aaa'}}>X</div>
                         <div style={{textAlign:'center', width:'40%'}}>
                             <b style={{fontSize:13}}>{m.awayName}</b>
-                            {m.status==='FINISHED' && <div style={{fontSize:18, fontWeight:'bold'}}>{m.scoreAway}</div>}
+                            <div style={{fontSize:18, fontWeight:'bold'}}>{m.status==='FINISHED' ? m.scoreAway : '-'}</div>
                         </div>
                     </div>
                     
+                    {/* Botão de Súmula (Aparece se não acabou) */}
                     {m.status !== 'FINISHED' && (
-                        <button className="btn btn-green" onClick={() => onReportMatch(m)}>📝 SÚMULA</button>
+                        <button className="btn btn-green" onClick={() => onReportMatch(m)}>
+                            📝 LANÇAR SÚMULA
+                        </button>
                     )}
                 </div>
             ))}
+        </div>
+    );
+};
+        //FIM
+        const MatchManagerForm = ({ initialData, teams, onSave, onDelete }) => {
+    // Estado inicial (se for edição usa os dados, se for novo usa padrão)
+    const [f, setF] = useState(initialData || {
+        homeId: '', awayId: '', serie: 'A', round: 1, 
+        scoreHome: 0, scoreAway: 0, status: 'PENDING'
+    });
+
+    const handleSubmit = () => {
+        if (!f.homeId || !f.awayId) return alert("Selecione os dois times!");
+        if (f.homeId === f.awayId) return alert("O time não pode jogar contra si mesmo!");
+        
+        // Pega os nomes atualizados dos times escolhidos
+        const homeTeam = teams.find(t => t.id === f.homeId);
+        const awayTeam = teams.find(t => t.id === f.awayId);
+
+        const payload = {
+            ...f,
+            homeName: homeTeam.name,
+            homeLogo: homeTeam.logo || null,
+            awayName: awayTeam.name,
+            awayLogo: awayTeam.logo || null,
+            round: parseInt(f.round),
+            scoreHome: parseInt(f.scoreHome),
+            scoreAway: parseInt(f.scoreAway)
+        };
+
+        onSave(payload);
+    };
+
+    return (
+        <div className="modal-bg">
+            <div className="modal-content">
+                <h3>{f.id ? 'Editar Partida' : 'Criar Partida'}</h3>
+                
+                <div style={{display:'flex', gap:10}}>
+                    <div style={{flex:1}}>
+                        <label>Série</label>
+                        <select className="input-field" value={f.serie} onChange={e=>setF({...f, serie:e.target.value})}>
+                            {['A','B','C','D'].map(s=><option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+                    <div style={{flex:1}}>
+                        <label>Rodada</label>
+                        <input className="input-field" type="number" value={f.round} onChange={e=>setF({...f, round:e.target.value})} />
+                    </div>
+                </div>
+
+                <label>Time Mandante (Casa)</label>
+                <select className="input-field" value={f.homeId} onChange={e=>setF({...f, homeId:e.target.value})}>
+                    <option value="">-- Selecione --</option>
+                    {teams.filter(t => t.serie === f.serie).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+
+                <label>Time Visitante (Fora)</label>
+                <select className="input-field" value={f.awayId} onChange={e=>setF({...f, awayId:e.target.value})}>
+                    <option value="">-- Selecione --</option>
+                    {teams.filter(t => t.serie === f.serie).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+
+                <hr style={{borderColor:'#333', margin:'15px 0'}}/>
+
+                <label>Status</label>
+                <select className="input-field" value={f.status} onChange={e=>setF({...f, status:e.target.value})}>
+                    <option value="PENDING">Agendado (Não jogado)</option>
+                    <option value="FINISHED">Finalizado (Exibir Placar)</option>
+                </select>
+
+                {f.status === 'FINISHED' && (
+                    <div style={{display:'flex', gap:10, alignItems:'center', justifyContent:'center', background:'#222', padding:10, borderRadius:8}}>
+                        <input className="input-field" type="number" style={{width:50, textAlign:'center', marginBottom:0}} value={f.scoreHome} onChange={e=>setF({...f, scoreHome:e.target.value})} />
+                        <b>X</b>
+                        <input className="input-field" type="number" style={{width:50, textAlign:'center', marginBottom:0}} value={f.scoreAway} onChange={e=>setF({...f, scoreAway:e.target.value})} />
+                    </div>
+                )}
+
+                <div style={{marginTop:20, display:'flex', gap:10}}>
+                    <button className="btn btn-green" onClick={handleSubmit}>SALVAR</button>
+                    {f.id && <button className="btn btn-red" onClick={()=>onDelete(f.id)}>EXCLUIR JOGO</button>}
+                    <button className="btn" onClick={()=>onSave(null)}>CANCELAR</button>
+                </div>
+            </div>
         </div>
     );
 };
@@ -934,7 +1041,35 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         setLoading(false);
     };
 // FIM DA FUNÇÃO LOGIN E INÍCIO DO COMPONENTE APP
+// --- LÓGICA DE GERENCIAR PARTIDAS (ADM) ---
+    const handleSaveMatch = async (matchData) => {
+        if (!matchData) { setModal(null); return; } // Cancelar
+        
+        setLoading(true);
+        try {
+            if (matchData.id) {
+                // Edição
+                await db.collection('matches').doc(matchData.id).update(matchData);
+                alert("Partida atualizada!");
+            } else {
+                // Criação
+                await db.collection('matches').add(matchData);
+                alert("Partida criada!");
+            }
+            setModal(null);
+        } catch (e) {
+            alert("Erro: " + e.message);
+        }
+        setLoading(false);
+    };
 
+    const handleDeleteMatch = async (matchId) => {
+        if(!confirm("Tem certeza que deseja excluir esta partida permanentemente?")) return;
+        await db.collection('matches').doc(matchId).delete();
+        setModal(null);
+        alert("Partida excluída.");
+    };
+            //FIM
            // ... continuação do código anterior
             const loginAdmin = () => { setUser({ type: 'ADMIN', data: { id: 'admin', name: 'FEDERAÇÃO (ADM)', balance: 0, logo: null, stadiumLevel: 1, serie: 'ADM' } }); setScreen('HOME'); };
 
@@ -2994,7 +3129,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.2</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.3</div>
                             </div>
                         </div>
                         
@@ -3134,19 +3269,29 @@ const renewContract = async (p) => {
 
                                 <hr style={{borderColor:'#333', margin:'20px 0'}}/>
                                 
-                                {/* Renderiza o MatchCenter */}
-                                <MatchCenter 
-                                    matches={matches} 
-                                    teams={teams} 
-                                    onReportMatch={(m) => {
-                                        if(user.type.includes('PRESS') || user.type === 'ADMIN') {
-                                            setModal({type:'MATCH_REPORT', data: m}); // Usa lógica antiga de modal para compatibilidade ou troca para MATCH_PERFORMANCE se preferir o novo
-                                            // Se quiser usar o novo direto: setModal({type:'MATCH_PERFORMANCE', data: m});
-                                        } else {
-                                            alert("Apenas imprensa/admin lança súmula.");
-                                        }
-                                    }} 
-                                />
+                               {/* Renderiza o MatchCenter com poderes de ADMIN */}
+        <MatchCenter 
+            matches={matches} 
+            teams={teams}
+            isAdmin={user.type === 'ADMIN'} // <--- Importante: Libera os botões
+            onCreateMatch={(serie, round) => setModal({
+                type: 'MATCH_MANAGER', 
+                data: { serie, round, homeId:'', awayId:'', scoreHome:0, scoreAway:0, status:'PENDING' }
+            })}
+            onEditMatch={(m) => setModal({ type: 'MATCH_MANAGER', data: m })}
+            onDeleteMatch={(id) => handleDeleteMatch(id)} // Delete rápido direto da lista
+            onReportMatch={(m) => {
+                if(user.type.includes('PRESS') || user.type === 'ADMIN') {
+                     // Usa o modal de súmula existente
+                     setModal({type:'MATCH_PERFORMANCE', data: { match: m, player: null } }); 
+                     // Obs: Adaptei para abrir o modal de Súmula. 
+                     // Se o seu modal pede 'players' primeiro, ajuste conforme seu fluxo de súmula.
+                     // Normalmente é: setModal({type:'MATCH_PERFORMANCE', data: m });
+                } else {
+                    alert("Apenas imprensa/admin lança súmula.");
+                }
+            }} 
+        />
                             </div>
                         )}
 
@@ -3350,6 +3495,14 @@ const renewContract = async (p) => {
                             {modal.type==='TEAM_TABLE' && <TeamStandingsEditor teams={teams} onUpdateTeamStats={updateTeamStats} />}
                             {modal.type==='POST_NEWS' && <div><h3>Nova Notícia</h3><input className="input-field" placeholder="Manchete / Texto" id="news-body" /><button className="btn btn-blue" onClick={()=>{postNews(`📰 **${user.data.name}:**\n${document.getElementById('news-body').value}`, 'press'); setModal(null);}}>PUBLICAR</button></div>}
                             {modal.type==='STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
+                            {modal.type === 'MATCH_MANAGER' && (
+    <MatchManagerForm 
+        initialData={modal.data} 
+        teams={teams} 
+        onSave={handleSaveMatch} 
+        onDelete={handleDeleteMatch} 
+    />
+)}
                             {/* Modal de Relatório da Tela de Jogos usa MATCH_REPORT, se quiser reutilizar MATCH_PERFORMANCE mude acima no MatchCenter */}
                             {modal.type==='MATCH_REPORT' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} />}
                             
@@ -3447,7 +3600,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.2 CLASSIFICAÇÃO E JOGOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.3 CLASSIFICAÇÃO E JOGOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

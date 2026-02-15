@@ -100,6 +100,42 @@ const getPosColor = (p) => {
     if (['PTD', 'PTE', 'ATA', 'SA'].includes(p)) return '#FF1744'; // Vermelho (Ataque)
     return '#888';
 };
+    // --- CALCULADORA DE VALOR DE MERCADO (BASEADO NA TABELA OFICIAL) ---
+const getRecommendedPrice = (ovr, pos) => {
+    const o = parseInt(ovr) || 0;
+    
+    // 1. Tabela Base por Overall
+    let base = 40000; // Padrão (50-54)
+    if (o >= 90) base = 20000000;
+    else if (o >= 85) base = 10000000;
+    else if (o >= 80) base = 6000000;
+    else if (o >= 75) base = 3000000;
+    else if (o >= 70) base = 1000000;
+    else if (o >= 65) base = 400000;
+    else if (o >= 60) base = 150000;
+    else if (o >= 55) base = 80000;
+
+    // 2. Multiplicador por Posição
+    let mult = 1.0; // Base (Laterais e Meias)
+    if (pos === 'GOL') mult = 1.20;       // +20%
+    else if (['ZAG'].includes(pos)) mult = 1.15; // +15%
+    else if (['VOL'].includes(pos)) mult = 1.05; // +5%
+    else if (['PTD', 'PTE'].includes(pos)) mult = 0.95; // -5%
+    else if (['ATA', 'SA'].includes(pos)) mult = 0.90;  // -10%
+
+    return Math.round(base * mult);
+};
+
+const getPriceStatus = (askedPrice, recommendedPrice) => {
+    if (!askedPrice || askedPrice <= 0) return { label: 'GRÁTIS', color: 'lime' };
+    
+    const ratio = parseFloat(askedPrice) / parseFloat(recommendedPrice);
+
+    // Lógica de tolerância (Margem de 20%)
+    if (ratio < 0.8) return { label: '💰 BARGANHA (ABAIXO DA MÉDIA)', color: 'gold' };
+    if (ratio > 1.2) return { label: '💸 ACIMA DA MÉDIA', color: '#ff5555' };
+    return { label: '✅ PREÇO JUSTO', color: '#00E676' };
+};
         //FIM
         
         // --- CONSTANTES DE EMPRESAS ---
@@ -3600,7 +3636,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.3 CLASSIFICAÇÃO E JOGOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.4 SUGESTÃO DE VALORES </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -4730,186 +4766,191 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
         };
 
      const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams, onRenew, isOwner }) => {
-            // 1. Definição dos dados padrão (Isso garante que 'position' nunca seja vazio)
-            const defaultState = {
-                name:'', position:'ATA', overall:45, value:'', salary:'', 
-                clause:'', contract:'', mood:'😐', status:'NAO_A_VENDA', 
-                password:'', balance: 0, rating: '', 
-                stats: {goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0},
-                attributes: null 
-            };
+    // 1. Definição dos dados padrão (Isso garante que 'position' nunca seja vazio)
+    const defaultState = {
+        name:'', position:'ATA', overall:45, value:'', salary:'', 
+        clause:'', contract:'', mood:'😐', status:'NAO_A_VENDA', 
+        password:'', balance: 0, rating: '', 
+        stats: {goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0},
+        attributes: null 
+    };
 
-            // 2. MISTURA os dados (Correção do Erro)
-            // Se 'initial' tiver só o teamId, ele mantém o resto do defaultState (como position: 'ATA')
-            const [f, setF] = useState({ ...defaultState, ...(initial || {}) });
+    // 2. MISTURA os dados (Correção do Erro)
+    const [f, setF] = useState({ ...defaultState, ...(initial || {}) });
 
-            // Verifica se é edição real (tem ID gerado pelo banco)
-            const isEditing = f.id ? true : false;
+    // Verifica se é edição real (tem ID gerado pelo banco)
+    const isEditing = f.id ? true : false;
+    
+    // Função auxiliar para calcular média ignorando status inúteis
+    const calculateRealOverall = (position, attrs) => {
+        let sum = 0;
+        let count = 0;
+        const safePos = position || 'ATA'; 
+        
+        const ignoreList = safePos === 'GOL' 
+            ? ['shot', 'attack', 'dribble', 'curve', 'freeKick', 'weakFootAcc', 'weakFootFreq'] 
+            : ['gk'];
+
+        Object.entries(attrs).forEach(([key, val]) => {
+            if (ignoreList.includes(key)) return;
+            sum += val;
+            count++;
+        });
+        return count === 0 ? 0 : Math.round(sum / count);
+    };
+
+    const handleSave = () => {
+        try {
+            const dataToSave = { ...f };
             
-            // Função auxiliar para calcular média ignorando status inúteis
-            const calculateRealOverall = (position, attrs) => {
-                let sum = 0;
-                let count = 0;
-                // Garante que position tenha valor
-                const safePos = position || 'ATA'; 
+            // SEGURANÇA EXTRA: Garante que existe uma posição definida antes de gerar
+            const safePos = dataToSave.position || 'ATA'; 
+
+            // SE NÃO TIVER ATRIBUTOS (Criação ou Jogador Antigo), GERA AGORA!
+            if (!dataToSave.attributes || Object.keys(dataToSave.attributes).length === 0) {
+                const targetOv = parseInt(dataToSave.overall) || 60;
+                const newAttrs = generateAttributes(safePos, targetOv);
                 
-                const ignoreList = safePos === 'GOL' 
-                    ? ['shot', 'attack', 'dribble', 'curve', 'freeKick', 'weakFootAcc', 'weakFootFreq'] 
-                    : ['gk'];
+                // Calcula a média real balanceada
+                const realAvg = calculateRealOverall(safePos, newAttrs);
+                
+                // Atualiza o objeto final
+                dataToSave.attributes = newAttrs;
+                dataToSave.overall = realAvg;
+                dataToSave.position = safePos; // Garante que salva a posição usada
 
-                Object.entries(attrs).forEach(([key, val]) => {
-                    if (ignoreList.includes(key)) return;
-                    sum += val;
-                    count++;
-                });
-                return count === 0 ? 0 : Math.round(sum / count);
-            };
+                alert(`Atributos gerados com sucesso!\nOverall Real: ${realAvg}`);
+            }
 
-            const handleSave = () => {
-                try {
-                    const dataToSave = { ...f };
-                    
-                    // SEGURANÇA EXTRA: Garante que existe uma posição definida antes de gerar
-                    const safePos = dataToSave.position || 'ATA'; 
+            onSave(dataToSave);
+        } catch (error) {
+            console.error(error);
+            alert("Erro ao salvar: " + error.message);
+        }
+    };
 
-                    // SE NÃO TIVER ATRIBUTOS (Criação ou Jogador Antigo), GERA AGORA!
-                    if (!dataToSave.attributes || Object.keys(dataToSave.attributes).length === 0) {
-                        const targetOv = parseInt(dataToSave.overall) || 60;
-                        const newAttrs = generateAttributes(safePos, targetOv);
-                        
-                        // Calcula a média real balanceada
-                        const realAvg = calculateRealOverall(safePos, newAttrs);
-                        
-                        // Atualiza o objeto final
-                        dataToSave.attributes = newAttrs;
-                        dataToSave.overall = realAvg;
-                        dataToSave.position = safePos; // Garante que salva a posição usada
+    return (
+        <div className="modal-bg">
+            <div className="modal-content" style={{maxHeight:'90vh', overflowY:'auto'}}>
+                <h3>{isEditing ? 'Ficha do Jogador' : 'Criar Jogador'}</h3>
+                
+                <label>Nome</label>
+                {/* Só desabilita se não for admin E se o jogador já existir (isEditing) */}
+                <input className="input-field" value={f.name} onChange={e=>setF({...f, name:e.target.value})} disabled={!isAdmin && isEditing} />
+                
+                <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:5, marginBottom:10, border:'1px solid #444'}}>
+                    <label style={{color:'var(--secondary)'}}>🔐 Senha de Acesso</label>
+                    <input className="input-field" type="text" placeholder="Crie uma senha provisória" value={f.password || ''} onChange={e=>setF({...f, password:e.target.value})} />
+                </div>
 
-                        alert(`Atributos gerados com sucesso!\nOverall Real: ${realAvg}`);
-                    }
+                {isAdmin && (
+                    <div style={{border:'1px solid var(--primary)', padding:8, borderRadius:5, marginBottom:10, background:'rgba(0,255,0,0.05)'}}>
+                        <label style={{color:'var(--primary)'}}>💰 Saldo em Conta (Admin)</label>
+                        <input className="input-field" type="number" value={f.balance||0} onChange={e=>setF({...f, balance:e.target.value})} />
+                    </div>
+                )}
 
-                    onSave(dataToSave);
-                } catch (error) {
-                    console.error(error);
-                    alert("Erro ao salvar: " + error.message);
-                }
-            };
-
-            return (
-                <div className="modal-bg">
-                    <div className="modal-content" style={{maxHeight:'90vh', overflowY:'auto'}}>
-                        <h3>{isEditing ? 'Ficha do Jogador' : 'Criar Jogador'}</h3>
-                        
-                        <label>Nome</label>
-                        {/* Só desabilita se não for admin E se o jogador já existir (isEditing) */}
-                        <input className="input-field" value={f.name} onChange={e=>setF({...f, name:e.target.value})} disabled={!isAdmin && isEditing} />
-                        
-                        <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:5, marginBottom:10, border:'1px solid #444'}}>
-                            <label style={{color:'var(--secondary)'}}>🔐 Senha de Acesso</label>
-                            <input className="input-field" type="text" placeholder="Crie uma senha provisória" value={f.password || ''} onChange={e=>setF({...f, password:e.target.value})} />
-                        </div>
-
-                        {isAdmin && (
-                            <div style={{border:'1px solid var(--primary)', padding:8, borderRadius:5, marginBottom:10, background:'rgba(0,255,0,0.05)'}}>
-                                <label style={{color:'var(--primary)'}}>💰 Saldo em Conta (Admin)</label>
-                                <input className="input-field" type="number" value={f.balance||0} onChange={e=>setF({...f, balance:e.target.value})} />
-                            </div>
-                        )}
-
-                        <div style={{display:'flex', gap:5}}>
-                            <div style={{flex:1}}>
-                                <label>Posição</label>
-                                <select className="input-field" value={f.position} onChange={e=>setF({...f, position:e.target.value})} disabled={!isAdmin && isEditing}>
-                                    {POS.map(p=><option key={p} value={p}>{p}</option>)}
-                                </select>
-                            </div>
-                            <div style={{flex:1}}>
-                                <label>Overall (Meta)</label>
-                                <input className="input-field" type="number" value={f.overall} onChange={e=>setF({...f, overall:e.target.value})} disabled={!isAdmin && isEditing} />
-                            </div>
-                        </div>
-
-                        {/* VISUALIZAÇÃO APENAS (Read-Only) */}
-                        {f.attributes ? (
-                            <div style={{border:'1px solid #444', padding:10, borderRadius:8, margin:'10px 0'}}>
-                                <AttributeGrid attrs={f.attributes} pendingXP={f.pendingXP || 0} />
-                                {isAdmin && <button className="btn btn-gold" style={{marginTop:5, fontSize:10}} onClick={()=>{
-                                    if(confirm("Regerar (Admin)?")) {
-                                        try {
-                                            const pos = f.position || 'ATA';
-                                            const n = generateAttributes(pos, parseInt(f.overall)||60);
-                                            const avg = calculateRealOverall(pos, n);
-                                            setF({...f, attributes:n, overall: avg});
-                                        } catch(e) { alert("Erro: " + e.message); }
-                                    }
-                                }}>🎲 REGERAR (ADM)</button>}
-                            </div>
-                        ) : (
-                            <div style={{padding:15, textAlign:'center', color:'#aaa', border:'1px dashed #666', borderRadius:8, margin:'10px 0', background:'rgba(0,0,0,0.2)'}}>
-                                <i className="fas fa-magic" style={{fontSize:20, marginBottom:5}}></i><br/>
-                                Os atributos serão gerados e salvos<br/>automaticamente ao clicar em <b>SALVAR</b>.
-                            </div>
-                        )}
-
-                        <div style={{display:'flex', gap:5}}>
-                            <div style={{flex:1}}><label>Valor</label><input className="input-field" type="number" value={f.value} onChange={e=>setF({...f, value:e.target.value})} /></div>
-                            <div style={{flex:1}}><label>Salário</label><input className="input-field" type="number" value={f.salary} onChange={e=>setF({...f, salary:e.target.value})} /></div>
-                        </div>
-                        <div style={{display:'flex', gap:5}}>
-                            <div style={{flex:1}}><label>Multa</label><input className="input-field" type="number" value={f.clause} onChange={e=>setF({...f, clause:e.target.value})} /></div>
-                            <div style={{flex:1}}><label>Contrato</label><input className="input-field" type="number" value={f.contract} onChange={e=>setF({...f, contract:e.target.value})} /></div>
-                        </div>
-                        
-                        <label>Status</label>
-                        <select className="input-field" value={f.status} onChange={e=>setF({...f, status:e.target.value})}>
-                            <option value="NAO_A_VENDA">Não Listado</option>
-                            <option value="VENDA">À Venda</option>
-                            <option value="EMPRESTIMO">Empréstimo</option>
-                            <option value="INTRANSFERIVEL">Bloqueado</option>
+                <div style={{display:'flex', gap:5}}>
+                    <div style={{flex:1}}>
+                        <label>Posição</label>
+                        <select className="input-field" value={f.position} onChange={e=>setF({...f, position:e.target.value})} disabled={!isAdmin && isEditing}>
+                            {POS.map(p=><option key={p} value={p}>{p}</option>)}
                         </select>
-                        <label>Humor</label>
-                        <select className="input-field" value={f.mood} onChange={e=>setF({...f, mood:e.target.value})}><option>🤩</option><option>😐</option><option>😡</option></select>
-                        
-                        {isAdmin && (
-                            <div style={{border:'1px solid var(--purple)', padding:8, borderRadius:5, margin:'5px 0'}}>
-                                <label style={{color:'var(--purple)'}}>Nota Oficial (XP)</label>
-                                <input className="input-field" type="number" step="0.1" value={f.rating} onChange={e=>setF({...f, rating:e.target.value})} />
-                            </div>
-                        )}
-
-                        {isAdmin && <div style={{border:'1px solid var(--primary)', padding:8, borderRadius:8, marginTop:10}}>
-                            <label style={{color:'var(--primary)'}}>Estatísticas (Admin)</label>
-                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:5}}>
-                                <div><small>⚽ Gols</small><input className="input-field" type="number" value={f.stats?.goals||0} onChange={e=>setF({...f, stats:{...f.stats, goals:e.target.value}})} /></div>
-                                <div><small>👟 Assis</small><input className="input-field" type="number" value={f.stats?.assists||0} onChange={e=>setF({...f, stats:{...f.stats, assists:e.target.value}})} /></div>
-                                <div><small>🛡️ Desar</small><input className="input-field" type="number" value={f.stats?.tackles||0} onChange={e=>setF({...f, stats:{...f.stats, tackles:e.target.value}})} /></div>
-                                <div><small>🧤 Defes</small><input className="input-field" type="number" value={f.stats?.saves||0} onChange={e=>setF({...f, stats:{...f.stats, saves:e.target.value}})} /></div>
-                                <div><small>🟨 Amar</small><input className="input-field" type="number" value={f.stats?.yellows||0} onChange={e=>setF({...f, stats:{...f.stats, yellows:e.target.value}})} /></div>
-                                <div><small>🟥 Verm</small><input className="input-field" type="number" value={f.stats?.reds||0} onChange={e=>setF({...f, stats:{...f.stats, reds:e.target.value}})} /></div>
-                            </div>
-                        </div>}
-
-                        {isAdmin && <div style={{border:'1px solid gold', padding:5, marginTop:5}}>
-                            <label style={{color:'gold'}}>Mover Time (Adm)</label>
-                            <select className="input-field" onChange={e=>setF({...f, forcedTeamId:e.target.value})}>
-                                <option value="">-- Manter --</option>
-                                {teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
-                            </select>
-                        </div>}
-                        
-                        <div style={{display:'flex', gap:10, marginTop:15}}>
-                            <button className="btn btn-green" onClick={handleSave}>SALVAR</button>
-                            
-                            {/* Botões extras só aparecem se o jogador já existe (isEditing) */}
-                            {isOwner && isEditing && <button className="btn btn-blue" onClick={()=>onRenew(initial)}>RENOVAR</button>}
-                            {isEditing && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>X</button>}
-                            
-                            <button className="btn" onClick={()=>setF(null)}>CANCELAR</button>
-                        </div>
+                    </div>
+                    <div style={{flex:1}}>
+                        <label>Overall (Meta)</label>
+                        <input className="input-field" type="number" value={f.overall} onChange={e=>setF({...f, overall:e.target.value})} disabled={!isAdmin && isEditing} />
                     </div>
                 </div>
-            );
-        };
+
+                {/* VISUALIZAÇÃO APENAS (Read-Only) */}
+                {f.attributes ? (
+                    <div style={{border:'1px solid #444', padding:10, borderRadius:8, margin:'10px 0'}}>
+                        <AttributeGrid attrs={f.attributes} pendingXP={f.pendingXP || 0} />
+                        {isAdmin && <button className="btn btn-gold" style={{marginTop:5, fontSize:10}} onClick={()=>{
+                            if(confirm("Regerar (Admin)?")) {
+                                try {
+                                    const pos = f.position || 'ATA';
+                                    const n = generateAttributes(pos, parseInt(f.overall)||60);
+                                    const avg = calculateRealOverall(pos, n);
+                                    setF({...f, attributes:n, overall: avg});
+                                } catch(e) { alert("Erro: " + e.message); }
+                            }
+                        }}>🎲 REGERAR (ADM)</button>}
+                    </div>
+                ) : (
+                    <div style={{padding:15, textAlign:'center', color:'#aaa', border:'1px dashed #666', borderRadius:8, margin:'10px 0', background:'rgba(0,0,0,0.2)'}}>
+                        <i className="fas fa-magic" style={{fontSize:20, marginBottom:5}}></i><br/>
+                        Os atributos serão gerados e salvos<br/>automaticamente ao clicar em <b>SALVAR</b>.
+                    </div>
+                )}
+
+                {/* --- EXIBIÇÃO DO VALOR RECOMENDADO NO FORMULÁRIO (NOVO) --- */}
+                <div style={{background: 'rgba(0, 230, 118, 0.1)', padding: '8px', borderRadius: '5px', marginBottom: '5px', border: '1px dashed #00E676', textAlign: 'center'}}>
+                    <small style={{color: '#00E676', fontWeight: 'bold'}}>
+                        ⚖️ Valor Sugerido: {fmt(getRecommendedPrice(f.overall, f.position))}
+                    </small>
+                </div>
+
+                <div style={{display:'flex', gap:5}}>
+                    <div style={{flex:1}}><label>Valor</label><input className="input-field" type="number" value={f.value} onChange={e=>setF({...f, value:e.target.value})} /></div>
+                    <div style={{flex:1}}><label>Salário</label><input className="input-field" type="number" value={f.salary} onChange={e=>setF({...f, salary:e.target.value})} /></div>
+                </div>
+                <div style={{display:'flex', gap:5}}>
+                    <div style={{flex:1}}><label>Multa</label><input className="input-field" type="number" value={f.clause} onChange={e=>setF({...f, clause:e.target.value})} /></div>
+                    <div style={{flex:1}}><label>Contrato</label><input className="input-field" type="number" value={f.contract} onChange={e=>setF({...f, contract:e.target.value})} /></div>
+                </div>
+                
+                <label>Status</label>
+                <select className="input-field" value={f.status} onChange={e=>setF({...f, status:e.target.value})}>
+                    <option value="NAO_A_VENDA">Não Listado</option>
+                    <option value="VENDA">À Venda</option>
+                    <option value="EMPRESTIMO">Empréstimo</option>
+                    <option value="INTRANSFERIVEL">Bloqueado</option>
+                </select>
+                <label>Humor</label>
+                <select className="input-field" value={f.mood} onChange={e=>setF({...f, mood:e.target.value})}><option>🤩</option><option>😐</option><option>😡</option></select>
+                
+                {isAdmin && (
+                    <div style={{border:'1px solid var(--purple)', padding:8, borderRadius:5, margin:'5px 0'}}>
+                        <label style={{color:'var(--purple)'}}>Nota Oficial (XP)</label>
+                        <input className="input-field" type="number" step="0.1" value={f.rating} onChange={e=>setF({...f, rating:e.target.value})} />
+                    </div>
+                )}
+
+                {isAdmin && <div style={{border:'1px solid var(--primary)', padding:8, borderRadius:8, marginTop:10}}>
+                    <label style={{color:'var(--primary)'}}>Estatísticas (Admin)</label>
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:5}}>
+                        <div><small>⚽ Gols</small><input className="input-field" type="number" value={f.stats?.goals||0} onChange={e=>setF({...f, stats:{...f.stats, goals:e.target.value}})} /></div>
+                        <div><small>👟 Assis</small><input className="input-field" type="number" value={f.stats?.assists||0} onChange={e=>setF({...f, stats:{...f.stats, assists:e.target.value}})} /></div>
+                        <div><small>🛡️ Desar</small><input className="input-field" type="number" value={f.stats?.tackles||0} onChange={e=>setF({...f, stats:{...f.stats, tackles:e.target.value}})} /></div>
+                        <div><small>🧤 Defes</small><input className="input-field" type="number" value={f.stats?.saves||0} onChange={e=>setF({...f, stats:{...f.stats, saves:e.target.value}})} /></div>
+                        <div><small>🟨 Amar</small><input className="input-field" type="number" value={f.stats?.yellows||0} onChange={e=>setF({...f, stats:{...f.stats, yellows:e.target.value}})} /></div>
+                        <div><small>🟥 Verm</small><input className="input-field" type="number" value={f.stats?.reds||0} onChange={e=>setF({...f, stats:{...f.stats, reds:e.target.value}})} /></div>
+                    </div>
+                </div>}
+
+                {isAdmin && <div style={{border:'1px solid gold', padding:5, marginTop:5}}>
+                    <label style={{color:'gold'}}>Mover Time (Adm)</label>
+                    <select className="input-field" onChange={e=>setF({...f, forcedTeamId:e.target.value})}>
+                        <option value="">-- Manter --</option>
+                        {teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                </div>}
+                
+                <div style={{display:'flex', gap:10, marginTop:15}}>
+                    <button className="btn btn-green" onClick={handleSave}>SALVAR</button>
+                    
+                    {/* Botões extras só aparecem se o jogador já existe (isEditing) */}
+                    {isOwner && isEditing && <button className="btn btn-blue" onClick={()=>onRenew(initial)}>RENOVAR</button>}
+                    {isEditing && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>X</button>}
+                    
+                    <button className="btn" onClick={()=>setF(null)}>CANCELAR</button>
+                </div>
+            </div>
+        </div>
+    );
+};
 // FIM DO STATS EDITOR E PLAYER FORM
 
 const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, onPre, onHireCoach }) => {
@@ -5032,77 +5073,92 @@ const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, 
             
             {list.length === 0 && <p style={{textAlign:'center', color:'#666', marginTop:30, fontStyle:'italic'}}>Nenhum jogador disponível nesta categoria.</p>}
             
-            {list.map(p => (
-                <div key={p.id} className="card" style={{borderLeft: `4px solid ${getPosColor(p.position)}`, opacity: p.preContract ? 0.7 : 1}}>
-                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'start'}}>
-                        <div style={{display:'flex', gap: 10, alignItems:'center'}}>
-                            {/* FOTO DO JOGADOR NO MERCADO */}
-                            {p.face ? (
-                                <img src={p.face} style={{width: 45, height: 45, borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border:'2px solid #444'}} />
-                            ) : (
-                                <span className="badge-pos" style={{background:getPosColor(p.position), width: 40, height: 40, display:'flex', alignItems:'center', justifyContent:'center', fontSize: 12}}>{p.position}</span>
-                            )}
-                            
-                            <div>
-                                <b style={{fontSize:16}}>{p.name}</b>
-                                <div style={{fontSize:10, color:'#888', marginTop:2}}>
-                                    {p.teamId === 'FREE' ? <b style={{color:'var(--warning)'}}><i className="fas fa-unlock"></i> PASSE LIVRE</b> : <span><i className="fas fa-tshirt"></i> {teams.find(t=>t.id===p.teamId)?.name}</span>}
+            {list.map(p => {
+                // CALCULA O STATUS DO PREÇO NA HORA
+                const recPrice = getRecommendedPrice(p.overall, p.position);
+                const status = getPriceStatus(p.value, recPrice);
+
+                return (
+                    <div key={p.id} className="card" style={{borderLeft: `4px solid ${getPosColor(p.position)}`, opacity: p.preContract ? 0.7 : 1}}>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'start'}}>
+                            <div style={{display:'flex', gap: 10, alignItems:'center'}}>
+                                {/* FOTO DO JOGADOR NO MERCADO */}
+                                {p.face ? (
+                                    <img src={p.face} style={{width: 45, height: 45, borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border:'2px solid #444'}} />
+                                ) : (
+                                    <span className="badge-pos" style={{background:getPosColor(p.position), width: 40, height: 40, display:'flex', alignItems:'center', justifyContent:'center', fontSize: 12}}>{p.position}</span>
+                                )}
+                                
+                                <div>
+                                    <b style={{fontSize:16}}>{p.name}</b>
+                                    <div style={{fontSize:10, color:'#888', marginTop:2}}>
+                                        {p.teamId === 'FREE' ? <b style={{color:'var(--warning)'}}><i className="fas fa-unlock"></i> PASSE LIVRE</b> : <span><i className="fas fa-tshirt"></i> {teams.find(t=>t.id===p.teamId)?.name}</span>}
+                                    </div>
                                 </div>
                             </div>
+                            <span className="player-ov">{p.overall}</span>
                         </div>
-                        <span className="player-ov">{p.overall}</span>
-                    </div>
 
-                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, fontSize:11, color:'#aaa', marginTop:10, background:'rgba(0,0,0,0.2)', padding:8, borderRadius:8}}>
-                        <div>Valor: <b style={{color:'#fff'}}>{fmt(p.value)}</b></div>
-                        <div>Contrato: <b style={{color: p.contract === 0 ? 'var(--danger)' : (p.contract === 1 ? 'var(--warning)' : '#fff')}}>{p.contract} Temporada{p.contract !== 1 ? 's' : ''}</b></div>
-                    </div>
+                        {/* --- NOVA ETIQUETA DE ANÁLISE DE MERCADO --- */}
+                        {p.teamId !== 'FREE' && (
+                            <div style={{marginTop: 8, textAlign:'center', background: 'rgba(0,0,0,0.4)', padding: '4px', borderRadius: '4px'}}>
+                                <span style={{color: status.color, fontSize: '10px', fontWeight: 'bold', letterSpacing: '0.5px'}}>
+                                    {status.label}
+                                </span>
+                            </div>
+                        )}
 
-                    <div style={{marginTop:8, borderTop:'1px dashed #444', paddingTop:5}}>
-                        <AttributeGrid attrs={p.attributes} />
-                    </div>
-
-                    {p.preContract && (
-                        <div style={{marginTop:10, background:'rgba(0,0,0,0.5)', padding:5, borderRadius:4, textAlign:'center', border:'1px solid var(--secondary)'}}>
-                            <small style={{color:'var(--secondary)', fontWeight:'bold'}}>📝 JÁ ASSINOU PRÉ-CONTRATO</small><br/>
-                            <small style={{color:'#aaa', fontSize:9}}>Vai para o {p.preContract.teamName} no fim da temporada.</small>
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, fontSize:11, color:'#aaa', marginTop:10, background:'rgba(0,0,0,0.2)', padding:8, borderRadius:8}}>
+                            <div>Valor: <b style={{color:'#fff'}}>{fmt(p.value)}</b></div>
+                            <div>Contrato: <b style={{color: p.contract === 0 ? 'var(--danger)' : (p.contract === 1 ? 'var(--warning)' : '#fff')}}>{p.contract} Temporada{p.contract !== 1 ? 's' : ''}</b></div>
                         </div>
-                    )}
 
-                    {!isVis && !p.preContract && (
-                        <div style={{marginTop:12, display:'flex', gap:8}}>
-                            
-                            {(open || p.teamId === 'FREE') && p.status !== 'INTRANSFERIVEL' && (
-                                <button className="btn btn-purple" style={{flex:1, marginBottom:0}} onClick={()=>onNeg(p)}>
-                                    <i className="fas fa-handshake"></i> {p.teamId === 'FREE' ? 'CONTRATAR' : 'NEGOCIAR'}
-                                </button>
-                            )}
-
-                            {p.contract === 1 && p.teamId !== 'FREE' && p.status !== 'INTRANSFERIVEL' && (
-                                <button className="btn btn-blue" style={{flex:1, marginBottom:0}} onClick={()=>{
-                                    const dummyOffer = { type: 'PRE_CONTRATO', value: 0 };
-                                    onNeg({...p, oldOffer: dummyOffer});
-                                }}>
-                                    <i className="fas fa-file-signature"></i> PRÉ-CONTRATO
-                                </button>
-                            )}
-                            
-                            {!open && p.teamId !== 'FREE' && p.contract !== 1 && (
-                                <button className="btn btn-ghost" style={{flex:1, marginBottom:0, opacity:0.5}} disabled>
-                                    <i className="fas fa-lock"></i> FECHADO
-                                </button>
-                            )}
-                            
-                            {/* BOTÃO DE MULTA INVISÍVEL (false && ...) PARA EVITAR BUGS */}
-                            {false && p.teamId !== 'FREE' && parseFloat(p.clause) > 0 && (
-                                <button className="btn btn-gold" style={{width:'auto', marginBottom:0}} onClick={()=>onPayClause(p)}>
-                                    <i className="fas fa-gavel"></i> MULTA
-                                </button>
-                            )}
+                        <div style={{marginTop:8, borderTop:'1px dashed #444', paddingTop:5}}>
+                            <AttributeGrid attrs={p.attributes} />
                         </div>
-                    )}
-                </div>
-            ))}
+
+                        {p.preContract && (
+                            <div style={{marginTop:10, background:'rgba(0,0,0,0.5)', padding:5, borderRadius:4, textAlign:'center', border:'1px solid var(--secondary)'}}>
+                                <small style={{color:'var(--secondary)', fontWeight:'bold'}}>📝 JÁ ASSINOU PRÉ-CONTRATO</small><br/>
+                                <small style={{color:'#aaa', fontSize:9}}>Vai para o {p.preContract.teamName} no fim da temporada.</small>
+                            </div>
+                        )}
+
+                        {!isVis && !p.preContract && (
+                            <div style={{marginTop:12, display:'flex', gap:8}}>
+                                
+                                {(open || p.teamId === 'FREE') && p.status !== 'INTRANSFERIVEL' && (
+                                    <button className="btn btn-purple" style={{flex:1, marginBottom:0}} onClick={()=>onNeg(p)}>
+                                        <i className="fas fa-handshake"></i> {p.teamId === 'FREE' ? 'CONTRATAR' : 'NEGOCIAR'}
+                                    </button>
+                                )}
+
+                                {p.contract === 1 && p.teamId !== 'FREE' && p.status !== 'INTRANSFERIVEL' && (
+                                    <button className="btn btn-blue" style={{flex:1, marginBottom:0}} onClick={()=>{
+                                        const dummyOffer = { type: 'PRE_CONTRATO', value: 0 };
+                                        onNeg({...p, oldOffer: dummyOffer});
+                                    }}>
+                                        <i className="fas fa-file-signature"></i> PRÉ-CONTRATO
+                                    </button>
+                                )}
+                                
+                                {!open && p.teamId !== 'FREE' && p.contract !== 1 && (
+                                    <button className="btn btn-ghost" style={{flex:1, marginBottom:0, opacity:0.5}} disabled>
+                                        <i className="fas fa-lock"></i> FECHADO
+                                    </button>
+                                )}
+                                
+                                {/* BOTÃO DE MULTA INVISÍVEL (false && ...) PARA EVITAR BUGS */}
+                                {false && p.teamId !== 'FREE' && parseFloat(p.clause) > 0 && (
+                                    <button className="btn btn-gold" style={{width:'auto', marginBottom:0}} onClick={()=>onPayClause(p)}>
+                                        <i className="fas fa-gavel"></i> MULTA
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
         </div>
     );
 };

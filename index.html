@@ -74,6 +74,46 @@
     </style>
 </head>
 <body>
+    <div id="emergency-panel" style="position:fixed; top:10px; left:10px; z-index:999999; background:red; padding:10px; border-radius:10px; border:2px solid white; color:white; font-family:sans-serif;">
+    <p style="margin:0 0 10px 0; font-weight:bold; font-size:12px;">🔥 BOTÃO DE EMERGÊNCIA (FIX CRASH)</p>
+    <button onclick="emergencyClearSales()" style="cursor:pointer; background:white; color:red; border:none; padding:10px; font-weight:bold; border-radius:5px;">
+        LIMPAR MOCHILAS E DESTRAVAR APP
+    </button>
+</div>
+
+<script>
+    async function emergencyClearSales() {
+        const pass = prompt("Digite a senha master para limpar o banco:");
+        if (pass !== '2503') return alert("Senha errada!");
+        
+        alert("Iniciando limpeza... Acompanhe o console (F12).");
+        
+        try {
+            // 1. Limpa a coleção de vendas que está causando o crash
+            const salesSnap = await firebase.firestore().collection('sales').get();
+            const b = firebase.firestore().batch();
+            
+            salesSnap.docs.forEach(doc => {
+                b.delete(doc.ref);
+            });
+            
+            // 2. Limpa fama e itens equipados dos jogadores que podem estar zumbis
+            const playersSnap = await firebase.firestore().collection('players').get();
+            playersSnap.docs.forEach(doc => {
+                b.update(doc.ref, { 
+                    equippedItem: firebase.firestore.FieldValue.delete(),
+                    fame: 0 
+                });
+            });
+
+            await b.commit();
+            alert("✅ BANCO LIMPO! O App vai recarregar agora.");
+            window.location.reload();
+        } catch (e) {
+            alert("Erro: " + e.message);
+        }
+    }
+</script>
     <div id="root"></div>
 
     <script type="text/babel">
@@ -892,7 +932,10 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             db.collection('sponsorships').onSnapshot(s => setSps(s.docs.map(d => ({id:d.id, ...d.data()})))),
             
             // CORREÇÃO CRÍTICA AQUI: Adicionado {id: d.id, ...} para que o botão de usar/deletar funcione
-            db.collection('sales').orderBy('date', 'desc').limit(50).onSnapshot(s => setSales(s.docs.map(d => ({id:d.id, ...d.data()})))),
+            db.collection('sales').orderBy('date', 'desc').limit(50).onSnapshot(s => {
+    const cleanData = s.docs.map(d => ({id:d.id, ...d.data()}));
+    setSales(cleanData);
+}),
             
             db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => { 
                 const list = s.docs.map(d => ({id:d.id, ...d.data()})); 
@@ -3367,7 +3410,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.76.9</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.77.0</div>
                             </div>
                         </div>
                         
@@ -3846,7 +3889,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.76.9 CORREÇÃO DE BUGS </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77.0 CORREÇÃO DE BUGS </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

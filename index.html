@@ -1967,22 +1967,22 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             
 
             
-           const handleUseItem = async (item, action) => {
+        const handleUseItem = async (item, action) => {
         if (!user.data || user.type !== 'PLAYER') return;
         
-        // 1. TRAVA A TELA IMEDIATAMENTE (Evita bug de usar item infinito)
+        // 1. TRAVA A TELA (LOADING)
         setLoading(true);
 
         try {
             const b = db.batch();
-            const itemRef = db.collection('sales').doc(item.id); // O item na mochila é um documento de 'sales'
+            const itemRef = db.collection('sales').doc(item.id); 
 
             // AÇÃO 1: CONSUMIR (Energia)
             if (action === 'CONSUME') {
                 const energyGain = parseInt(item.power) || 1; // Garante que lê o número inteiro
                 const currentEnergy = user.data.energy || 0;
 
-                // Verificação extra: Se já estiver cheio, não gasta o item
+                // Verificação: Energia Cheia?
                 if (currentEnergy >= 100) {
                     alert("Sua energia já está cheia!");
                     setLoading(false);
@@ -1991,12 +1991,17 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
 
                 const newEnergy = Math.min(100, currentEnergy + energyGain);
                 
+                // Atualiza Banco de Dados
                 b.update(db.collection('players').doc(user.data.id), { energy: newEnergy });
-                b.delete(itemRef); // Remove da mochila (DELETA O ITEM)
+                b.delete(itemRef); // Deleta item no banco
                 
                 await b.commit();
                 
-                // Atualiza a barra de energia visualmente na hora
+                // --- ATUALIZAÇÃO VISUAL IMEDIATA (CORREÇÃO DO BUG) ---
+                // Remove o item da lista 'sales' localmente na hora, sem esperar o Firebase
+                setSales(prev => prev.filter(s => s.id !== item.id));
+                
+                // Atualiza a barra de energia visualmente
                 setUser(prev => ({...prev, data: {...prev.data, energy: newEnergy}}));
                 
                 alert(`⚡ Energia recuperada: +${energyGain}% (Total: ${newEnergy}%)`);
@@ -2010,7 +2015,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                         id: item.id,
                         name: item.productName,
                         cat: item.cat,
-                        power: parseInt(item.power) || 0, // Grava o poder blindado
+                        power: parseInt(item.power) || 0,
                         img: item.img
                     }
                 });
@@ -2020,9 +2025,9 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
 
         } catch (error) {
             console.error("Erro ao usar item:", error);
-            // Se o item já tiver sido deletado por um clique duplo anterior, o erro cai aqui e não quebra o app
+            // Se der erro (ex: item já usado), apenas recarrega para limpar
         } finally {
-            // 2. DESTRAVA A TELA APÓS TERMINAR TUDO
+            // 2. DESTRAVA A TELA
             setLoading(false);
         }
     };
@@ -3316,7 +3321,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.8</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.9</div>
                             </div>
                         </div>
                         
@@ -3794,7 +3799,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.8 CORREÇÃO DE BUGS </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.9 CORREÇÃO DE BUGS </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

@@ -878,38 +878,38 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             const [adminTeam, setAdminTeam] = useState(null); 
             const [sales, setSales] = useState([]);
 
-          useEffect(() => {
-                const unsubs = [
-                    db.collection('teams').onSnapshot(s => setTeams(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    db.collection('players').onSnapshot(s => setPlayers(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    db.collection('config').doc('system').onSnapshot(s => setConf(s.exists ? s.data() : {marketOpen:true})),
-                    db.collection('financeRequests').onSnapshot(s => setReqs(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    db.collection('newspapers').onSnapshot(s => setPapers(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    db.collection('journalists').onSnapshot(s => setJournalists(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    
-                    db.collection('companies').onSnapshot(s => setCompanies(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    db.collection('products').onSnapshot(s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    db.collection('sponsorships').onSnapshot(s => setSps(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    
-                    // CORREÇÃO CRÍTICA AQUI: Adicionado {id: d.id, ...} para que o botão de usar/deletar funcione
-                    db.collection('sales').orderBy('date', 'desc').limit(50).onSnapshot(s => setSales(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    
-                    db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => { 
-                        const list = s.docs.map(d => ({id:d.id, ...d.data()})); 
-                        setNews(list); 
-                        const lastRead = localStorage.getItem('lastRead'); 
-                        if (list.length && (!lastRead || list[0].date > parseInt(lastRead))) setNewNews(true); 
-                        setLoading(false); 
-                    }),
+           useEffect(() => {
+        const unsubs = [
+            db.collection('teams').onSnapshot(s => setTeams(s.docs.map(d => ({id:d.id, ...d.data()})))),
+            db.collection('players').onSnapshot(s => setPlayers(s.docs.map(d => ({id:d.id, ...d.data()})))),
+            db.collection('config').doc('system').onSnapshot(s => setConf(s.exists ? s.data() : {marketOpen:true})),
+            db.collection('financeRequests').onSnapshot(s => setReqs(s.docs.map(d => ({id:d.id, ...d.data()})))),
+            db.collection('newspapers').onSnapshot(s => setPapers(s.docs.map(d => ({id:d.id, ...d.data()})))),
+            db.collection('journalists').onSnapshot(s => setJournalists(s.docs.map(d => ({id:d.id, ...d.data()})))),
+            
+            db.collection('companies').onSnapshot(s => setCompanies(s.docs.map(d => ({id:d.id, ...d.data()})))),
+            db.collection('products').onSnapshot(s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()})))),
+            db.collection('sponsorships').onSnapshot(s => setSps(s.docs.map(d => ({id:d.id, ...d.data()})))),
+            
+            // CORREÇÃO CRÍTICA AQUI: Adicionado {id: d.id, ...} para que o botão de usar/deletar funcione
+            db.collection('sales').orderBy('date', 'desc').limit(50).onSnapshot(s => setSales(s.docs.map(d => ({id:d.id, ...d.data()})))),
+            
+            db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => { 
+                const list = s.docs.map(d => ({id:d.id, ...d.data()})); 
+                setNews(list); 
+                const lastRead = localStorage.getItem('lastRead'); 
+                if (list.length && (!lastRead || list[0].date > parseInt(lastRead))) setNewNews(true); 
+                setLoading(false); 
+            }),
 
-                    db.collection('users').where('type', '==', 'COACH').onSnapshot(snap => {
-                        setCoaches(snap.docs.map(d => ({id: d.id, ...d.data()})));
-                    }),
-                    db.collection('matches').onSnapshot(s => setMatches(s.docs.map(d => ({id:d.id, ...d.data()}))))
-                ];
+            db.collection('users').where('type', '==', 'COACH').onSnapshot(snap => {
+                setCoaches(snap.docs.map(d => ({id: d.id, ...d.data()})));
+            }),
+            db.collection('matches').onSnapshot(s => setMatches(s.docs.map(d => ({id:d.id, ...d.data()}))))
+        ];
 
-                return () => unsubs.forEach(u => u());
-            }, []);
+        return () => unsubs.forEach(u => u());
+    }, []);
 
     // --- LISTENER DE OFERTAS (Para Times, Jogadores e Técnicos) ---
     useEffect(() => {
@@ -929,6 +929,40 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
 
         return () => unsub();
     }, [user]);
+
+    // --- NOVO: SINCRONIZADOR DE FAMA (CORREÇÃO AUTOMÁTICA) ---
+    // Isso garante que a Fama seja SEMPRE a soma dos itens na mochila.
+    // Se o jogador tiver 2 bonés (200), e estiver mostrando 300, isso corrige para 200 na hora.
+    useEffect(() => {
+        if (!user || user.type !== 'PLAYER' || sales.length === 0) return;
+
+        // 1. Pega apenas os itens deste jogador
+        const myInventory = sales.filter(s => s.buyerId === user.data.id);
+
+        // 2. Calcula quanto de Fama esses itens valem somados
+        const realFame = myInventory.reduce((total, item) => {
+            // Verifica se é um item que dá fama (Luxo, Veículo, etc)
+            if (['VEICULO', 'IMOVEL', 'TECNOLOGIA', 'LUXO'].includes(item.cat)) {
+                 // Usa o valor gravado na venda ou calcula baseado no poder
+                 return total + (item.fameGained || (parseInt(item.power || 0) * 100));
+            }
+            return total;
+        }, 0);
+
+        // 3. Se o valor no perfil estiver errado, corrige no Banco de Dados
+        if ((user.data.fame || 0) !== realFame) {
+            console.log(`Corrigindo Fama: De ${user.data.fame} para ${realFame}`);
+            
+            // Atualiza no Firebase
+            db.collection('players').doc(user.data.id).update({ fame: realFame });
+            
+            // Atualiza na tela do usuário imediatamente
+            setUser(prev => ({
+                ...prev,
+                data: { ...prev.data, fame: realFame }
+            }));
+        }
+    }, [sales, user?.data?.id]); // Roda sempre que houver uma venda ou compra nova
 
     useEffect(() => {
         // Sincronização de dados do usuário logado
@@ -1882,83 +1916,84 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         }
     };
 
-    const buyProduct = async (prod, seller) => {
-        const currentBalance = user.data.balance || 0;
-        if (currentBalance < prod.price) return alert("Saldo insuficiente!");
+            //FIM
+    
+   const buyProduct = async (prod, seller) => {
+        const buyerBalance = user.data.balance || 0;
+        
+        // 1. Validações
+        if (buyerBalance < prod.price) return alert("Saldo insuficiente!");
         if (!confirm(`Comprar ${prod.name} por ${fmt(prod.price)}?`)) return;
 
-        // --- CÁLCULO DO CUSTO DE PRODUÇÃO (Segurança para garantir que funcione) ---
+        // 2. Cálculo de Custos
         const getLocalCost = (c, p) => {
             const pow = parseInt(p);
-            if (!pow || pow <= 0) return 0; // Se poder for 0, custo é 0
+            if (!pow || pow <= 0) return 0;
             if (['SAUDE', 'CONSUMIVEL'].includes(c)) return pow * 7000;
             if (['CHUTEIRA', 'LUVAS'].includes(c)) return pow * 12000;
-            return pow * 15000; // Veículo, Imóvel, Luxo, Tecnologia
+            return pow * 15000; 
         };
 
         const productionCost = getLocalCost(prod.cat, prod.power);
         const profit = prod.price - productionCost;
 
-        // 3. Verifica FAMA (Calcula e congela o valor AGORA)
+        // 3. Prepara dados da Fama (apenas para salvar no item, não no jogador agora)
         let fameBonus = 0;
         if (['VEICULO', 'IMOVEL', 'TECNOLOGIA', 'LUXO'].includes(prod.cat)) {
-            // Regra: Poder * 100. Ex: Poder 5 = 500 Fama.
-            fameBonus = (parseInt(prod.power) || 0) * 100;
+            fameBonus = (parseInt(prod.power) || 0) * 100; 
         }
 
         const b = db.batch();
         
-        // 1. Desconta do Comprador
+        // 4. Desconta do Comprador
         if (user.type === 'PLAYER') {
+            // NOTA: Removemos a soma de 'fame' aqui. 
+            // O Sincronizador (useEffect) vai detectar o item novo na mochila e calcular a Fama correta automaticamente.
             b.update(db.collection('players').doc(user.data.id), { 
-                balance: currentBalance - prod.price,
-                fame: (user.data.fame || 0) + fameBonus // Entrega a fama imediatamente
+                balance: buyerBalance - prod.price
             });
         } else if (user.type === 'COACH') { 
-            b.update(db.collection('users').doc(user.data.id), { balance: currentBalance - prod.price });
+            b.update(db.collection('users').doc(user.data.id), { balance: buyerBalance - prod.price });
         } else {
-            b.update(db.collection('teams').doc(user.data.id), { balance: currentBalance - prod.price });
+            b.update(db.collection('teams').doc(user.data.id), { balance: buyerBalance - prod.price });
         }
 
-        // 2. Atualiza a Empresa (Recebe o LUCRO: Preço - Custo)
-        b.update(db.collection('companies').doc(seller.id), { balance: (seller.balance || 0) + profit });
+        // 5. Paga a Empresa
+        b.update(db.collection('companies').doc(seller.id), { 
+            balance: (seller.balance || 0) + profit 
+        });
 
-        // 4. Registra a Venda e Cria o Item na Mochila (DADOS CONGELADOS)
-        // Aqui garantimos que se o dono mudar o produto depois, o item comprado NÃO muda.
+        // 6. Cria o item na Mochila (Sales) com DADOS CONGELADOS
         const saleRef = db.collection('sales').doc();
         b.set(saleRef, { 
             companyId: seller.id, 
             buyerId: user.data.id, 
             buyerName: user.data.name, 
             
-            // Salva uma cópia independente do produto
-            productOriginalId: prod.id, 
+            productOriginalId: prod.id,
             productName: prod.name, 
-            price: parseFloat(prod.price), 
+            price: parseFloat(prod.price),
             cost: productionCost, 
             img: prod.img, 
             cat: prod.cat,
-            power: parseInt(prod.power) || 0, // O poder fica gravado fixo aqui
-            fameGained: fameBonus, // A fama ganha fica gravada fixa aqui
+            
+            // Grava os atributos fixos (Poder e Fama) neste momento
+            power: parseInt(prod.power) || 0, 
+            fameGained: fameBonus, 
             
             date: Date.now() 
         });
         
         await b.commit();
         
-        // Atualiza o saldo visualmente sem recarregar
+        // Atualiza saldo visualmente
         setUser(prev => ({
             ...prev,
-            data: {
-                ...prev.data,
-                balance: currentBalance - prod.price,
-                fame: (prev.data.fame || 0) + fameBonus
-            }
+            data: { ...prev.data, balance: buyerBalance - prod.price }
         }));
 
-        // Mensagem de Feedback
-        let msg = `Compra realizada!`;
-        if (fameBonus > 0) msg += `\n🌟 FAMA +${fameBonus}`;
+        let msg = `Compra realizada com sucesso!`;
+        if (fameBonus > 0) msg += `\n🌟 FAMA +${fameBonus} (Atualizando...)`;
         if (profit < 0) msg += `\n(Nota: A empresa teve prejuízo nesta venda)`;
         alert(msg);
     };
@@ -3330,7 +3365,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.76.3</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.76.4</div>
                             </div>
                         </div>
                         
@@ -3808,7 +3843,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.76.3 CORREÇÃO DE BUGS </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.76.4 CORREÇÃO DE BUGS </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

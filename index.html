@@ -878,38 +878,38 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             const [adminTeam, setAdminTeam] = useState(null); 
             const [sales, setSales] = useState([]);
 
-           useEffect(() => {
-        const unsubs = [
-            db.collection('teams').onSnapshot(s => setTeams(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('players').onSnapshot(s => setPlayers(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('config').doc('system').onSnapshot(s => setConf(s.exists ? s.data() : {marketOpen:true})),
-            db.collection('financeRequests').onSnapshot(s => setReqs(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('newspapers').onSnapshot(s => setPapers(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('journalists').onSnapshot(s => setJournalists(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            
-            db.collection('companies').onSnapshot(s => setCompanies(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('products').onSnapshot(s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('sponsorships').onSnapshot(s => setSps(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('sales').orderBy('date', 'desc').limit(50).onSnapshot(s => setSales(s.docs.map(d => d.data()))),
-            
-            db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => { 
-                const list = s.docs.map(d => ({id:d.id, ...d.data()})); 
-                setNews(list); 
-                const lastRead = localStorage.getItem('lastRead'); 
-                if (list.length && (!lastRead || list[0].date > parseInt(lastRead))) setNewNews(true); 
-                setLoading(false); 
-            }),
+          useEffect(() => {
+                const unsubs = [
+                    db.collection('teams').onSnapshot(s => setTeams(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    db.collection('players').onSnapshot(s => setPlayers(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    db.collection('config').doc('system').onSnapshot(s => setConf(s.exists ? s.data() : {marketOpen:true})),
+                    db.collection('financeRequests').onSnapshot(s => setReqs(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    db.collection('newspapers').onSnapshot(s => setPapers(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    db.collection('journalists').onSnapshot(s => setJournalists(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    
+                    db.collection('companies').onSnapshot(s => setCompanies(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    db.collection('products').onSnapshot(s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    db.collection('sponsorships').onSnapshot(s => setSps(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    
+                    // CORREÇÃO CRÍTICA AQUI: Adicionado {id: d.id, ...} para que o botão de usar/deletar funcione
+                    db.collection('sales').orderBy('date', 'desc').limit(50).onSnapshot(s => setSales(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    
+                    db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => { 
+                        const list = s.docs.map(d => ({id:d.id, ...d.data()})); 
+                        setNews(list); 
+                        const lastRead = localStorage.getItem('lastRead'); 
+                        if (list.length && (!lastRead || list[0].date > parseInt(lastRead))) setNewNews(true); 
+                        setLoading(false); 
+                    }),
 
-            // LISTENER DE TÉCNICOS (Adicionado Corretamente)
-            db.collection('users').where('type', '==', 'COACH').onSnapshot(snap => {
-                // Importante: Adicionei {id: d.id, ...} para garantir que o ID venha certo para exclusão
-                setCoaches(snap.docs.map(d => ({id: d.id, ...d.data()})));
-            }),
-            db.collection('matches').onSnapshot(s => setMatches(s.docs.map(d => ({id:d.id, ...d.data()}))))
-        ];
+                    db.collection('users').where('type', '==', 'COACH').onSnapshot(snap => {
+                        setCoaches(snap.docs.map(d => ({id: d.id, ...d.data()})));
+                    }),
+                    db.collection('matches').onSnapshot(s => setMatches(s.docs.map(d => ({id:d.id, ...d.data()}))))
+                ];
 
-        return () => unsubs.forEach(u => u());
-    }, []);
+                return () => unsubs.forEach(u => u());
+            }, []);
 
     // --- LISTENER DE OFERTAS (Para Times, Jogadores e Técnicos) ---
     useEffect(() => {
@@ -3321,7 +3321,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.9</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.76.0</div>
                             </div>
                         </div>
                         
@@ -3799,7 +3799,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.9 CORREÇÃO DE BUGS </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.76.0 CORREÇÃO DE BUGS </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

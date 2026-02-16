@@ -933,8 +933,8 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     // --- NOVO: SINCRONIZADOR DE FAMA (CORREÇÃO AUTOMÁTICA) ---
     // Isso garante que a Fama seja SEMPRE a soma dos itens na mochila.
     // Se o jogador tiver 2 bonés (200), e estiver mostrando 300, isso corrige para 200 na hora.
-    useEffect(() => {
-        if (!user || user.type !== 'PLAYER' || sales.length === 0) return;
+   useEffect(() => {
+        if (!user || user.type !== 'PLAYER' || !sales || sales.length === 0) return;
 
         // 1. Pega apenas os itens deste jogador
         const myInventory = sales.filter(s => s.buyerId === user.data.id);
@@ -943,18 +943,20 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         const realFame = myInventory.reduce((total, item) => {
             // Verifica se é um item que dá fama (Luxo, Veículo, etc)
             if (['VEICULO', 'IMOVEL', 'TECNOLOGIA', 'LUXO'].includes(item.cat)) {
-                 // Usa o valor gravado na venda ou calcula baseado no poder
-                 return total + (item.fameGained || (parseInt(item.power || 0) * 100));
+                // Garante que estamos somando apenas NÚMEROS para evitar erro de [object Object]
+                const gained = parseInt(item.fameGained) || 0;
+                return total + gained;
             }
             return total;
         }, 0);
 
         // 3. Se o valor no perfil estiver errado, corrige no Banco de Dados
-        if ((user.data.fame || 0) !== realFame) {
+        if (typeof realFame === 'number' && (user.data.fame || 0) !== realFame) {
             console.log(`Corrigindo Fama: De ${user.data.fame} para ${realFame}`);
             
             // Atualiza no Firebase
-            db.collection('players').doc(user.data.id).update({ fame: realFame });
+            db.collection('players').doc(user.data.id).update({ fame: realFame })
+              .catch(err => console.error("Erro ao sincronizar fama:", err));
             
             // Atualiza na tela do usuário imediatamente
             setUser(prev => ({
@@ -3365,7 +3367,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.76.5</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.76.6</div>
                             </div>
                         </div>
                         
@@ -3632,7 +3634,7 @@ const renewContract = async (p) => {
                             <CompanyDashboard company={user.data} products={products.filter(p => p.companyId === user.data.id)} sps={sps.filter(s => s.companyId === user.data.id)} sales={sales || []} teams={teams} onSaveProd={saveProduct} onDeleteProd={async(id)=>{if(confirm("Excluir produto?")) await db.collection('products').doc(id).delete();}} onProcessSpons={processSponsorship} />
                         }
                         
-                       {screen === 'PLAYER_DASH' && user.type === 'PLAYER' && 
+                      {screen === 'PLAYER_DASH' && user.type === 'PLAYER' && 
                             <div key="player-dash-container">
                                 <PlayerDashboard 
                                     player={players.find(p=>p.id===user.data.id) || user.data} 
@@ -3648,7 +3650,6 @@ const renewContract = async (p) => {
                                 </div>
                             </div>
                         }
-
                         {/* --- PAINEL DO TÉCNICO --- */}
                         {(screen === 'HOME' || screen === 'COACH_DASH') && user.type === 'COACH' && 
                             <div key="coach-home-container">
@@ -3845,7 +3846,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.76.5 CORREÇÃO DE BUGS </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.76.6 CORREÇÃO DE BUGS </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

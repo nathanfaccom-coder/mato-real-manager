@@ -1106,6 +1106,47 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         alert("Partida excluída.");
     };
             //FIM
+            // --- LÓGICA DE APROVAÇÃO FINANCEIRA (ADM) ---
+    const handleFinanceApprove = async (req) => {
+        setLoading(true);
+        const b = db.batch();
+        const reqRef = db.collection('financeRequests').doc(req.id);
+
+        try {
+            // TIPO 1: INJEÇÃO (Dinheiro na hora, uma vez só)
+            if (req.type === 'INJECTION') {
+                const teamRef = db.collection('teams').doc(req.teamId);
+                b.update(teamRef, { balance: firebase.firestore.FieldValue.increment(req.amount) });
+                b.delete(reqRef); // Remove o pedido
+                
+                postNews(`💰 **INJEÇÃO FINANCEIRA**\nA Federação aportou ${fmt(req.amount)} no caixa do ${req.teamName}.`, 'admin');
+            }
+            
+            // TIPO 2: PATROCÍNIO (Cria um contrato semanal)
+            else if (req.type === 'SPONSORSHIP') {
+                const sponsRef = db.collection('sponsorships').doc();
+                // Cria o patrocínio com ID de empresa 'FEDERACAO' para identificarmos depois
+                b.set(sponsRef, {
+                    teamId: req.teamId,
+                    teamName: req.teamName,
+                    companyId: 'FEDERACAO', 
+                    companyName: 'FEDERAÇÃO (Governo)',
+                    value: parseFloat(req.amount),
+                    status: 'ACTIVE'
+                });
+                b.delete(reqRef); // Remove o pedido
+                
+                postNews(`🤝 **PATROCÍNIO ESTATAL**\nO ${req.teamName} fechou contrato com a Federação.\nValor: ${fmt(req.amount)}/semana.`, 'admin');
+            }
+
+            await b.commit();
+            alert("Solicitação Aprovada com Sucesso!");
+        } catch (e) {
+            alert("Erro ao aprovar: " + e.message);
+        }
+        setLoading(false);
+    };
+            //FIM
            // ... continuação do código anterior
             const loginAdmin = () => { setUser({ type: 'ADMIN', data: { id: 'admin', name: 'FEDERAÇÃO (ADM)', balance: 0, logo: null, stadiumLevel: 1, serie: 'ADM' } }); setScreen('HOME'); };
 
@@ -1970,7 +2011,8 @@ const resetDatabase = async () => {
     setLoading(false);
 };
 
-const AdminPanel = ({ teams, onGenFixtures, onTurnSeasonAdvanced, papers, journalists, companies, coaches, reqs, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onApprovePaper, onDeletePaper, onDeleteJourno, onRejectPaper, onConfig, onReset, onApproveComp, onDeleteComp, onUpdateCompBal, onGenAttrs }) => {    const [tab, setTab] = useState('DASH');
+const AdminPanel = ({ teams, onGenFixtures, onTurnSeasonAdvanced, papers, journalists, companies, coaches, reqs, sps, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onApprovePaper, onDeletePaper, onDeleteJourno, onRejectPaper, onConfig, onReset, onApproveComp, onDeleteComp, onUpdateCompBal, onGenAttrs }) => {    
+    const [tab, setTab] = useState('DASH');
 
     const tabStyle = (active) => ({
         background: active ? 'var(--primary)' : '#333',
@@ -1981,6 +2023,9 @@ const AdminPanel = ({ teams, onGenFixtures, onTurnSeasonAdvanced, papers, journa
         cursor: 'pointer',
         fontWeight: 'bold'
     });
+
+    // Filtra os patrocínios que são da Federação (Governo)
+    const fedSpons = (sps || []).filter(s => s.companyId === 'FEDERACAO');
 
     return (
         <div>
@@ -1994,7 +2039,7 @@ const AdminPanel = ({ teams, onGenFixtures, onTurnSeasonAdvanced, papers, journa
                 <button style={{...tabStyle(tab==='COACH'), background: tab==='COACH' ? 'gold' : '#333', color: tab==='COACH' ? '#000' : '#fff'}} onClick={()=>setTab('COACH')}>Técnicos</button>
             </div>
 
-            {/* ABA DE TÉCNICOS (CORRIGIDA E INTELIGENTE) */}
+            {/* ABA DE TÉCNICOS */}
             {tab === 'COACH' && (
                 <div>
                     <h3>Técnicos Pendentes</h3>
@@ -2033,12 +2078,10 @@ const AdminPanel = ({ teams, onGenFixtures, onTurnSeasonAdvanced, papers, journa
                             </div>
                             
                             <div style={{display:'flex', gap:5}}>
-                                {/* BOTÃO EDITAR NÍVEL (CORRIGIDO PARA ADICIONAR PERKS) */}
                                 <button className="btn btn-blue" style={{fontSize:10, width:'auto', padding:'5px 8px'}} onClick={async()=>{
                                     const n = prompt(`Novo Nível para ${c.name} (Atual: ${c.level}):`, c.level);
                                     if(n) {
                                         const newLevel = parseInt(n);
-                                        // CORREÇÃO: Calcula 1 perk a cada 5 níveis (ex: Nv 5 = 1, Nv 10 = 2)
                                         const currentPerksCount = (c.perks || []).length;
                                         const idealPerksCount = Math.floor(newLevel / 5);
                                         const newPending = Math.max(0, idealPerksCount - currentPerksCount);
@@ -2051,13 +2094,11 @@ const AdminPanel = ({ teams, onGenFixtures, onTurnSeasonAdvanced, papers, journa
                                     }
                                 }}>LVL</button>
 
-                                {/* BOTÃO EDITAR SALDO */}
                                 <button className="btn btn-green" style={{fontSize:10, width:'auto', padding:'5px 8px'}} onClick={async()=>{
                                     const n = prompt("Novo Saldo:", c.balance);
                                     if(n) await db.collection('users').doc(c.id).update({balance: parseFloat(n)});
                                 }}>$</button>
 
-                                {/* BOTÃO EXCLUIR */}
                                 <button className="btn btn-red" style={{fontSize:10, width:'auto', padding:'5px 8px'}} onClick={async()=>{
                                     if(prompt("Digite DELETE para banir este técnico:") === "DELETE") await db.collection('users').doc(c.id).delete();
                                 }}>X</button>
@@ -2076,7 +2117,7 @@ const AdminPanel = ({ teams, onGenFixtures, onTurnSeasonAdvanced, papers, journa
                     <button className="btn btn-red" onClick={()=>onAct('SEASON')}>VIRAR TEMPORADA</button>
                     <button className="btn btn-gold" onClick={()=>{ const t=prompt("Título"); const b=prompt("Texto"); if(t)onPost(t,b,'admin'); }}>COMUNICADO</button>
                     <button className="btn btn-blue" style={{marginTop:10}} onClick={onGenFixtures}>🗓️ GERAR TABELA DE JOGOS</button>
-<button className="btn btn-purple" style={{marginTop:10}} onClick={onTurnSeasonAdvanced}>🏆 VIRAR TEMPORADA (AVANÇADO)</button>
+                    <button className="btn btn-purple" style={{marginTop:10}} onClick={onTurnSeasonAdvanced}>🏆 VIRAR TEMPORADA (AVANÇADO)</button>
                     <button className="btn" style={{background:'#333', border:'1px solid #666', marginTop:10}} onClick={onGenAttrs}>
                         🎲 GERAR ATRIBUTOS (ALL)
                     </button>
@@ -2099,9 +2140,41 @@ const AdminPanel = ({ teams, onGenFixtures, onTurnSeasonAdvanced, papers, journa
                 {(teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>{t.name}</span><div><button className="btn btn-ghost" style={{width:'auto', marginRight:5}} onClick={()=>onConfig(t)}><i className="fas fa-cog"></i></button><button className="btn btn-green" style={{width:'auto', marginRight:5}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button><button className="btn btn-purple" style={{width:'auto'}} onClick={()=>onEditT(t)}>ELENCO</button><button className="btn btn-red" style={{width:'auto', marginLeft:5}} onClick={()=>onDeleteTeam(t.id)}><i className="fas fa-trash"></i></button></div></div>)}
             </div>}
 
+            {/* ABA DE FINANÇAS ATUALIZADA */}
             {tab==='FINANCE' && <div>
                 <h4>Solicitações Financeiras</h4>
-                {(reqs||[]).filter(r=>r.status==='PENDING').map(r=><div key={r.id} className="card"><b>{r.teamName}</b>: {fmt(r.amount)} ({r.type})<br/>{r.details}<br/><button className="btn-green" style={{width:'auto', marginRight:5}} onClick={()=>onApprove(r)}>V</button><button className="btn-red" style={{width:'auto'}} onClick={()=>onReject(r.id)}>X</button></div>)}
+                {(reqs||[]).filter(r=>r.status==='PENDING').length === 0 && <p style={{color:'#666'}}>Nenhum pedido pendente.</p>}
+                
+                {(reqs||[]).filter(r=>r.status==='PENDING').map(r=>(
+                    <div key={r.id} className="card" style={{borderLeft: '4px solid gold'}}>
+                        <b>{r.teamName}</b>: {fmt(r.amount)} <small>({r.type})</small><br/>
+                        <span style={{fontSize:11, color:'#ccc'}}>{r.details}</span>
+                        <div style={{display:'flex', gap:10, marginTop:10}}>
+                            <button className="btn btn-green" style={{width:'auto', padding:'5px 15px'}} onClick={()=>onApprove(r)}>APROVAR</button>
+                            <button className="btn btn-red" style={{width:'auto', padding:'5px 15px'}} onClick={()=>onReject(r.id)}>RECUSAR</button>
+                        </div>
+                    </div>
+                ))}
+
+                <hr style={{borderColor:'#333', margin:'20px 0'}}/>
+
+                <h4>🏛️ Patrocínios Ativos da Federação</h4>
+                {fedSpons.length === 0 && <p style={{color:'#666'}}>Nenhum patrocínio governamental ativo.</p>}
+                
+                {fedSpons.map(s => (
+                    <div key={s.id} className="card" style={{borderLeft: '4px solid var(--primary)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                        <div>
+                            <b>{s.teamName}</b><br/>
+                            <small style={{color:'lime'}}>+ {fmt(s.value)} / semana</small>
+                        </div>
+                        <button className="btn btn-red" style={{width:'auto', fontSize:10}} onClick={async ()=>{
+                            if(confirm(`Cancelar o patrocínio do ${s.teamName}?`)) {
+                                await firebase.firestore().collection('sponsorships').doc(s.id).delete();
+                                alert("Patrocínio cancelado!");
+                            }
+                        }}>CANCELAR</button>
+                    </div>
+                ))}
             </div>}
 
             {tab==='PRESS' && <div>
@@ -3176,7 +3249,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.4</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.5</div>
                             </div>
                         </div>
                         
@@ -3213,14 +3286,15 @@ const renewContract = async (p) => {
                     </div>
 
                     <div className="container">
-                        {screen === 'HOME' && user.type === 'ADMIN' && 
+                       {screen === 'HOME' && user.type === 'ADMIN' && 
                             <AdminPanel 
                                 teams={teams} papers={papers} journalists={journalists} companies={companies} reqs={reqs} config={conf} coaches={coaches} 
+                                sps={sps}
                                 onAct={adminAction} 
                                 onGenFixtures={generateFixtures}
                                 onTurnSeasonAdvanced={handleSeasonTurnAdvanced}
                                 onPost={(t,b,tp)=>postNews(`📢 **${t}**\n${b}`, tp)} 
-                                onApprove={async(r)=>{/*Fin*/}} 
+                                onApprove={handleFinanceApprove} 
                                 onReject={(id)=>db.collection('financeRequests').doc(id).delete()} 
                                 onEditT={(t)=>{setAdminTeam(t); setScreen('ADMIN_TEAM');}} 
                                 onApproveTeam={approveTeam} 
@@ -3653,7 +3727,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.4 SUGESTÃO DE VALORES </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.5 SUGESTÃO DE VALORES </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

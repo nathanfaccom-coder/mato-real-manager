@@ -1899,11 +1899,21 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         const productionCost = getLocalCost(prod.cat, prod.power);
         const profit = prod.price - productionCost;
 
+        // 3. Verifica FAMA (Calcula e congela o valor AGORA)
+        let fameBonus = 0;
+        if (['VEICULO', 'IMOVEL', 'TECNOLOGIA', 'LUXO'].includes(prod.cat)) {
+            // Regra: Poder * 100. Ex: Poder 5 = 500 Fama.
+            fameBonus = (parseInt(prod.power) || 0) * 100;
+        }
+
         const b = db.batch();
         
         // 1. Desconta do Comprador
         if (user.type === 'PLAYER') {
-            b.update(db.collection('players').doc(user.data.id), { balance: currentBalance - prod.price });
+            b.update(db.collection('players').doc(user.data.id), { 
+                balance: currentBalance - prod.price,
+                fame: (user.data.fame || 0) + fameBonus // Entrega a fama imediatamente
+            });
         } else if (user.type === 'COACH') { 
             b.update(db.collection('users').doc(user.data.id), { balance: currentBalance - prod.price });
         } else {
@@ -1911,35 +1921,41 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         }
 
         // 2. Atualiza a Empresa (Recebe o LUCRO: Preço - Custo)
-        b.update(db.collection('companies').doc(seller.id), { balance: seller.balance + profit });
+        b.update(db.collection('companies').doc(seller.id), { balance: (seller.balance || 0) + profit });
 
-        // 3. Verifica FAMA (Se for item de Luxo/Status)
-        let fameBonus = 0;
-        if (['VEICULO', 'IMOVEL', 'TECNOLOGIA', 'LUXO'].includes(prod.cat)) {
-            fameBonus = (prod.power || 0) * 100; // Ex: Poder 10 = 1000 Fama. Se poder 0, Fama 0.
-            if (user.type === 'PLAYER') {
-                b.update(db.collection('players').doc(user.data.id), { fame: (user.data.fame || 0) + fameBonus });
-            }
-        }
-
-        // 4. Registra a Venda e Cria o Item na Mochila
+        // 4. Registra a Venda e Cria o Item na Mochila (DADOS CONGELADOS)
+        // Aqui garantimos que se o dono mudar o produto depois, o item comprado NÃO muda.
         const saleRef = db.collection('sales').doc();
         b.set(saleRef, { 
             companyId: seller.id, 
-            productName: prod.name, 
             buyerId: user.data.id, 
             buyerName: user.data.name, 
-            price: prod.price, 
-            cost: productionCost, // Guarda quanto custou fabricar
+            
+            // Salva uma cópia independente do produto
+            productOriginalId: prod.id, 
+            productName: prod.name, 
+            price: parseFloat(prod.price), 
+            cost: productionCost, 
             img: prod.img, 
             cat: prod.cat,
-            power: prod.power || 0, // Guarda o poder para usar depois
-            fameGained: fameBonus,
+            power: parseInt(prod.power) || 0, // O poder fica gravado fixo aqui
+            fameGained: fameBonus, // A fama ganha fica gravada fixa aqui
+            
             date: Date.now() 
         });
         
         await b.commit();
         
+        // Atualiza o saldo visualmente sem recarregar
+        setUser(prev => ({
+            ...prev,
+            data: {
+                ...prev.data,
+                balance: currentBalance - prod.price,
+                fame: (prev.data.fame || 0) + fameBonus
+            }
+        }));
+
         // Mensagem de Feedback
         let msg = `Compra realizada!`;
         if (fameBonus > 0) msg += `\n🌟 FAMA +${fameBonus}`;
@@ -1948,7 +1964,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     };
             //FIM
 
-            //FIM
+            
 
             
             const handleUseItem = async (item, action) => {
@@ -1959,7 +1975,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
 
         // AÇÃO 1: CONSUMIR (Energia)
         if (action === 'CONSUME') {
-            const energyGain = item.power || 1;
+            const energyGain = parseInt(item.power) || 1; // Garante que lê o número inteiro
             const currentEnergy = user.data.energy || 0;
             const newEnergy = Math.min(100, currentEnergy + energyGain);
             
@@ -1967,6 +1983,10 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             b.delete(itemRef); // Remove da mochila
             
             await b.commit();
+            
+            // Atualiza a barra de energia visualmente na hora
+            setUser(prev => ({...prev, data: {...prev.data, energy: newEnergy}}));
+            
             alert(`⚡ Energia recuperada: +${energyGain}% (Total: ${newEnergy}%)`);
         }
 
@@ -1978,7 +1998,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                     id: item.id,
                     name: item.productName,
                     cat: item.cat,
-                    power: item.power,
+                    power: parseInt(item.power) || 0, // Grava o poder blindado
                     img: item.img
                 }
             });
@@ -1987,6 +2007,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         }
     };
             //FIM
+            
 const resetDatabase = async () => {
     const senha = prompt("⚠️ PERIGO: Isso apagará TODOS os dados do jogo. Digite a senha master para confirmar:");
     if (senha !== '2503') return; 
@@ -3275,7 +3296,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.6</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.7</div>
                             </div>
                         </div>
                         
@@ -3753,7 +3774,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.6 SUGESTÃO DE VALORES </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.7 CORREÇÃO DE BUGS </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

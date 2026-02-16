@@ -1967,7 +1967,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             
 
             
-        const handleUseItem = async (item, action) => {
+       const handleUseItem = async (item, action) => {
         if (!user.data || user.type !== 'PLAYER') return;
         
         // 1. TRAVA A TELA (LOADING)
@@ -2009,18 +2009,26 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
 
             // AÇÃO 2: EQUIPAR (XP Boost)
             if (action === 'EQUIP') {
-                // Define este item como o equipado no perfil do jogador
+                // 1. Grava no perfil do jogador (Movendo o item)
                 b.update(db.collection('players').doc(user.data.id), { 
                     equippedItem: {
-                        id: item.id,
+                        id: item.id, // Mantemos o ID original apenas como referência histórica
                         name: item.productName,
                         cat: item.cat,
                         power: parseInt(item.power) || 0,
                         img: item.img
                     }
                 });
+
+                // 2. DELETA DA MOCHILA (Agora ele sai da lista de baixo e fica só no slot verde)
+                b.delete(itemRef);
+
                 await b.commit();
-                alert(`🛡️ Item equipado: ${item.productName}\nBônus de +${item.power}% XP no próximo treino!`);
+
+                // 3. Atualiza visualmente: Remove da lista de vendas
+                setSales(prev => prev.filter(s => s.id !== item.id));
+                
+                alert(`🛡️ Item equipado: ${item.productName}\nEle será consumido automaticamente no próximo treino.`);
             }
 
         } catch (error) {
@@ -3321,7 +3329,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.76.0</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.76.1</div>
                             </div>
                         </div>
                         
@@ -3799,7 +3807,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.76.0 CORREÇÃO DE BUGS </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.76.1 CORREÇÃO DE BUGS </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

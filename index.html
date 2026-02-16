@@ -3208,33 +3208,59 @@ const renewContract = async (p) => {
         alert(msg);
     };
 // --- NOVA FUNÇÃO: AÇÕES DE CARREIRA DO JOGADOR ---
-            const handlePlayerActions = async (type, p) => {
-                const team = teams.find(t => t.id === p.teamId);
-                
-                // 1. PEDIR TRANSFERÊNCIA
-                if (type === 'TRANSFER_REQUEST') {
-                    if (!team) return alert("Já és um Agente Livre!");
-                    if (p.status === 'VENDA') return alert("Já estás na lista de transferências.");
-                    if (!confirm(`Tens a certeza que queres pedir para sair do ${team.name}? O adepto não vai gostar...`)) return;
+           const handlePlayerActions = async (type, p) => {
+        const team = teams.find(t => t.id === p.teamId);
+        
+        // 1. PEDIR TRANSFERÊNCIA
+        if (type === 'TRANSFER_REQUEST') {
+            if (!team) return alert("Já és um Agente Livre!");
+            if (p.status === 'VENDA') return alert("Já estás na lista de transferências.");
+            if (!confirm(`Tens a certeza que queres pedir para sair do ${team.name}? O adepto não vai gostar...`)) return;
 
-                    await db.collection('players').doc(p.id).update({
-                        status: 'VENDA',
-                        mood: '😡'
-                    });
-                    postNews(`💣 **CRISE NO ${team.name.toUpperCase()}!**\nO jogador **${p.name}** está insatisfeito e pediu para ser colocado na lista de transferências!`, 'rumor');
-                    alert("O pedido foi feito. O teu humor piorou.");
-                }
+            await db.collection('players').doc(p.id).update({
+                status: 'VENDA',
+                mood: '😡'
+            });
+            postNews(`💣 **CRISE NO ${team.name.toUpperCase()}!**\nO jogador **${p.name}** está insatisfeito e pediu para ser colocado na lista de transferências!`, 'rumor');
+            alert("O pedido foi feito. O teu humor piorou.");
+        }
 
-                // 2. PEDIR AUMENTO
-                if (type === 'ASK_RAISE') {
-                    if (!team) return alert("Precisas de um clube para pedir aumento.");
-                    if (!confirm("Ir à imprensa pedir um aumento salarial?")) return;
+        // 2. PEDIR AUMENTO
+        if (type === 'ASK_RAISE') {
+            if (!team) return alert("Precisas de um clube para pedir aumento.");
+            if (!confirm("Ir à imprensa pedir um aumento salarial?")) return;
 
-                    // Apenas lança a notícia para pressionar o dono
-                    postNews(`💰 **POLÉMICA**\n**${p.name}** declara publicamente: "Mereço ganhar mais no ${team.name}. Espero uma renovação em breve."`, 'press');
-                    alert("Declaração feita à imprensa! O presidente foi notificado.");
-                }
-            };
+            // Apenas lança a notícia para pressionar o dono
+            postNews(`💰 **POLÉMICA**\n**${p.name}** declara publicamente: "Mereço ganhar mais no ${team.name}. Espero uma renovação em breve."`, 'press');
+            alert("Declaração feita à imprensa! O presidente foi notificado.");
+        }
+
+        // 3. DECLARAR FELICIDADE (NOVO)
+        if (type === 'DECLARE_HAPPY') {
+            if (!team) return alert("Precisas de um clube.");
+            if (p.mood === '🤩') return alert("Já estás feliz!");
+
+            await db.collection('players').doc(p.id).update({
+                mood: '🤩',
+                status: 'NAO_A_VENDA' // Tira da lista de venda se estiver
+            });
+            postNews(`💙 **AMOR À CAMISA**\n**${p.name}** declarou: "Estou muito feliz no ${team.name} e quero fazer história aqui!"`, 'press');
+            alert("Declaração feita! A torcida adorou.");
+        }
+
+        // 4. FICAR NEUTRO / RETIRAR PEDIDO (NOVO)
+        if (type === 'RESET_MOOD') {
+            if (!team) return alert("Precisas de um clube.");
+            
+            await db.collection('players').doc(p.id).update({
+                mood: '😐',
+                status: 'NAO_A_VENDA'
+            });
+            postNews(`🤝 **PAZES FEITAS**\n**${p.name}** retirou seu pedido de transferência e foca novamente no ${team.name}.`, 'press');
+            alert("Voltaste ao normal. Clima apaziguado.");
+        }
+    };
+            //FIM
             
             // 3. Função Mestra do Admin (COM REGRA DE AGENTES LIVRES)
      
@@ -3249,7 +3275,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.5</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.6</div>
                             </div>
                         </div>
                         
@@ -3514,7 +3540,7 @@ const renewContract = async (p) => {
                             <CompanyDashboard company={user.data} products={products.filter(p => p.companyId === user.data.id)} sps={sps.filter(s => s.companyId === user.data.id)} sales={sales || []} teams={teams} onSaveProd={saveProduct} onDeleteProd={async(id)=>{if(confirm("Excluir produto?")) await db.collection('products').doc(id).delete();}} onProcessSpons={processSponsorship} />
                         }
                         
-                        {screen === 'PLAYER_DASH' && user.type === 'PLAYER' && 
+                       {screen === 'PLAYER_DASH' && user.type === 'PLAYER' && 
                             <div key="player-dash-container">
                                 <PlayerDashboard 
                                     player={players.find(p=>p.id===user.data.id) || user.data} 
@@ -3727,7 +3753,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.5 SUGESTÃO DE VALORES </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.6 SUGESTÃO DE VALORES </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -5181,7 +5207,9 @@ const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, 
                                 )}
                                 
                                 <div>
-                                    <b style={{fontSize:16}}>{p.name}</b>
+                                    <b style={{fontSize:16}}>
+    {p.name} <span style={{fontSize:14}}>{p.mood}</span>
+</b>
                                     <div style={{fontSize:10, color:'#888', marginTop:2}}>
                                         {p.teamId === 'FREE' ? <b style={{color:'var(--warning)'}}><i className="fas fa-unlock"></i> PASSE LIVRE</b> : <span><i className="fas fa-tshirt"></i> {teams.find(t=>t.id===p.teamId)?.name}</span>}
                                     </div>

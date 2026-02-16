@@ -1967,43 +1967,63 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             
 
             
-            const handleUseItem = async (item, action) => {
+           const handleUseItem = async (item, action) => {
         if (!user.data || user.type !== 'PLAYER') return;
         
-        const b = db.batch();
-        const itemRef = db.collection('sales').doc(item.id); // O item na mochila é um documento de 'sales'
+        // 1. TRAVA A TELA IMEDIATAMENTE (Evita bug de usar item infinito)
+        setLoading(true);
 
-        // AÇÃO 1: CONSUMIR (Energia)
-        if (action === 'CONSUME') {
-            const energyGain = parseInt(item.power) || 1; // Garante que lê o número inteiro
-            const currentEnergy = user.data.energy || 0;
-            const newEnergy = Math.min(100, currentEnergy + energyGain);
-            
-            b.update(db.collection('players').doc(user.data.id), { energy: newEnergy });
-            b.delete(itemRef); // Remove da mochila
-            
-            await b.commit();
-            
-            // Atualiza a barra de energia visualmente na hora
-            setUser(prev => ({...prev, data: {...prev.data, energy: newEnergy}}));
-            
-            alert(`⚡ Energia recuperada: +${energyGain}% (Total: ${newEnergy}%)`);
-        }
+        try {
+            const b = db.batch();
+            const itemRef = db.collection('sales').doc(item.id); // O item na mochila é um documento de 'sales'
 
-        // AÇÃO 2: EQUIPAR (XP Boost)
-        if (action === 'EQUIP') {
-            // Define este item como o equipado no perfil do jogador
-            b.update(db.collection('players').doc(user.data.id), { 
-                equippedItem: {
-                    id: item.id,
-                    name: item.productName,
-                    cat: item.cat,
-                    power: parseInt(item.power) || 0, // Grava o poder blindado
-                    img: item.img
+            // AÇÃO 1: CONSUMIR (Energia)
+            if (action === 'CONSUME') {
+                const energyGain = parseInt(item.power) || 1; // Garante que lê o número inteiro
+                const currentEnergy = user.data.energy || 0;
+
+                // Verificação extra: Se já estiver cheio, não gasta o item
+                if (currentEnergy >= 100) {
+                    alert("Sua energia já está cheia!");
+                    setLoading(false);
+                    return;
                 }
-            });
-            await b.commit();
-            alert(`🛡️ Item equipado: ${item.productName}\nBônus de +${item.power}% XP no próximo treino!`);
+
+                const newEnergy = Math.min(100, currentEnergy + energyGain);
+                
+                b.update(db.collection('players').doc(user.data.id), { energy: newEnergy });
+                b.delete(itemRef); // Remove da mochila (DELETA O ITEM)
+                
+                await b.commit();
+                
+                // Atualiza a barra de energia visualmente na hora
+                setUser(prev => ({...prev, data: {...prev.data, energy: newEnergy}}));
+                
+                alert(`⚡ Energia recuperada: +${energyGain}% (Total: ${newEnergy}%)`);
+            }
+
+            // AÇÃO 2: EQUIPAR (XP Boost)
+            if (action === 'EQUIP') {
+                // Define este item como o equipado no perfil do jogador
+                b.update(db.collection('players').doc(user.data.id), { 
+                    equippedItem: {
+                        id: item.id,
+                        name: item.productName,
+                        cat: item.cat,
+                        power: parseInt(item.power) || 0, // Grava o poder blindado
+                        img: item.img
+                    }
+                });
+                await b.commit();
+                alert(`🛡️ Item equipado: ${item.productName}\nBônus de +${item.power}% XP no próximo treino!`);
+            }
+
+        } catch (error) {
+            console.error("Erro ao usar item:", error);
+            // Se o item já tiver sido deletado por um clique duplo anterior, o erro cai aqui e não quebra o app
+        } finally {
+            // 2. DESTRAVA A TELA APÓS TERMINAR TUDO
+            setLoading(false);
         }
     };
             //FIM
@@ -3296,7 +3316,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.7</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.8</div>
                             </div>
                         </div>
                         
@@ -3774,7 +3794,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.7 CORREÇÃO DE BUGS </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.75.8 CORREÇÃO DE BUGS </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

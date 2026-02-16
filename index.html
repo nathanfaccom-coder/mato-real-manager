@@ -1979,11 +1979,12 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
 
             // AÇÃO 1: CONSUMIR (Energia)
             if (action === 'CONSUME') {
-                const energyGain = parseInt(item.power) || 1; // Garante que lê o número inteiro
+                const energyGain = parseInt(item.power) || 0; // AGORA ACEITA 0 (Para itens RP)
                 const currentEnergy = user.data.energy || 0;
 
-                // Verificação: Energia Cheia?
-                if (currentEnergy >= 100) {
+                // Verificação: Energia Cheia? (Só bloqueia se for ganhar algo e já estiver cheio)
+                // Se for 0, deixa usar mesmo cheio (é roleplay, bebeu porque quis)
+                if (energyGain > 0 && currentEnergy >= 100) {
                     alert("Sua energia já está cheia!");
                     setLoading(false);
                     return;
@@ -3329,7 +3330,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.76.2</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.76.3</div>
                             </div>
                         </div>
                         
@@ -3807,7 +3808,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.76.2 CORREÇÃO DE BUGS </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.76.3 CORREÇÃO DE BUGS </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -4594,15 +4595,10 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                             </span>
                             <div style={{fontWeight:'bold', fontSize:13, lineHeight:'1.2em'}}>{p.name}</div>
                             
-                            {/* EXIBE O PODER REAL (Igual ao da compra) */}
+                            {/* EXIBE O PODER REAL (Permite mostrar 0%) */}
                             <div style={{fontSize:10, color:'gold', margin:'2px 0'}}>
-                                {/* Energia: Se for 0, o sistema dá 1. Mostramos 1 para ser honesto. */}
-                                {isConsumable && `⚡ Rec. ${powerVal || 1}%`}
-                                
-                                {/* XP: Se for 0, é 0 mesmo. */}
+                                {isConsumable && `⚡ Rec. ${powerVal}%`}
                                 {isEquippable && `⚔️ XP +${powerVal}%`}
-                                
-                                {/* Fama: Se for 0, é 0. Antes mostrava 100 errado. */}
                                 {isLuxury && `💎 Fama +${powerVal * 100}`}
                             </div>
 

@@ -3367,7 +3367,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.76.8</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.76.9</div>
                             </div>
                         </div>
                         
@@ -3846,7 +3846,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.76.8 CORREÇÃO DE BUGS </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.76.9 CORREÇÃO DE BUGS </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -4496,7 +4496,7 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                 </div>
             </div>}
 
-            {tab==='CARREIRA' && <div>
+           {tab==='CARREIRA' && <div>
                 <div className="card">
                     <h3>🏆 Conquistas</h3>
                     {badges.length === 0 && <p style={{color:'#666', fontSize:11}}>Joga para desbloquear.</p>}
@@ -4505,14 +4505,17 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                     </div>
                 </div>
                 <div className="card" style={{borderLeft:'4px solid #fff'}}>
-                    <h3>🌍 Histórico</h3>
+                    <h3>🌍 Histórico de Carreira</h3>
                     <div style={{display: 'flex', flexDirection: 'column-reverse', gap: 10}}>
                         {(player.history || []).map((h, i) => (
                             <div key={i} style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.05)', padding: 10, borderRadius: 8}}>
-                                <span style={{fontSize: 9, color: '#aaa'}}>{String(h.from || 'Desconhecido')}</span>
+                                <span style={{fontSize: 9, color: '#aaa'}}>{String(h.from || 'Agente Livre')}</span>
                                 <div style={{textAlign: 'center'}}>
                                     <div style={{color: 'var(--primary)', fontSize: 12}}>➡</div>
-                                    <div style={{fontSize: 9, color: '#fff'}}>{h.value > 0 ? fmt(h.value) : 'Grátis'}</div>
+                                    <div style={{fontSize: 9, color: '#fff'}}>
+                                        {/* Blindagem contra objetos no histórico */}
+                                        {typeof h.value === 'object' ? 'Negociado' : (h.value > 0 ? fmt(h.value) : 'Transferência Grátis')}
+                                    </div>
                                 </div>
                                 <span style={{fontSize: 9, fontWeight: 'bold'}}>{String(h.to || 'Desconhecido')}</span>
                             </div>
@@ -4531,7 +4534,7 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                         <div>
                             <span style={{fontSize:10, color:'lime', fontWeight:'bold'}}>EQUIPADO</span>
                             <div style={{fontWeight:'bold'}}>{String(player.equippedItem.name || 'Item')}</div>
-                            <small style={{color:'#ccc'}}>Bônus: +{String(player.equippedItem.power || 0)}% XP</small>
+                            <small style={{color:'#ccc'}}>Bônus: +{String(player.equippedItem.power || 0)}% Pontos de Experiência</small>
                         </div>
                     </div>
                 )}
@@ -4557,9 +4560,9 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                                 <div style={{fontWeight:'bold', fontSize:12, height:30, overflow:'hidden'}}>{String(item.productName || 'Produto')}</div>
                                 
                                 <div style={{fontSize:10, color:'gold', margin:'5px 0'}}>
-                                    {isConsumable && `⚡ Recuperação ${item.power}%`}
-                                    {isEquippable && `⚔️ XP +${item.power}%`}
-                                    {isLuxury && `💎 Fama +${item.fameGained}`}
+                                    {isConsumable && `⚡ Recuperação de Energia: ${item.power}%`}
+                                    {isEquippable && `⚔️ Bônus de Experiência: +${item.power}%`}
+                                    {isLuxury && `💎 Fama Adquirida: +${item.fameGained}`}
                                 </div>
 
                                 {/* BOTÕES DE AÇÃO */}
@@ -4567,7 +4570,7 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                                     <button className="btn btn-green" style={{fontSize:10, padding:5, margin:0}} onClick={() => onUseItem(item, 'CONSUME')}>USAR AGORA</button>
                                 )}
                                 {isEquippable && (
-                                    <button className="btn btn-blue" style={{fontSize:10, padding:5, margin:0}} onClick={() => onUseItem(item, 'EQUIP')}>EQUIPAR</button>
+                                    <button className="btn btn-blue" style={{fontSize:10, padding:5, margin:0}} onClick={() => onUseItem(item, 'EQUIP')}>EQUIPAR NO PERFIL</button>
                                 )}
                                 {isLuxury && (
                                     <div style={{fontSize:9, color:'#666', fontStyle:'italic'}}>Item de Coleção</div>
@@ -5684,10 +5687,10 @@ const Ranking = ({ teams, players, sales }) => {
     const [inspect, setInspect] = React.useState(null); // Estado para o modal de inspeção
 
     // Filtra para não mostrar jogadores bugados (sem time)
-    const validPlayers = players.filter(p => p.teamId && p.teamId !== 'FREE' && p.name);
+    const validPlayers = players.filter(p => p && p.teamId && p.teamId !== 'FREE' && p.name);
 
     const renderTeams = () => teams
-        .filter(t => t.status !== 'PENDING')
+        .filter(t => t && t.status !== 'PENDING')
         .map(t => {
             // Calcula o valor total do elenco somando o 'value' de cada jogador
             const squadValue = validPlayers.filter(p => p.teamId === t.id).reduce((a, b) => a + (parseFloat(b.value) || 0), 0);
@@ -5703,7 +5706,7 @@ const Ranking = ({ teams, players, sales }) => {
                 {t.logo ? <img src={t.logo} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '2px solid #333' }} /> : <div style={{ width: 40 }}></div>}
                 
                 <div style={{ flex: 1 }}>
-                    <div style={{marginBottom: 5, fontWeight: 'bold'}}>{t.name}</div>
+                    <div style={{marginBottom: 5, fontWeight: 'bold'}}>{String(t.name)}</div>
                     
                     {/* EXIBIÇÃO DETALHADA DO PATRIMÔNIO (3 Colunas) */}
                     <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5}}>
@@ -5750,7 +5753,7 @@ const Ranking = ({ teams, players, sales }) => {
                 )}
 
                 <div style={{ flex: 1 }}>
-                    <b>{p.name}</b> <small>({teams.find(t => t.id === p.teamId)?.name})</small>
+                    <b>{String(p.name)}</b> <small>({String(teams.find(t => t.id === p.teamId)?.name || 'Sem Clube')})</small>
                 </div>
                 <div style={{ fontWeight: 'bold', fontSize: 14, color: color }}>
                     {label} {isStat ? p.stats[sortKey] : (sortKey === 'salary' ? fmt(p[sortKey]) : p[sortKey])}
@@ -5768,7 +5771,7 @@ const Ranking = ({ teams, players, sales }) => {
                 <div className={`rank-tab ${view === 'OVERALL' ? 'active' : ''}`} onClick={() => setView('OVERALL')}>⭐ Craques</div>
                 <div className={`rank-tab ${view === 'SALARY' ? 'active' : ''}`} onClick={() => setView('SALARY')}>💸 Salários</div>
                 <div className={`rank-tab ${view === 'GOALS' ? 'active' : ''}`} onClick={() => setView('GOALS')}>⚽ Gols</div>
-                <div className={`rank-tab ${view === 'ASSIST' ? 'active' : ''}`} onClick={() => setView('ASSIST')}>👟 Assis</div>
+                <div className={`rank-tab ${view === 'ASSIST' ? 'active' : ''}`} onClick={() => setView('ASSIST')}>👟 Assistências</div>
                 <div className={`rank-tab ${view === 'SAVES' ? 'active' : ''}`} onClick={() => setView('SAVES')}>🧤 Defesas</div>
                 <div className={`rank-tab ${view === 'YEL' ? 'active' : ''}`} onClick={() => setView('YEL')}>🟨 Amarelos</div>
                 <div className={`rank-tab ${view === 'RED' ? 'active' : ''}`} onClick={() => setView('RED')}>🟥 Vermelhos</div>
@@ -5777,8 +5780,8 @@ const Ranking = ({ teams, players, sales }) => {
             <div style={{ marginTop: 10 }}>
                 {view === 'TEAMS' && renderTeams()}
                 {view === 'FAME' && renderPlayers('fame', 'Fama:', 'var(--purple)', false)}
-                {view === 'OVERALL' && renderPlayers('overall', 'Ov:', 'var(--warning)', false)}
-                {view === 'SALARY' && renderPlayers('salary', '', 'var(--primary)', false)}
+                {view === 'OVERALL' && renderPlayers('overall', 'Overall:', 'var(--warning)', false)}
+                {view === 'SALARY' && renderPlayers('salary', 'Salário:', 'var(--primary)', false)}
                 {view === 'GOALS' && renderPlayers('goals', '⚽', '#fff')}
                 {view === 'ASSIST' && renderPlayers('assists', '👟', '#fff')}
                 {view === 'SAVES' && renderPlayers('saves', '🧤', '#fff')}
@@ -5791,7 +5794,7 @@ const Ranking = ({ teams, players, sales }) => {
                 <div className="modal-overlay" onClick={() => setInspect(null)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()}>
                         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:15}}>
-                            <h3>{inspect.type === 'PLAYER' ? `🔍 Itens de ${inspect.data.name}` : `🛡️ Elenco do ${inspect.data.name}`}</h3>
+                            <h3>{inspect.type === 'PLAYER' ? `🔍 Itens de ${String(inspect.data.name)}` : `🛡️ Elenco do ${String(inspect.data.name)}`}</h3>
                             <button className="btn btn-red" style={{width:'auto', padding:'5px 10px'}} onClick={() => setInspect(null)}>X</button>
                         </div>
 
@@ -5800,13 +5803,13 @@ const Ranking = ({ teams, players, sales }) => {
                                 <div className="highlight-card" style={{padding:10, marginBottom:10}}>
                                     Fama Total: <b style={{color:'gold'}}>{String(inspect.data.fame || 0)}</b>
                                 </div>
-                                {sales.filter(s => s.buyerId === inspect.data.id && s.fameGained > 0).length === 0 ? (
+                                {sales.filter(s => s && s.buyerId === inspect.data.id && s.fameGained > 0).length === 0 ? (
                                     <p style={{textAlign:'center', color:'#666'}}>Nenhum item de fama encontrado.</p>
                                 ) : (
-                                    sales.filter(s => s.buyerId === inspect.data.id && s.fameGained > 0).map((item, idx) => (
+                                    sales.filter(s => s && s.buyerId === inspect.data.id && s.fameGained > 0).map((item, idx) => (
                                         <div key={idx} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderLeft:'3px solid gold'}}>
                                             <div style={{display:'flex', alignItems:'center', gap:10}}>
-                                                {item.img ? <img src={item.img} style={{width:30, height:30, borderRadius:4}}/> : '📦'}
+                                                {item.img ? <img src={item.img} style={{width:30, height:30, borderRadius:4}}/> : <div style={{fontSize:20}}>📦</div>}
                                                 <b>{String(item.productName || 'Item Desconhecido')}</b>
                                             </div>
                                             <b style={{color:'var(--purple)'}}>+{String(item.fameGained || 0)} Fama</b>

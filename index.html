@@ -1362,7 +1362,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         alert(`Contrato assinado! ${offer.coachName || 'O técnico'} agora comanda o ${offer.teamName}.`);
     };
             //FIM
-      const adminAction = async (act, data) => {
+     const adminAction = async (act, data) => {
         // --- 1. ABRIR/FECHAR MERCADO ---
         if (act === 'MARKET') {
             db.collection('config').doc('system').update({ marketOpen: data });
@@ -1418,18 +1418,29 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                 }
             });
 
-            // 2.4. TÉCNICOS (Salário e Reset de Treino)
+            // 2.4. TÉCNICOS (Salário e Reset de Treino) - CORRIGIDO
             const coachSnap = await db.collection('users').where('type', '==', 'COACH').get();
             coachSnap.docs.forEach(doc => {
                 const c = doc.data();
                 let updates = { trainingsLeft: 2 }; 
 
                 if (c.teamId && c.teamId !== 'FREE') {
-                    b.update(db.collection('teams').doc(c.teamId), {
-                        balance: firebase.firestore.FieldValue.increment(-c.salary)
-                    });
-                    const currentCoachBal = parseFloat(c.balance) || 0;
-                    updates.balance = currentCoachBal + parseFloat(c.salary);
+                    // VERIFICAÇÃO DE SEGURANÇA: O time ainda existe?
+                    const teamExists = teams.some(t => t.id === c.teamId);
+
+                    if (teamExists) {
+                        // Se o time existe, cobra o salário normalmente
+                        b.update(db.collection('teams').doc(c.teamId), {
+                            balance: firebase.firestore.FieldValue.increment(-c.salary)
+                        });
+                        const currentCoachBal = parseFloat(c.balance) || 0;
+                        updates.balance = currentCoachBal + parseFloat(c.salary);
+                    } else {
+                        // Se o time NÃO existe mais (foi excluído), libera o técnico automaticamente
+                        // Isso corrige o erro "No document to update"
+                        updates.teamId = 'FREE';
+                        updates.contract = 0;
+                    }
                 }
                 b.update(db.collection('users').doc(doc.id), updates);
             });
@@ -3165,7 +3176,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.3</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.75.4</div>
                             </div>
                         </div>
                         
@@ -3477,7 +3488,7 @@ const renewContract = async (p) => {
                         }
                     </div>
 
-                   <div className="bottom-nav">
+                 <div className="bottom-nav">
     {/* 1. HOME */}
     <div className={`nav-item ${['HOME','COMPANY_HOME','COMPANY_DASH','PLAYER_DASH','COACH_DASH','PRESS_DASH'].includes(screen)?'active':''}`} 
          onClick={() => { 
@@ -3517,7 +3528,14 @@ const renewContract = async (p) => {
         </div>
     }
 
-    {/* 6. NEWS (Todos) */}
+    {/* 6. RANKING (RESTAURADO) */}
+    {user.type!=='COMPANY' &&
+        <div className={`nav-item ${screen==='RANKING'?'active':''}`} onClick={()=>setScreen('RANKING')}>
+            <i className="fas fa-trophy"></i>RANK
+        </div>
+    }
+
+    {/* 7. NEWS (Todos) */}
     <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={()=>{setScreen('NEWS'); setNewNews(false); localStorage.setItem('lastRead', Date.now());}}>
         <i className="fas fa-newspaper"></i>NEWS
     </div>
@@ -3571,7 +3589,6 @@ const renewContract = async (p) => {
                 </div>
             );
             }
-        
 // --- COMPONENTS ---
      const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor, onCreateCoach }) => {
     const [tab, setTab] = useState('LOGIN'); 

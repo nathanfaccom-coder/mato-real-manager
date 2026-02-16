@@ -3367,7 +3367,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.76.6</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.76.7</div>
                             </div>
                         </div>
                         
@@ -3846,7 +3846,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.76.6 CORREÇÃO DE BUGS </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.76.7 CORREÇÃO DE BUGS </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -5783,19 +5783,19 @@ const Ranking = ({ teams, players, sales }) => {
                 {view === 'RED' && renderPlayers('reds', '🟥', 'red')}
             </div>
 
-            {/* MODAL DE INSPEÇÃO (AUDITORIA) */}
+            {/* MODAL DE INSPEÇÃO CORRIGIDO (SEM ERRO DE OBJETO) */}
             {inspect && (
                 <div className="modal-overlay" onClick={() => setInspect(null)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()}>
                         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:15}}>
-                            <h3>{inspect.type === 'PLAYER' ? '🔍 Itens de ' + inspect.data.name : '🛡️ Elenco do ' + inspect.data.name}</h3>
+                            <h3>{inspect.type === 'PLAYER' ? `🔍 Itens de ${inspect.data.name}` : `🛡️ Elenco do ${inspect.data.name}`}</h3>
                             <button className="btn btn-red" style={{width:'auto', padding:'5px 10px'}} onClick={() => setInspect(null)}>X</button>
                         </div>
 
                         {inspect.type === 'PLAYER' ? (
                             <div style={{maxHeight:'60vh', overflowY:'auto'}}>
                                 <div className="highlight-card" style={{padding:10, marginBottom:10}}>
-                                    Fama Total: <b style={{color:'gold'}}>{inspect.data.fame || 0}</b>
+                                    Fama Total: <b style={{color:'gold'}}>{String(inspect.data.fame || 0)}</b>
                                 </div>
                                 {sales.filter(s => s.buyerId === inspect.data.id && s.fameGained > 0).length === 0 ? (
                                     <p style={{textAlign:'center', color:'#666'}}>Nenhum item de fama encontrado.</p>
@@ -5804,9 +5804,9 @@ const Ranking = ({ teams, players, sales }) => {
                                         <div key={idx} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderLeft:'3px solid gold'}}>
                                             <div style={{display:'flex', alignItems:'center', gap:10}}>
                                                 {item.img ? <img src={item.img} style={{width:30, height:30, borderRadius:4}}/> : '📦'}
-                                                <b>{item.productName}</b>
+                                                <b>{String(item.productName || 'Item Desconhecido')}</b>
                                             </div>
-                                            <b style={{color:'var(--purple)'}}>+{item.fameGained} Fama</b>
+                                            <b style={{color:'var(--purple)'}}>+{String(item.fameGained || 0)} Fama</b>
                                         </div>
                                     ))
                                 )}
@@ -5817,8 +5817,8 @@ const Ranking = ({ teams, players, sales }) => {
                                     .sort((a,b) => b.overall - a.overall)
                                     .map(p => (
                                     <div key={p.id} className="card" style={{display:'flex', justifyContent:'space-between', borderLeft:`4px solid ${getPosColor(p.position)}`}}>
-                                        <span><b>{p.name}</b> <small>({p.position})</small></span>
-                                        <b className="player-ov">{p.overall}</b>
+                                        <span><b>{String(p.name)}</b> <small>({String(p.position)})</small></span>
+                                        <b className="player-ov">{String(p.overall)}</b>
                                     </div>
                                 ))}
                             </div>

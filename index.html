@@ -3365,7 +3365,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.76.4</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.76.5</div>
                             </div>
                         </div>
                         
@@ -3609,7 +3609,9 @@ const renewContract = async (p) => {
                             </div>
                         )}
                         
-                        {screen === 'RANKING' && <Ranking teams={teams} players={players} />}
+                        // Procure por esta linha e adicione o parâmetro sales={sales}
+{screen === 'RANKING' && <Ranking teams={teams} players={players} sales={sales} />}
+                        
                         {screen === 'NEWS' && <div><h3>Notícias</h3>{news.map(n=><div key={n.id} className={`news-card news-${n.type}`}>{n.text}<br/><small style={{color:'#666'}}>{new Date(n.date).toLocaleString()}</small></div>)}</div>}
                         
                         {screen === 'OFFERS' && (
@@ -3843,7 +3845,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.76.4 CORREÇÃO DE BUGS </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.76.5 CORREÇÃO DE BUGS </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -5673,8 +5675,9 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter, onCo
 };
         //FIM
 
-const Ranking = ({ teams, players }) => {
+const Ranking = ({ teams, players, sales }) => {
     const [view, setView] = React.useState('TEAMS');
+    const [inspect, setInspect] = React.useState(null); // Estado para o modal de inspeção
 
     // Filtra para não mostrar jogadores bugados (sem time)
     const validPlayers = players.filter(p => p.teamId && p.teamId !== 'FREE' && p.name);
@@ -5691,7 +5694,7 @@ const Ranking = ({ teams, players }) => {
         })
         .sort((a, b) => b.totalWealth - a.totalWealth)
         .map((t, i) => (
-            <div key={t.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px' }}>
+            <div key={t.id} className="card" onClick={() => setInspect({ type: 'TEAM', data: t })} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px', cursor: 'pointer' }}>
                 <b style={{ fontSize: 20, color: '#555', width: 30, textAlign:'center' }}>{i + 1}</b>
                 {t.logo ? <img src={t.logo} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '2px solid #333' }} /> : <div style={{ width: 40 }}></div>}
                 
@@ -5719,6 +5722,7 @@ const Ranking = ({ teams, players }) => {
                         </div>
                     </div>
                 </div>
+                <i className="fas fa-chevron-right" style={{color:'#333'}}></i>
             </div>
         ));
 
@@ -5731,7 +5735,7 @@ const Ranking = ({ teams, players }) => {
         }
 
         return sorted.slice(0, 20).map((p, i) => (
-            <div key={p.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div key={p.id} className="card" onClick={() => setInspect({ type: 'PLAYER', data: p })} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
                 <b style={{ fontSize: 20, color: '#555', width: 30, textAlign: 'center' }}>{i + 1}</b>
                 
                 {/* FOTO DO JOGADOR NO RANKING */}
@@ -5777,6 +5781,50 @@ const Ranking = ({ teams, players }) => {
                 {view === 'YEL' && renderPlayers('yellows', '🟨', 'yellow')}
                 {view === 'RED' && renderPlayers('reds', '🟥', 'red')}
             </div>
+
+            {/* MODAL DE INSPEÇÃO (AUDITORIA) */}
+            {inspect && (
+                <div className="modal-overlay" onClick={() => setInspect(null)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()}>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:15}}>
+                            <h3>{inspect.type === 'PLAYER' ? '🔍 Itens de ' + inspect.data.name : '🛡️ Elenco do ' + inspect.data.name}</h3>
+                            <button className="btn btn-red" style={{width:'auto', padding:'5px 10px'}} onClick={() => setInspect(null)}>X</button>
+                        </div>
+
+                        {inspect.type === 'PLAYER' ? (
+                            <div style={{maxHeight:'60vh', overflowY:'auto'}}>
+                                <div className="highlight-card" style={{padding:10, marginBottom:10}}>
+                                    Fama Total: <b style={{color:'gold'}}>{inspect.data.fame || 0}</b>
+                                </div>
+                                {sales.filter(s => s.buyerId === inspect.data.id && s.fameGained > 0).length === 0 ? (
+                                    <p style={{textAlign:'center', color:'#666'}}>Nenhum item de fama encontrado.</p>
+                                ) : (
+                                    sales.filter(s => s.buyerId === inspect.data.id && s.fameGained > 0).map((item, idx) => (
+                                        <div key={idx} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderLeft:'3px solid gold'}}>
+                                            <div style={{display:'flex', alignItems:'center', gap:10}}>
+                                                {item.img ? <img src={item.img} style={{width:30, height:30, borderRadius:4}}/> : '📦'}
+                                                <b>{item.productName}</b>
+                                            </div>
+                                            <b style={{color:'var(--purple)'}}>+{item.fameGained} Fama</b>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        ) : (
+                            <div style={{maxHeight:'60vh', overflowY:'auto'}}>
+                                {validPlayers.filter(p => p.teamId === inspect.data.id)
+                                    .sort((a,b) => b.overall - a.overall)
+                                    .map(p => (
+                                    <div key={p.id} className="card" style={{display:'flex', justifyContent:'space-between', borderLeft:`4px solid ${getPosColor(p.position)}`}}>
+                                        <span><b>{p.name}</b> <small>({p.position})</small></span>
+                                        <b className="player-ov">{p.overall}</b>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

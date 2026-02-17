@@ -2914,17 +2914,23 @@ const resetDatabase = async () => {
                 </div>
             )}
 
-            {/* VISUALIZAÇÃO DA LISTA DE JOGADORES (QUANDO CLICA EM ELENCO) */}
+           {/* VISUALIZAÇÃO DA LISTA DE JOGADORES (CORRIGIDO PARA NÃO CRASHAR) */}
             {tab==='TEAMS' && selTeamPlayers && (
                 <div>
                     <button className="btn btn-ghost" style={{width:'auto', marginBottom:10}} onClick={()=>setSelTeamPlayers(null)}>⬅ VOLTAR</button>
                     <h4>Gerenciar Senhas: {selTeamPlayers.name}</h4>
-                    {players.filter(p => p.teamId === selTeamPlayers.id).map(p => (
+                    
+                    {/* AQUI ESTAVA O ERRO: Adicionei (players||[]) antes do .filter */}
+                    {(players||[]).filter(p => p.teamId === selTeamPlayers.id).map(p => (
                         <div key={p.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderLeft:`4px solid ${getPosColor(p.position)}`}}>
                             <span><b>{p.name}</b> <small>({p.position})</small></span>
                             <button className="btn btn-ghost" style={{width:'auto', fontSize:10}} onClick={()=>managePassword('players', p.id, p.password, p.name)}>🔑 SENHA</button>
                         </div>
                     ))}
+                    
+                    {(players||[]).filter(p => p.teamId === selTeamPlayers.id).length === 0 && (
+                        <p style={{color:'#666', textAlign:'center'}}>Nenhum jogador neste time.</p>
+                    )}
                 </div>
             )}
 
@@ -4288,7 +4294,7 @@ const renewContract = async (p) => {
                        {screen === 'HOME' && user.type === 'ADMIN' && 
                             <AdminPanel 
                                 teams={teams} papers={papers} journalists={journalists} companies={companies} reqs={reqs} config={conf} coaches={coaches} 
-                                sps={sps}
+                                sps={sps} players={players}
                                 onAct={adminAction} 
                                 onGenFixtures={generateFixtures}
                                 onTurnSeasonAdvanced={handleSeasonTurnAdvanced}

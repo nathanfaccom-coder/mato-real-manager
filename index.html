@@ -1322,7 +1322,8 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
                     db.collection('products').onSnapshot(s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('sponsorships').onSnapshot(s => setSps(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     
-                    db.collection('sales').orderBy('date', 'desc').limit(50).onSnapshot(s => {
+                    // --- CORREÇÃO AQUI: REMOVIDO O LIMIT(50) PARA OS ITENS NÃO SUMIREM ---
+                    db.collection('sales').orderBy('date', 'desc').onSnapshot(s => {
                         const cleanData = s.docs.map(d => ({id:d.id, ...d.data()}));
                         setSales(cleanData);
                     }),
@@ -1340,7 +1341,6 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
                     }),
                     db.collection('matches').onSnapshot(s => setMatches(s.docs.map(d => ({id:d.id, ...d.data()})))),
 
-                    // --- NOVO: LISTENER DO MATOGRAM (SOCIAL) ---
                     db.collection('posts').orderBy('date', 'desc').limit(50).onSnapshot(s => {
                         setPosts(s.docs.map(d => ({id:d.id, ...d.data()})));
                     })
@@ -4250,7 +4250,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.78.8</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.78.9</div>
                             </div>
                         </div>
                         
@@ -4776,7 +4776,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.78.8 MATOGRAM </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.78.9 MATOGRAM </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

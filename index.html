@@ -192,6 +192,39 @@ const getPriceStatus = (askedPrice, recommendedPrice) => {
             'TECNOLOGIA': '📱 Tecnologia (+Fama)',
             'LUXO': '💎 Luxo/Moda (+Fama)'
         };
+        //FIM
+
+        const INJURIES_DB = {
+    LEVE: [
+        "Fadiga Muscular", "Entorse de Tornozelo G1", "Contusão na Canela", "Corte no Supercílio", "Bolhas no Pé", 
+        "Luxação de Dedo", "Pancada no Quadril", "Torcicolo", "Edema Leve", "Câimbras Fortes", 
+        "Desgaste Físico", "Pequena Contusão Lombar", "Arranhão na Córnea", "Inflamação no Tendão", "Pancada no Nariz"
+    ],
+    MODERADA: [
+        "Estiramento na Coxa G1", "Lesão no Adutor", "Concussão Leve", "Entorse de Tornozelo G2", "Tendinite Aquileia", 
+        "Contusão Óssea", "Fibrose Muscular", "Fissura no Metatarso", "Estiramento na Panturrilha", "Lesão no Ligamento Colateral", 
+        "Sinovite no Joelho", "Bursite no Quadril", "Contusão Traumática", "Luxação de Ombro Parcial", "Hérnia Inguinal Inicial"
+    ],
+    GRAVE: [
+        "Estiramento G2", "Ruptura Parcial de Menisco", "Pubalgia Crônica", "Fratura de Nariz", "Lesão de Cartilagem", 
+        "Entorse de Joelho com Edema", "Fratura de Costela", "Ruptura Parcial de Tendão", "Descolamento Muscular", "Lesão Traumática Cervical",
+        "Fratura de Malar", "Lesão Complexa no Psoas", "Entorse de Tornozelo G3", "Ruptura de Fibras Grau 3", "Edema Ósseo Profundo"
+    ],
+    EXTREMA: [
+        "Ruptura de LCA (Cruzado)", "Ruptura do Tendão de Aquiles", "Fratura de Tíbia e Fíbula", "Ruptura Total de Isquiotibiais", "Hérnia de Disco", 
+        "Fratura por Estresse", "Ruptura de Ligamento Cruzado Posterior", "Fratura de Tornozelo", "Luxação de Patela Grave", "Ruptura Total de Adutor",
+        "Lesão Nervosa", "Síndrome Compartimental", "Fratura de Vértebra", "Ruptura de Tendão Patelar", "Pneumotórax Traumático"
+    ]
+};
+
+const SURGERIES = [
+    { id: 'S1', name: 'Limpeza Articular / Infiltração', timeRed: 1, cost: 600000, success: 0.90 },
+    { id: 'S2', name: 'Artroscopia Simples (Menisco)', timeRed: 2, cost: 1200000, success: 0.85 },
+    { id: 'S3', name: 'Artroscopia Avançada', timeRed: 3, cost: 3000000, success: 0.75 },
+    { id: 'S4', name: 'Reconstrução Parcial Ligamentar', timeRed: 4, cost: 6000000, success: 0.65 },
+    { id: 'S5', name: 'Reconstrução Ligamentar Acelerada', timeRed: 5, cost: 12000000, success: 0.55 }
+];
+        
 
         // Função que calcula o Custo de Produção (Permite 0)
         const getProdCost = (cat, power) => {
@@ -889,8 +922,124 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
 };
 // FIM DO SHOPPING E TEAM DASHBOARD
 
+       const PublicServices = ({ players, user, onDonate }) => {
+    const [hTab, setHTab] = useState('HOSPITAL');
+    // Filtra apenas quem tem tempo de molho restante
+    const injured = (players || []).filter(p => (p.recoveryLeft || 0) > 0);
+
+    const handleSurgery = async (p) => {
+        const lista = SURGERIES.map((s, idx) => 
+            `${idx + 1}) ${s.name}\n💰 Custo: ${fmt(s.cost)} | ⏳ Reduz: ${s.timeRed} jogo(s) | ✅ Sucesso: ${s.success * 100}%`
+        ).join('\n\n');
+
+        const escolha = prompt(`HOSPITAL MUNICIPAL - PRONTUÁRIO: ${p.name}\nSaldo na Vaquinha: ${fmt(p.hospitalFund || 0)}\n\nEscolha o procedimento (1-5):\n\n${lista}`);
         
-       // ... continuação do código anterior
+        if (escolha) {
+            const cirurgia = SURGERIES[parseInt(escolha) - 1];
+            if (!cirurgia) return alert("Opção inválida.");
+            
+            if ((p.hospitalFund || 0) < cirurgia.cost) {
+                return alert("A vaquinha ainda não atingiu o valor necessário para este procedimento!");
+            }
+
+            if (confirm(`Confirmar ${cirurgia.name}?\nO valor de ${fmt(cirurgia.cost)} será debitado da vaquinha do jogador.`)) {
+                const sucesso = Math.random() < cirurgia.success;
+                const b = db.batch();
+                const pRef = db.collection('players').doc(p.id);
+
+                if (sucesso) {
+                    const novoTempo = Math.max(0, p.recoveryLeft - cirurgia.timeRed);
+                    b.update(pRef, { 
+                        recoveryLeft: novoTempo,
+                        hospitalFund: (p.hospitalFund || 0) - cirurgia.cost,
+                        injury: novoTempo === 0 ? firebase.firestore.FieldValue.delete() : p.injury
+                    });
+                    alert(`✅ SUCESSO!\nA cirurgia de ${p.name} foi um sucesso. Tempo reduzido em ${cirurgia.timeRed} jogo(s).`);
+                } else {
+                    b.update(pRef, { 
+                        hospitalFund: (p.hospitalFund || 0) - cirurgia.cost,
+                        recoveryLeft: p.recoveryLeft + 1, // Falha aumenta o tempo
+                        mood: '😡'
+                    });
+                    alert(`❌ COMPLICAÇÕES...\nHouve um erro no procedimento. ${p.name} terá que ficar mais 1 jogo em observação.`);
+                }
+                await b.commit();
+            }
+        }
+    };
+
+    return (
+        <div style={{paddingBottom: 80}}>
+            <div className="highlight-card" style={{background:'linear-gradient(135deg, #1a237e 0%, #0d47a1 100%)', marginBottom: 20}}>
+                <h2 style={{margin:0}}>🏛️ Serviços Públicos</h2>
+                <p style={{margin:0, fontSize:12, opacity:0.8}}>Gestão de Saúde e Bem-Estar de Mato Real</p>
+            </div>
+
+            <div style={{display:'flex', gap:10, marginBottom:15}}>
+                <button className={`btn ${hTab==='HOSPITAL'?'btn-red':'btn-ghost'}`} onClick={()=>setHTab('HOSPITAL')}>🏥 HOSPITAL</button>
+                <button className="btn btn-ghost" disabled>🏢 PREFEITURA</button>
+            </div>
+
+            {hTab === 'HOSPITAL' && (
+                <div>
+                    <div style={{background:'#b71c1c', padding:10, borderRadius:8, color:'white', marginBottom:15, display:'flex', alignItems:'center', gap:10}}>
+                        <span style={{fontSize:24}}>🚑</span>
+                        <div>
+                            <b style={{display:'block'}}>EMERGÊNCIA MUNICIPAL</b>
+                            <small>{injured.length} jogador(es) em tratamento</small>
+                        </div>
+                    </div>
+
+                    {injured.length === 0 ? (
+                        <div className="card" style={{textAlign:'center', padding:40}}>
+                            <div style={{fontSize:40, marginBottom:10}}>🥗</div>
+                            <p>Todos os atletas de Mato Real estão saudáveis!</p>
+                        </div>
+                    ) : (
+                        injured.map(p => (
+                            <div key={p.id} className="card" style={{borderLeft:'5px solid #ff1744', position:'relative'}}>
+                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+                                    <div>
+                                        <b style={{fontSize:16}}>❌ {p.name}</b>
+                                        <div style={{fontSize:11, color:'#ff1744', fontWeight:'bold', marginTop:2}}>
+                                            {p.injury || 'Lesão não especificada'}
+                                        </div>
+                                    </div>
+                                    <div style={{textAlign:'right'}}>
+                                        <span style={{background:'#ff1744', color:'white', padding:'2px 8px', borderRadius:10, fontSize:10, fontWeight:'bold'}}>
+                                            {p.recoveryLeft} JOGOS
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* ÁREA DA VAQUINHA */}
+                                <div style={{marginTop:15, background:'rgba(0,0,0,0.2)', padding:10, borderRadius:8}}>
+                                    <div style={{display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:5}}>
+                                        <span>Fundo para Cirurgia:</span>
+                                        <b style={{color:'gold'}}>{fmt(p.hospitalFund || 0)}</b>
+                                    </div>
+                                    
+                                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10}}>
+                                        <button className="btn btn-green" style={{fontSize:10, padding:8}} onClick={() => {
+                                            const v = prompt(`Quanto desejas doar para ajudar na cirurgia de ${p.name}?`);
+                                            if(v && !isNaN(v)) onDonate(p, parseFloat(v));
+                                        }}>💸 DOAR</button>
+                                        
+                                        <button className="btn btn-blue" style={{fontSize:10, padding:8}} onClick={() => handleSurgery(p)}>
+                                            🏥 OPERAR
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+        //FIM
+       
         function App() {
             const [user, setUser] = useState(null); 
             const [teams, setTeams] = useState([]);
@@ -1041,6 +1190,28 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             date: Date.now() 
         });
     };
+            const handleHospitalDonation = async (player, amount) => {
+        if (!user.data || user.data.balance < amount) return alert("Saldo insuficiente!");
+        if (amount <= 0) return alert("Valor inválido.");
+
+        const b = db.batch();
+        
+        // 1. Tira dinheiro de quem está doando (Pode ser time, jogador, empresa...)
+        const donorRef = user.type === 'PLAYER' ? db.collection('players').doc(user.data.id) :
+                         user.type === 'USER' ? db.collection('teams').doc(user.data.id) :
+                         db.collection('companies').doc(user.data.id);
+        
+        b.update(donorRef, { balance: firebase.firestore.FieldValue.increment(-amount) });
+
+        // 2. Coloca no fundo do jogador lesionado
+        b.update(db.collection('players').doc(player.id), { 
+            hospitalFund: firebase.firestore.FieldValue.increment(amount) 
+        });
+
+        await b.commit();
+        alert(`🙏 Obrigado! Você doou ${fmt(amount)} para a recuperação de ${player.name}.`);
+    };
+            //FIM
             // --- FUNÇÃO DE LOGIN UNIVERSAL (CORRIGIDA) ---
     const login = async (loginId, loginPass, type) => {
         setLoading(true);
@@ -2244,7 +2415,93 @@ const AdminPanel = ({ teams, onGenFixtures, onTurnSeasonAdvanced, papers, journa
                         <button className={`btn ${config.marketOpen?'btn-red':'btn-green'}`} onClick={()=>onAct('MARKET', !config.marketOpen)}>{config.marketOpen?'FECHAR MERCADO':'ABRIR MERCADO'}</button>
                         <button className="btn btn-purple" onClick={()=>onAct('WEEK')}>VIRAR SEMANA</button>
                     </div>
-                    <button className="btn btn-red" onClick={()=>onAct('SEASON')}>VIRAR TEMPORADA</button>
+                    
+                    {/* BOTÃO DE LIMPEZA DE MOCHILAS */}
+                    <button 
+                        className="btn" 
+                        style={{background: '#442200', color: '#ffaa00', border: '1px solid #ffaa00', marginTop: 0}} 
+                        onClick={async () => {
+                            if(confirm("⚠️ ATENÇÃO: Isso vai apagar TODOS os itens de TODAS as mochilas e resetar a Fama de todos para 0. Isso limpa bugs de itens antigos. Continuar?")) {
+                                const senha = prompt("Confirme a senha master:");
+                                if(senha === '2503') {
+                                    setLoading(true);
+                                    try {
+                                        const b = db.batch();
+                                        const salesSnap = await db.collection('sales').get();
+                                        salesSnap.docs.forEach(doc => b.delete(doc.ref));
+                                        const playersSnap = await db.collection('players').get();
+                                        playersSnap.docs.forEach(doc => {
+                                            b.update(doc.ref, { 
+                                                equippedItem: firebase.firestore.FieldValue.delete(),
+                                                fame: 0 
+                                            });
+                                        });
+                                        await b.commit();
+                                        alert("🧹 FAXINA CONCLUÍDA! Todas as mochilas foram esvaziadas e a fama resetada.");
+                                        window.location.reload();
+                                    } catch(e) {
+                                        alert("Erro na faxina: " + e.message);
+                                    }
+                                    setLoading(false);
+                                }
+                            }
+                        }}
+                    >
+                        <i className="fas fa-broom"></i> LIMPAR TODAS AS MOCHILAS (FIX BUG)
+                    </button>
+
+                   {/* BOTÃO DE AVANÇO DE RECUPERAÇÃO */}
+                    <button 
+                        className="btn" 
+                        style={{background: '#b71c1c', color: 'white', marginTop: 10}} 
+                        onClick={async () => {
+                            if(confirm("Deseja reduzir 1 jogo de recuperação de TODOS os jogadores lesionados? Use isso APÓS a realização de uma partida.")) {
+                                setLoading(true);
+                                try {
+                                    const b = db.batch();
+                                    // Pega todos os jogadores para filtrar manualmente e evitar erro de índice
+                                    const snap = await db.collection('players').get();
+                                    
+                                    let count = 0;
+                                    snap.docs.forEach(doc => {
+                                        const p = doc.data();
+                                        const currentRecovery = parseInt(p.recoveryLeft) || 0;
+
+                                        if (currentRecovery > 0) {
+                                            const nextVal = currentRecovery - 1;
+                                            
+                                            if (nextVal <= 0) {
+                                                // Jogador recebeu alta
+                                                b.update(doc.ref, { 
+                                                    recoveryLeft: 0, 
+                                                    injury: firebase.firestore.FieldValue.delete() 
+                                                });
+                                            } else {
+                                                // Apenas diminui um jogo
+                                                b.update(doc.ref, { recoveryLeft: nextVal });
+                                            }
+                                            count++;
+                                        }
+                                    });
+
+                                    if (count > 0) {
+                                        await b.commit();
+                                        alert(`✅ Sucesso! ${count} jogadores avançaram na recuperação.`);
+                                    } else {
+                                        alert("ℹ️ Nenhum jogador está lesionado no momento.");
+                                    }
+                                } catch(e) {
+                                    console.error(e);
+                                    alert("Erro: " + e.message);
+                                }
+                                setLoading(false);
+                            }
+                        }}
+                    >
+                        <i className="fas fa-clock"></i> AVANÇAR 1 JOGO NA RECUPERAÇÃO
+                    </button>
+
+                    <button className="btn btn-red" style={{marginTop: 10}} onClick={()=>onAct('SEASON')}>VIRAR TEMPORADA</button>
                     <button className="btn btn-gold" onClick={()=>{ const t=prompt("Título"); const b=prompt("Texto"); if(t)onPost(t,b,'admin'); }}>COMUNICADO</button>
                     <button className="btn btn-blue" style={{marginTop:10}} onClick={onGenFixtures}>🗓️ GERAR TABELA DE JOGOS</button>
                     <button className="btn btn-purple" style={{marginTop:10}} onClick={onTurnSeasonAdvanced}>🏆 VIRAR TEMPORADA (AVANÇADO)</button>
@@ -2270,7 +2527,6 @@ const AdminPanel = ({ teams, onGenFixtures, onTurnSeasonAdvanced, papers, journa
                 {(teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>{t.name}</span><div><button className="btn btn-ghost" style={{width:'auto', marginRight:5}} onClick={()=>onConfig(t)}><i className="fas fa-cog"></i></button><button className="btn btn-green" style={{width:'auto', marginRight:5}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button><button className="btn btn-purple" style={{width:'auto'}} onClick={()=>onEditT(t)}>ELENCO</button><button className="btn btn-red" style={{width:'auto', marginLeft:5}} onClick={()=>onDeleteTeam(t.id)}><i className="fas fa-trash"></i></button></div></div>)}
             </div>}
 
-            {/* ABA DE FINANÇAS ATUALIZADA */}
             {tab==='FINANCE' && <div>
                 <h4>Solicitações Financeiras</h4>
                 {(reqs||[]).filter(r=>r.status==='PENDING').length === 0 && <p style={{color:'#666'}}>Nenhum pedido pendente.</p>}
@@ -2575,22 +2831,41 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
         const affPerk = activePerks.find(p => p.type === 'AFFINITY_BOOST');
         const affBonus = affPerk ? affPerk.value : 0;
 
-        // Mapeamento dos tipos de treino para atributos reais
+        // Mapeamento dos tipos de treino para atributos reais (Atualizado para cobrir todos)
         let trainedAttrs = [];
-        if(type === 'FISICO_BASE') trainedAttrs = ['stamina', 'strength', 'balance'];
-        else if(type === 'VELOCIDADE') trainedAttrs = ['speed', 'accel', 'agility'];
+        if(type === 'FISICO_BASE') trainedAttrs = ['stamina', 'balance', 'condition'];
+        else if(type === 'VELOCIDADE') trainedAttrs = ['speed', 'accel', 'agility', 'dribbleSpd'];
         else if(type === 'IMPULSAO') trainedAttrs = ['jump', 'header', 'condition'];
         else if(type === 'CHUTE') trainedAttrs = ['shot', 'shotPower', 'shotTech'];
-        else if(type === 'PASSE') trainedAttrs = ['shortPass', 'longPass', 'tech'];
-        else if(type === 'DRIBLE') trainedAttrs = ['dribble', 'dribbleSpd', 'agility'];
+        else if(type === 'PASSE') trainedAttrs = ['shortPass', 'longPass', 'shortPassSpd', 'longPassSpd', 'tech'];
+        else if(type === 'DRIBLE') trainedAttrs = ['dribble', 'dribbleSpd', 'agility', 'tech'];
         else if(type === 'DEFESA') trainedAttrs = ['defense', 'aggression', 'response'];
-        else if(type === 'MENTAL') trainedAttrs = ['teamwork', 'mentality'];
-        else if(type === 'BOLA_PARADA') trainedAttrs = ['freeKick', 'curve', 'penalties'];
-        else if(type === 'GOLEIRO') trainedAttrs = ['gk', 'response'];
+        else if(type === 'MENTAL') trainedAttrs = ['teamwork', 'mentality', 'response'];
+        else if(type === 'BOLA_PARADA') trainedAttrs = ['freeKick', 'curve', 'header'];
+        else if(type === 'GOLEIRO') trainedAttrs = ['gk', 'response', 'jump'];
 
         playerIds.forEach(pid => {
             const p = players.find(x => x.id === pid);
             if (!p) return;
+
+            // TRAVA: Jogador já lesionado não treina
+            if ((p.recoveryLeft || 0) > 0) {
+                report.push(`⚠️ ${p.name} ignorado (está lesionado)`);
+                return;
+            }
+
+            // --- CHANCE DE LESÃO NO TREINO COLETIVO (1%) ---
+            if (Math.random() < 0.01) {
+                const injuryName = INJURIES_DB.LEVE[Math.floor(Math.random() * INJURIES_DB.LEVE.length)];
+                b.update(db.collection('players').doc(p.id), {
+                    injury: injuryName,
+                    recoveryLeft: 1,
+                    energy: Math.max(0, (p.energy || 100) - 15),
+                    mood: '😡'
+                });
+                report.push(`❌ ${p.name} se lesionou: ${injuryName}`);
+                return; // Pula o ganho de XP deste jogador
+            }
 
             // Gasto de Energia
             const newEnergy = Math.max(0, (p.energy || 100) - energyCost);
@@ -2605,13 +2880,11 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
 
             // --- NOVO: BÔNUS DE ITEM EQUIPADO (CHUTEIRA/LUVA) ---
             if (p.equippedItem) {
-                const itemBonusPercent = p.equippedItem.power || 0; // Ex: 10 (= 10%)
+                const itemBonusPercent = p.equippedItem.power || 0;
                 const bonusAmount = Math.ceil(xpGain * (itemBonusPercent / 100));
                 xpGain += bonusAmount;
-                report.push(`👟 ${p.name} usou ${p.equippedItem.name} (+${bonusAmount} XP) e o item quebrou.`);
+                report.push(`👟 ${p.name} usou ${p.equippedItem.name} (+${bonusAmount} XP)`);
                 
-                // O item é consumido (quebra) após o uso no treino
-                // Removemos o item da mochila (collection sales) e do equippedItem
                 const itemRef = db.collection('sales').doc(p.equippedItem.id);
                 b.delete(itemRef);
                 b.update(db.collection('players').doc(pid), { equippedItem: firebase.firestore.FieldValue.delete() });
@@ -2620,15 +2893,12 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
             // --- APLICAÇÃO DOS PERKS (TRAIN_BOOST e YOUTH_BOOST) ---
             activePerks.forEach(perk => {
                 if (perk.type === 'TRAIN_BOOST') {
-                    // Se algum atributo do treino bate com os atributos do perk
                     const hasSynergy = perk.attrs.some(attr => trainedAttrs.includes(attr));
                     if (hasSynergy) {
                         xpGain = Math.round(xpGain * perk.multiplier);
                     }
                 }
                 if (perk.type === 'YOUTH_BOOST') {
-                    // Se for jovem e tiver o perk
-                    // Assumindo idade base 18 se não tiver
                     const age = p.age || 18;
                     if (age <= perk.ageLimit) {
                         xpGain = Math.round(xpGain * perk.multiplier);
@@ -2638,28 +2908,23 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
 
             // Chance de Crítico (Grande Evolução)
             if (Math.random() < (0.10 + critBonus)) {
-                xpGain *= 2; // Dobra o XP no crítico
+                xpGain *= 2;
                 report.push(`🔥 ${p.name} teve uma GRANDE evolução!`);
             }
 
-            // Atualiza Atributos Específicos (Chance de subir atributo direto)
+            // Atualiza Atributos Específicos
             let newAttrs = { ...(p.attributes || {}) };
             trainedAttrs.forEach(attr => {
                 if((newAttrs[attr] || 50) < 99) {
-                    // Chance pequena de subir o atributo direto além do XP geral
-                    // Se o XP ganho for alto, maior a chance
                     if(Math.random() < (xpGain / 100)) {
                         newAttrs[attr] = (newAttrs[attr] || 50) + 1;
                     }
                 }
             });
 
-            // --- CORREÇÃO: Cálculo Inteligente do Overall (Trava de Queda) ---
+            // CORREÇÃO: Cálculo Inteligente do Overall (Trava de Queda)
             const vals = Object.values(newAttrs).filter(v => typeof v === 'number');
             const rawAvg = vals.length > 0 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : (p.overall || 60);
-            
-            // AQUI ESTÁ A TRAVA: O novo Overall será o MAIOR entre o atual e a nova média.
-            // Isso impede que o Overall caia se a média matemática for menor que o Overall manual.
             const finalOverall = Math.max(p.overall || 60, rawAvg);
 
             // Atualiza Jogador
@@ -2683,9 +2948,7 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
         if (newCoachXp >= xpNeed && newLevel < 30) {
             newCoachXp -= xpNeed;
             newLevel++;
-            // Regra: Perk a cada 5 níveis
             if (newLevel % 5 === 0) pendingPerks++;
-            // Regra: Afinidade nos níveis 10, 20, 30
             if ([10, 20, 30].includes(newLevel)) pendingAffinity++;
             alert(`🎉 PARABÉNS! Nível ${newLevel} alcançado!`);
         }
@@ -2701,7 +2964,6 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
         await b.commit();
         setLoading(false);
         
-        // Feedback Visual
         let msg = "Treino realizado com sucesso!";
         if(report.length > 0) msg += "\n\n" + report.join("\n");
         alert(msg);
@@ -3194,7 +3456,7 @@ const renewContract = async (p) => {
 
             // 2. Função para lançar Súmula (ATUALIZADA: CÁLCULO DA MÉDIA)
             // --- FUNÇÃO INTELIGENTE DE SÚMULA (INDIVIDUAL OU EM MASSA) ---
-            const saveMatchStats = async (dataPayload, legacyMatch, legacyXp) => {
+           const saveMatchStats = async (dataPayload, legacyMatch, legacyXp) => {
                 let batchData = [];
 
                 // 1. Compatibilidade com chamadas antigas (player, match, xp)
@@ -3206,7 +3468,7 @@ const renewContract = async (p) => {
                     batchData = Array.isArray(dataPayload) ? dataPayload : [dataPayload];
                 }
                 
-                if (batchData.length === 0) return alert("Nenhum dado para salvar.");
+                if (batchData.length === 0) return alert("Nenhum dataPayload para salvar.");
                 
                 setLoading(true);
                 const b = db.batch();
@@ -3256,13 +3518,24 @@ const renewContract = async (p) => {
                     const newCount = currentCount + 1;
                     const newAvg = newSum / newCount; 
                     
-                    b.update(pRef, { 
+                    // Preparação do objeto de atualização
+                    const updateData = { 
                         stats: newStats, 
                         pendingXP: (player.pendingXP || 0) + xpGained,
                         pressRatingSum: newSum,
                         pressRatingCount: newCount,
-                        pressRatingAvg: parseFloat(newAvg.toFixed(1)) 
-                    });
+                        pressRatingAvg: parseFloat(newAvg.toFixed(1)),
+                        energy: Math.max(0, (player.energy || 100) - 25) // Desgaste físico do jogo
+                    };
+
+                    // --- INTEGRAÇÃO DO SISTEMA MÉDICO (LESÕES) ---
+                    if (match.injury && (match.recoveryLeft || 0) > 0) {
+                        updateData.injury = match.injury;
+                        updateData.recoveryLeft = parseInt(match.recoveryLeft);
+                        updateData.mood = '😡'; // Jogador fica irritado ao se lesionar
+                    }
+                    
+                    b.update(pRef, updateData);
                     count++;
                 });
                 
@@ -3275,30 +3548,47 @@ const renewContract = async (p) => {
 // FIM DA LÓGICA DE IMPRENSA E SÚMULAS
             // --- TREINO SOLO DO JOGADOR ---
    const handlePlayerSoloTrain = async (player, type) => {
-        // 1. Verifica Energia (Custo alto: 15)
+        // 1. Verifica Energia (Custo alto: 35) e se está lesionado
         if ((player.energy || 100) < 35) {
             return alert("Você está exausto! Precisa de pelo menos 35% de energia.");
+        }
+        if ((player.recoveryLeft || 0) > 0) {
+            return alert(`Você está lesionado (${player.injury}) e não pode treinar por mais ${player.recoveryLeft} jogos!`);
         }
 
         setLoading(true);
         const b = db.batch();
 
-        // 2. Define Atributos baseados no Tipo (Mesma lista do Técnico)
+        // --- CHANCE DE LESÃO AUTOMÁTICA (2%) ---
+        if (Math.random() < 0.02) {
+            const injuryName = INJURIES_DB.LEVE[Math.floor(Math.random() * INJURIES_DB.LEVE.length)];
+            b.update(db.collection('players').doc(player.id), {
+                injury: injuryName,
+                recoveryLeft: 1,
+                energy: (player.energy || 100) - 20, // Gasta um pouco de energia no susto
+                mood: '😡'
+            });
+            await b.commit();
+            setLoading(false);
+            return alert(`❌ INFORTÚNIO!\nVocê sentiu o físico durante o treino.\nDiagnóstico: ${injuryName}\nTempo: 1 Jogo fora.`);
+        }
+
+        // 2. Define Atributos baseados no Tipo (Atualizado para cobrir TODOS os atributos do sistema)
         let trainedAttrs = [];
-        if(type === 'FISICO_BASE') trainedAttrs = ['stamina', 'strength', 'balance'];
-        else if(type === 'VELOCIDADE') trainedAttrs = ['speed', 'accel', 'agility'];
+        if(type === 'FISICO_BASE') trainedAttrs = ['stamina', 'balance', 'condition'];
+        else if(type === 'VELOCIDADE') trainedAttrs = ['speed', 'accel', 'agility', 'dribbleSpd'];
         else if(type === 'IMPULSAO') trainedAttrs = ['jump', 'header', 'condition'];
         else if(type === 'CHUTE') trainedAttrs = ['shot', 'shotPower', 'shotTech'];
-        else if(type === 'PASSE') trainedAttrs = ['shortPass', 'longPass', 'tech'];
-        else if(type === 'DRIBLE') trainedAttrs = ['dribble', 'dribbleSpd', 'agility'];
+        else if(type === 'PASSE') trainedAttrs = ['shortPass', 'longPass', 'shortPassSpd', 'longPassSpd', 'tech'];
+        else if(type === 'DRIBLE') trainedAttrs = ['dribble', 'dribbleSpd', 'agility', 'tech'];
         else if(type === 'DEFESA') trainedAttrs = ['defense', 'aggression', 'response'];
-        else if(type === 'MENTAL') trainedAttrs = ['teamwork', 'mentality'];
-        else if(type === 'BOLA_PARADA') trainedAttrs = ['freeKick', 'curve', 'penalties'];
-        else if(type === 'GOLEIRO') trainedAttrs = ['gk', 'response'];
+        else if(type === 'MENTAL') trainedAttrs = ['teamwork', 'mentality', 'response'];
+        else if(type === 'BOLA_PARADA') trainedAttrs = ['freeKick', 'curve', 'header'];
+        else if(type === 'GOLEIRO') trainedAttrs = ['gk', 'response', 'jump'];
 
-        // 3. Cálculos (Eficiência Baixa)
-        const xpGain = Math.floor(Math.random() * 4) + 3; // Ganha entre 3 e 6 XP (Pouco)
-        const newEnergy = (player.energy || 100) - 35; // Gasta 15 de Energia (Muito)
+        // 3. Cálculos (Eficiência Baixa no Solo)
+        const xpGain = Math.floor(Math.random() * 4) + 3; // Ganha entre 3 e 6 XP
+        const newEnergy = (player.energy || 100) - 35; // Gasta 35 de Energia
 
         // 4. Evolução de Atributos (Chance Baixa: 15%)
         let newAttrs = { ...(player.attributes || {}) };
@@ -3337,8 +3627,8 @@ const renewContract = async (p) => {
         if(evolved) msg += "\n✨ Alguns atributos melhoraram um pouco.";
         alert(msg);
     };
-// --- NOVA FUNÇÃO: AÇÕES DE CARREIRA DO JOGADOR ---
-           const handlePlayerActions = async (type, p) => {
+
+const handlePlayerActions = async (type, p) => {
         const team = teams.find(t => t.id === p.teamId);
         
         // 1. PEDIR TRANSFERÊNCIA
@@ -3405,7 +3695,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.77.2</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.77.3</div>
                             </div>
                         </div>
                         
@@ -3667,7 +3957,14 @@ const renewContract = async (p) => {
                                 onCoachCounter={handleCounterCoachOffer} 
                             />
                         )}                        
-                        
+                        {/* NOVA TELA DE SERVIÇOS PÚBLICOS (HOSPITAL) */}
+{screen === 'PUBLIC_SERVICES' && (
+    <PublicServices 
+        players={players} 
+        user={user} 
+        onDonate={handleHospitalDonation} 
+    />
+)}
                         {(screen === 'COMPANY_DASH' || screen === 'COMPANY_HOME') && user.type === 'COMPANY' && 
                             <CompanyDashboard company={user.data} products={products.filter(p => p.companyId === user.data.id)} sps={sps.filter(s => s.companyId === user.data.id)} sales={sales || []} teams={teams} onSaveProd={saveProduct} onDeleteProd={async(id)=>{if(confirm("Excluir produto?")) await db.collection('products').doc(id).delete();}} onProcessSpons={processSponsorship} />
                         }
@@ -3737,40 +4034,46 @@ const renewContract = async (p) => {
     <div className={`nav-item ${screen==='MATCHES'?'active':''}`} onClick={()=>setScreen('MATCHES')}>
         <i className="fas fa-futbol"></i>JOGOS
     </div>
+
+    {/* 3. SERVIÇOS PÚBLICOS (HOSPITAL) */}
+    <div className={`nav-item ${screen==='PUBLIC_SERVICES'?'active':''}`} onClick={()=>setScreen('PUBLIC_SERVICES')}>
+        <i className="fas fa-hospital-symbol"></i>HOSPITAL
+    </div>
     
-    {/* 3. MERCADO (Esconde para empresas) */}
+    {/* 4. MERCADO (Esconde para empresas) */}
     {user.type!=='COMPANY' && 
         <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}>
             <i className="fas fa-globe"></i>MERCADO
         </div>
     }
     
-    {/* 4. SHOP (Esconde para empresas) */}
+    {/* 5. SHOP (Esconde para empresas) */}
     {user.type!=='COMPANY' && 
         <div className={`nav-item ${screen==='SHOPPING'?'active':''}`} onClick={()=>setScreen('SHOPPING')}>
             <i className="fas fa-shopping-bag"></i>SHOP
         </div>
     }
 
-    {/* 5. PATROCINIO (Só times) */}
+    {/* 6. PATROCINIO (Só times) */}
     {user.type==='USER' && 
         <div className={`nav-item ${screen==='SPONSORSHIPS'?'active':''}`} onClick={()=>setScreen('SPONSORSHIPS')}>
             <i className="fas fa-handshake"></i>PATRO
         </div>
     }
 
-    {/* 6. RANKING (RESTAURADO) */}
+    {/* 7. RANKING (RESTAURADO) */}
     {user.type!=='COMPANY' &&
         <div className={`nav-item ${screen==='RANKING'?'active':''}`} onClick={()=>setScreen('RANKING')}>
             <i className="fas fa-trophy"></i>RANK
         </div>
     }
 
-    {/* 7. NEWS (Todos) */}
+    {/* 8. NEWS (Todos) */}
     <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={()=>{setScreen('NEWS'); setNewNews(false); localStorage.setItem('lastRead', Date.now());}}>
         <i className="fas fa-newspaper"></i>NEWS
     </div>
 </div>
+    //FIM
                     {modal && <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget && setModal(null)}>
                         <div className="modal-content">
                             {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={async(id)=>{db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} onRenew={renewContract} isOwner={user.type==='USER' && modal.data?.teamId===user.data?.id} />}
@@ -3884,7 +4187,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77.2 HUMOR DOS JOGADORES </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77.3 SERVIÇOS PUBLICOS </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -3938,7 +4241,7 @@ const renewContract = async (p) => {
                     
                     {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).map(p => (
                         <div key={p.id} className="card" onClick={()=>setSel({...p, type:'PLAYER'})} style={{cursor:'pointer', borderLeft:'4px solid var(--secondary)'}}>
-                            👟 <b>{p.name}</b>
+                            👟 <b>{p.name} {p.recoveryLeft > 0 ? '❌' : ''}</b>
                         </div>
                     ))}
                 </div>}
@@ -4640,7 +4943,7 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
     const [selComp, setSelComp] = useState(null);
     
     // --- VISÃO GERAL (SHOPPING CENTER - LISTA DE LOJAS) ---
-    if (view === 'MALL') return (
+    if (=== 'MALL') return (
         <div>
             <h3>Shopping Center</h3>
             <p style={{color:'#aaa', fontSize:12, marginBottom:15}}>Escolha uma loja para ver os produtos.</p>
@@ -5037,7 +5340,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
             const [search, setSearch] = useState(''); const [selP, setSelP] = useState(null); const [s, setS] = useState({});
             const filtered = players.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
             if (selP) return ( <div><h3>Editando: {selP.name}</h3><div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}><div><label>Gols</label><input className="input-field" type="number" value={s.goals} onChange={e=>setS({...s, goals:parseInt(e.target.value)})} /></div><div><label>Assistências</label><input className="input-field" type="number" value={s.assists} onChange={e=>setS({...s, assists:parseInt(e.target.value)})} /></div><div><label>Desarmes</label><input className="input-field" type="number" value={s.tackles} onChange={e=>setS({...s, tackles:parseInt(e.target.value)})} /></div><div><label>Defesas</label><input className="input-field" type="number" value={s.saves} onChange={e=>setS({...s, saves:parseInt(e.target.value)})} /></div><div><label>Amarelos</label><input className="input-field" type="number" value={s.yellows} onChange={e=>setS({...s, yellows:parseInt(e.target.value)})} /></div><div><label>Vermelhos</label><input className="input-field" type="number" value={s.reds} onChange={e=>setS({...s, reds:parseInt(e.target.value)})} /></div></div><button className="btn btn-green" onClick={()=>onSave(selP.id, s)}>SALVAR ESTATÍSTICAS</button><button className="btn" onClick={()=>setSelP(null)}>VOLTAR</button></div> );
-            return (<div><input className="input-field" placeholder="Buscar jogador..." value={search} onChange={e=>setSearch(e.target.value)} /><div style={{maxHeight:300, overflowY:'auto'}}>{search.length > 0 && filtered.map(p => (<div key={p.id} className="card" onClick={()=>{setSelP(p); setS(p.stats || {goals:0,assists:0,tackles:0,saves:0,yellows:0,reds:0})}}><b>{p.name}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small></div>))}</div></div>);
+            return (<div><input className="input-field" placeholder="Buscar jogador..." value={search} onChange={e=>setSearch(e.target.value)} /><div style={{maxHeight:300, overflowY:'auto'}}>{search.length > 0 && filtered.map(p => (<div key={p.id} className="card" onClick={()=>{setSelP(p); setS(p.stats || {goals:0,assists:0,tackles:0,saves:0,yellows:0,reds:0})}}><b>{p.name} {p.recoveryLeft > 0 ? '❌' : ''}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small></div>))}</div></div>);
         };
 
      const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams, onRenew, isOwner }) => {
@@ -5803,7 +6106,7 @@ const Ranking = ({ teams, players, sales }) => {
                 )}
 
                 <div style={{ flex: 1 }}>
-                    <b>{String(p.name)}</b> <small>({String(teams.find(t => t.id === p.teamId)?.name || 'Sem Clube')})</small>
+                    <b>{String(p.name)} {p.recoveryLeft > 0 ? '❌' : ''}</b> <small>({String(teams.find(t => t.id === p.teamId)?.name || 'Sem Clube')})</small>
                 </div>
                 <div style={{ fontWeight: 'bold', fontSize: 14, color: color }}>
                     {label} {isStat ? p.stats[sortKey] : (sortKey === 'salary' ? fmt(p[sortKey]) : p[sortKey])}
@@ -5873,7 +6176,7 @@ const Ranking = ({ teams, players, sales }) => {
                                     .sort((a,b) => b.overall - a.overall)
                                     .map(p => (
                                     <div key={p.id} className="card" style={{display:'flex', justifyContent:'space-between', borderLeft:`4px solid ${getPosColor(p.position)}`}}>
-                                        <span><b>{String(p.name)}</b> <small>({String(p.position)})</small></span>
+                                        <span><b>{String(p.name)} {p.recoveryLeft > 0 ? '❌' : ''}</b> <small>({String(p.position)})</small></span>
                                         <b className="player-ov">{String(p.overall)}</b>
                                     </div>
                                 ))}
@@ -5890,237 +6193,272 @@ const Ranking = ({ teams, players, sales }) => {
 // --- COMPONENTES QUE FALTAVAM (Súmula e Tabela) ---
 
        const MatchPerformanceForm = ({ players, teams, onSaveStats }) => {
-            const [mode, setMode] = useState('TEAM'); 
-            
-            // --- ESTADOS DO MODO SÚMULA RÁPIDA (TIME) ---
-            const [selTeamId, setSelTeamId] = useState('');
-            const [teamResult, setTeamResult] = useState('NENHUM');
-            const [batchStats, setBatchStats] = useState({}); 
+    const [mode, setMode] = useState('TEAM'); 
+    
+    // --- ESTADOS DO MODO SÚMULA RÁPIDA (TIME) ---
+    const [selTeamId, setSelTeamId] = useState('');
+    const [teamResult, setTeamResult] = useState('NENHUM');
+    const [batchStats, setBatchStats] = useState({}); 
 
-            // --- ESTADOS DO MODO INDIVIDUAL (ANTIGO) ---
-            const [selP, setSelP] = useState(null);
-            const [match, setMatch] = useState({ goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0, rating:'', result:'NENHUM' }); 
-            const [search, setSearch] = useState('');
+    // --- ESTADOS DO MODO INDIVIDUAL (ANTIGO) ---
+    const [selP, setSelP] = useState(null);
+    const [match, setMatch] = useState({ goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0, rating:'', result:'NENHUM' }); 
+    const [search, setSearch] = useState('');
 
-            // --- LÓGICA DO MODO TIME ---
-            const handleBatchChange = (pid, field, val) => {
-                setBatchStats(prev => ({
-                    ...prev,
-                    [pid]: { ...prev[pid], [field]: val }
-                }));
-            };
+    // --- LÓGICA DE SORTEIO DE LESÃO (SÚMULA) ---
+    const rollInjury = (withAmbulance) => {
+        const rand = Math.random() * 100;
+        let cat = 'LEVE';
+        let time = 1;
 
-            const submitBatch = () => {
-                const payload = [];
-                const teamPlayers = players.filter(p => p.teamId === selTeamId);
-                
-                teamPlayers.forEach(p => {
-                    const s = batchStats[p.id] || {};
-                    // Só adiciona se o jornalista tiver dado pelo menos a NOTA
-                    if (s.rating && s.rating !== '') {
-                        payload.push({
-                            player: p,
-                            match: {
-                                goals: parseInt(s.goals || 0),
-                                assists: parseInt(s.assists || 0),
-                                tackles: parseInt(s.tackles || 0),
-                                saves: parseInt(s.saves || 0),
-                                yellows: parseInt(s.yellows || 0),
-                                reds: parseInt(s.reds || 0),
-                                rating: parseFloat(s.rating),
-                                result: teamResult 
-                            }
-                        });
+        if (withAmbulance) {
+            // Se sair de ambulância: Maior chance de ser Grave/Extrema
+            if (rand < 10) { cat = 'LEVE'; time = 1; }
+            else if (rand < 35) { cat = 'MODERADA'; time = Math.floor(Math.random() * 2) + 2; } // 2-3
+            else if (rand < 75) { cat = 'GRAVE'; time = Math.floor(Math.random() * 3) + 4; }    // 4-6
+            else { cat = 'EXTREMA'; time = Math.floor(Math.random() * 4) + 7; }                // 7-10
+        } else {
+            // Se sair andando: Geralmente Leve/Moderada
+            if (rand < 50) { cat = 'LEVE'; time = 1; }
+            else if (rand < 85) { cat = 'MODERADA'; time = 2; }
+            else if (rand < 97) { cat = 'GRAVE'; time = Math.floor(Math.random() * 2) + 3; }    // 3-4
+            else { cat = 'EXTREMA'; time = 5; }
+        }
+
+        const injuryList = INJURIES_DB[cat];
+        const injuryName = injuryList[Math.floor(Math.random() * injuryList.length)];
+
+        return { name: injuryName, time: time };
+    };
+
+    // --- LÓGICA DO MODO TIME ---
+    const handleBatchChange = (pid, field, val) => {
+        setBatchStats(prev => ({
+            ...prev,
+            [pid]: { ...prev[pid], [field]: val }
+        }));
+    };
+
+    const submitBatch = () => {
+        const payload = [];
+        const teamPlayers = players.filter(p => p.teamId === selTeamId);
+        
+        teamPlayers.forEach(p => {
+            const s = batchStats[p.id] || {};
+            // Só adiciona se o jornalista tiver dado pelo menos a NOTA
+            if (s.rating && s.rating !== '') {
+                let injuryData = null;
+                // Se marcou que lesionou
+                if (s.injuredType && s.injuredType !== 'NONE') {
+                    injuryData = rollInjury(s.injuredType === 'AMBULANCE');
+                }
+
+                payload.push({
+                    player: p,
+                    match: {
+                        goals: parseInt(s.goals || 0),
+                        assists: parseInt(s.assists || 0),
+                        tackles: parseInt(s.tackles || 0),
+                        saves: parseInt(s.saves || 0),
+                        yellows: parseInt(s.yellows || 0),
+                        reds: parseInt(s.reds || 0),
+                        rating: parseFloat(s.rating),
+                        result: teamResult,
+                        // Novos campos de lesão
+                        injury: injuryData ? injuryData.name : null,
+                        recoveryLeft: injuryData ? injuryData.time : 0
                     }
                 });
+            }
+        });
 
-                if (payload.length === 0) return alert("Preencha a NOTA de pelo menos um jogador para salvar.");
-                
-                if (confirm(`Confirmar súmula para ${payload.length} jogadores?`)) {
-                    onSaveStats(payload); 
-                }
-            };
+        if (payload.length === 0) return alert("Preencha a NOTA de pelo menos um jogador para salvar.");
+        
+        if (confirm(`Confirmar súmula para ${payload.length} jogadores?`)) {
+            onSaveStats(payload); 
+        }
+    };
 
-            const filtered = players.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+    const filtered = players.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
 
-            // --- RENDERIZAÇÃO ---
-            return (
-                <div style={{minHeight: 400}}>
-                    <h3 style={{color:'var(--primary)', marginTop:0}}>Lançar Desempenho</h3>
-                    
-                    <div style={{display:'flex', gap:10, marginBottom:15}}>
-                        <button className={`btn ${mode==='TEAM'?'btn-blue':'btn-ghost'}`} onClick={()=>setMode('TEAM')}>POR TIME (RÁPIDO)</button>
-                        <button className={`btn ${mode==='SEARCH'?'btn-purple':'btn-ghost'}`} onClick={()=>setMode('SEARCH')}>BUSCA INDIVIDUAL</button>
+    // --- RENDERIZAÇÃO ---
+    return (
+        <div style={{minHeight: 400}}>
+            <h3 style={{color:'var(--primary)', marginTop:0}}>Lançar Desempenho</h3>
+            
+            <div style={{display:'flex', gap:10, marginBottom:15}}>
+                <button className={`btn ${mode==='TEAM'?'btn-blue':'btn-ghost'}`} onClick={()=>setMode('TEAM')}>POR TIME (RÁPIDO)</button>
+                <button className={`btn ${mode==='SEARCH'?'btn-purple':'btn-ghost'}`} onClick={()=>setMode('SEARCH')}>BUSCA INDIVIDUAL</button>
+            </div>
+
+            {/* === MODO 1: SÚMULA POR TIME (TABELA DETALHADA) === */}
+            {mode === 'TEAM' && (
+                <div>
+                    <div style={{display:'flex', gap:10, marginBottom:10}}>
+                        <div style={{flex:1}}>
+                            <label style={{fontSize:10}}>Selecione o Time</label>
+                            <select className="input-field" value={selTeamId} onChange={e=>setSelTeamId(e.target.value)}>
+                                <option value="">-- Escolha --</option>
+                                {teams.filter(t=>t.status!=='PENDING').map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+                            </select>
+                        </div>
+                        <div style={{width:120}}>
+                            <label style={{fontSize:10}}>Resultado Geral</label>
+                            <select className="input-field" value={teamResult} onChange={e=>setTeamResult(e.target.value)}>
+                                <option value="NENHUM">Neutro</option>
+                                <option value="VITORIA">Vitória</option>
+                                <option value="EMPATE">Empate</option>
+                                <option value="DERROTA">Derrota</option>
+                            </select>
+                        </div>
                     </div>
 
-                    {/* === MODO 1: SÚMULA POR TIME (TABELA DETALHADA) === */}
-                    {mode === 'TEAM' && (
+                    {selTeamId && (
                         <div>
-                            <div style={{display:'flex', gap:10, marginBottom:10}}>
-                                <div style={{flex:1}}>
-                                    <label style={{fontSize:10}}>Selecione o Time</label>
-                                    <select className="input-field" value={selTeamId} onChange={e=>setSelTeamId(e.target.value)}>
-                                        <option value="">-- Escolha --</option>
-                                        {teams.filter(t=>t.status!=='PENDING').map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
-                                    </select>
-                                </div>
-                                <div style={{width:120}}>
-                                    <label style={{fontSize:10}}>Resultado Geral</label>
-                                    <select className="input-field" value={teamResult} onChange={e=>setTeamResult(e.target.value)}>
-                                        <option value="NENHUM">Neutro</option>
-                                        <option value="VITORIA">Vitória</option>
-                                        <option value="EMPATE">Empate</option>
-                                        <option value="DERROTA">Derrota</option>
-                                    </select>
-                                </div>
-                            </div>
+                            <div style={{maxHeight:'350px', overflowY:'auto', border:'1px solid #333', borderRadius:5}}>
+                                <table style={{width:'100%', borderCollapse:'collapse', fontSize:10}}>
+                                    <thead style={{background:'#222', position:'sticky', top:0, zIndex:2}}>
+                                        <tr>
+                                            <th style={{padding:5, textAlign:'left'}}>Jogador</th>
+                                            <th style={{padding:2, width:35, textAlign:'center', color:'gold'}}>Nota</th>
+                                            <th style={{padding:2, width:30, textAlign:'center'}}>GOL</th>
+                                            <th style={{padding:2, width:30, textAlign:'center'}}>ASS</th>
+                                            <th style={{padding:2, width:110, textAlign:'center', color:'#ff1744'}}>Ocorreu Lesão?</th>
+                                            <th style={{padding:2, width:30, textAlign:'center', color:'orange'}}>DES</th>
+                                            <th style={{padding:2, width:30, textAlign:'center', color:'cyan'}}>DEF</th>
+                                            <th style={{padding:2, width:30, textAlign:'center', color:'yellow'}}>AMA</th>
+                                            <th style={{padding:2, width:30, textAlign:'center', color:'red'}}>VER</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {players.filter(p => p.teamId === selTeamId).map(p => {
+                                            const s = batchStats[p.id] || {};
+                                            const hasData = s.rating && s.rating !== '';
+                                            const isGK = p.position === 'GOL';
 
-                            {selTeamId && (
-                                <div>
-                                    <div style={{maxHeight:'350px', overflowY:'auto', border:'1px solid #333', borderRadius:5}}>
-                                        <table style={{width:'100%', borderCollapse:'collapse', fontSize:10}}>
-                                            <thead style={{background:'#222', position:'sticky', top:0, zIndex:2}}>
-                                                <tr>
-                                                    <th style={{padding:5, textAlign:'left'}}>Jogador</th>
-                                                    <th style={{padding:2, width:35, textAlign:'center', color:'gold'}}>Nota</th>
-                                                    <th style={{padding:2, width:30, textAlign:'center'}}>GOL</th>
-                                                    <th style={{padding:2, width:30, textAlign:'center'}}>ASS</th>
-                                                    <th style={{padding:2, width:30, textAlign:'center', color:'orange'}}>DES</th>
-                                                    <th style={{padding:2, width:30, textAlign:'center', color:'cyan'}}>DEF</th>
-                                                    <th style={{padding:2, width:30, textAlign:'center', color:'yellow'}}>AMA</th>
-                                                    <th style={{padding:2, width:30, textAlign:'center', color:'red'}}>VER</th>
+                                            return (
+                                                <tr key={p.id} style={{background: hasData ? 'rgba(0,255,0,0.08)' : 'transparent', borderBottom:'1px solid #333'}}>
+                                                    <td style={{padding:5}}>
+                                                        <b>{p.name} {p.recoveryLeft > 0 ? '❌' : ''}</b><br/>
+                                                        <span style={{color:'#888', fontSize:9}}>{p.position}</span>
+                                                    </td>
+                                                    <td style={{padding:2}}>
+                                                        <input className="input-field" type="number" step="0.1" style={{marginBottom:0, padding:2, textAlign:'center', height:25, borderColor: hasData ? 'lime' : '#444'}} 
+                                                            placeholder="-" 
+                                                            value={s.rating || ''}
+                                                            onChange={e=>handleBatchChange(p.id, 'rating', e.target.value)}
+                                                        />
+                                                    </td>
+                                                    <td style={{padding:2}}>
+                                                        <input className="input-field" type="number" style={{marginBottom:0, padding:2, textAlign:'center', height:25}} 
+                                                            placeholder="0"
+                                                            onChange={e=>handleBatchChange(p.id, 'goals', e.target.value)}
+                                                        />
+                                                    </td>
+                                                    <td style={{padding:2}}>
+                                                        <input className="input-field" type="number" style={{marginBottom:0, padding:2, textAlign:'center', height:25}} 
+                                                            placeholder="0"
+                                                            onChange={e=>handleBatchChange(p.id, 'assists', e.target.value)}
+                                                        />
+                                                    </td>
+                                                    <td style={{padding:2}}>
+                                                        <select className="input-field" style={{marginBottom:0, fontSize:9, padding:2, background: s.injuredType && s.injuredType !== 'NONE' ? '#440000' : 'var(--bg-input)'}} onChange={e=>handleBatchChange(p.id, 'injuredType', e.target.value)}>
+                                                            <option value="NONE">✅ Saudável</option>
+                                                            <option value="WALKING">🚶 Lesão s/ Ambulância</option>
+                                                            <option value="AMBULANCE">🚑 Lesão c/ Ambulância</option>
+                                                        </select>
+                                                    </td>
+                                                    <td style={{padding:2}}>
+                                                        <input className="input-field" type="number" 
+                                                            style={{marginBottom:0, padding:2, textAlign:'center', height:25, background: isGK ? '#111' : 'var(--bg-input)', color:'orange', opacity: isGK ? 0.3 : 1}} 
+                                                            placeholder="0" 
+                                                            disabled={isGK}
+                                                            onChange={e=>handleBatchChange(p.id, 'tackles', e.target.value)} 
+                                                        />
+                                                    </td>
+                                                    <td style={{padding:2}}>
+                                                        <input className="input-field" type="number" 
+                                                            style={{marginBottom:0, padding:2, textAlign:'center', height:25, background: !isGK ? '#111' : 'var(--bg-input)', color:'cyan', opacity: !isGK ? 0.3 : 1}} 
+                                                            placeholder="0" 
+                                                            disabled={!isGK}
+                                                            onChange={e=>handleBatchChange(p.id, 'saves', e.target.value)} 
+                                                        />
+                                                    </td>
+                                                    <td style={{padding:2}}>
+                                                        <input className="input-field" type="number" style={{marginBottom:0, padding:2, textAlign:'center', height:25, color:'yellow'}} 
+                                                            placeholder="0"
+                                                            onChange={e=>handleBatchChange(p.id, 'yellows', e.target.value)}
+                                                        />
+                                                    </td>
+                                                    <td style={{padding:2}}>
+                                                        <input className="input-field" type="number" style={{marginBottom:0, padding:2, textAlign:'center', height:25, color:'red'}} 
+                                                            placeholder="0"
+                                                            onChange={e=>handleBatchChange(p.id, 'reds', e.target.value)}
+                                                        />
+                                                    </td>
                                                 </tr>
-                                            </thead>
-                                            <tbody>
-                                                {players.filter(p => p.teamId === selTeamId).map(p => {
-                                                    const s = batchStats[p.id] || {};
-                                                    const hasData = s.rating && s.rating !== '';
-                                                    const isGK = p.position === 'GOL';
-
-                                                    return (
-                                                        <tr key={p.id} style={{background: hasData ? 'rgba(0,255,0,0.08)' : 'transparent', borderBottom:'1px solid #333'}}>
-                                                            <td style={{padding:5}}>
-                                                                <b>{p.name}</b><br/>
-                                                                <span style={{color:'#888', fontSize:9}}>{p.position}</span>
-                                                            </td>
-                                                            {/* NOTA */}
-                                                            <td style={{padding:2}}>
-                                                                <input className="input-field" type="number" step="0.1" style={{marginBottom:0, padding:2, textAlign:'center', height:25, borderColor: hasData ? 'lime' : '#444'}} 
-                                                                    placeholder="-" 
-                                                                    value={s.rating || ''}
-                                                                    onChange={e=>handleBatchChange(p.id, 'rating', e.target.value)}
-                                                                />
-                                                            </td>
-                                                            {/* GOLS */}
-                                                            <td style={{padding:2}}>
-                                                                <input className="input-field" type="number" style={{marginBottom:0, padding:2, textAlign:'center', height:25}} 
-                                                                    placeholder="0"
-                                                                    onChange={e=>handleBatchChange(p.id, 'goals', e.target.value)}
-                                                                />
-                                                            </td>
-                                                            {/* ASSISTENCIAS */}
-                                                            <td style={{padding:2}}>
-                                                                <input className="input-field" type="number" style={{marginBottom:0, padding:2, textAlign:'center', height:25}} 
-                                                                    placeholder="0"
-                                                                    onChange={e=>handleBatchChange(p.id, 'assists', e.target.value)}
-                                                                />
-                                                            </td>
-                                                            {/* DESARMES (Bloqueado se for Goleiro) */}
-                                                            <td style={{padding:2}}>
-                                                                <input className="input-field" type="number" 
-                                                                    style={{marginBottom:0, padding:2, textAlign:'center', height:25, background: isGK ? '#111' : 'var(--bg-input)', color:'orange', opacity: isGK ? 0.3 : 1}} 
-                                                                    placeholder="0" 
-                                                                    disabled={isGK}
-                                                                    onChange={e=>handleBatchChange(p.id, 'tackles', e.target.value)} 
-                                                                />
-                                                            </td>
-                                                            {/* DEFESAS (Bloqueado se NÃO for Goleiro) */}
-                                                            <td style={{padding:2}}>
-                                                                <input className="input-field" type="number" 
-                                                                    style={{marginBottom:0, padding:2, textAlign:'center', height:25, background: !isGK ? '#111' : 'var(--bg-input)', color:'cyan', opacity: !isGK ? 0.3 : 1}} 
-                                                                    placeholder="0" 
-                                                                    disabled={!isGK}
-                                                                    onChange={e=>handleBatchChange(p.id, 'saves', e.target.value)} 
-                                                                />
-                                                            </td>
-                                                            {/* AMARELOS (Numérico) */}
-                                                            <td style={{padding:2}}>
-                                                                <input className="input-field" type="number" style={{marginBottom:0, padding:2, textAlign:'center', height:25, color:'yellow'}} 
-                                                                    placeholder="0"
-                                                                    onChange={e=>handleBatchChange(p.id, 'yellows', e.target.value)}
-                                                                />
-                                                            </td>
-                                                            {/* VERMELHOS (Numérico) */}
-                                                            <td style={{padding:2}}>
-                                                                <input className="input-field" type="number" style={{marginBottom:0, padding:2, textAlign:'center', height:25, color:'red'}} 
-                                                                    placeholder="0"
-                                                                    onChange={e=>handleBatchChange(p.id, 'reds', e.target.value)}
-                                                                />
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <button className="btn btn-green" style={{marginTop:15, padding:15}} onClick={submitBatch}>
-                                        💾 SALVAR SÚMULA COMPLETA
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* === MODO 2: BUSCA INDIVIDUAL (Mantido como Backup) === */}
-                    {mode === 'SEARCH' && (
-                        <div>
-                            {!selP ? (
-                                <div>
-                                    <input className="input-field" placeholder="Buscar jogador..." value={search} onChange={e=>setSearch(e.target.value)} />
-                                    <div style={{maxHeight:300, overflowY:'auto'}}>
-                                        {search.length > 0 && players.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => (
-                                            <div key={p.id} className="card" onClick={()=>{setSelP(p); setMatch({goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0, rating:'', result:'NENHUM'});}}>
-                                                <b>{p.name}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div>
-                                    <h4 style={{color:'var(--primary)', margin:'0 0 10px 0'}}>Súmula: {selP.name}</h4>
-                                    <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8, marginBottom:10}}>
-                                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                                            <div><label>⚽ Gols</label><input className="input-field" type="number" value={match.goals} onChange={e=>setMatch({...match, goals:parseInt(e.target.value)})} /></div>
-                                            <div><label>👟 Assistências</label><input className="input-field" type="number" value={match.assists} onChange={e=>setMatch({...match, assists:parseInt(e.target.value)})} /></div>
-                                            <div><label>🛡️ Desarmes</label><input className="input-field" type="number" value={match.tackles} onChange={e=>setMatch({...match, tackles:parseInt(e.target.value)})} /></div>
-                                            <div><label>🧤 Defesas</label><input className="input-field" type="number" value={match.saves} onChange={e=>setMatch({...match, saves:parseInt(e.target.value)})} /></div>
-                                            <div><label>🟨 Amarelo</label><input className="input-field" type="number" value={match.yellows} onChange={e=>setMatch({...match, yellows:parseInt(e.target.value)})} /></div>
-                                            <div><label>🟥 Vermelho</label><input className="input-field" type="number" value={match.reds} onChange={e=>setMatch({...match, reds:parseInt(e.target.value)})} /></div>
-                                        </div>
-                                        <hr style={{borderColor:'#444'}}/>
-                                        <label>⭐ Nota (0.0 - 10.0)</label>
-                                        <input className="input-field" type="number" step="0.1" value={match.rating} onChange={e=>setMatch({...match, rating:e.target.value})} />
-                                        <label>🚩 Resultado</label>
-                                        <select className="input-field" value={match.result} onChange={e=>setMatch({...match, result:e.target.value})}>
-                                            <option value="NENHUM">Neutro</option>
-                                            <option value="VITORIA">Vitória</option>
-                                            <option value="EMPATE">Empate</option>
-                                            <option value="DERROTA">Derrota</option>
-                                        </select>
-                                    </div>
-                                    <div style={{display:'flex', gap:10}}>
-                                        {/* Envia array com 1 item para manter compatibilidade */}
-                                        <button className="btn btn-green" onClick={()=>onSaveStats([{ player: selP, match: match }])}>LANÇAR</button>
-                                        <button className="btn" onClick={()=>setSelP(null)}>VOLTAR</button>
-                                    </div>
-                                </div>
-                            )}
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <button className="btn btn-green" style={{marginTop:15, padding:15}} onClick={submitBatch}>
+                                💾 SALVAR SÚMULA COMPLETA
+                            </button>
                         </div>
                     )}
                 </div>
-            );
-        };
-// FIM DO COMPONENTE MATCH PERFORMANCE FORM
+            )}
+
+            {/* === MODO 2: BUSCA INDIVIDUAL (Mantido como Backup) === */}
+            {mode === 'SEARCH' && (
+                <div>
+                    {!selP ? (
+                        <div>
+                            <input className="input-field" placeholder="Buscar jogador..." value={search} onChange={e=>setSearch(e.target.value)} />
+                            <div style={{maxHeight:300, overflowY:'auto'}}>
+                                {search.length > 0 && filtered.map(p => (
+                                    <div key={p.id} className="card" onClick={()=>{setSelP(p); setMatch({goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0, rating:'', result:'NENHUM'});}}>
+                                        <b>{p.name} {p.recoveryLeft > 0 ? '❌' : ''}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        <div>
+                            <h4 style={{color:'var(--primary)', margin:'0 0 10px 0'}}>Súmula: {selP.name}</h4>
+                            <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8, marginBottom:10}}>
+                                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                                    <div><label>⚽ Gols</label><input className="input-field" type="number" value={match.goals} onChange={e=>setMatch({...match, goals:parseInt(e.target.value)})} /></div>
+                                    <div><label>👟 Assistências</label><input className="input-field" type="number" value={match.assists} onChange={e=>setMatch({...match, assists:parseInt(e.target.value)})} /></div>
+                                    <div><label>🛡️ Desarmes</label><input className="input-field" type="number" value={match.tackles} onChange={e=>setMatch({...match, tackles:parseInt(e.target.value)})} /></div>
+                                    <div><label>🧤 Defesas</label><input className="input-field" type="number" value={match.saves} onChange={e=>setMatch({...match, saves:parseInt(e.target.value)})} /></div>
+                                    <div><label>🟨 Amarelo</label><input className="input-field" type="number" value={match.yellows} onChange={e=>setMatch({...match, yellows:parseInt(e.target.value)})} /></div>
+                                    <div><label>🟥 Vermelho</label><input className="input-field" type="number" value={match.reds} onChange={e=>setMatch({...match, reds:parseInt(e.target.value)})} /></div>
+                                </div>
+                                <hr style={{borderColor:'#444'}}/>
+                                <label>⭐ Nota (0.0 - 10.0)</label>
+                                <input className="input-field" type="number" step="0.1" value={match.rating} onChange={e=>setMatch({...match, rating:e.target.value})} />
+                                <label>🚩 Resultado</label>
+                                <select className="input-field" value={match.result} onChange={e=>setMatch({...match, result:e.target.value})}>
+                                    <option value="NENHUM">Neutro</option>
+                                    <option value="VITORIA">Vitória</option>
+                                    <option value="EMPATE">Empate</option>
+                                    <option value="DERROTA">Derrota</option>
+                                </select>
+                            </div>
+                            <div style={{display:'flex', gap:10}}>
+                                <button className="btn btn-green" onClick={()=>onSaveStats([{ player: selP, match: match }])}>LANÇAR</button>
+                                <button className="btn" onClick={()=>setSelP(null)}>VOLTAR</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+    //FIM
 
 
   const TeamStandingsEditor = ({ teams, onUpdateTeamStats }) => {

@@ -3800,7 +3800,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.77.6</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.77.7</div>
                             </div>
                         </div>
                         
@@ -4301,7 +4301,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77.6 SERVIÇOS PUBLICOS </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77.7 SERVIÇOS PUBLICOS </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -6178,11 +6178,16 @@ const Ranking = ({ teams, players, sales }) => {
     const renderTeams = () => teams
         .filter(t => t && t.status !== 'PENDING')
         .map(t => {
-            // Calcula o valor total do elenco somando o 'value' de cada jogador
-            const squadValue = validPlayers.filter(p => p.teamId === t.id).reduce((a, b) => a + (parseFloat(b.value) || 0), 0);
+            // MUDANÇA AQUI: Calcula o valor do elenco usando o PREÇO JUSTO RECOMENDADO
+            // Isso impede que times superfaturem jogadores para subir no ranking artificialmente
+            const squadValue = validPlayers
+                .filter(p => p.teamId === t.id)
+                .reduce((total, p) => total + getRecommendedPrice(p.overall, p.position), 0);
+            
             // Pega o saldo em caixa
             const balance = parseFloat(t.balance) || 0;
-            // Soma tudo
+            
+            // Soma tudo para o Ranking Geral
             return { ...t, balance, squadValue, totalWealth: balance + squadValue };
         })
         .sort((a, b) => b.totalWealth - a.totalWealth)
@@ -6202,7 +6207,7 @@ const Ranking = ({ teams, players, sales }) => {
                             <div style={{fontSize: 10, fontWeight: 'bold', color: '#00E676'}}>{fmt(t.balance)}</div>
                         </div>
 
-                        {/* 2. Valor do Elenco */}
+                        {/* 2. Valor do Elenco (Real/Justo) */}
                         <div style={{background: 'rgba(41, 121, 255, 0.1)', padding: 4, borderRadius: 4, textAlign: 'center', border: '1px solid rgba(41, 121, 255, 0.2)'}}>
                             <div style={{fontSize: 8, color: '#aaa', textTransform: 'uppercase'}}>Elenco</div>
                             <div style={{fontSize: 10, fontWeight: 'bold', color: '#2979FF'}}>{fmt(t.squadValue)}</div>
@@ -6309,8 +6314,8 @@ const Ranking = ({ teams, players, sales }) => {
                                     .sort((a,b) => b.overall - a.overall)
                                     .map(p => (
                                     <div key={p.id} className="card" style={{display:'flex', justifyContent:'space-between', borderLeft:`4px solid ${getPosColor(p.position)}`}}>
-                                        <span><b>{String(p.name)} {p.recoveryLeft > 0 ? '❌' : ''}</b> <small>({String(p.position)})</small></span>
-                                        <b className="player-ov">{String(p.overall)}</b>
+                                            <span><b>{String(p.name)} {p.recoveryLeft > 0 ? '❌' : ''}</b> <small>({String(p.position)})</small></span>
+                                            <b className="player-ov">{String(p.overall)}</b>
                                     </div>
                                 ))}
                             </div>

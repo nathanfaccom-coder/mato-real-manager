@@ -1040,12 +1040,28 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
 };
         //FIM
        // --- COMPONENTE DE REDE SOCIAL (MATOGRAM) ---
-const SocialFeed = ({ user, posts, onPost, onLike, onDeletePost }) => {
+const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSubChat, messages, onFollow }) => {
+    const [tab, setTab] = useState('FEED'); // FEED, PERFIL, CHAT
+    const [subChat, setSubChat] = useState('GLOBAL'); // GLOBAL, TEAM
+    
+    // Estados de input
     const [newText, setNewText] = useState('');
     const [newImg, setNewImg] = useState(null);
+    const [chatInput, setChatInput] = useState('');
     const [loading, setLoading] = useState(false);
 
-    // Compressão de Imagem para o Feed (Máx 600px)
+    // Efeito para ligar o Chat quando muda a aba
+    useEffect(() => {
+        if (tab === 'CHAT') {
+            const chatId = subChat === 'GLOBAL' ? 'GLOBAL_CHAT' : `TEAM_${user.data.teamId || 'FREE'}`;
+            if (subChat === 'TEAM' && (!user.data.teamId || user.data.teamId === 'FREE')) return; // Sem time não tem chat de time
+            
+            const unsub = onSubChat(chatId);
+            return () => unsub && unsub(); // Desliga ao sair
+        }
+    }, [tab, subChat, user.data.teamId]);
+
+    // Compressão de Imagem
     const handleImageChange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -1057,103 +1073,168 @@ const SocialFeed = ({ user, posts, onPost, onLike, onDeletePost }) => {
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-                const MAX_W = 600; // Tamanho ideal para feed mobile
-                let w = img.width;
-                let h = img.height;
-                
+                const MAX_W = 600; 
+                let w = img.width; let h = img.height;
                 if (w > MAX_W) { h *= MAX_W / w; w = MAX_W; }
-                
-                canvas.width = w;
-                canvas.height = h;
+                canvas.width = w; canvas.height = h;
                 ctx.drawImage(img, 0, 0, w, h);
-                setNewImg(canvas.toDataURL('image/jpeg', 0.7)); // Qualidade 70%
+                setNewImg(canvas.toDataURL('image/jpeg', 0.7)); 
             };
         };
     };
 
     const submitPost = async () => {
-        if (!newText && !newImg) return alert("Escreva algo ou poste uma foto!");
+        if (!newText && !newImg) return alert("Escreva algo!");
         setLoading(true);
         await onPost(newText, newImg);
-        setNewText('');
-        setNewImg(null);
-        setLoading(false);
+        setNewText(''); setNewImg(null); setLoading(false);
+        setTab('FEED'); // Volta pro feed ao postar
     };
 
-    return (
-        <div style={{paddingBottom: 60}}>
-            <h3 style={{textAlign:'center', color:'var(--purple)'}}>📸 MatoGram</h3>
-            
-            {/* ÁREA DE POSTAR */}
-            <div className="card" style={{marginBottom: 20, border: '1px solid var(--purple)'}}>
-                <textarea 
-                    className="input-field" 
-                    rows="2" 
-                    placeholder={`No que você está pensando, ${user.data.name}?`}
-                    value={newText}
-                    onChange={e => setNewText(e.target.value)}
-                    style={{resize:'none'}}
-                />
-                
-                {newImg && (
-                    <div style={{position:'relative', marginBottom:10}}>
-                        <img src={newImg} style={{width:'100%', borderRadius:8, maxHeight:200, objectFit:'cover'}} />
-                        <button 
-                            style={{position:'absolute', top:5, right:5, background:'red', color:'white', border:'none', borderRadius:'50%', width:25, height:25, cursor:'pointer'}}
-                            onClick={() => setNewImg(null)}
-                        >X</button>
-                    </div>
-                )}
+    const handleChatSubmit = () => {
+        const chatId = subChat === 'GLOBAL' ? 'GLOBAL_CHAT' : `TEAM_${user.data.teamId}`;
+        onSendChat(chatId, chatInput);
+        setChatInput('');
+    };
 
-                <div style={{display:'flex', gap:10}}>
-                    <label className="btn btn-ghost" style={{flex:1, marginBottom:0, display:'flex', alignItems:'center', justifyContent:'center'}}>
-                        <i className="fas fa-camera" style={{marginRight:5}}></i> FOTO
-                        <input type="file" accept="image/*" style={{display:'none'}} onChange={handleImageChange} />
-                    </label>
-                    <button className="btn btn-purple" style={{flex:2, marginBottom:0}} onClick={submitPost} disabled={loading}>
-                        {loading ? 'ENVIANDO...' : 'PUBLICAR'}
-                    </button>
-                </div>
+    // Filtros de Posts
+    const myPosts = posts.filter(p => p.authorId === user.data.id);
+
+    return (
+        <div style={{paddingBottom: 80}}>
+            {/* CABEÇALHO DE NAVEGAÇÃO SOCIAL */}
+            <div style={{display:'flex', gap:10, marginBottom:15, background:'#222', padding:10, borderRadius:10, justifyContent:'space-around'}}>
+                <button className={`btn btn-ghost ${tab==='FEED'?'active-tab':''}`} style={{border:'none', color: tab==='FEED' ? 'var(--primary)' : '#666'}} onClick={()=>setTab('FEED')}>
+                    <i className="fas fa-home"></i> FEED
+                </button>
+                <button className={`btn btn-ghost ${tab==='CHAT'?'active-tab':''}`} style={{border:'none', color: tab==='CHAT' ? 'cyan' : '#666'}} onClick={()=>setTab('CHAT')}>
+                    <i className="fas fa-comments"></i> CHAT
+                </button>
+                <button className={`btn btn-ghost ${tab==='PERFIL'?'active-tab':''}`} style={{border:'none', color: tab==='PERFIL' ? 'gold' : '#666'}} onClick={()=>setTab('PERFIL')}>
+                    <i className="fas fa-user"></i> PERFIL
+                </button>
             </div>
 
-            {/* FEED DE POSTS */}
-            {posts.length === 0 && <p style={{textAlign:'center', color:'#666'}}>Seja o primeiro a postar algo!</p>}
-            
-            {posts.map(p => (
-                <div key={p.id} className="card" style={{padding:0, overflow:'hidden', marginBottom:15}}>
-                    {/* CABEÇALHO DO POST */}
-                    <div style={{padding:10, display:'flex', alignItems:'center', gap:10, background:'rgba(0,0,0,0.2)'}}>
-                        {p.authorLogo ? <img src={p.authorLogo} style={{width:30, height:30, borderRadius:'50%'}} /> : <div style={{width:30, height:30, background:'#333', borderRadius:'50%'}}></div>}
-                        <div>
-                            <b style={{fontSize:13}}>{p.authorName}</b>
-                            <div style={{fontSize:9, color:'#888'}}>{new Date(p.date).toLocaleString()}</div>
+            {/* --- ABA 1: FEED GERAL --- */}
+            {tab === 'FEED' && (
+                <div>
+                    {/* ÁREA DE POSTAR (Compacta) */}
+                    <div className="card" style={{marginBottom: 15, border: '1px solid #444', display:'flex', gap:10, alignItems:'center'}}>
+                        <div style={{fontSize:24, cursor:'pointer'}} onClick={()=>document.getElementById('feed-img').click()}>📷</div>
+                        <input className="input-field" placeholder="No que você está pensando?" value={newText} onChange={e=>setNewText(e.target.value)} style={{marginBottom:0, borderRadius:20}} />
+                        <button className="btn btn-purple" style={{width:'auto', borderRadius:20, marginBottom:0}} onClick={submitPost} disabled={loading}>➤</button>
+                        <input id="feed-img" type="file" accept="image/*" style={{display:'none'}} onChange={handleImageChange} />
+                    </div>
+                    {newImg && <div style={{textAlign:'center', marginBottom:10}}><img src={newImg} style={{height:100, borderRadius:10}} /><button className="btn btn-red" style={{width:'auto'}} onClick={()=>setNewImg(null)}>X</button></div>}
+
+                    {posts.map(p => (
+                        <div key={p.id} className="card" style={{padding:0, overflow:'hidden', marginBottom:15}}>
+                            <div style={{padding:10, display:'flex', alignItems:'center', gap:10, background:'rgba(0,0,0,0.2)'}}>
+                                {p.authorLogo ? <img src={p.authorLogo} style={{width:30, height:30, borderRadius:'50%'}} /> : <div style={{width:30, height:30, background:'#333', borderRadius:'50%'}}></div>}
+                                <div>
+                                    <b style={{fontSize:13}}>{p.authorName}</b>
+                                    <div style={{fontSize:9, color:'#888'}}>{new Date(p.date).toLocaleString()}</div>
+                                </div>
+                                <div style={{marginLeft:'auto', display:'flex', gap:10}}>
+                                    {/* Botão Seguir (Se não for eu) */}
+                                    {user.data.id !== p.authorId && (
+                                        <button className="btn btn-ghost" style={{padding:'2px 8px', fontSize:10, border:'1px solid #555'}} onClick={()=>onFollow(p.authorId)}>
+                                            {(user.data.following || []).includes(p.authorId) ? 'Seguindo' : 'Seguir'}
+                                        </button>
+                                    )}
+                                    {(user.type === 'ADMIN' || user.data.id === p.authorId) && (
+                                        <i className="fas fa-trash" style={{color:'#666', cursor:'pointer'}} onClick={() => onDeletePost(p.id)}></i>
+                                    )}
+                                </div>
+                            </div>
+                            {p.img && <img src={p.img} style={{width:'100%', maxHeight:400, objectFit:'cover'}} />}
+                            {p.text && <div style={{padding:'10px 10px 5px 10px', fontSize:13}}>{p.text}</div>}
+                            <div style={{padding:10, borderTop:'1px solid #333', display:'flex', alignItems:'center', gap:5}}>
+                                <button style={{background:'transparent', border:'none', color: (p.likes || []).includes(user.data.id) ? 'red' : '#ccc', cursor:'pointer', fontSize:18}} onClick={() => onLike(p)}>❤</button>
+                                <span style={{fontSize:12, fontWeight:'bold'}}>{(p.likes || []).length}</span>
+                            </div>
                         </div>
-                        {/* Botão de Delete (Se for dono ou Admin) */}
-                        {(user.type === 'ADMIN' || user.data.id === p.authorId) && (
-                            <i className="fas fa-trash" style={{marginLeft:'auto', color:'#666', cursor:'pointer'}} onClick={() => onDeletePost(p.id)}></i>
-                        )}
-                    </div>
-
-                    {/* CONTEÚDO */}
-                    {p.img && <img src={p.img} style={{width:'100%', maxHeight:400, objectFit:'cover'}} />}
-                    {p.text && <div style={{padding:'10px 10px 5px 10px', fontSize:13, lineHeight:1.4}}>{p.text}</div>}
-
-                    {/* RODAPÉ (LIKES) */}
-                    <div style={{padding:10, borderTop:'1px solid #333', display:'flex', alignItems:'center', gap:5}}>
-                        <button 
-                            style={{background:'transparent', border:'none', color: (p.likes || []).includes(user.data.id) ? 'red' : '#ccc', cursor:'pointer', fontSize:18}}
-                            onClick={() => onLike(p)}
-                        >
-                            ❤
-                        </button>
-                        <span style={{fontSize:12, fontWeight:'bold'}}>{(p.likes || []).length} curtidas</span>
-                    </div>
+                    ))}
                 </div>
-            ))}
+            )}
+
+            {/* --- ABA 2: CHAT --- */}
+            {tab === 'CHAT' && (
+                <div>
+                    <div style={{display:'flex', gap:5, marginBottom:10}}>
+                        <button className={`btn ${subChat==='GLOBAL'?'btn-blue':'btn-ghost'}`} onClick={()=>setSubChat('GLOBAL')}>🌍 GLOBAL</button>
+                        <button className={`btn ${subChat==='TEAM'?'btn-green':'btn-ghost'}`} onClick={()=>setSubChat('TEAM')}>🛡️ TIME</button>
+                    </div>
+
+                    {subChat === 'TEAM' && (!user.data.teamId || user.data.teamId === 'FREE') ? (
+                        <div className="card" style={{textAlign:'center', padding:30}}>🚫 Você precisa estar em um time para acessar o vestiário.</div>
+                    ) : (
+                        <div className="card" style={{height: '60vh', display:'flex', flexDirection:'column', padding:0, overflow:'hidden', background:'#121212'}}>
+                            <div style={{flex:1, overflowY:'auto', padding:10, display:'flex', flexDirection:'column', gap:10}}>
+                                {messages.map(m => (
+                                    <div key={m.id} style={{alignSelf: m.authorId === user.data.id ? 'flex-end' : 'flex-start', maxWidth:'80%'}}>
+                                        <small style={{display:'block', fontSize:9, color:'#888', marginBottom:2, textAlign: m.authorId === user.data.id ? 'right' : 'left'}}>
+                                            {m.authorName} {m.authorType === 'ADMIN' && '👑'}
+                                        </small>
+                                        <div style={{
+                                            background: m.authorId === user.data.id ? 'var(--primary)' : '#333',
+                                            color: m.authorId === user.data.id ? '#000' : '#fff',
+                                            padding: '8px 12px', borderRadius: 10, fontSize: 13
+                                        }}>
+                                            {m.text}
+                                        </div>
+                                    </div>
+                                ))}
+                                {messages.length === 0 && <p style={{textAlign:'center', color:'#444', marginTop:50}}>Nenhuma mensagem aqui...</p>}
+                            </div>
+                            <div style={{padding:10, background:'#1e1e1e', display:'flex', gap:10}}>
+                                <input className="input-field" placeholder="Mensagem..." value={chatInput} onChange={e=>setChatInput(e.target.value)} style={{marginBottom:0, borderRadius:20}} 
+                                    onKeyDown={(e) => e.key === 'Enter' && handleChatSubmit()}
+                                />
+                                <button className="btn btn-blue" style={{width:'auto', marginBottom:0, borderRadius:'50%', height:40, width:40, padding:0}} onClick={handleChatSubmit}>➤</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* --- ABA 3: PERFIL (MatoGram) --- */}
+            {tab === 'PERFIL' && (
+                <div>
+                    <div className="card" style={{textAlign:'center', background:'linear-gradient(180deg, #1e1e1e 0%, #000 100%)'}}>
+                        {user.data.face || user.data.logo ? 
+                            <img src={user.data.face || user.data.logo} style={{width:80, height:80, borderRadius:'50%', border:'3px solid var(--gold)'}} /> 
+                            : <div style={{width:80, height:80, borderRadius:'50%', background:'#333', margin:'0 auto'}}></div>
+                        }
+                        <h2>{user.data.name}</h2>
+                        <div style={{display:'flex', justifyContent:'center', gap:20, margin:'15px 0'}}>
+                            <div><b>{myPosts.length}</b><br/><small style={{color:'#888'}}>Posts</small></div>
+                            <div><b>{(user.data.followers || []).length || 0}</b><br/><small style={{color:'#888'}}>Seguidores</small></div>
+                            <div><b>{(user.data.following || []).length || 0}</b><br/><small style={{color:'#888'}}>Seguindo</small></div>
+                        </div>
+                        <button className="btn btn-ghost" style={{fontSize:10}}>EDITAR PERFIL</button>
+                    </div>
+
+                    <h4 style={{marginLeft:5, marginTop:20}}>📸 Minhas Fotos</h4>
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:2}}>
+                        {myPosts.map(p => (
+                            <div key={p.id} style={{aspectRatio:'1/1', background:'#222', position:'relative'}}>
+                                {p.img ? <img src={p.img} style={{width:'100%', height:'100%', objectFit:'cover'}} /> : <div style={{display:'grid', placeItems:'center', height:'100%', fontSize:20}}>📝</div>}
+                                <div style={{position:'absolute', bottom:0, left:0, right:0, background:'rgba(0,0,0,0.5)', color:'white', fontSize:10, padding:2, textAlign:'center'}}>
+                                    ❤ {p.likes ? p.likes.length : 0}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    {myPosts.length === 0 && <p style={{textAlign:'center', color:'#666', marginTop:30}}>Você ainda não postou nada.</p>}
+                </div>
+            )}
         </div>
     );
 };
         //FIM
+
+        
         function App() {
             const [user, setUser] = useState(null); 
             const [teams, setTeams] = useState([]);
@@ -3951,7 +4032,58 @@ const renewContract = async (p) => {
         }
     };
             //FIM
-            
+            // --- FUNÇÕES DE CHAT (MENSAGENS) ---
+    const [chatMessages, setChatMessages] = useState([]); // Estado para guardar msgs
+
+    // Listener de Chat (Ativa quando entra na sala)
+    const subscribeToChat = (chatId) => {
+        return db.collection('chats').doc(chatId).collection('messages')
+            .orderBy('date', 'desc').limit(50) // Só as últimas 50
+            .onSnapshot(snap => {
+                const msgs = snap.docs.map(d => ({id: d.id, ...d.data()})).reverse(); // Inverte para ficar cronológico
+                setChatMessages(msgs);
+            });
+    };
+
+    const sendChatMessage = async (chatId, text) => {
+        if(!text.trim()) return;
+        const msgRef = db.collection('chats').doc(chatId).collection('messages');
+        
+        await msgRef.add({
+            text: text,
+            authorId: user.data.id,
+            authorName: user.data.name,
+            authorType: user.type, // Para colorir o nome (Admin, Jogador, etc)
+            date: Date.now()
+        });
+
+        // Limpeza automática (Anti-peso)
+        // Nota: Em produção real faríamos via Cloud Function, aqui faremos "Lazy Cleanup"
+        // Se a lista local estiver muito grande, deleta as antigas do banco
+        if(chatMessages.length > 60) {
+            const oldSnap = await msgRef.orderBy('date', 'asc').limit(10).get();
+            const b = db.batch();
+            oldSnap.docs.forEach(doc => b.delete(doc.ref));
+            b.commit();
+        }
+    };
+
+    // --- FUNÇÃO DE SEGUIR (FOLLOW) ---
+    const toggleFollow = async (targetId) => {
+        const myRef = user.type === 'USER' ? db.collection('teams').doc(user.data.id) : db.collection('players').doc(user.data.id);
+        const myFollowing = user.data.following || [];
+        
+        if(myFollowing.includes(targetId)) {
+            // Deixar de Seguir
+            await myRef.update({ following: firebase.firestore.FieldValue.arrayRemove(targetId) });
+            alert("Deixou de seguir.");
+        } else {
+            // Seguir
+            await myRef.update({ following: firebase.firestore.FieldValue.arrayUnion(targetId) });
+            alert("Seguindo!");
+        }
+    };
+        //FIM
            
      
           // --- RENDER ---
@@ -3965,7 +4097,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.77.8</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.77.9</div>
                             </div>
                         </div>
                         
@@ -4224,13 +4356,17 @@ const renewContract = async (p) => {
                         {screen === 'NEWS' && <div><h3>Notícias</h3>{news.map(n=><div key={n.id} className={`news-card news-${n.type}`}>{n.text}<br/><small style={{color:'#666'}}>{new Date(n.date).toLocaleString()}</small></div>)}</div>}
 
                         {/* TELA DO MATOGRAM */}
-                        {screen === 'SOCIAL' && (
-                            <SocialFeed 
+                       {screen === 'SOCIAL' && (
+                            <SocialHub 
                                 user={user} 
                                 posts={posts} 
                                 onPost={handleSocialPost} 
                                 onLike={handleSocialLike}
                                 onDeletePost={handleSocialDelete}
+                                onSendChat={sendChatMessage}
+                                onSubChat={subscribeToChat}
+                                messages={chatMessages}
+                                onFollow={toggleFollow}
                             />
                         )}
         
@@ -4482,7 +4618,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77.8 SERVIÇOS PUBLICOS </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77.9 MATOGRAM </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

@@ -4065,7 +4065,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.78.2</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.78.3</div>
                             </div>
                         </div>
                         
@@ -4096,8 +4096,13 @@ const renewContract = async (p) => {
                                 <i className="fas fa-cog" style={{cursor:'pointer', marginLeft:10}} onClick={()=>setModal({type:'SETTINGS', data:user.data})}></i>
                             )}
 
-                            {/* BOTÃO DE SAIR */}
-                            <i className="fas fa-sign-out-alt" style={{cursor:'pointer', marginLeft:10}} onClick={()=>window.location.reload()}></i>
+                           {/* BOTÃO DE SAIR */}
+                            <i className="fas fa-sign-out-alt" style={{cursor:'pointer', marginLeft:10}} onClick={() => {
+                                if(confirm("Deseja realmente sair e trocar de conta?")) {
+                                    localStorage.clear(); 
+                                    window.location.reload();
+                                }
+                            }}></i>
                         </div>
                     </div>
 
@@ -4586,7 +4591,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.78.2 MATOGRAM </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.78.3 MATOGRAM </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

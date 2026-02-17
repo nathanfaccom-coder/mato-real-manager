@@ -3405,7 +3405,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.77.1</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.77.2</div>
                             </div>
                         </div>
                         
@@ -3884,7 +3884,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77.1 CORREÇÃO DE BUGS </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77.2 HUMOR DOS JOGADORES </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -4517,8 +4517,20 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                     <h4>📢 O Gabinete do Presidente</h4>
                     {team ? (
                         <div style={{display:'flex', gap:10, flexDirection:'column'}}>
+                            {/* Botões Padrão */}
                             <button className="btn btn-gold" onClick={()=>onAction('ASK_RAISE', player)}>💰 PEDIR AUMENTO</button>
-                            <button className="btn btn-red" onClick={()=>onAction('TRANSFER_REQUEST', player)}>😡 PEDIR TRANSFERÊNCIA</button>
+                            
+                            {/* Lógica Inteligente para Transferência/Neutro */}
+                            {player.status === 'VENDA' ? (
+                                <button className="btn btn-blue" onClick={()=>onAction('RESET_MOOD', player)}>🤝 RETIRAR PEDIDO E FICAR NEUTRO</button>
+                            ) : (
+                                <button className="btn btn-red" onClick={()=>onAction('TRANSFER_REQUEST', player)}>😡 PEDIR TRANSFERÊNCIA</button>
+                            )}
+
+                            {/* Lógica para Felicidade */}
+                            {player.mood !== '🤩' && (
+                                <button className="btn btn-green" style={{background: '#00E676', color: '#000'}} onClick={()=>onAction('DECLARE_HAPPY', player)}>💙 DECLARAR AMOR AO CLUBE</button>
+                            )}
                         </div>
                     ) : (
                         <p style={{color:'var(--primary)', fontWeight:'bold'}}>Estás livre no mercado!</p>

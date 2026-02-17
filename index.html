@@ -2878,59 +2878,60 @@ const resetDatabase = async () => {
                     </button>
                 </div>
             </div>}
-            {/* ABA TEAMS (COM GESTÃO DE SENHAS E SUB-LISTA DE JOGADORES) */}
+            {/* --- ABA TIMES --- */}
             {tab==='TEAMS' && !selTeamPlayers && (
                 <div>
-                    {(teams||[]).some(t=>t.status==='PENDING') && <h4>Times Pendentes</h4>}
                     {(teams||[]).filter(t=>t.status==='PENDING').map(t=>(
                         <div key={t.id} className="card" style={{borderLeft:'4px solid var(--warning)'}}>
-                            <b>{t.name}</b>
-                            <div style={{display:'flex', gap:5}}>
-                                <input className="input-field" style={{marginBottom:0, width:100}} defaultValue={t.balance} id={`bal-${t.id}`} />
-                                <button className="btn btn-green" onClick={()=>onApproveTeam(t.id, document.getElementById(`bal-${t.id}`).value)}>V</button>
-                                <button className="btn btn-red" onClick={()=>onDeleteTeam(t.id)}>X</button>
+                            <b>{t.name} (PENDENTE)</b>
+                            <div style={{display:'flex', gap:5, marginTop:5}}>
+                                <input className="input-field" style={{width:100, marginBottom:0}} defaultValue={t.balance} id={`bal-${t.id}`} />
+                                <button className="btn btn-green" style={{width:'auto'}} onClick={()=>onApproveTeam(t.id, document.getElementById(`bal-${t.id}`).value)}>V</button>
+                                <button className="btn btn-red" style={{width:'auto'}} onClick={()=>onDeleteTeam(t.id)}>X</button>
                             </div>
                         </div>
                     ))}
-                    
-                    <h4>Clubes e Acessos</h4>
+                    <h4>Clubes Ativos</h4>
                     {(teams||[]).filter(t=>t.status!=='PENDING').map(t=>(
                         <div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                            <span>{t.name} {t.recoveryLeft > 0 ? '❌' : ''}</span>
+                            <span><b>{t.name}</b></span>
                             <div style={{display:'flex', gap:5}}>
-                                {/* BOTÃO DE SENHA DO CLUBE */}
-                                <button className="btn btn-ghost" style={{width:'auto', fontSize:10}} onClick={()=>managePassword('teams', t.id, t.password, t.name)}>🔑 SENHA</button>
+                                {/* 1. Senha do Clube */}
+                                <button className="btn btn-ghost" style={{width:'auto', fontSize:10}} onClick={()=>managePassword('teams', t.id, t.password, t.name)}>🔑 TIME</button>
                                 
-                                <button className="btn btn-ghost" style={{width:'auto', marginRight:5}} onClick={()=>onConfig(t)}><i className="fas fa-cog"></i></button>
-                                <button className="btn btn-green" style={{width:'auto', marginRight:5}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button>
+                                {/* 2. Saldo */}
+                                <button className="btn btn-green" style={{width:'auto', fontSize:10}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button>
                                 
-                                {/* BOTÃO PARA ABRIR LISTA DE SENHAS DOS JOGADORES */}
-                                <button className="btn btn-purple" style={{width:'auto'}} onClick={()=>setSelTeamPlayers(t)}>👥 ELENCO</button>
+                                {/* 3. Senhas dos Jogadores (A tela que você está vendo agora) */}
+                                <button className="btn btn-purple" style={{width:'auto', fontSize:10}} onClick={()=>setSelTeamPlayers(t)}>🔐 SENHAS</button>
                                 
-                                <button className="btn btn-red" style={{width:'auto', marginLeft:5}} onClick={()=>onDeleteTeam(t.id)}><i className="fas fa-trash"></i></button>
+                                {/* 4. GERENCIAR (O botão que sumiu - Edição completa, Over, Posição) */}
+                                <button className="btn btn-blue" style={{width:'auto', fontSize:10}} onClick={()=>onEditT(t)}>📝 EDITAR</button>
+                                
+                                {/* 5. Excluir */}
+                                <button className="btn btn-red" style={{width:'auto', fontSize:10}} onClick={()=>onDeleteTeam(t.id)}>🗑️</button>
                             </div>
                         </div>
                     ))}
                 </div>
             )}
 
-           {/* VISUALIZAÇÃO DA LISTA DE JOGADORES (CORRIGIDO PARA NÃO CRASHAR) */}
+            {/* SUB-ABA: SENHAS DOS JOGADORES (A que aparece no seu print) */}
             {tab==='TEAMS' && selTeamPlayers && (
                 <div>
-                    <button className="btn btn-ghost" style={{width:'auto', marginBottom:10}} onClick={()=>setSelTeamPlayers(null)}>⬅ VOLTAR</button>
-                    <h4>Gerenciar Senhas: {selTeamPlayers.name}</h4>
+                    <div style={{display:'flex', gap:10, marginBottom:10}}>
+                        <button className="btn btn-ghost" style={{width:'auto'}} onClick={()=>setSelTeamPlayers(null)}>⬅ VOLTAR</button>
+                        {/* Atalho para ir direto para a edição completa deste time */}
+                        <button className="btn btn-blue" style={{width:'auto'}} onClick={()=>onEditT(selTeamPlayers)}>📝 IR PARA EDIÇÃO COMPLETA</button>
+                    </div>
                     
-                    {/* AQUI ESTAVA O ERRO: Adicionei (players||[]) antes do .filter */}
-                    {(players||[]).filter(p => p.teamId === selTeamPlayers.id).map(p => (
+                    <h4>Gerenciar Senhas: {selTeamPlayers.name}</h4>
+                    {players.filter(p => p.teamId === selTeamPlayers.id).sort((a,b)=>b.overall - a.overall).map(p => (
                         <div key={p.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderLeft:`4px solid ${getPosColor(p.position)}`}}>
-                            <span><b>{p.name}</b> <small>({p.position})</small></span>
+                            <span><b>{p.name}</b> <small>({p.position} - {p.overall})</small></span>
                             <button className="btn btn-ghost" style={{width:'auto', fontSize:10}} onClick={()=>managePassword('players', p.id, p.password, p.name)}>🔑 SENHA</button>
                         </div>
                     ))}
-                    
-                    {(players||[]).filter(p => p.teamId === selTeamPlayers.id).length === 0 && (
-                        <p style={{color:'#666', textAlign:'center'}}>Nenhum jogador neste time.</p>
-                    )}
                 </div>
             )}
 
@@ -4249,7 +4250,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.78.5</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.78.8</div>
                             </div>
                         </div>
                         
@@ -4775,7 +4776,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.78.5 MATOGRAM </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.78.8 MATOGRAM </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

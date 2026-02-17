@@ -4267,7 +4267,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.79.0</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.79.1</div>
                             </div>
                         </div>
                         
@@ -4793,7 +4793,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.79.0 MATOGRAM </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.79.1 MATOGRAM </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -5968,7 +5968,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
             return (<div><input className="input-field" placeholder="Buscar jogador..." value={search} onChange={e=>setSearch(e.target.value)} /><div style={{maxHeight:300, overflowY:'auto'}}>{search.length > 0 && filtered.map(p => (<div key={p.id} className="card" onClick={()=>{setSelP(p); setS(p.stats || {goals:0,assists:0,tackles:0,saves:0,yellows:0,reds:0})}}><b>{p.name} {p.recoveryLeft > 0 ? '❌' : ''}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small></div>))}</div></div>);
         };
 
-    const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams, onRenew, isOwner }) => {
+   const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams, onRenew, isOwner }) => {
     // 1. Definição dos dados padrão
     const defaultState = {
         name:'', position:'ATA', overall:45, value:'', salary:'', 
@@ -5999,12 +5999,10 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
             const ovr = parseInt(dataToSave.overall) || 50;
             const salary = parseFloat(dataToSave.salary) || 0;
 
-            // --- TRAVA DE SALÁRIO (ADMIN) ---
-            // O Admin recebe um aviso, mas pode forçar se clicar em OK
+            // --- TRAVA RÍGIDA DE SALÁRIO (ZERO TOLERÂNCIA) ---
             if (salary < limits.minSal || salary > limits.maxSal) {
-                if(!confirm(`⚠️ ALERTA SALARIAL!\n\nCategoria: ${limits.label} (Over ${ovr})\nFaixa Permitida: ${fmt(limits.minSal)} - ${fmt(limits.maxSal)}\n\nVocê colocou: ${fmt(salary)}.\n\nSalvar mesmo assim (Forçar)?`)) {
-                    return; 
-                }
+                alert(`🚫 AÇÃO BLOQUEADA: SALÁRIO IRREGULAR!\n\nCategoria: ${limits.label} (Over ${ovr})\nFaixa Permitida: ${fmt(limits.minSal)} - ${fmt(limits.maxSal)}\n\nVocê tentou colocar: ${fmt(salary)}.\n\nPor favor, ajuste o valor para dentro da faixa permitida para salvar.`);
+                return; // O CÓDIGO PARA AQUI. NÃO SALVA.
             }
 
             if (!dataToSave.attributes || Object.keys(dataToSave.attributes).length === 0) {

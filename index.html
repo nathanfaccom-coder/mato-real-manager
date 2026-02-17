@@ -2286,7 +2286,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             setLoading(false);
         }
     };
-            //FIM
+          
             
 const resetDatabase = async () => {
     const senha = prompt("⚠️ PERIGO: Isso apagará TODOS os dados do jogo. Digite a senha master para confirmar:");
@@ -2803,7 +2803,7 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
             //FIM
             
     // --- LÓGICA DE TREINO (APENAS XP) ---
-  const handleCoachTrain = async (playerIds, type) => {
+ const handleCoachTrain = async (playerIds, type) => {
         const currentCoach = user.data;
         if (!currentCoach || currentCoach.trainingsLeft <= 0) return alert("Sem treinos disponíveis!");
 
@@ -2814,35 +2814,27 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
 
         // 1. Identificar Perks Ativos do Técnico
         const activePerks = currentCoach.perks || [];
-        
-        // Verifica se tem Perk de Energia (FITNESS_EXPERT)
         const energyPerk = activePerks.find(p => p.type === 'ENERGY_SAVE');
-        const energyCost = energyPerk ? Math.round(10 * energyPerk.value) : 10; // Custa 10 ou 8 se tiver o perk
-
-        // Verifica se tem Perk de Crítico (MOTIVATOR)
+        const energyCost = energyPerk ? Math.round(10 * energyPerk.value) : 10; 
         const critPerk = activePerks.find(p => p.type === 'CRIT_CHANCE');
         const critBonus = critPerk ? critPerk.value : 0;
-
-        // Verifica se tem Perk de XP Mínimo (HARD_WORKER)
         const minXpPerk = activePerks.find(p => p.type === 'MIN_XP_BOOST');
         const minXpBonus = minXpPerk ? minXpPerk.value : 0;
-
-        // Verifica se tem Perk de Afinidade (POS_SPECIALIST)
         const affPerk = activePerks.find(p => p.type === 'AFFINITY_BOOST');
         const affBonus = affPerk ? affPerk.value : 0;
 
-        // Mapeamento dos tipos de treino para atributos reais (Atualizado para cobrir todos)
+        // 2. Mapeamento de Atributos (Completo e Corrigido)
         let trainedAttrs = [];
-        if(type === 'FISICO_BASE') trainedAttrs = ['stamina', 'balance', 'condition'];
+        if(type === 'FISICO_BASE') trainedAttrs = ['stamina', 'balance', 'condition', 'strength'];
         else if(type === 'VELOCIDADE') trainedAttrs = ['speed', 'accel', 'agility', 'dribbleSpd'];
         else if(type === 'IMPULSAO') trainedAttrs = ['jump', 'header', 'condition'];
-        else if(type === 'CHUTE') trainedAttrs = ['shot', 'shotPower', 'shotTech'];
-        else if(type === 'PASSE') trainedAttrs = ['shortPass', 'longPass', 'shortPassSpd', 'longPassSpd', 'tech'];
+        else if(type === 'CHUTE') trainedAttrs = ['shot', 'shotPower', 'shotTech', 'weakFootAcc'];
+        else if(type === 'PASSE') trainedAttrs = ['shortPass', 'longPass', 'shortPassSpd', 'longPassSpd', 'tech', 'weakFootFreq'];
         else if(type === 'DRIBLE') trainedAttrs = ['dribble', 'dribbleSpd', 'agility', 'tech'];
         else if(type === 'DEFESA') trainedAttrs = ['defense', 'aggression', 'response'];
         else if(type === 'MENTAL') trainedAttrs = ['teamwork', 'mentality', 'response'];
-        else if(type === 'BOLA_PARADA') trainedAttrs = ['freeKick', 'curve', 'header'];
-        else if(type === 'GOLEIRO') trainedAttrs = ['gk', 'response', 'jump'];
+        else if(type === 'BOLA_PARADA') trainedAttrs = ['freeKick', 'curve', 'header', 'penalties'];
+        else if(type === 'GOLEIRO') trainedAttrs = ['gk', 'response', 'jump', 'longPass'];
 
         playerIds.forEach(pid => {
             const p = players.find(x => x.id === pid);
@@ -2870,15 +2862,15 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
             // Gasto de Energia
             const newEnergy = Math.max(0, (p.energy || 100) - energyCost);
             
-            // Cálculo de XP Base
-            let xpGain = Math.floor(Math.random() * 5) + 5 + minXpBonus; 
+            // Cálculo de XP Base (Técnico dá mais base que treino solo)
+            let xpGain = Math.floor(Math.random() * 5) + 8 + minXpBonus; 
             
             // Afinidade Posicional
             if ((currentCoach.affinities || []).includes(p.position)) {
-                xpGain += (3 + affBonus);
+                xpGain += (5 + affBonus);
             }
 
-            // --- NOVO: BÔNUS DE ITEM EQUIPADO (CHUTEIRA/LUVA) ---
+            // Bônus de Item Equipado
             if (p.equippedItem) {
                 const itemBonusPercent = p.equippedItem.power || 0;
                 const bonusAmount = Math.ceil(xpGain * (itemBonusPercent / 100));
@@ -2890,61 +2882,53 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
                 b.update(db.collection('players').doc(pid), { equippedItem: firebase.firestore.FieldValue.delete() });
             }
 
-            // --- APLICAÇÃO DOS PERKS (TRAIN_BOOST e YOUTH_BOOST) ---
+            // Aplicação dos Perks
             activePerks.forEach(perk => {
                 if (perk.type === 'TRAIN_BOOST') {
                     const hasSynergy = perk.attrs.some(attr => trainedAttrs.includes(attr));
-                    if (hasSynergy) {
-                        xpGain = Math.round(xpGain * perk.multiplier);
-                    }
+                    if (hasSynergy) xpGain = Math.round(xpGain * perk.multiplier);
                 }
                 if (perk.type === 'YOUTH_BOOST') {
                     const age = p.age || 18;
-                    if (age <= perk.ageLimit) {
-                        xpGain = Math.round(xpGain * perk.multiplier);
-                    }
+                    if (age <= perk.ageLimit) xpGain = Math.round(xpGain * perk.multiplier);
                 }
             });
 
-            // Chance de Crítico (Grande Evolução)
+            // Chance de Crítico
             if (Math.random() < (0.10 + critBonus)) {
                 xpGain *= 2;
                 report.push(`🔥 ${p.name} teve uma GRANDE evolução!`);
             }
 
-            // Atualiza Atributos Específicos
+            // Evolução de Atributos Específicos
             let newAttrs = { ...(p.attributes || {}) };
             trainedAttrs.forEach(attr => {
                 if((newAttrs[attr] || 50) < 99) {
-                    if(Math.random() < (xpGain / 100)) {
+                    // Técnico tem mais chance de subir atributo direto que treino solo
+                    if(Math.random() < (xpGain / 80)) { 
                         newAttrs[attr] = (newAttrs[attr] || 50) + 1;
                     }
                 }
             });
 
-            // CORREÇÃO: Cálculo Inteligente do Overall (Trava de Queda)
-            const vals = Object.values(newAttrs).filter(v => typeof v === 'number');
-            const rawAvg = vals.length > 0 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : (p.overall || 60);
-            const finalOverall = Math.max(p.overall || 60, rawAvg);
-
-            // Atualiza Jogador
+            // Salva no Banco (SEM ATUALIZAR O OVERALL)
             b.update(db.collection('players').doc(pid), { 
                 xp: (p.xp || 0) + xpGain, 
                 energy: newEnergy,
-                attributes: newAttrs,
-                overall: finalOverall
+                attributes: newAttrs
+                // overall removido para só atualizar na virada de temporada
             });
             
-            coachXpGain += 15;
+            coachXpGain += 20;
         });
 
-        // Evolução do Técnico (XP dele)
+        // Evolução do Técnico
         let newCoachXp = (currentCoach.xp || 0) + coachXpGain;
         let newLevel = currentCoach.level;
         let pendingPerks = currentCoach.pendingPerks || 0;
         let pendingAffinity = currentCoach.pendingAffinity || 0;
         
-        const xpNeed = newLevel * 100;
+        const xpNeed = newLevel * 120;
         if (newCoachXp >= xpNeed && newLevel < 30) {
             newCoachXp -= xpNeed;
             newLevel++;
@@ -3547,7 +3531,7 @@ const renewContract = async (p) => {
 
 // FIM DA LÓGICA DE IMPRENSA E SÚMULAS
             // --- TREINO SOLO DO JOGADOR ---
-   const handlePlayerSoloTrain = async (player, type) => {
+  const handlePlayerSoloTrain = async (player, type) => {
         // 1. Verifica Energia (Custo alto: 35) e se está lesionado
         if ((player.energy || 100) < 35) {
             return alert("Você está exausto! Precisa de pelo menos 35% de energia.");
@@ -3575,14 +3559,14 @@ const renewContract = async (p) => {
 
         // 2. Define Atributos baseados no Tipo (Atualizado para cobrir TODOS os atributos do sistema)
         let trainedAttrs = [];
-        if(type === 'FISICO_BASE') trainedAttrs = ['stamina', 'balance', 'condition'];
+        if(type === 'FISICO_BASE') trainedAttrs = ['stamina', 'balance', 'condition', 'strength'];
         else if(type === 'VELOCIDADE') trainedAttrs = ['speed', 'accel', 'agility', 'dribbleSpd'];
         else if(type === 'IMPULSAO') trainedAttrs = ['jump', 'header', 'condition'];
-        else if(type === 'CHUTE') trainedAttrs = ['shot', 'shotPower', 'shotTech'];
+        else if(type === 'CHUTE') trainedAttrs = ['shot', 'shotPower', 'shotTech', 'weakFootAcc'];
         else if(type === 'PASSE') trainedAttrs = ['shortPass', 'longPass', 'shortPassSpd', 'longPassSpd', 'tech'];
         else if(type === 'DRIBLE') trainedAttrs = ['dribble', 'dribbleSpd', 'agility', 'tech'];
         else if(type === 'DEFESA') trainedAttrs = ['defense', 'aggression', 'response'];
-        else if(type === 'MENTAL') trainedAttrs = ['teamwork', 'mentality', 'response'];
+        else if(type === 'MENTAL') trainedAttrs = ['teamwork', 'mentality', 'response', 'weakFootFreq'];
         else if(type === 'BOLA_PARADA') trainedAttrs = ['freeKick', 'curve', 'header'];
         else if(type === 'GOLEIRO') trainedAttrs = ['gk', 'response', 'jump'];
 
@@ -3595,6 +3579,7 @@ const renewContract = async (p) => {
         let evolved = false;
         
         trainedAttrs.forEach(attr => {
+            // Garante que o atributo existe antes de tentar subir
             if((newAttrs[attr] || 50) < 99) {
                 if(Math.random() < 0.15) { // 15% de chance de subir 1 ponto
                     newAttrs[attr] = (newAttrs[attr] || 50) + 1;
@@ -3603,21 +3588,13 @@ const renewContract = async (p) => {
             }
         });
 
-        // 5. Cálculo Inteligente do Overall (Trava de Queda)
-        let finalOverall = player.overall || 60;
-        if (evolved) {
-            const vals = Object.values(newAttrs).filter(v => typeof v === 'number');
-            const rawAvg = vals.length > 0 ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : 60;
-            // Garante que o Overall nunca diminui, apenas mantém ou sobe
-            finalOverall = Math.max(player.overall, rawAvg);
-        }
-
-        // 6. Salva no Banco
+        // 5. Salva no Banco (SEM ATUALIZAR O OVERALL)
+        // O Overall agora só deve ser recalculado na virada de temporada pelo Admin
         b.update(db.collection('players').doc(player.id), {
             xp: (player.xp || 0) + xpGain,
             energy: newEnergy,
-            attributes: newAttrs,
-            overall: finalOverall
+            attributes: newAttrs
+            // overall removido daqui para evitar inflação fora de época
         });
 
         await b.commit();
@@ -3628,7 +3605,7 @@ const renewContract = async (p) => {
         alert(msg);
     };
 
-const handlePlayerActions = async (type, p) => {
+    const handlePlayerActions = async (type, p) => {
         const team = teams.find(t => t.id === p.teamId);
         
         // 1. PEDIR TRANSFERÊNCIA
@@ -3695,7 +3672,7 @@ const handlePlayerActions = async (type, p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.77.3</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.77.4</div>
                             </div>
                         </div>
                         
@@ -4073,7 +4050,7 @@ const handlePlayerActions = async (type, p) => {
         <i className="fas fa-newspaper"></i>NEWS
     </div>
 </div>
-    //FIM
+  
                     {modal && <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget && setModal(null)}>
                         <div className="modal-content">
                             {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={async(id)=>{db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} onRenew={renewContract} isOwner={user.type==='USER' && modal.data?.teamId===user.data?.id} />}
@@ -4187,7 +4164,7 @@ const handlePlayerActions = async (type, p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77.3 SERVIÇOS PUBLICOS </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77.4 SERVIÇOS PUBLICOS </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -6414,14 +6391,14 @@ const Ranking = ({ teams, players, sales }) => {
             )}
 
             {/* === MODO 2: BUSCA INDIVIDUAL (Mantido como Backup) === */}
-            {mode === 'SEARCH' && (
+           {mode === 'SEARCH' && (
                 <div>
                     {!selP ? (
                         <div>
                             <input className="input-field" placeholder="Buscar jogador..." value={search} onChange={e=>setSearch(e.target.value)} />
                             <div style={{maxHeight:300, overflowY:'auto'}}>
                                 {search.length > 0 && filtered.map(p => (
-                                    <div key={p.id} className="card" onClick={()=>{setSelP(p); setMatch({goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0, rating:'', result:'NENHUM'});}}>
+                                    <div key={p.id} className="card" onClick={()=>{setSelP(p); setMatch({goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0, rating:'', result:'NENHUM', injuredType: 'NONE'});}}>
                                         <b>{p.name} {p.recoveryLeft > 0 ? '❌' : ''}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small>
                                     </div>
                                 ))}
@@ -6433,13 +6410,24 @@ const Ranking = ({ teams, players, sales }) => {
                             <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8, marginBottom:10}}>
                                 <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
                                     <div><label>⚽ Gols</label><input className="input-field" type="number" value={match.goals} onChange={e=>setMatch({...match, goals:parseInt(e.target.value)})} /></div>
-                                    <div><label>👟 Assistências</label><input className="input-field" type="number" value={match.assists} onChange={e=>setMatch({...match, assists:parseInt(e.target.value)})} /></div>
-                                    <div><label>🛡️ Desarmes</label><input className="input-field" type="number" value={match.tackles} onChange={e=>setMatch({...match, tackles:parseInt(e.target.value)})} /></div>
-                                    <div><label>🧤 Defesas</label><input className="input-field" type="number" value={match.saves} onChange={e=>setMatch({...match, saves:parseInt(e.target.value)})} /></div>
-                                    <div><label>🟨 Amarelo</label><input className="input-field" type="number" value={match.yellows} onChange={e=>setMatch({...match, yellows:parseInt(e.target.value)})} /></div>
-                                    <div><label>🟥 Vermelho</label><input className="input-field" type="number" value={match.reds} onChange={e=>setMatch({...match, reds:parseInt(e.target.value)})} /></div>
+                                    <div><label>👟 Assist</label><input className="input-field" type="number" value={match.assists} onChange={e=>setMatch({...match, assists:parseInt(e.target.value)})} /></div>
+                                    <div><label>🛡️ Desar</label><input className="input-field" type="number" value={match.tackles} onChange={e=>setMatch({...match, tackles:parseInt(e.target.value)})} /></div>
+                                    <div><label>🧤 Defes</label><input className="input-field" type="number" value={match.saves} onChange={e=>setMatch({...match, saves:parseInt(e.target.value)})} /></div>
+                                    <div><label>🟨 Amar</label><input className="input-field" type="number" value={match.yellows} onChange={e=>setMatch({...match, yellows:parseInt(e.target.value)})} /></div>
+                                    <div><label>🟥 Verm</label><input className="input-field" type="number" value={match.reds} onChange={e=>setMatch({...match, reds:parseInt(e.target.value)})} /></div>
                                 </div>
                                 <hr style={{borderColor:'#444'}}/>
+                                
+                                {/* --- SELETOR DE LESÃO ADICIONADO AQUI --- */}
+                                <div style={{marginBottom:10, border:'1px dashed #ff1744', padding:5, borderRadius:5}}>
+                                    <label style={{color:'#ff1744'}}>🚑 Ocorreu Lesão?</label>
+                                    <select className="input-field" value={match.injuredType || 'NONE'} onChange={e=>setMatch({...match, injuredType:e.target.value})}>
+                                        <option value="NONE">✅ Não, Saudável</option>
+                                        <option value="WALKING">🚶 Sim (Leve/Moderada)</option>
+                                        <option value="AMBULANCE">🚑 Sim (Grave/Ambulância)</option>
+                                    </select>
+                                </div>
+
                                 <label>⭐ Nota (0.0 - 10.0)</label>
                                 <input className="input-field" type="number" step="0.1" value={match.rating} onChange={e=>setMatch({...match, rating:e.target.value})} />
                                 <label>🚩 Resultado</label>
@@ -6451,17 +6439,23 @@ const Ranking = ({ teams, players, sales }) => {
                                 </select>
                             </div>
                             <div style={{display:'flex', gap:10}}>
-                                <button className="btn btn-green" onClick={()=>onSaveStats([{ player: selP, match: match }])}>LANÇAR</button>
+                                <button className="btn btn-green" onClick={()=>{
+                                    // Processa a lesão no modo individual antes de salvar
+                                    let finalMatch = {...match};
+                                    if(match.injuredType && match.injuredType !== 'NONE') {
+                                        const injuryData = rollInjury(match.injuredType === 'AMBULANCE');
+                                        finalMatch.injury = injuryData.name;
+                                        finalMatch.recoveryLeft = injuryData.time;
+                                    }
+                                    onSaveStats([{ player: selP, match: finalMatch }]);
+                                }}>LANÇAR</button>
                                 <button className="btn" onClick={()=>setSelP(null)}>VOLTAR</button>
                             </div>
                         </div>
                     )}
                 </div>
             )}
-        </div>
-    );
-};
-    //FIM
+   
 
 
   const TeamStandingsEditor = ({ teams, onUpdateTeamStats }) => {

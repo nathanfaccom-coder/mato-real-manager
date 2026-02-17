@@ -3542,6 +3542,7 @@ const renewContract = async (p) => {
 
         setLoading(true);
         const b = db.batch();
+        let report = [];
 
         // --- CHANCE DE LESÃO AUTOMÁTICA (2%) ---
         if (Math.random() < 0.02) {
@@ -3549,7 +3550,7 @@ const renewContract = async (p) => {
             b.update(db.collection('players').doc(player.id), {
                 injury: injuryName,
                 recoveryLeft: 1,
-                energy: (player.energy || 100) - 20, // Gasta um pouco de energia no susto
+                energy: Math.max(0, (player.energy || 100) - 20), // Gasta um pouco de energia no susto
                 mood: '😡'
             });
             await b.commit();
@@ -3563,23 +3564,35 @@ const renewContract = async (p) => {
         else if(type === 'VELOCIDADE') trainedAttrs = ['speed', 'accel', 'agility', 'dribbleSpd'];
         else if(type === 'IMPULSAO') trainedAttrs = ['jump', 'header', 'condition'];
         else if(type === 'CHUTE') trainedAttrs = ['shot', 'shotPower', 'shotTech', 'weakFootAcc'];
-        else if(type === 'PASSE') trainedAttrs = ['shortPass', 'longPass', 'shortPassSpd', 'longPassSpd', 'tech'];
+        else if(type === 'PASSE') trainedAttrs = ['shortPass', 'longPass', 'shortPassSpd', 'longPassSpd', 'tech', 'weakFootFreq'];
         else if(type === 'DRIBLE') trainedAttrs = ['dribble', 'dribbleSpd', 'agility', 'tech'];
         else if(type === 'DEFESA') trainedAttrs = ['defense', 'aggression', 'response'];
-        else if(type === 'MENTAL') trainedAttrs = ['teamwork', 'mentality', 'response', 'weakFootFreq'];
-        else if(type === 'BOLA_PARADA') trainedAttrs = ['freeKick', 'curve', 'header'];
-        else if(type === 'GOLEIRO') trainedAttrs = ['gk', 'response', 'jump'];
+        else if(type === 'MENTAL') trainedAttrs = ['teamwork', 'mentality', 'response'];
+        else if(type === 'BOLA_PARADA') trainedAttrs = ['freeKick', 'curve', 'header', 'penalties'];
+        else if(type === 'GOLEIRO') trainedAttrs = ['gk', 'response', 'jump', 'longPass'];
 
         // 3. Cálculos (Eficiência Baixa no Solo)
-        const xpGain = Math.floor(Math.random() * 4) + 3; // Ganha entre 3 e 6 XP
+        let xpGain = Math.floor(Math.random() * 4) + 3; // Ganha entre 3 e 6 XP
         const newEnergy = (player.energy || 100) - 35; // Gasta 35 de Energia
+
+        // --- BÔNUS DE ITEM EQUIPADO (CHUTEIRA/LUVA) ---
+        if (player.equippedItem) {
+            const itemBonusPercent = player.equippedItem.power || 0;
+            const bonusAmount = Math.ceil(xpGain * (itemBonusPercent / 100));
+            xpGain += bonusAmount;
+            report.push(`👟 Item usado: ${player.equippedItem.name} (+${bonusAmount} XP)`);
+            
+            // Consome o item (remove da coleção sales e do player)
+            const itemRef = db.collection('sales').doc(player.equippedItem.id);
+            b.delete(itemRef);
+            b.update(db.collection('players').doc(player.id), { equippedItem: firebase.firestore.FieldValue.delete() });
+        }
 
         // 4. Evolução de Atributos (Chance Baixa: 15%)
         let newAttrs = { ...(player.attributes || {}) };
         let evolved = false;
         
         trainedAttrs.forEach(attr => {
-            // Garante que o atributo existe antes de tentar subir
             if((newAttrs[attr] || 50) < 99) {
                 if(Math.random() < 0.15) { // 15% de chance de subir 1 ponto
                     newAttrs[attr] = (newAttrs[attr] || 50) + 1;
@@ -3594,13 +3607,14 @@ const renewContract = async (p) => {
             xp: (player.xp || 0) + xpGain,
             energy: newEnergy,
             attributes: newAttrs
-            // overall removido daqui para evitar inflação fora de época
+            // overall removido para evitar inflação fora de época
         });
 
         await b.commit();
         setLoading(false);
         
         let msg = `Treino realizado!\n⚡ Energia: -35%\n📈 XP: +${xpGain}`;
+        if(report.length > 0) msg += `\n${report.join('\n')}`;
         if(evolved) msg += "\n✨ Alguns atributos melhoraram um pouco.";
         alert(msg);
     };
@@ -4915,7 +4929,7 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
 };
         // ... continuação do código anterior
 
-      const ShoppingScreen = ({ products, companies, userTeam, onBuy }) => {
+     const ShoppingScreen = ({ products, companies, userTeam, onBuy }) => {
     const [view, setView] = useState('MALL'); // MALL ou STORE
     const [selComp, setSelComp] = useState(null);
     
@@ -6172,7 +6186,7 @@ const Ranking = ({ teams, players, sales }) => {
 
 // --- COMPONENTES QUE FALTAVAM (Súmula e Tabela) ---
 
-       const MatchPerformanceForm = ({ players, teams, onSaveStats }) => {
+      const MatchPerformanceForm = ({ players, teams, onSaveStats }) => {
     const [mode, setMode] = useState('TEAM'); 
     
     // --- ESTADOS DO MODO SÚMULA RÁPIDA (TIME) ---
@@ -6182,7 +6196,7 @@ const Ranking = ({ teams, players, sales }) => {
 
     // --- ESTADOS DO MODO INDIVIDUAL (ANTIGO) ---
     const [selP, setSelP] = useState(null);
-    const [match, setMatch] = useState({ goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0, rating:'', result:'NENHUM' }); 
+    const [match, setMatch] = useState({ goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0, rating:'', result:'NENHUM', injuredType: 'NONE' }); 
     const [search, setSearch] = useState('');
 
     // --- LÓGICA DE SORTEIO DE LESÃO (SÚMULA) ---
@@ -6390,7 +6404,7 @@ const Ranking = ({ teams, players, sales }) => {
                 </div>
             )}
 
-            {/* === MODO 2: BUSCA INDIVIDUAL (Mantido como Backup) === */}
+            {/* === MODO 2: BUSCA INDIVIDUAL (Mantido e Corrigido) === */}
            {mode === 'SEARCH' && (
                 <div>
                     {!selP ? (
@@ -6418,11 +6432,11 @@ const Ranking = ({ teams, players, sales }) => {
                                 </div>
                                 <hr style={{borderColor:'#444'}}/>
                                 
-                                {/* --- SELETOR DE LESÃO ADICIONADO AQUI --- */}
+                                {/* --- SELETOR DE LESÃO NO MODO INDIVIDUAL --- */}
                                 <div style={{marginBottom:10, border:'1px dashed #ff1744', padding:5, borderRadius:5}}>
-                                    <label style={{color:'#ff1744'}}>🚑 Ocorreu Lesão?</label>
-                                    <select className="input-field" value={match.injuredType || 'NONE'} onChange={e=>setMatch({...match, injuredType:e.target.value})}>
-                                        <option value="NONE">✅ Não, Saudável</option>
+                                    <label style={{color:'#ff1744', fontSize:11}}>🚑 Ocorreu Lesão?</label>
+                                    <select className="input-field" value={match.injuredType} onChange={e=>setMatch({...match, injuredType:e.target.value})}>
+                                        <option value="NONE">✅ Não</option>
                                         <option value="WALKING">🚶 Sim (Leve/Moderada)</option>
                                         <option value="AMBULANCE">🚑 Sim (Grave/Ambulância)</option>
                                     </select>
@@ -6440,12 +6454,12 @@ const Ranking = ({ teams, players, sales }) => {
                             </div>
                             <div style={{display:'flex', gap:10}}>
                                 <button className="btn btn-green" onClick={()=>{
-                                    // Processa a lesão no modo individual antes de salvar
                                     let finalMatch = {...match};
+                                    // Processa a lesão no modo individual
                                     if(match.injuredType && match.injuredType !== 'NONE') {
-                                        const injuryData = rollInjury(match.injuredType === 'AMBULANCE');
-                                        finalMatch.injury = injuryData.name;
-                                        finalMatch.recoveryLeft = injuryData.time;
+                                        const inj = rollInjury(match.injuredType === 'AMBULANCE');
+                                        finalMatch.injury = inj.name;
+                                        finalMatch.recoveryLeft = inj.time;
                                     }
                                     onSaveStats([{ player: selP, match: finalMatch }]);
                                 }}>LANÇAR</button>
@@ -6455,35 +6469,36 @@ const Ranking = ({ teams, players, sales }) => {
                     )}
                 </div>
             )}
-   
+        </div>
+    );
+};
 
-
-  const TeamStandingsEditor = ({ teams, onUpdateTeamStats }) => {
-            return (
-                <div>
-                    <h3>Editar Tabela (Jornalista)</h3>
-                    <div style={{maxHeight:400, overflowY:'auto'}}>
-                        {teams.filter(t=>t.status!=='PENDING').map(t => (
-                            <div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                <div style={{width:'30%'}}><b>{t.name}</b></div>
-                                <div style={{display:'flex', gap:5}}>
-                                    <div style={{textAlign:'center'}}><small>V</small><input className="input-field" type="number" style={{width:40, padding:5, marginBottom:0}} defaultValue={t.stats?.wins||0} id={`w-${t.id}`} /></div>
-                                    <div style={{textAlign:'center'}}><small>E</small><input className="input-field" type="number" style={{width:40, padding:5, marginBottom:0}} defaultValue={t.stats?.draws||0} id={`d-${t.id}`} /></div>
-                                    <div style={{textAlign:'center'}}><small>D</small><input className="input-field" type="number" style={{width:40, padding:5, marginBottom:0}} defaultValue={t.stats?.losses||0} id={`l-${t.id}`} /></div>
-                                    <button className="btn btn-green" style={{width:'auto', height:35, marginTop:18}} onClick={()=>{
-                                        const w = parseInt(document.getElementById(`w-${t.id}`).value)||0;
-                                        const d = parseInt(document.getElementById(`d-${t.id}`).value)||0;
-                                        const l = parseInt(document.getElementById(`l-${t.id}`).value)||0;
-                                        onUpdateTeamStats(t.id, {wins:w, draws:d, losses:l});
-                                    }}>💾</button>
-                                </div>
-                            </div>
-                        ))}
+const TeamStandingsEditor = ({ teams, onUpdateTeamStats }) => {
+    return (
+        <div>
+            <h3>Editar Tabela (Jornalista)</h3>
+            <div style={{maxHeight:400, overflowY:'auto'}}>
+                {teams.filter(t=>t.status!=='PENDING').map(t => (
+                    <div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                        <div style={{width:'30%'}}><b>{String(t.name)}</b></div>
+                        <div style={{display:'flex', gap:5}}>
+                            <div style={{textAlign:'center'}}><small>V</small><input className="input-field" type="number" style={{width:40, padding:5, marginBottom:0}} defaultValue={t.stats?.wins||0} id={`w-${t.id}`} /></div>
+                            <div style={{textAlign:'center'}}><small>E</small><input className="input-field" type="number" style={{width:40, padding:5, marginBottom:0}} defaultValue={t.stats?.draws||0} id={`d-${t.id}`} /></div>
+                            <div style={{textAlign:'center'}}><small>D</small><input className="input-field" type="number" style={{width:40, padding:5, marginBottom:0}} defaultValue={t.stats?.losses||0} id={`l-${t.id}`} /></div>
+                            <button className="btn btn-green" style={{width:'auto', height:35, marginTop:18}} onClick={()=>{
+                                const w = parseInt(document.getElementById(`w-${t.id}`).value)||0;
+                                const d = parseInt(document.getElementById(`d-${t.id}`).value)||0;
+                                const l = parseInt(document.getElementById(`l-${t.id}`).value)||0;
+                                onUpdateTeamStats(t.id, {wins:w, draws:d, losses:l});
+                            }}>💾</button>
+                        </div>
                     </div>
-                </div>
-            );
-        };
-//fim
+                ))}
+            </div>
+        </div>
+    );
+};
+
        const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<ErrorBoundary><App /></ErrorBoundary>);
 

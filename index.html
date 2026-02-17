@@ -2312,7 +2312,7 @@ const resetDatabase = async () => {
     setLoading(false);
 };
 
-const AdminPanel = ({ teams, onGenFixtures, onTurnSeasonAdvanced, papers, journalists, companies, coaches, reqs, sps, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onApprovePaper, onDeletePaper, onDeleteJourno, onRejectPaper, onConfig, onReset, onApproveComp, onDeleteComp, onUpdateCompBal, onGenAttrs }) => {    
+const AdminPanel = ({ teams, onGenFixtures, onTurnSeasonAdvanced, papers, journalists, companies, coaches, reqs, sps, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onApprovePaper, onDeletePaper, onDeleteJourno, onRejectPaper, onConfig, onReset, onApproveComp, onDeleteComp, onUpdateCompBal, onGenAttrs }) => {      
     const [tab, setTab] = useState('DASH');
 
     const tabStyle = (active) => ({
@@ -2325,8 +2325,105 @@ const AdminPanel = ({ teams, onGenFixtures, onTurnSeasonAdvanced, papers, journa
         fontWeight: 'bold'
     });
 
-    // Filtra os patrocínios que são da Federação (Governo)
     const fedSpons = (sps || []).filter(s => s.companyId === 'FEDERACAO');
+
+    // --- NOVA FUNÇÃO: CORRIGIR PREÇOS DO SHOP (ANTI-CHEAT) ---
+    const fixShopPrices = async () => {
+        if(!confirm("⚠️ ANTI-CHEAT SHOP:\nIsso vai varrer TODOS os produtos e corrigir o preço daqueles que estiverem abaixo do custo de produção.\n\nDeseja aplicar a correção?")) return;
+        
+        try {
+            setLoading(true);
+            const snap = await db.collection('products').get();
+            const b = db.batch();
+            let count = 0;
+            
+            snap.docs.forEach(doc => {
+                const p = doc.data();
+                const minCost = getProdCost(p.cat, p.power); // Usa a função global de custo
+                
+                // Se o custo for maior que 0 e o preço atual for menor que o custo
+                if (minCost > 0 && (parseFloat(p.price) || 0) < minCost) {
+                    b.update(doc.ref, { price: minCost });
+                    count++;
+                }
+            });
+            
+            if(count > 0) {
+                await b.commit();
+                alert(`✅ SUCESSO!\n${count} produtos estavam com preço ilegal e foram corrigidos para o valor mínimo.`);
+            } else {
+                alert("👍 Tudo certo! Nenhum produto com preço irregular encontrado.");
+            }
+        } catch(e) {
+            alert("Erro: " + e.message);
+        }
+        setLoading(false);
+    };
+
+    // --- NOVA FUNÇÃO: ABONO COLETIVO (EVENTOS) ---
+    const giveMassGrant = async () => {
+        const target = prompt("🎁 ABONO COLETIVO - QUEM VAI RECEBER?\n\n1: Jogadores (Todos)\n2: Jogadores (Apenas Contratados)\n3: Times\n4: Empresas\n5: Técnicos");
+        if(!target) return;
+        
+        const amountStr = prompt("💰 QUAL O VALOR DO BÔNUS? (Ex: 10000)");
+        if(!amountStr) return;
+        const amount = parseFloat(amountStr);
+        if(isNaN(amount) || amount <= 0) return alert("Valor inválido");
+        
+        const reason = prompt("📝 MOTIVO (Aparecerá no jornal):", "🎁 Bônus de Feriado");
+
+        let collectionName = '';
+        let typeName = '';
+        let filterFn = () => true; // Filtro padrão (todos)
+
+        if(target === '1') { collectionName = 'players'; typeName = 'Jogadores'; }
+        else if(target === '2') { 
+            collectionName = 'players'; 
+            typeName = 'Jogadores Contratados';
+            filterFn = (d) => d.teamId && d.teamId !== 'FREE'; 
+        }
+        else if(target === '3') { collectionName = 'teams'; typeName = 'Times'; }
+        else if(target === '4') { collectionName = 'companies'; typeName = 'Empresas'; }
+        else if(target === '5') { collectionName = 'users'; typeName = 'Técnicos'; } 
+        else return alert("Opção inválida");
+        
+        if(!confirm(`CONFIRMA?\nDar ${fmt(amount)} para ${typeName.toUpperCase()}?\nMotivo: ${reason}`)) return;
+
+        try {
+            setLoading(true);
+            const b = db.batch();
+            let q = db.collection(collectionName);
+            
+            // Se for técnico, filtra no banco
+            if(target === '5') q = q.where('type', '==', 'COACH');
+            
+            const snap = await q.get();
+            let count = 0;
+
+            snap.docs.forEach(doc => {
+                const d = doc.data();
+                // Aplica filtros extras (ex: status pendente ou jogadores sem time)
+                if(d.status === 'PENDING' || d.status === 'BLOCKED') return;
+                if(!filterFn(d)) return; 
+                
+                b.update(doc.ref, { balance: firebase.firestore.FieldValue.increment(amount) });
+                count++;
+            });
+            
+            // Posta notícia automática
+            db.collection('news').add({
+                text: `🎉 **${reason.toUpperCase()}**\nA Federação concedeu um bônus de ${fmt(amount)} para os **${typeName}**!`,
+                type: 'money',
+                date: Date.now()
+            });
+
+            await b.commit();
+            alert(`✅ Sucesso! Bônus enviado para ${count} ${typeName}.`);
+        } catch(e) {
+            alert("Erro: " + e.message);
+        }
+        setLoading(false);
+    };
 
     return (
         <div>
@@ -2411,20 +2508,30 @@ const AdminPanel = ({ teams, onGenFixtures, onTurnSeasonAdvanced, papers, journa
 
             {tab==='DASH' && <div>
                 <div className="card" style={{border: '1px solid var(--danger)'}}>
+                    <h4 style={{marginTop:0, color:'var(--danger)'}}>🎮 Controle do Jogo</h4>
                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10}}>
                         <button className={`btn ${config.marketOpen?'btn-red':'btn-green'}`} onClick={()=>onAct('MARKET', !config.marketOpen)}>{config.marketOpen?'FECHAR MERCADO':'ABRIR MERCADO'}</button>
                         <button className="btn btn-purple" onClick={()=>onAct('WEEK')}>VIRAR SEMANA</button>
+                    </div>
+
+                    {/* NOVOS BOTÕES DE EVENTOS E CORREÇÕES */}
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10}}>
+                        <button className="btn" style={{background:'#E65100', color:'white'}} onClick={fixShopPrices}>
+                            🛠️ CORRIGIR SHOP
+                        </button>
+                        <button className="btn" style={{background:'#00E676', color:'black'}} onClick={giveMassGrant}>
+                            🎁 ABONO COLETIVO
+                        </button>
                     </div>
                     
                     {/* BOTÃO DE LIMPEZA DE MOCHILAS */}
                     <button 
                         className="btn" 
-                        style={{background: '#442200', color: '#ffaa00', border: '1px solid #ffaa00', marginTop: 0}} 
+                        style={{background: '#442200', color: '#ffaa00', border: '1px solid #ffaa00', marginTop: 10}} 
                         onClick={async () => {
                             if(confirm("⚠️ ATENÇÃO: Isso vai apagar TODOS os itens de TODAS as mochilas e resetar a Fama de todos para 0. Isso limpa bugs de itens antigos. Continuar?")) {
                                 const senha = prompt("Confirme a senha master:");
                                 if(senha === '2503') {
-                                    setLoading(true);
                                     try {
                                         const b = db.batch();
                                         const salesSnap = await db.collection('sales').get();
@@ -2442,7 +2549,6 @@ const AdminPanel = ({ teams, onGenFixtures, onTurnSeasonAdvanced, papers, journa
                                     } catch(e) {
                                         alert("Erro na faxina: " + e.message);
                                     }
-                                    setLoading(false);
                                 }
                             }
                         }}
@@ -2450,13 +2556,12 @@ const AdminPanel = ({ teams, onGenFixtures, onTurnSeasonAdvanced, papers, journa
                         <i className="fas fa-broom"></i> LIMPAR TODAS AS MOCHILAS (FIX BUG)
                     </button>
 
-                   {/* BOTÃO DE AVANÇO DE RECUPERAÇÃO */}
+                    {/* BOTÃO DE AVANÇO DE RECUPERAÇÃO */}
                     <button 
                         className="btn" 
                         style={{background: '#b71c1c', color: 'white', marginTop: 10}} 
                         onClick={async () => {
                             if(confirm("Deseja reduzir 1 jogo de recuperação de TODOS os jogadores lesionados? Use isso APÓS a realização de uma partida.")) {
-                                setLoading(true);
                                 try {
                                     const b = db.batch();
                                     // Pega todos os jogadores para filtrar manualmente e evitar erro de índice
@@ -2494,7 +2599,6 @@ const AdminPanel = ({ teams, onGenFixtures, onTurnSeasonAdvanced, papers, journa
                                     console.error(e);
                                     alert("Erro: " + e.message);
                                 }
-                                setLoading(false);
                             }
                         }}
                     >
@@ -2524,7 +2628,7 @@ const AdminPanel = ({ teams, onGenFixtures, onTurnSeasonAdvanced, papers, journa
                 {(teams||[]).filter(t=>t.status==='PENDING').map(t=><div key={t.id} className="card" style={{borderLeft:'4px solid var(--warning)'}}><b>{t.name}</b><div style={{display:'flex', gap:5}}><input className="input-field" style={{marginBottom:0, width:100}} defaultValue={t.balance} id={`bal-${t.id}`} /><button className="btn btn-green" onClick={()=>onApproveTeam(t.id, document.getElementById(`bal-${t.id}`).value)}>V</button><button className="btn btn-red" onClick={()=>onDeleteTeam(t.id)}>X</button></div></div>)}
                 
                 <h4>Clubes</h4>
-                {(teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>{t.name}</span><div><button className="btn btn-ghost" style={{width:'auto', marginRight:5}} onClick={()=>onConfig(t)}><i className="fas fa-cog"></i></button><button className="btn btn-green" style={{width:'auto', marginRight:5}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button><button className="btn btn-purple" style={{width:'auto'}} onClick={()=>onEditT(t)}>ELENCO</button><button className="btn btn-red" style={{width:'auto', marginLeft:5}} onClick={()=>onDeleteTeam(t.id)}><i className="fas fa-trash"></i></button></div></div>)}
+                {(teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between'}}><span>{t.name} {t.recoveryLeft > 0 ? '❌' : ''}</span><div><button className="btn btn-ghost" style={{width:'auto', marginRight:5}} onClick={()=>onConfig(t)}><i className="fas fa-cog"></i></button><button className="btn btn-green" style={{width:'auto', marginRight:5}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button><button className="btn btn-purple" style={{width:'auto'}} onClick={()=>onEditT(t)}>ELENCO</button><button className="btn btn-red" style={{width:'auto', marginLeft:5}} onClick={()=>onDeleteTeam(t.id)}><i className="fas fa-trash"></i></button></div></div>)}
             </div>}
 
             {tab==='FINANCE' && <div>
@@ -3686,7 +3790,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.77.4</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.77.5</div>
                             </div>
                         </div>
                         
@@ -3903,8 +4007,17 @@ const renewContract = async (p) => {
                             />
                         )}
 
-                        {screen === 'SHOPPING' && <ShoppingScreen products={products} companies={companies} userTeam={user.type==='USER' || user.type==='PLAYER' || user.type==='COACH'} onBuy={buyProduct} />}
-                        
+
+        {screen === 'SHOPPING' && 
+                            <ShoppingScreen 
+                                products={products} 
+                                companies={companies} 
+                                user={user} // Passa o usuário para checar Admin
+                                userTeam={user.type==='USER' || user.type==='PLAYER' || user.type==='COACH'} 
+                                onBuy={buyProduct} 
+                                onDeleteProd={async(id)=>{if(confirm("Admin: Excluir produto?")) await db.collection('products').doc(id).delete();}} // Função de deletar
+                            />
+                        }
                         {screen === 'SPONSORSHIPS' && user.type === 'USER' && (
                             <div>
                                 <h3>Buscar Patrocínio</h3>
@@ -4178,7 +4291,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77.4 SERVIÇOS PUBLICOS </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77.5 SERVIÇOS PUBLICOS </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -4527,10 +4640,14 @@ const VisitorDashboard = ({ players, teams }) => {
                         
                         <div style={{display:'flex', gap:10}}>
                             <button className="btn btn-green" onClick={()=>{
+                                // --- LÓGICA ANTI-CHEAT IMPLEMENTADA AQUI ---
                                 const cost = getProdCost(editP.cat, editP.power);
-                                if(cost > 0 && parseFloat(editP.price) < cost) {
-                                    if(!confirm("⚠️ AVISO: O preço de venda é menor que o custo de produção! Você terá prejuízo. Continuar?")) return;
+                                const price = parseFloat(editP.price);
+                                
+                                if(cost > 0 && price < cost) {
+                                    return alert(`🚫 ANTI-CHEAT ATIVADO!\n\nVocê não pode vender este item abaixo do custo de produção.\n\nCusto Mínimo: ${fmt(cost)}\nSeu Preço: ${fmt(price)}`);
                                 }
+                                
                                 onSaveProd(editP); setEditP(null);
                             }}>SALVAR</button>
                             <button className="btn" onClick={()=>setEditP(null)}>CANCELAR</button>
@@ -4929,7 +5046,7 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
 };
         // ... continuação do código anterior
 
-     const ShoppingScreen = ({ products, companies, userTeam, onBuy }) => {
+    const ShoppingScreen = ({ products, companies, user, onBuy, onDeleteProd }) => {
     const [view, setView] = useState('MALL'); // MALL ou STORE
     const [selComp, setSelComp] = useState(null);
     
@@ -4953,6 +5070,8 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
 
     // --- VISÃO DA LOJA ESPECÍFICA (VITRINE) ---
     const storeProducts = products.filter(p => p.companyId === selComp.id);
+    const isAdmin = user && user.type === 'ADMIN';
+    const userTeam = user && (user.type === 'USER' || user.type === 'PLAYER' || user.type === 'COACH');
 
     return (
         <div>
@@ -4963,6 +5082,7 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                 <div>
                     <h2 style={{margin:0}}>{String(selComp.name)}</h2>
                     <small style={{color:'var(--purple)'}}>Vitrine Oficial</small>
+                    <div style={{fontSize:11, color:'#aaa', marginTop:2}}>Proprietário: <b>{selComp.owner || 'Desconhecido'}</b></div>
                 </div>
             </div>
 
@@ -4994,7 +5114,16 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                             </div>
 
                             <div style={{color:'var(--primary)', fontWeight:'900', fontSize:14}}>{fmt(p.price)}</div>
-                            {userTeam && <button className="btn btn-green" style={{marginTop:5, fontSize:10}} onClick={()=>onBuy(p, selComp)}>COMPRAR</button>}
+                            
+                            <div style={{display:'flex', gap:5, marginTop:5}}>
+                                {userTeam && <button className="btn btn-green" style={{fontSize:10, flex:1}} onClick={()=>onBuy(p, selComp)}>COMPRAR</button>}
+                                
+                                {isAdmin && (
+                                    <button className="btn btn-red" style={{width:'auto', padding:'0 10px'}} onClick={()=>onDeleteProd(p.id)}>
+                                        <i className="fas fa-trash"></i>
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     );
                 })}

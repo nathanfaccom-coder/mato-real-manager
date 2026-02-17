@@ -1039,7 +1039,121 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     );
 };
         //FIM
-       
+       // --- COMPONENTE DE REDE SOCIAL (MATOGRAM) ---
+const SocialFeed = ({ user, posts, onPost, onLike, onDeletePost }) => {
+    const [newText, setNewText] = useState('');
+    const [newImg, setNewImg] = useState(null);
+    const [loading, setLoading] = useState(false);
+
+    // Compressão de Imagem para o Feed (Máx 600px)
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (ev) => {
+            const img = new Image();
+            img.src = ev.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const MAX_W = 600; // Tamanho ideal para feed mobile
+                let w = img.width;
+                let h = img.height;
+                
+                if (w > MAX_W) { h *= MAX_W / w; w = MAX_W; }
+                
+                canvas.width = w;
+                canvas.height = h;
+                ctx.drawImage(img, 0, 0, w, h);
+                setNewImg(canvas.toDataURL('image/jpeg', 0.7)); // Qualidade 70%
+            };
+        };
+    };
+
+    const submitPost = async () => {
+        if (!newText && !newImg) return alert("Escreva algo ou poste uma foto!");
+        setLoading(true);
+        await onPost(newText, newImg);
+        setNewText('');
+        setNewImg(null);
+        setLoading(false);
+    };
+
+    return (
+        <div style={{paddingBottom: 60}}>
+            <h3 style={{textAlign:'center', color:'var(--purple)'}}>📸 MatoGram</h3>
+            
+            {/* ÁREA DE POSTAR */}
+            <div className="card" style={{marginBottom: 20, border: '1px solid var(--purple)'}}>
+                <textarea 
+                    className="input-field" 
+                    rows="2" 
+                    placeholder={`No que você está pensando, ${user.data.name}?`}
+                    value={newText}
+                    onChange={e => setNewText(e.target.value)}
+                    style={{resize:'none'}}
+                />
+                
+                {newImg && (
+                    <div style={{position:'relative', marginBottom:10}}>
+                        <img src={newImg} style={{width:'100%', borderRadius:8, maxHeight:200, objectFit:'cover'}} />
+                        <button 
+                            style={{position:'absolute', top:5, right:5, background:'red', color:'white', border:'none', borderRadius:'50%', width:25, height:25, cursor:'pointer'}}
+                            onClick={() => setNewImg(null)}
+                        >X</button>
+                    </div>
+                )}
+
+                <div style={{display:'flex', gap:10}}>
+                    <label className="btn btn-ghost" style={{flex:1, marginBottom:0, display:'flex', alignItems:'center', justifyContent:'center'}}>
+                        <i className="fas fa-camera" style={{marginRight:5}}></i> FOTO
+                        <input type="file" accept="image/*" style={{display:'none'}} onChange={handleImageChange} />
+                    </label>
+                    <button className="btn btn-purple" style={{flex:2, marginBottom:0}} onClick={submitPost} disabled={loading}>
+                        {loading ? 'ENVIANDO...' : 'PUBLICAR'}
+                    </button>
+                </div>
+            </div>
+
+            {/* FEED DE POSTS */}
+            {posts.length === 0 && <p style={{textAlign:'center', color:'#666'}}>Seja o primeiro a postar algo!</p>}
+            
+            {posts.map(p => (
+                <div key={p.id} className="card" style={{padding:0, overflow:'hidden', marginBottom:15}}>
+                    {/* CABEÇALHO DO POST */}
+                    <div style={{padding:10, display:'flex', alignItems:'center', gap:10, background:'rgba(0,0,0,0.2)'}}>
+                        {p.authorLogo ? <img src={p.authorLogo} style={{width:30, height:30, borderRadius:'50%'}} /> : <div style={{width:30, height:30, background:'#333', borderRadius:'50%'}}></div>}
+                        <div>
+                            <b style={{fontSize:13}}>{p.authorName}</b>
+                            <div style={{fontSize:9, color:'#888'}}>{new Date(p.date).toLocaleString()}</div>
+                        </div>
+                        {/* Botão de Delete (Se for dono ou Admin) */}
+                        {(user.type === 'ADMIN' || user.data.id === p.authorId) && (
+                            <i className="fas fa-trash" style={{marginLeft:'auto', color:'#666', cursor:'pointer'}} onClick={() => onDeletePost(p.id)}></i>
+                        )}
+                    </div>
+
+                    {/* CONTEÚDO */}
+                    {p.img && <img src={p.img} style={{width:'100%', maxHeight:400, objectFit:'cover'}} />}
+                    {p.text && <div style={{padding:'10px 10px 5px 10px', fontSize:13, lineHeight:1.4}}>{p.text}</div>}
+
+                    {/* RODAPÉ (LIKES) */}
+                    <div style={{padding:10, borderTop:'1px solid #333', display:'flex', alignItems:'center', gap:5}}>
+                        <button 
+                            style={{background:'transparent', border:'none', color: (p.likes || []).includes(user.data.id) ? 'red' : '#ccc', cursor:'pointer', fontSize:18}}
+                            onClick={() => onLike(p)}
+                        >
+                            ❤
+                        </button>
+                        <span style={{fontSize:12, fontWeight:'bold'}}>{(p.likes || []).length} curtidas</span>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
+        //FIM
         function App() {
             const [user, setUser] = useState(null); 
             const [teams, setTeams] = useState([]);
@@ -1055,6 +1169,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             const [sps, setSps] = useState([]);
             const [coaches, setCoaches] = useState([]); 
             const [matches, setMatches] = useState([]);
+            const [posts, setPosts] = useState([]);
             const [screen, setScreen] = useState('HOME');
             const [modal, setModal] = useState(null);
             const [loading, setLoading] = useState(true);
@@ -1075,11 +1190,10 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             db.collection('products').onSnapshot(s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()})))),
             db.collection('sponsorships').onSnapshot(s => setSps(s.docs.map(d => ({id:d.id, ...d.data()})))),
             
-            // CORREÇÃO CRÍTICA AQUI: Adicionado {id: d.id, ...} para que o botão de usar/deletar funcione
             db.collection('sales').orderBy('date', 'desc').limit(50).onSnapshot(s => {
-    const cleanData = s.docs.map(d => ({id:d.id, ...d.data()}));
-    setSales(cleanData);
-}),
+                const cleanData = s.docs.map(d => ({id:d.id, ...d.data()}));
+                setSales(cleanData);
+            }),
             
             db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => { 
                 const list = s.docs.map(d => ({id:d.id, ...d.data()})); 
@@ -1092,12 +1206,16 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             db.collection('users').where('type', '==', 'COACH').onSnapshot(snap => {
                 setCoaches(snap.docs.map(d => ({id: d.id, ...d.data()})));
             }),
-            db.collection('matches').onSnapshot(s => setMatches(s.docs.map(d => ({id:d.id, ...d.data()}))))
+            db.collection('matches').onSnapshot(s => setMatches(s.docs.map(d => ({id:d.id, ...d.data()})))),
+
+            // --- NOVO: LISTENER DO MATOGRAM (SOCIAL) ---
+            db.collection('posts').orderBy('date', 'desc').limit(50).onSnapshot(s => {
+                setPosts(s.docs.map(d => ({id:d.id, ...d.data()})));
+            })
         ];
 
         return () => unsubs.forEach(u => u());
     }, []);
-
     // --- LISTENER DE OFERTAS (Para Times, Jogadores e Técnicos) ---
     useEffect(() => {
         if (!user || user.type === 'ADMIN' || user.type === 'VISITOR') return;
@@ -3541,7 +3659,54 @@ const renewContract = async (p) => {
 };
             //FIM
 
-            // ... continuação do código anterior
+            // --- FUNÇÕES DO MATOGRAM (Cole isso antes do return) ---
+    const handleSocialPost = async (text, img) => {
+        const b = db.batch();
+        const newPostRef = db.collection('posts').doc();
+        
+        // 1. Cria o post
+        b.set(newPostRef, {
+            authorId: user.data.id,
+            authorName: user.data.name,
+            authorLogo: user.data.logo || user.data.face || null, 
+            text: text,
+            img: img, 
+            date: Date.now(),
+            likes: []
+        });
+
+        // 2. Trava de Segurança (FIFO - Limite 50)
+        if (posts.length >= 50) {
+            const oldestPost = posts[posts.length - 1]; // O último da lista é o mais velho
+            if (oldestPost) {
+                const oldRef = db.collection('posts').doc(oldestPost.id);
+                b.delete(oldRef);
+            }
+        }
+
+        await b.commit();
+    };
+
+    const handleSocialLike = async (post) => {
+        const uid = user.data.id;
+        const isLiked = (post.likes || []).includes(uid);
+        
+        if (isLiked) {
+            await db.collection('posts').doc(post.id).update({
+                likes: firebase.firestore.FieldValue.arrayRemove(uid)
+            });
+        } else {
+            await db.collection('posts').doc(post.id).update({
+                likes: firebase.firestore.FieldValue.arrayUnion(uid)
+            });
+        }
+    };
+
+    const handleSocialDelete = async (pid) => {
+        if(confirm("Apagar esta publicação?")) {
+            await db.collection('posts').doc(pid).delete();
+        }
+    };
 
             // 1. Função para o Jornalista atualizar a tabela
             const updateTeamStats = async (tid, stats) => { 
@@ -3787,7 +3952,7 @@ const renewContract = async (p) => {
     };
             //FIM
             
-            // 3. Função Mestra do Admin (COM REGRA DE AGENTES LIVRES)
+           
      
           // --- RENDER ---
           if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
@@ -3800,7 +3965,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.77.7</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.77.8</div>
                             </div>
                         </div>
                         
@@ -4057,7 +4222,18 @@ const renewContract = async (p) => {
 {screen === 'RANKING' && <Ranking teams={teams} players={players} sales={sales} />}
                         
                         {screen === 'NEWS' && <div><h3>Notícias</h3>{news.map(n=><div key={n.id} className={`news-card news-${n.type}`}>{n.text}<br/><small style={{color:'#666'}}>{new Date(n.date).toLocaleString()}</small></div>)}</div>}
-                        
+
+                        {/* TELA DO MATOGRAM */}
+                        {screen === 'SOCIAL' && (
+                            <SocialFeed 
+                                user={user} 
+                                posts={posts} 
+                                onPost={handleSocialPost} 
+                                onLike={handleSocialLike}
+                                onDeletePost={handleSocialDelete}
+                            />
+                        )}
+        
                         {screen === 'OFFERS' && (
                             <OffersScreen 
                                 user={user} 
@@ -4147,6 +4323,11 @@ const renewContract = async (p) => {
     {/* 2. JOGOS (NOVO - PARA TODOS) */}
     <div className={`nav-item ${screen==='MATCHES'?'active':''}`} onClick={()=>setScreen('MATCHES')}>
         <i className="fas fa-futbol"></i>JOGOS
+    </div>
+
+    {/* NOVO BOTÃO SOCIAL */}
+    <div className={`nav-item ${screen==='SOCIAL'?'active':''}`} onClick={()=>setScreen('SOCIAL')}>
+        <i className="fas fa-camera"></i>SOCIAL
     </div>
 
     {/* 3. SERVIÇOS PÚBLICOS (HOSPITAL) */}
@@ -4301,7 +4482,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77.7 SERVIÇOS PUBLICOS </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77.8 SERVIÇOS PUBLICOS </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

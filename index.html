@@ -2907,7 +2907,7 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
             //FIM
             
     // --- LÓGICA DE TREINO (APENAS XP) ---
- const handleCoachTrain = async (playerIds, type) => {
+const handleCoachTrain = async (playerIds, type) => {
         const currentCoach = user.data;
         if (!currentCoach || currentCoach.trainingsLeft <= 0) return alert("Sem treinos disponíveis!");
 
@@ -2927,7 +2927,7 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
         const affPerk = activePerks.find(p => p.type === 'AFFINITY_BOOST');
         const affBonus = affPerk ? affPerk.value : 0;
 
-        // 2. Mapeamento de Atributos (Completo e Corrigido)
+        // 2. Mapeamento de Atributos (Completo)
         let trainedAttrs = [];
         if(type === 'FISICO_BASE') trainedAttrs = ['stamina', 'balance', 'condition', 'strength'];
         else if(type === 'VELOCIDADE') trainedAttrs = ['speed', 'accel', 'agility', 'dribbleSpd'];
@@ -2944,9 +2944,18 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
             const p = players.find(x => x.id === pid);
             if (!p) return;
 
-            // TRAVA: Jogador já lesionado não treina
+            // CORREÇÃO CRÍTICA: Define energia atual aceitando o ZERO
+            const currentEnergy = p.energy !== undefined ? p.energy : 100;
+
+            // TRAVA 1: Jogador lesionado não treina
             if ((p.recoveryLeft || 0) > 0) {
                 report.push(`⚠️ ${p.name} ignorado (está lesionado)`);
+                return;
+            }
+
+            // TRAVA 2: Jogador Exausto (Evita bug de energia infinita)
+            if (currentEnergy < energyCost) {
+                report.push(`⚠️ ${p.name} ignorado (exausto: ${currentEnergy}%)`);
                 return;
             }
 
@@ -2956,17 +2965,17 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
                 b.update(db.collection('players').doc(p.id), {
                     injury: injuryName,
                     recoveryLeft: 1,
-                    energy: Math.max(0, (p.energy || 100) - 15),
+                    energy: Math.max(0, currentEnergy - 15),
                     mood: '😡'
                 });
                 report.push(`❌ ${p.name} se lesionou: ${injuryName}`);
                 return; // Pula o ganho de XP deste jogador
             }
 
-            // Gasto de Energia
-            const newEnergy = Math.max(0, (p.energy || 100) - energyCost);
+            // Gasto de Energia Seguro
+            const newEnergy = currentEnergy - energyCost;
             
-            // Cálculo de XP Base (Técnico dá mais base que treino solo)
+            // Cálculo de XP Base
             let xpGain = Math.floor(Math.random() * 5) + 8 + minXpBonus; 
             
             // Afinidade Posicional
@@ -3008,7 +3017,6 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
             let newAttrs = { ...(p.attributes || {}) };
             trainedAttrs.forEach(attr => {
                 if((newAttrs[attr] || 50) < 99) {
-                    // Técnico tem mais chance de subir atributo direto que treino solo
                     if(Math.random() < (xpGain / 80)) { 
                         newAttrs[attr] = (newAttrs[attr] || 50) + 1;
                     }
@@ -3020,7 +3028,6 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
                 xp: (p.xp || 0) + xpGain, 
                 energy: newEnergy,
                 attributes: newAttrs
-                // overall removido para só atualizar na virada de temporada
             });
             
             coachXpGain += 20;
@@ -3635,10 +3642,13 @@ const renewContract = async (p) => {
 
 // FIM DA LÓGICA DE IMPRENSA E SÚMULAS
             // --- TREINO SOLO DO JOGADOR ---
-  const handlePlayerSoloTrain = async (player, type) => {
+ const handlePlayerSoloTrain = async (player, type) => {
+        // CORREÇÃO CRÍTICA: Define energia atual aceitando o ZERO
+        const currentEnergy = player.energy !== undefined ? player.energy : 100;
+
         // 1. Verifica Energia (Custo alto: 35) e se está lesionado
-        if ((player.energy || 100) < 35) {
-            return alert("Você está exausto! Precisa de pelo menos 35% de energia.");
+        if (currentEnergy < 35) {
+            return alert(`Você está exausto (${currentEnergy}%)! Precisa de pelo menos 35% de energia.`);
         }
         if ((player.recoveryLeft || 0) > 0) {
             return alert(`Você está lesionado (${player.injury}) e não pode treinar por mais ${player.recoveryLeft} jogos!`);
@@ -3654,7 +3664,7 @@ const renewContract = async (p) => {
             b.update(db.collection('players').doc(player.id), {
                 injury: injuryName,
                 recoveryLeft: 1,
-                energy: Math.max(0, (player.energy || 100) - 20), // Gasta um pouco de energia no susto
+                energy: Math.max(0, currentEnergy - 20), // Gasta um pouco de energia no susto
                 mood: '😡'
             });
             await b.commit();
@@ -3677,7 +3687,7 @@ const renewContract = async (p) => {
 
         // 3. Cálculos (Eficiência Baixa no Solo)
         let xpGain = Math.floor(Math.random() * 4) + 3; // Ganha entre 3 e 6 XP
-        const newEnergy = (player.energy || 100) - 35; // Gasta 35 de Energia
+        const newEnergy = currentEnergy - 35; // Gasta 35 de Energia (Cálculo seguro)
 
         // --- BÔNUS DE ITEM EQUIPADO (CHUTEIRA/LUVA) ---
         if (player.equippedItem) {
@@ -3717,7 +3727,7 @@ const renewContract = async (p) => {
         await b.commit();
         setLoading(false);
         
-        let msg = `Treino realizado!\n⚡ Energia: -35%\n📈 XP: +${xpGain}`;
+        let msg = `Treino realizado!\n⚡ Energia: -35% (Resta: ${newEnergy}%)\n📈 XP: +${xpGain}`;
         if(report.length > 0) msg += `\n${report.join('\n')}`;
         if(evolved) msg += "\n✨ Alguns atributos melhoraram um pouco.";
         alert(msg);
@@ -3790,7 +3800,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.77.5</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.77.6</div>
                             </div>
                         </div>
                         
@@ -4291,7 +4301,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77.5 SERVIÇOS PUBLICOS </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77.6 SERVIÇOS PUBLICOS </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

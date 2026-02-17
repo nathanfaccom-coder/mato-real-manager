@@ -1259,7 +1259,7 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
         //FIM
 
         
-        function App() {
+       function App() {
             const [user, setUser] = useState(null); 
             const [teams, setTeams] = useState([]);
             const [players, setPlayers] = useState([]);
@@ -1282,45 +1282,72 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
             const [adminTeam, setAdminTeam] = useState(null); 
             const [sales, setSales] = useState([]);
 
+            // --- NOVO: PERSISTÊNCIA DE SESSÃO (LEMBRAR ONDE PAREI) ---
+            
+            // 1. Ao abrir o app, tenta recuperar o login e a tela salva
+            useEffect(() => {
+                const savedUser = localStorage.getItem('user');
+                const savedScreen = localStorage.getItem('savedScreen');
+
+                if (savedUser) {
+                    // Restaura o usuário logado
+                    setUser(JSON.parse(savedUser));
+                    
+                    // Restaura a tela onde ele estava (ou vai pra HOME se não tiver)
+                    if (savedScreen && savedScreen !== 'LOGIN') {
+                        setScreen(savedScreen);
+                    } else {
+                        setScreen('HOME');
+                    }
+                }
+            }, []);
+
+            // 2. Toda vez que você muda de tela, salva ela na memória
+            useEffect(() => {
+                if (screen && user) {
+                    localStorage.setItem('savedScreen', screen);
+                }
+            }, [screen, user]);
+
            useEffect(() => {
-        const unsubs = [
-            db.collection('teams').onSnapshot(s => setTeams(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('players').onSnapshot(s => setPlayers(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('config').doc('system').onSnapshot(s => setConf(s.exists ? s.data() : {marketOpen:true})),
-            db.collection('financeRequests').onSnapshot(s => setReqs(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('newspapers').onSnapshot(s => setPapers(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('journalists').onSnapshot(s => setJournalists(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            
-            db.collection('companies').onSnapshot(s => setCompanies(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('products').onSnapshot(s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            db.collection('sponsorships').onSnapshot(s => setSps(s.docs.map(d => ({id:d.id, ...d.data()})))),
-            
-            db.collection('sales').orderBy('date', 'desc').limit(50).onSnapshot(s => {
-                const cleanData = s.docs.map(d => ({id:d.id, ...d.data()}));
-                setSales(cleanData);
-            }),
-            
-            db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => { 
-                const list = s.docs.map(d => ({id:d.id, ...d.data()})); 
-                setNews(list); 
-                const lastRead = localStorage.getItem('lastRead'); 
-                if (list.length && (!lastRead || list[0].date > parseInt(lastRead))) setNewNews(true); 
-                setLoading(false); 
-            }),
+                const unsubs = [
+                    db.collection('teams').onSnapshot(s => setTeams(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    db.collection('players').onSnapshot(s => setPlayers(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    db.collection('config').doc('system').onSnapshot(s => setConf(s.exists ? s.data() : {marketOpen:true})),
+                    db.collection('financeRequests').onSnapshot(s => setReqs(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    db.collection('newspapers').onSnapshot(s => setPapers(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    db.collection('journalists').onSnapshot(s => setJournalists(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    
+                    db.collection('companies').onSnapshot(s => setCompanies(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    db.collection('products').onSnapshot(s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    db.collection('sponsorships').onSnapshot(s => setSps(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    
+                    db.collection('sales').orderBy('date', 'desc').limit(50).onSnapshot(s => {
+                        const cleanData = s.docs.map(d => ({id:d.id, ...d.data()}));
+                        setSales(cleanData);
+                    }),
+                    
+                    db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => { 
+                        const list = s.docs.map(d => ({id:d.id, ...d.data()})); 
+                        setNews(list); 
+                        const lastRead = localStorage.getItem('lastRead'); 
+                        if (list.length && (!lastRead || list[0].date > parseInt(lastRead))) setNewNews(true); 
+                        setLoading(false); 
+                    }),
 
-            db.collection('users').where('type', '==', 'COACH').onSnapshot(snap => {
-                setCoaches(snap.docs.map(d => ({id: d.id, ...d.data()})));
-            }),
-            db.collection('matches').onSnapshot(s => setMatches(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                    db.collection('users').where('type', '==', 'COACH').onSnapshot(snap => {
+                        setCoaches(snap.docs.map(d => ({id: d.id, ...d.data()})));
+                    }),
+                    db.collection('matches').onSnapshot(s => setMatches(s.docs.map(d => ({id:d.id, ...d.data()})))),
 
-            // --- NOVO: LISTENER DO MATOGRAM (SOCIAL) ---
-            db.collection('posts').orderBy('date', 'desc').limit(50).onSnapshot(s => {
-                setPosts(s.docs.map(d => ({id:d.id, ...d.data()})));
-            })
-        ];
+                    // --- NOVO: LISTENER DO MATOGRAM (SOCIAL) ---
+                    db.collection('posts').orderBy('date', 'desc').limit(50).onSnapshot(s => {
+                        setPosts(s.docs.map(d => ({id:d.id, ...d.data()})));
+                    })
+                ];
 
-        return () => unsubs.forEach(u => u());
-    }, []);
+                return () => unsubs.forEach(u => u());
+            }, []);
     // --- LISTENER DE OFERTAS (Para Times, Jogadores e Técnicos) ---
     useEffect(() => {
         if (!user || user.type === 'ADMIN' || user.type === 'VISITOR') return;
@@ -4121,7 +4148,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.78.0</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.78.1</div>
                             </div>
                         </div>
                         
@@ -4642,7 +4669,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.78.0 MATOGRAM </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.78.1 MATOGRAM </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

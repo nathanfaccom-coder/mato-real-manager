@@ -159,6 +159,7 @@ const getPosColor = (p) => {
     if (['PTD', 'PTE', 'ATA', 'SA'].includes(p)) return '#FF1744'; // Vermelho (Ataque)
     return '#888';
 };
+        
     // --- CALCULADORA DE VALOR DE MERCADO (BASEADO NA TABELA OFICIAL) ---
 const getRecommendedPrice = (ovr, pos) => {
     const o = parseInt(ovr) || 0;
@@ -196,7 +197,38 @@ const getPriceStatus = (askedPrice, recommendedPrice) => {
     return { label: '✅ PREÇO JUSTO', color: '#00E676' };
 };
         //FIM
-        
+        // --- TABELA DE TETO SALARIAL (REAJUSTADA) ---
+const SALARY_CAPS = [
+    { minOv: 0,  maxOv: 49, minSal: 500,    maxSal: 2000,   label: 'Amador' },
+    { minOv: 50, maxOv: 59, minSal: 1500,   maxSal: 6000,   label: 'Iniciante' },
+    { minOv: 60, maxOv: 69, minSal: 5000,   maxSal: 18000,  label: 'Profissional' },
+    { minOv: 70, maxOv: 79, minSal: 15000,  maxSal: 45000,  label: 'Estrela' },
+    { minOv: 80, maxOv: 89, minSal: 40000,  maxSal: 110000, label: 'Craque' },
+    { minOv: 90, maxOv: 99, minSal: 100000, maxSal: 300000, label: 'Lenda' }
+];
+
+// Função auxiliar para pegar os limites
+const getSalaryLimits = (ovr) => {
+    const o = parseInt(ovr) || 0;
+    return SALARY_CAPS.find(t => o >= t.minOv && o <= t.maxOv) || SALARY_CAPS[0];
+};
+        //FIM
+        // --- TABELA DE TETO SALARIAL (REAJUSTADA) ---
+const SALARY_CAPS = [
+    { minOv: 0,  maxOv: 49, minSal: 500,    maxSal: 2000,   label: 'Amador' },
+    { minOv: 50, maxOv: 59, minSal: 1500,   maxSal: 6000,   label: 'Iniciante' },
+    { minOv: 60, maxOv: 69, minSal: 5000,   maxSal: 18000,  label: 'Profissional' },
+    { minOv: 70, maxOv: 79, minSal: 15000,  maxSal: 45000,  label: 'Estrela' },
+    { minOv: 80, maxOv: 89, minSal: 40000,  maxSal: 110000, label: 'Craque' },
+    { minOv: 90, maxOv: 99, minSal: 100000, maxSal: 300000, label: 'Lenda' }
+];
+
+// Função que descobre os limites baseados no Overall
+const getSalaryLimits = (ovr) => {
+    const o = parseInt(ovr) || 0;
+    return SALARY_CAPS.find(t => o >= t.minOv && o <= t.maxOv) || SALARY_CAPS[0];
+};
+        //FIM 
         // --- CONSTANTES DE EMPRESAS ---
         const COMPANY_TYPES = {
             'COMERCIO': { label: 'Comércio Local', start: 2500000, tax: 50000, desc: 'Ideal para iniciantes. Imposto baixo.' },
@@ -4250,7 +4282,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.78.9</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.79.0</div>
                             </div>
                         </div>
                         
@@ -4776,7 +4808,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.78.9 MATOGRAM </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.79.0 MATOGRAM </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -5951,8 +5983,8 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
             return (<div><input className="input-field" placeholder="Buscar jogador..." value={search} onChange={e=>setSearch(e.target.value)} /><div style={{maxHeight:300, overflowY:'auto'}}>{search.length > 0 && filtered.map(p => (<div key={p.id} className="card" onClick={()=>{setSelP(p); setS(p.stats || {goals:0,assists:0,tackles:0,saves:0,yellows:0,reds:0})}}><b>{p.name} {p.recoveryLeft > 0 ? '❌' : ''}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small></div>))}</div></div>);
         };
 
-     const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams, onRenew, isOwner }) => {
-    // 1. Definição dos dados padrão (Isso garante que 'position' nunca seja vazio)
+    const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams, onRenew, isOwner }) => {
+    // 1. Definição dos dados padrão
     const defaultState = {
         name:'', position:'ATA', overall:45, value:'', salary:'', 
         clause:'', contract:'', mood:'😐', status:'NAO_A_VENDA', 
@@ -5961,58 +5993,48 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
         attributes: null 
     };
 
-    // 2. MISTURA os dados (Correção do Erro)
     const [f, setF] = useState({ ...defaultState, ...(initial || {}) });
-
-    // Verifica se é edição real (tem ID gerado pelo banco)
     const isEditing = f.id ? true : false;
     
-    // Função auxiliar para calcular média ignorando status inúteis
-    const calculateRealOverall = (position, attrs) => {
-        let sum = 0;
-        let count = 0;
-        const safePos = position || 'ATA'; 
-        
-        const ignoreList = safePos === 'GOL' 
-            ? ['shot', 'attack', 'dribble', 'curve', 'freeKick', 'weakFootAcc', 'weakFootFreq'] 
-            : ['gk'];
+    // Calcula limites em tempo real baseado no Overall digitado
+    const limits = getSalaryLimits(f.overall);
 
-        Object.entries(attrs).forEach(([key, val]) => {
-            if (ignoreList.includes(key)) return;
-            sum += val;
-            count++;
-        });
+    const calculateRealOverall = (position, attrs) => {
+        let sum = 0; let count = 0;
+        const safePos = position || 'ATA'; 
+        const ignoreList = safePos === 'GOL' ? ['shot', 'attack', 'dribble', 'curve', 'freeKick', 'weakFootAcc', 'weakFootFreq'] : ['gk'];
+        Object.entries(attrs).forEach(([key, val]) => { if (!ignoreList.includes(key)) { sum += val; count++; } });
         return count === 0 ? 0 : Math.round(sum / count);
     };
 
     const handleSave = () => {
         try {
             const dataToSave = { ...f };
-            
-            // SEGURANÇA EXTRA: Garante que existe uma posição definida antes de gerar
             const safePos = dataToSave.position || 'ATA'; 
+            const ovr = parseInt(dataToSave.overall) || 50;
+            const salary = parseFloat(dataToSave.salary) || 0;
 
-            // SE NÃO TIVER ATRIBUTOS (Criação ou Jogador Antigo), GERA AGORA!
+            // --- TRAVA DE SALÁRIO (ADMIN) ---
+            // O Admin recebe um aviso, mas pode forçar se clicar em OK
+            if (salary < limits.minSal || salary > limits.maxSal) {
+                if(!confirm(`⚠️ ALERTA SALARIAL!\n\nCategoria: ${limits.label} (Over ${ovr})\nFaixa Permitida: ${fmt(limits.minSal)} - ${fmt(limits.maxSal)}\n\nVocê colocou: ${fmt(salary)}.\n\nSalvar mesmo assim (Forçar)?`)) {
+                    return; 
+                }
+            }
+
             if (!dataToSave.attributes || Object.keys(dataToSave.attributes).length === 0) {
                 const targetOv = parseInt(dataToSave.overall) || 60;
                 const newAttrs = generateAttributes(safePos, targetOv);
-                
-                // Calcula a média real balanceada
                 const realAvg = calculateRealOverall(safePos, newAttrs);
                 
-                // Atualiza o objeto final
                 dataToSave.attributes = newAttrs;
                 dataToSave.overall = realAvg;
-                dataToSave.position = safePos; // Garante que salva a posição usada
-
-                alert(`Atributos gerados com sucesso!\nOverall Real: ${realAvg}`);
+                dataToSave.position = safePos;
+                alert(`Atributos gerados!\nOverall Real: ${realAvg}`);
             }
 
             onSave(dataToSave);
-        } catch (error) {
-            console.error(error);
-            alert("Erro ao salvar: " + error.message);
-        }
+        } catch (error) { console.error(error); alert("Erro ao salvar: " + error.message); }
     };
 
     return (
@@ -6021,7 +6043,6 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                 <h3>{isEditing ? 'Ficha do Jogador' : 'Criar Jogador'}</h3>
                 
                 <label>Nome</label>
-                {/* Só desabilita se não for admin E se o jogador já existir (isEditing) */}
                 <input className="input-field" value={f.name} onChange={e=>setF({...f, name:e.target.value})} disabled={!isAdmin && isEditing} />
                 
                 <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:5, marginBottom:10, border:'1px solid #444'}}>
@@ -6049,7 +6070,6 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                     </div>
                 </div>
 
-                {/* VISUALIZAÇÃO APENAS (Read-Only) */}
                 {f.attributes ? (
                     <div style={{border:'1px solid #444', padding:10, borderRadius:8, margin:'10px 0'}}>
                         <AttributeGrid attrs={f.attributes} pendingXP={f.pendingXP || 0} />
@@ -6066,16 +6086,22 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                     </div>
                 ) : (
                     <div style={{padding:15, textAlign:'center', color:'#aaa', border:'1px dashed #666', borderRadius:8, margin:'10px 0', background:'rgba(0,0,0,0.2)'}}>
-                        <i className="fas fa-magic" style={{fontSize:20, marginBottom:5}}></i><br/>
-                        Os atributos serão gerados e salvos<br/>automaticamente ao clicar em <b>SALVAR</b>.
+                        <i className="fas fa-magic" style={{fontSize:20, marginBottom:5}}></i><br/>Atributos gerados ao salvar.
                     </div>
                 )}
 
-                {/* --- EXIBIÇÃO DO VALOR RECOMENDADO NO FORMULÁRIO (NOVO) --- */}
-                <div style={{background: 'rgba(0, 230, 118, 0.1)', padding: '8px', borderRadius: '5px', marginBottom: '5px', border: '1px dashed #00E676', textAlign: 'center'}}>
-                    <small style={{color: '#00E676', fontWeight: 'bold'}}>
-                        ⚖️ Valor Sugerido: {fmt(getRecommendedPrice(f.overall, f.position))}
-                    </small>
+                {/* --- VISUALIZADORES DE PREÇO E SALÁRIO (NOVOS) --- */}
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:5}}>
+                    <div style={{background: 'rgba(0, 230, 118, 0.1)', padding: '5px', borderRadius: '5px', border: '1px dashed #00E676', textAlign: 'center'}}>
+                        <small style={{color: '#00E676', fontWeight: 'bold', fontSize:10}}>
+                            ⚖️ Passe: {fmt(getRecommendedPrice(f.overall, f.position))}
+                        </small>
+                    </div>
+                    <div style={{background: 'rgba(41, 121, 255, 0.1)', padding: '5px', borderRadius: '5px', border: '1px dashed #2979FF', textAlign: 'center'}}>
+                        <small style={{color: '#2979FF', fontWeight: 'bold', fontSize:10}}>
+                            💵 Salário: {fmt(limits.minSal)} - {fmt(limits.maxSal)}
+                        </small>
+                    </div>
                 </div>
 
                 <div style={{display:'flex', gap:5}}>
@@ -6126,11 +6152,8 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                 
                 <div style={{display:'flex', gap:10, marginTop:15}}>
                     <button className="btn btn-green" onClick={handleSave}>SALVAR</button>
-                    
-                    {/* Botões extras só aparecem se o jogador já existe (isEditing) */}
                     {isOwner && isEditing && <button className="btn btn-blue" onClick={()=>onRenew(initial)}>RENOVAR</button>}
                     {isEditing && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>X</button>}
-                    
                     <button className="btn" onClick={()=>setF(null)}>CANCELAR</button>
                 </div>
             </div>
@@ -6351,7 +6374,7 @@ const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, 
     );
 };
 //fim
-        // --- COMPONENTE OFFER FORM CORRIGIDO ---
+        // --- COMPONENTE OFFER FORM CORRIGIDO (COM TETO SALARIAL) ---
 const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
     const old = target.oldOffer || {};
     const isCounter = !!old.id;
@@ -6360,6 +6383,9 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
     const isUrgentRenewal = old?.type === 'RENOVACAO_URGENTE';
     const shouldHidePart1 = isPlayerActing || clubsHaveAgreed || isUrgentRenewal;
     const maxLoanAllowed = parseInt(target.contract) || 1;
+
+    // --- NOVO: PEGA LIMITES SALARIAIS PARA O OVERALL DO ALVO ---
+    const limits = getSalaryLimits(target.overall);
 
     // Se vier do botão "Pré-Contrato", o type inicial será PRE_CONTRATO
     const [t, setT] = useState(old.type || 'COMPRA');
@@ -6493,10 +6519,15 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                         <input className="input-field" type="number" value={meta.signingBonus} onChange={e=>setMeta({...meta, signingBonus: parseFloat(e.target.value)})} />
                     </div>
 
+                    {/* MOSTRADOR DE FAIXA SALARIAL */}
                     <div style={{marginTop: 10}}>
                         <label>Salário Semanal (₣)</label>
+                        <div style={{fontSize:10, color:'#aaa', marginBottom:5}}>
+                            Faixa Permitida: <span style={{color:'#2979FF', fontWeight:'bold'}}>{fmt(limits.minSal)} - {fmt(limits.maxSal)}</span>
+                        </div>
                         <input className="input-field" type="number" value={sal} onChange={e=>setSal(e.target.value)} />
                     </div>
+
                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
                         <div>
                             <label>{t === 'EMPRESTIMO' ? 'Duração (Fixo)' : 'Contrato (Anos)'}</label>
@@ -6515,9 +6546,15 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
 
                 <div style={{display:'flex', gap:10, marginTop:15}}>
                     <button className="btn btn-green" style={{flex: 2}} onClick={() => {
+                        const finalSal = parseFloat(sal);
+                        // --- TRAVA DE SALÁRIO NA NEGOCIAÇÃO ---
+                        if (finalSal < limits.minSal || finalSal > limits.maxSal) {
+                            return alert(`🚫 SALÁRIO INVÁLIDO!\nO valor deve estar entre ${fmt(limits.minSal)} e ${fmt(limits.maxSal)} para este jogador (Over ${target.overall}).`);
+                        }
+
                         // Se for pré-contrato, o valor é 0
                         const finalVal = isPreContract ? 0 : v;
-                        onSend(target, t, finalVal, swaps, (t === 'EMPRESTIMO' ? meta.loanDuration : con), {...meta, hasBuyOption, newSalary: parseFloat(sal), role, status: 'PENDING'}, old);
+                        onSend(target, t, finalVal, swaps, (t === 'EMPRESTIMO' ? meta.loanDuration : con), {...meta, hasBuyOption, newSalary: finalSal, role, status: 'PENDING'}, old);
                     }}>
                         {isUrgentRenewal ? 'OFERECER RENOVAÇÃO' : (isPreContract ? 'ENVIAR PRÉ-CONTRATO' : 'ENVIAR RESPOSTA')}
                     </button>

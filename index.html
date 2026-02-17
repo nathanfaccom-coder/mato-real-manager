@@ -2777,18 +2777,73 @@ const AdminPanel = ({ teams, players, onGenFixtures, onTurnSeasonAdvanced, paper
 
             {/* --- ABA FINANCEIRA --- */}
             {tab==='FINANCE' && <div>
-                <h4>Solicitações</h4>
+
+                <h4>Solicitações Financeiras</h4>
+
+                {(reqs||[]).filter(r=>r.status==='PENDING').length === 0 && <p style={{color:'#666'}}>Nenhum pedido pendente.</p>}
+
+                
+
                 {(reqs||[]).filter(r=>r.status==='PENDING').map(r=>(
-                    <div key={r.id} className="card" style={{borderLeft: '4px solid gold'}}><b>{r.teamName}</b>: {fmt(r.amount)} <div style={{display:'flex', gap:10, marginTop:10}}><button className="btn btn-green" style={{width:'auto'}} onClick={()=>onApprove(r)}>APROVAR</button><button className="btn btn-red" style={{width:'auto'}} onClick={()=>onReject(r.id)}>RECUSAR</button></div></div>
-                ))}
-                <hr style={{borderColor:'#333'}}/>
-                <h4>🏛️ Patrocínios Ativos Gov.</h4>
-                {fedSpons.map(s => (
-                    <div key={s.id} className="card" style={{borderLeft: '4px solid var(--primary)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                        <div><b>{s.teamName}</b><br/><small style={{color:'lime'}}>+ {fmt(s.value)} / sem</small></div>
-                        <button className="btn btn-red" style={{width:'auto'}} onClick={async ()=>{if(confirm("Cancelar?")) await firebase.firestore().collection('sponsorships').doc(s.id).delete();}}>X</button>
+
+                    <div key={r.id} className="card" style={{borderLeft: '4px solid gold'}}>
+
+                        <b>{r.teamName}</b>: {fmt(r.amount)} <small>({r.type})</small><br/>
+
+                        <span style={{fontSize:11, color:'#ccc'}}>{r.details}</span>
+
+                        <div style={{display:'flex', gap:10, marginTop:10}}>
+
+                            <button className="btn btn-green" style={{width:'auto', padding:'5px 15px'}} onClick={()=>onApprove(r)}>APROVAR</button>
+
+                            <button className="btn btn-red" style={{width:'auto', padding:'5px 15px'}} onClick={()=>onReject(r.id)}>RECUSAR</button>
+
+                        </div>
+
                     </div>
+
                 ))}
+
+
+
+                <hr style={{borderColor:'#333', margin:'20px 0'}}/>
+
+
+
+                <h4>🏛️ Patrocínios Ativos da Federação</h4>
+
+                {fedSpons.length === 0 && <p style={{color:'#666'}}>Nenhum patrocínio governamental ativo.</p>}
+
+                
+
+                {fedSpons.map(s => (
+
+                    <div key={s.id} className="card" style={{borderLeft: '4px solid var(--primary)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+
+                        <div>
+
+                            <b>{s.teamName}</b><br/>
+
+                            <small style={{color:'lime'}}>+ {fmt(s.value)} / semana</small>
+
+                        </div>
+
+                        <button className="btn btn-red" style={{width:'auto', fontSize:10}} onClick={async ()=>{
+
+                            if(confirm(`Cancelar o patrocínio do ${s.teamName}?`)) {
+
+                                await firebase.firestore().collection('sponsorships').doc(s.id).delete();
+
+                                alert("Patrocínio cancelado!");
+
+                            }
+
+                        }}>CANCELAR</button>
+
+                    </div>
+
+                ))}
+
             </div>}
 
             {/* --- ABA IMPRENSA --- */}

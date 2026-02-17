@@ -197,22 +197,7 @@ const getPriceStatus = (askedPrice, recommendedPrice) => {
     return { label: '✅ PREÇO JUSTO', color: '#00E676' };
 };
         //FIM
-        // --- TABELA DE TETO SALARIAL (REAJUSTADA) ---
-const SALARY_CAPS = [
-    { minOv: 0,  maxOv: 49, minSal: 500,    maxSal: 2000,   label: 'Amador' },
-    { minOv: 50, maxOv: 59, minSal: 1500,   maxSal: 6000,   label: 'Iniciante' },
-    { minOv: 60, maxOv: 69, minSal: 5000,   maxSal: 18000,  label: 'Profissional' },
-    { minOv: 70, maxOv: 79, minSal: 15000,  maxSal: 45000,  label: 'Estrela' },
-    { minOv: 80, maxOv: 89, minSal: 40000,  maxSal: 110000, label: 'Craque' },
-    { minOv: 90, maxOv: 99, minSal: 100000, maxSal: 300000, label: 'Lenda' }
-];
 
-// Função auxiliar para pegar os limites
-const getSalaryLimits = (ovr) => {
-    const o = parseInt(ovr) || 0;
-    return SALARY_CAPS.find(t => o >= t.minOv && o <= t.maxOv) || SALARY_CAPS[0];
-};
-        //FIM
         // --- TABELA DE TETO SALARIAL (REAJUSTADA) ---
 const SALARY_CAPS = [
     { minOv: 0,  maxOv: 49, minSal: 500,    maxSal: 2000,   label: 'Amador' },

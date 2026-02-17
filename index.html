@@ -46,8 +46,32 @@
         .news-money-minus { border-color: var(--danger); }
         .news-admin { border-color: var(--warning); background: #2a2000; }
         .news-press { border-color: #00bcd4; background: #003333; }
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #1a1a1a; border-top: 1px solid var(--border); display: flex; padding-bottom: env(safe-area-inset-bottom); z-index: 100; }
-        .nav-item { flex: 1; padding: 12px; text-align: center; color: #666; font-size: 9px; cursor: pointer; }
+        .bottom-nav { 
+            position: fixed; 
+            bottom: 0; 
+            left: 0; 
+            right: 0; 
+            background: #1a1a1a; 
+            border-top: 1px solid var(--border); 
+            display: flex; 
+            padding-bottom: env(safe-area-inset-bottom); 
+            z-index: 100;
+            overflow-x: auto; /* Permite rolar para o lado */
+            white-space: nowrap; /* Impede quebra de linha */
+            -webkit-overflow-scrolling: touch; /* Scroll suave no iOS */
+            scrollbar-width: none; /* Esconde barra no Firefox */
+        }
+        .bottom-nav::-webkit-scrollbar { display: none; } /* Esconde barra no Chrome/Android */
+        
+        .nav-item { 
+            flex: 0 0 auto; /* Impede que o botão encolha */
+            min-width: 70px; /* Garante largura mínima clicável */
+            padding: 12px 5px; 
+            text-align: center; 
+            color: #666; 
+            font-size: 9px; 
+            cursor: pointer; 
+        }
         .nav-item.active { color: var(--primary); }
         .nav-item i { font-size: 20px; margin-bottom: 4px; display: block; }
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 999; display: grid; place-items: center; padding: 15px; backdrop-filter: blur(5px); }
@@ -4097,7 +4121,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.77.9</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.78.0</div>
                             </div>
                         </div>
                         
@@ -4618,7 +4642,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.77.9 MATOGRAM </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.78.0 MATOGRAM </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

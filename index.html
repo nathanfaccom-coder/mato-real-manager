@@ -2589,6 +2589,74 @@ const AdminPanel = ({ teams, players, onGenFixtures, onTurnSeasonAdvanced, paper
         }
     };
 
+    // --- FUNÇÃO 1: CORRIGIR PREÇOS DO SHOP (ANTI-CHEAT) ---
+    const fixShopPrices = async () => {
+        if(!confirm("⚠️ ANTI-CHEAT SHOP:\nIsso vai varrer TODOS os produtos e corrigir o preço daqueles que estiverem abaixo do custo de produção.\n\nDeseja aplicar a correção?")) return;
+        try {
+            setLoading(true);
+            const snap = await db.collection('products').get();
+            const b = db.batch();
+            let count = 0;
+            snap.docs.forEach(doc => {
+                const p = doc.data();
+                const minCost = getProdCost(p.cat, p.power); 
+                if (minCost > 0 && (parseFloat(p.price) || 0) < minCost) {
+                    b.update(doc.ref, { price: minCost });
+                    count++;
+                }
+            });
+            if(count > 0) {
+                await b.commit();
+                alert(`✅ SUCESSO!\n${count} produtos foram corrigidos para o valor mínimo.`);
+            } else { alert("👍 Tudo certo! Nenhum produto irregular."); }
+        } catch(e) { alert("Erro: " + e.message); }
+        setLoading(false);
+    };
+
+    // --- FUNÇÃO 2: ABONO COLETIVO (EVENTOS) ---
+    const giveMassGrant = async () => {
+        const target = prompt("🎁 ABONO COLETIVO - QUEM VAI RECEBER?\n\n1: Jogadores (Todos)\n2: Jogadores (Apenas Contratados)\n3: Times\n4: Empresas\n5: Técnicos");
+        if(!target) return;
+        const amountStr = prompt("💰 QUAL O VALOR DO BÔNUS? (Ex: 10000)");
+        if(!amountStr) return;
+        const amount = parseFloat(amountStr);
+        if(isNaN(amount) || amount <= 0) return alert("Valor inválido");
+        const reason = prompt("📝 MOTIVO:", "🎁 Bônus de Feriado");
+
+        let collectionName = '';
+        let typeName = '';
+        let filterFn = () => true;
+
+        if(target === '1') { collectionName = 'players'; typeName = 'Jogadores'; }
+        else if(target === '2') { collectionName = 'players'; typeName = 'Jogadores Contratados'; filterFn = (d) => d.teamId && d.teamId !== 'FREE'; }
+        else if(target === '3') { collectionName = 'teams'; typeName = 'Times'; }
+        else if(target === '4') { collectionName = 'companies'; typeName = 'Empresas'; }
+        else if(target === '5') { collectionName = 'users'; typeName = 'Técnicos'; } 
+        else return alert("Opção inválida");
+        
+        if(!confirm(`Dar ${fmt(amount)} para ${typeName.toUpperCase()}?`)) return;
+
+        try {
+            setLoading(true);
+            const b = db.batch();
+            let q = db.collection(collectionName);
+            if(target === '5') q = q.where('type', '==', 'COACH');
+            const snap = await q.get();
+            let count = 0;
+            snap.docs.forEach(doc => {
+                const d = doc.data();
+                if(d.status === 'PENDING' || d.status === 'BLOCKED') return;
+                if(!filterFn(d)) return; 
+                b.update(doc.ref, { balance: firebase.firestore.FieldValue.increment(amount) });
+                count++;
+            });
+            db.collection('news').add({ text: `🎉 **${reason.toUpperCase()}**\nA Federação concedeu um bônus de ${fmt(amount)} para os **${typeName}**!`, type: 'money', date: Date.now() });
+            await b.commit();
+            alert(`✅ Sucesso! Bônus enviado para ${count} ${typeName}.`);
+        } catch(e) { alert("Erro: " + e.message); }
+        setLoading(false);
+    };
+
     return (
         <div>
             <h2>Painel Administrativo</h2>
@@ -2598,29 +2666,26 @@ const AdminPanel = ({ teams, players, onGenFixtures, onTurnSeasonAdvanced, paper
                 <button style={tabStyle(tab==='FINANCE')} onClick={()=>setTab('FINANCE')}>Finanças</button>
                 <button style={tabStyle(tab==='PRESS')} onClick={()=>setTab('PRESS')}>Imprensa</button>
                 <button style={tabStyle(tab==='COMP')} onClick={()=>setTab('COMP')}>Empresas</button>
-                <button style={{...tabStyle(tab==='COACH'), background: tab==='COACH' ? 'gold' : '#333', color: tab==='COACH' ? '#000' : '#fff'}} onClick={()=>setTab('COACH')}>Técnicos</button>
+                <button style={tabStyle(tab==='COACH')} onClick={()=>setTab('COACH')}>Técnicos</button>
             </div>
 
             {/* --- ABA GERAL --- */}
             {tab==='DASH' && <div>
                 <div className="card" style={{border: '1px solid var(--danger)'}}>
-                    <h4 style={{marginTop:0, color:'var(--danger)'}}>🎮 Controle do Jogo</h4>
                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10}}>
                         <button className={`btn ${config.marketOpen?'btn-red':'btn-green'}`} onClick={()=>onAct('MARKET', !config.marketOpen)}>{config.marketOpen?'FECHAR MERCADO':'ABRIR MERCADO'}</button>
                         <button className="btn btn-purple" onClick={()=>onAct('WEEK')}>VIRAR SEMANA</button>
                     </div>
-
                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10}}>
-                        <button className="btn" style={{background:'#E65100', color:'white'}} onClick={fixShopPrices}>🛠️ CORRIGIR SHOP</button>
-                        <button className="btn" style={{background:'#00E676', color:'black'}} onClick={giveMassGrant}>🎁 ABONO COLETIVO</button>
+                        <button className="btn" style={{background:'#E65100'}} onClick={fixShopPrices}>🛠️ CORRIGIR SHOP</button>
+                        <button className="btn" style={{background:'#00E676', color:'black'}} onClick={giveMassGrant}>🎁 ABONO</button>
                     </div>
-                    
-                    <button className="btn btn-red" style={{marginTop: 10}} onClick={()=>onAct('SEASON')}>VIRAR TEMPORADA</button>
+                    <button className="btn btn-red" onClick={()=>onAct('SEASON')}>VIRAR TEMPORADA</button>
                     <button className="btn btn-gold" onClick={()=>{ const t=prompt("Título"); const b=prompt("Texto"); if(t)onPost(t,b,'admin'); }}>COMUNICADO</button>
                     <button className="btn btn-blue" style={{marginTop:10}} onClick={onGenFixtures}>🗓️ GERAR TABELA DE JOGOS</button>
                     <button className="btn btn-purple" style={{marginTop:10}} onClick={onTurnSeasonAdvanced}>🏆 VIRAR TEMPORADA (ADV)</button>
-                    <button className="btn" style={{background:'#333', border:'1px solid #666', marginTop:10}} onClick={onGenAttrs}>🎲 GERAR ATRIBUTOS (ALL)</button>
-                    <button className="btn" style={{background: 'black', color: 'red', border: '1px solid red', marginTop: 15}} onClick={onReset}><i className="fas fa-bomb"></i> RESETAR TODO O GAME</button>
+                    <button className="btn" style={{background:'#333', marginTop:10}} onClick={onGenAttrs}>🎲 GERAR ATRIBUTOS (ALL)</button>
+                    <button className="btn btn-red" style={{background: 'black', marginTop: 15}} onClick={onReset}>RESETAR TUDO</button>
                 </div>
             </div>}
 
@@ -2642,81 +2707,10 @@ const AdminPanel = ({ teams, players, onGenFixtures, onTurnSeasonAdvanced, paper
                         <div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                             <span><b>{t.name}</b></span>
                             <div style={{display:'flex', gap:5}}>
-                                <button className="btn btn-ghost" style={{width:'auto', fontSize:10}} onClick={()=>managePassword('teams', t.id, t.password, t.name)}>🔑 SENHA</button>
-                                <button className="btn btn-green" style={{width:'auto', fontSize:10}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button>
+                                <button className="btn btn-ghost" style={{width:'auto', fontSize:10}} onClick={()=>managePassword('teams', t.id, t.password, t.name)}>🔑</button>
+                                <button className="btn btn-green" style={{width:'auto', fontSize:10}} onClick={()=>{const n=prompt("Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button>
                                 <button className="btn btn-purple" style={{width:'auto', fontSize:10}} onClick={()=>setSelTeamPlayers(t)}>👥 ELENCO</button>
-                                <button className="btn btn-red" style={{width:'auto', fontSize:10}} onClick={()=>onDeleteTeam(t.id)}><i className="fas fa-trash"></i></button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {tab==='TEAMS' && selTeamPlayers && (
-                <div>
-                    <button className="btn btn-ghost" style={{width:'auto', marginBottom:10}} onClick={()=>setSelTeamPlayers(null)}>⬅ VOLTAR AOS TIMES</button>
-                    <h4>Gerenciar Senhas: {selTeamPlayers.name}</h4>
-                    {players.filter(p => p.teamId === selTeamPlayers.id).sort((a,b)=>b.overall - a.overall).map(p => (
-                        <div key={p.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderLeft:`4px solid ${getPosColor(p.position)}`}}>
-                            <span><b>{p.name}</b> <small>({p.position} - {p.overall})</small></span>
-                            <button className="btn btn-ghost" style={{width:'auto', fontSize:10}} onClick={()=>managePassword('players', p.id, p.password, p.name)}>🔑 SENHA</button>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {/* --- ABA FINANCEIRA --- */}
-            {tab==='FINANCE' && <div>
-                <h4>Solicitações Financeiras</h4>
-                {(reqs||[]).filter(r=>r.status==='PENDING').map(r=>(
-                    <div key={r.id} className="card" style={{borderLeft: '4px solid gold'}}>
-                        <b>{r.teamName}</b>: {fmt(r.amount)} <small>({r.type})</small><br/>
-                        <div style={{display:'flex', gap:10, marginTop:10}}>
-                            <button className="btn btn-green" style={{width:'auto'}} onClick={()=>onApprove(r)}>APROVAR</button>
-                            <button className="btn btn-red" style={{width:'auto'}} onClick={()=>onReject(r.id)}>RECUSAR</button>
-                        </div>
-                    </div>
-                ))}
-                <hr style={{borderColor:'#333'}}/>
-                <h4>🏛️ Patrocínios Ativos da Federação</h4>
-                {fedSpons.map(s => (
-                    <div key={s.id} className="card" style={{borderLeft: '4px solid var(--primary)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                        <div><b>{s.teamName}</b><br/><small style={{color:'lime'}}>+ {fmt(s.value)} / sem</small></div>
-                        <button className="btn btn-red" style={{width:'auto'}} onClick={async ()=>{if(confirm("Cancelar?")) await firebase.firestore().collection('sponsorships').doc(s.id).delete();}}>X</button>
-                    </div>
-                ))}
-            </div>}
-
-            {/* --- ABA IMPRENSA --- */}
-            {tab==='PRESS' && (
-                <div>
-                    <h4>Jornais e Jornalistas</h4>
-                    {(papers||[]).filter(p=>p.status==='PENDING').map(p=>(
-                        <div key={p.id} className="card" style={{borderLeft:'4px solid cyan'}}>
-                            <b>📰 {p.name} (PENDENTE)</b><br/><small>Dono: {p.ownerName}</small>
-                            <div style={{marginTop:5}}><button className="btn btn-green" onClick={()=>onApprovePaper(p.id)}>APROVAR</button></div>
-                        </div>
-                    ))}
-                    <h4>Ativos</h4>
-                    {(papers||[]).filter(p=>p.status==='ACTIVE').map(p=>(
-                        <div key={p.id} style={{marginBottom:20}}>
-                            <div className="card" style={{background:'#222', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                <b>📰 {p.name} (DONO)</b>
-                                <div style={{display:'flex', gap:5}}>
-                                    <button className="btn btn-ghost" style={{width:'auto'}} onClick={()=>managePassword('newspapers', p.id, p.password, p.name)}>🔑</button>
-                                    <button className="btn btn-red" style={{width:'auto'}} onClick={()=>onDeletePaper(p.id)}><i className="fas fa-trash"></i></button>
-                                </div>
-                            </div>
-                            <div style={{marginLeft:20}}>
-                                {journalists.filter(j => j.newspaperId === p.id).map(j => (
-                                    <div key={j.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 15px'}}>
-                                        <small>✒️ {j.name}</small>
-                                        <div style={{display:'flex', gap:5}}>
-                                            <button className="btn btn-ghost" style={{width:'auto', padding:'2px 8px'}} onClick={()=>managePassword('journalists', j.id, j.password, j.name)}>🔑</button>
-                                            <button className="btn btn-red" style={{width:'auto', padding:'2px 8px'}} onClick={()=>onDeleteJourno(j.id)}>X</button>
-                                        </div>
-                                    </div>
-                                ))}
+                                <button className="btn btn-red" style={{width:'auto', fontSize:10}} onClick={()=>onDeleteTeam(t.id)}>🗑️</button>
                             </div>
                         </div>
                     ))}
@@ -2726,7 +2720,6 @@ const AdminPanel = ({ teams, players, onGenFixtures, onTurnSeasonAdvanced, paper
             {/* --- ABA EMPRESAS --- */}
             {tab==='COMP' && (
                 <div>
-                    <h4>Empresas Pendentes</h4>
                     {(companies||[]).filter(c=>c.status==='PENDING').map(c => (
                         <div key={c.id} className="card" style={{borderLeft:'4px solid var(--purple)'}}>
                             <b>🏢 {c.name} (PENDENTE)</b><br/><small>Dono: {c.owner}</small>
@@ -2739,11 +2732,11 @@ const AdminPanel = ({ teams, players, onGenFixtures, onTurnSeasonAdvanced, paper
                     <h4>Empresas Ativas</h4>
                     {(companies||[]).filter(c=>c.status!=='PENDING').map(c => (
                         <div key={c.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                            <span><b>{c.name}</b> {c.status==='BLOCKED' && '(BLOQUEADA)'}<br/><small>Saldo: {fmt(c.balance)}</small></span>
+                            <span><b>{c.name}</b><br/><small>Saldo: {fmt(c.balance)}</small></span>
                             <div style={{display:'flex', gap:5}}>
                                 <button className="btn btn-ghost" style={{width:'auto'}} onClick={()=>managePassword('companies', c.id, c.password, c.name)}>🔑</button>
-                                <button className="btn btn-green" style={{width:'auto'}} onClick={()=>{const n = prompt("Novo Saldo:", c.balance); if(n) onUpdateCompBal(c.id, n);}}>$</button>
-                                <button className="btn btn-red" style={{width:'auto'}} onClick={()=>onDeleteComp(c.id)}><i className="fas fa-trash"></i></button>
+                                <button className="btn btn-green" style={{width:'auto'}} onClick={()=>{const n=prompt("Novo Saldo:", c.balance); if(n) onUpdateCompBal(c.id, n);}}>$</button>
+                                <button className="btn btn-red" style={{width:'auto'}} onClick={()=>onDeleteComp(c.id)}>🗑️</button>
                             </div>
                         </div>
                     ))}
@@ -2753,7 +2746,6 @@ const AdminPanel = ({ teams, players, onGenFixtures, onTurnSeasonAdvanced, paper
             {/* --- ABA TÉCNICOS --- */}
             {tab === 'COACH' && (
                 <div>
-                    <h4>Solicitações de Licença</h4>
                     {(coaches||[]).filter(c => c.status === 'PENDING').map(c => (
                         <div key={c.id} className="card" style={{borderLeft:'4px solid gold'}}>
                             <b>🎓 {c.name} (PENDENTE)</b>
@@ -2766,8 +2758,43 @@ const AdminPanel = ({ teams, players, onGenFixtures, onTurnSeasonAdvanced, paper
                             <span><b>{c.name}</b><br/><small>Saldo: {fmt(c.balance)}</small></span>
                             <div style={{display:'flex', gap:5}}>
                                 <button className="btn btn-ghost" style={{width:'auto'}} onClick={()=>managePassword('users', c.id, c.password, c.name)}>🔑</button>
-                                <button className="btn btn-green" style={{width:'auto'}} onClick={async()=>{const n=prompt("Saldo:", c.balance); if(n) await db.collection('users').doc(c.id).update({balance:parseFloat(n)})}}>$</button>
-                                <button className="btn btn-red" style={{width:'auto'}} onClick={async()=>{if(confirm("Excluir técnico?")) await db.collection('users').doc(c.id).delete();}}><i className="fas fa-trash"></i></button>
+                                <button className="btn btn-green" style={{width:'auto'}} onClick={async()=>{const n=prompt("Novo Saldo:", c.balance); if(n) await db.collection('users').doc(c.id).update({balance:parseFloat(n)})}}>$</button>
+                                <button className="btn btn-red" style={{width:'auto'}} onClick={async()=>{if(confirm("Excluir técnico?")) await db.collection('users').doc(c.id).delete();}}>🗑️</button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+            
+            {/* --- ABA IMPRENSA --- */}
+            {tab==='PRESS' && (
+                <div>
+                    {(papers||[]).filter(p=>p.status==='PENDING').map(p=>(
+                        <div key={p.id} className="card" style={{borderLeft:'4px solid cyan'}}>
+                            <b>📰 {p.name} (PENDENTE)</b><br/><small>Dono: {p.ownerName}</small>
+                            <div style={{marginTop:5}}><button className="btn btn-green" onClick={()=>onApprovePaper(p.id)}>APROVAR</button></div>
+                        </div>
+                    ))}
+                    <h4>Imprensa Ativa</h4>
+                    {(papers||[]).filter(p=>p.status==='ACTIVE').map(p=>(
+                        <div key={p.id} style={{marginBottom:20}}>
+                            <div className="card" style={{background:'#222', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                <b>📰 {p.name} (DONO)</b>
+                                <div style={{display:'flex', gap:5}}>
+                                    <button className="btn btn-ghost" style={{width:'auto'}} onClick={()=>managePassword('newspapers', p.id, p.password, p.name)}>🔑</button>
+                                    <button className="btn btn-red" style={{width:'auto'}} onClick={()=>onDeletePaper(p.id)}>🗑️</button>
+                                </div>
+                            </div>
+                            <div style={{marginLeft:20}}>
+                                {journalists.filter(j => j.newspaperId === p.id).map(j => (
+                                    <div key={j.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 15px'}}>
+                                        <small>✒️ {j.name}</small>
+                                        <div style={{display:'flex', gap:5}}>
+                                            <button className="btn btn-ghost" style={{width:'auto', padding:'2px 8px'}} onClick={()=>managePassword('journalists', j.id, j.password, j.name)}>🔑</button>
+                                            <button className="btn btn-red" style={{width:'auto', padding:'2px 8px'}} onClick={()=>onDeleteJourno(j.id)}>X</button>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     ))}
@@ -3967,7 +3994,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.78.4</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.78.5</div>
                             </div>
                         </div>
                         
@@ -4493,7 +4520,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.78.4 MATOGRAM </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.78.5 MATOGRAM </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

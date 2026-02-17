@@ -2619,68 +2619,7 @@ const resetDatabase = async () => {
         }
         setLoading(false);
     };
-
-    // --- FUNÇÃO 2: ABONO COLETIVO (EVENTOS) ---
-    const giveMassGrant = async () => {
-        const target = prompt("🎁 ABONO COLETIVO - QUEM VAI RECEBER?\n\n1: Jogadores (Todos)\n2: Jogadores (Apenas Contratados)\n3: Times\n4: Empresas\n5: Técnicos");
-        if(!target) return;
-        
-        const amountStr = prompt("💰 QUAL O VALOR DO BÔNUS? (Ex: 10000)");
-        if(!amountStr) return;
-        const amount = parseFloat(amountStr);
-        if(isNaN(amount) || amount <= 0) return alert("Valor inválido");
-        
-        const reason = prompt("📝 MOTIVO (Aparecerá no jornal):", "🎁 Bônus de Feriado");
-
-        let collectionName = '';
-        let typeName = '';
-        let filterFn = () => true;
-
-        if(target === '1') { collectionName = 'players'; typeName = 'Jogadores'; }
-        else if(target === '2') { 
-            collectionName = 'players'; 
-            typeName = 'Jogadores Contratados';
-            filterFn = (d) => d.teamId && d.teamId !== 'FREE'; 
-        }
-        else if(target === '3') { collectionName = 'teams'; typeName = 'Times'; }
-        else if(target === '4') { collectionName = 'companies'; typeName = 'Empresas'; }
-        else if(target === '5') { collectionName = 'users'; typeName = 'Técnicos'; } 
-        else return alert("Opção inválida");
-        
-        if(!confirm(`CONFIRMA?\nDar ${fmt(amount)} para ${typeName.toUpperCase()}?\nMotivo: ${reason}`)) return;
-
-        try {
-            setLoading(true);
-            const b = db.batch();
-            let q = db.collection(collectionName);
-            
-            if(target === '5') q = q.where('type', '==', 'COACH');
-            
-            const snap = await q.get();
-            let count = 0;
-
-            snap.docs.forEach(doc => {
-                const d = doc.data();
-                if(d.status === 'PENDING' || d.status === 'BLOCKED') return;
-                if(!filterFn(d)) return; 
-                
-                b.update(doc.ref, { balance: firebase.firestore.FieldValue.increment(amount) });
-                count++;
-            });
-            
-            db.collection('news').add({
-                text: `🎉 **${reason.toUpperCase()}**\nA Federação concedeu um bônus de ${fmt(amount)} para os **${typeName}**!`,
-                type: 'money',
-                date: Date.now()
-            });
-
-            await b.commit();
-            alert(`✅ Sucesso! Bônus enviado para ${count} ${typeName}.`);
-        } catch(e) {
-            alert("Erro: " + e.message);
-        }
-        setLoading(false);
-    };
+    
         // --- FUNÇÃO 2: ABONO COLETIVO (EVENTOS) ---
     const giveMassGrant = async () => {
         const target = prompt("🎁 ABONO COLETIVO - QUEM VAI RECEBER?\n\n1: Jogadores (Todos)\n2: Jogadores (Apenas Contratados)\n3: Times\n4: Empresas\n5: Técnicos");

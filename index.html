@@ -4425,7 +4425,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.79.4</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.79.5</div>
                             </div>
                         </div>
                         
@@ -4951,7 +4951,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.79.4 MATOGRAM </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.79.5 MATOGRAM </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -6795,15 +6795,49 @@ const ProductForm = ({ initial, onSave, onDelete, user }) => {
                         </div>
                     )}
 
-                    <label>{isEditing ? 'Fabricar Mais (Quantidade)' : 'Quantidade Inicial'}</label>
-                    <input className="input-field" type="number" min="1" value={p.stock} onChange={e=>setP({...p, stock:e.target.value})} />
-                    
-                    <div style={{display:'flex', justifyContent:'space-between', fontSize:12, marginTop:5, padding:'5px', background:'rgba(0,0,0,0.5)', borderRadius:4}}>
-                        <span>Custo Unitário: <b style={{color:'#ff5252'}}>{fmt(unitCost)}</b></span>
-                        <span>Custo Total: <b style={{color:'#ff5252'}}>{fmt(totalProductionCost)}</b></span>
+                    <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
+                        <label>{isEditing ? 'Fabricar Mais:' : 'Quantidade Inicial:'}</label>
+                        <b style={{color:'white', fontSize: 16}}>{quantity} un.</b>
                     </div>
 
-                    {!canAfford && <small style={{color:'red', display:'block', marginTop:5, fontWeight:'bold'}}>🚫 FUNDO INSUFICIENTE NA EMPRESA</small>}
+                    {/* SLIDER DE QUANTIDADE */}
+                    <input 
+                        type="range" 
+                        min="1" 
+                        max="200" 
+                        step="1"
+                        className="input-field" 
+                        value={quantity} 
+                        onChange={e=>setP({...p, stock: parseInt(e.target.value)})} 
+                    />
+                    
+                    {/* INPUT MANUAL DE QUANTIDADE (Para ajuste fino) */}
+                    <input 
+                        className="input-field" 
+                        type="number" 
+                        min="1" 
+                        value={quantity} 
+                        onChange={e=>setP({...p, stock: parseInt(e.target.value)})} 
+                        style={{marginTop: 5}}
+                    />
+                    
+                    {/* RESUMO DE CUSTOS */}
+                    <div style={{background:'rgba(0,0,0,0.5)', padding:10, borderRadius:6, marginTop:10}}>
+                        <div style={{display:'flex', justifyContent:'space-between', fontSize:11, color:'#aaa', marginBottom: 4}}>
+                            <span>Custo Unitário:</span>
+                            <span>{fmt(unitCost)}</span>
+                        </div>
+                        <div style={{display:'flex', justifyContent:'space-between', fontSize:11, color:'#aaa', marginBottom: 4}}>
+                            <span>Quantidade:</span>
+                            <span>x {quantity}</span>
+                        </div>
+                        <div style={{borderTop:'1px solid #555', paddingTop:5, display:'flex', justifyContent:'space-between', fontSize:13}}>
+                            <span style={{color:'white'}}>TOTAL A PAGAR:</span>
+                            <b style={{color: canAfford ? 'lime' : 'red'}}>{fmt(totalProductionCost)}</b>
+                        </div>
+                    </div>
+
+                    {!canAfford && <small style={{color:'red', display:'block', marginTop:5, fontWeight:'bold', textAlign:'center'}}>🚫 FUNDO INSUFICIENTE NA EMPRESA</small>}
                 </div>
 
                 <label>Preço de Venda (por unidade)</label>
@@ -6822,7 +6856,7 @@ const ProductForm = ({ initial, onSave, onDelete, user }) => {
                             productionCost: totalProductionCost // Manda o custo para descontar
                         });
                     }}>
-                        {isEditing ? `FABRICAR (+${quantity})` : 'LANÇAR PRODUTO'}
+                        {isEditing ? `FABRICAR (+${quantity})` : `LANÇAR PRODUTO (-${fmt(totalProductionCost)})`}
                     </button>
                     
                     {isEditing && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>🗑️ EXCLUIR</button>}

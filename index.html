@@ -4431,7 +4431,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.79.9</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.80.0</div>
                             </div>
                         </div>
                         
@@ -4957,7 +4957,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.79.9 MATOGRAM </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.80.0 MATOGRAM </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -6716,109 +6716,122 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
         
 // --- COMPONENTE: FÁBRICA DE PRODUTOS (ADMIN) ---
 const ProductForm = ({ initial, onSave, onDelete, user }) => {
-    // Estado inicial
+    // 1. Estados Iniciais (Forçando stock inicial em 1)
     const [p, setP] = useState(initial || { 
         name:'', cat:'energy', power:10, price:'', 
-        stock: 1, // Quantidade inicial obrigatória
+        stock: 1, 
         desc:'' 
     });
     
     const isEditing = !!initial?.id;
 
-    // --- CÁLCULO DE CUSTO UNITÁRIO ---
-    const getUnitCost = (cat, power) => {
-        const x = parseInt(power) || 0;
-        if (['energy', 'SAUDE', 'CONSUMIVEL'].includes(cat)) return x * 15; 
-        if (['training', 'CHUTEIRA', 'LUVAS'].includes(cat)) return x * 100;
-        if (['vehicle', 'real_estate', 'VEICULO', 'IMOVEL', 'TECNOLOGIA', 'LUXO'].includes(cat)) return x * 500;
+    // 2. Tabela de Custo de Produção (Varia por Categoria e Poder)
+    const getBaseUnitCost = (cat, power) => {
+        const pwr = parseInt(power) || 0;
+        // Energia/Saúde: Custo base 15 por ponto de poder
+        if (['energy', 'SAUDE', 'CONSUMIVEL'].includes(cat)) return pwr * 15; 
+        // Equipamento/Treino: Custo base 100 por ponto de poder
+        if (['training', 'CHUTEIRA', 'LUVAS'].includes(cat)) return pwr * 100;
+        // Veículo/Imóvel/Luxo: Custo base 500 por ponto de poder
+        if (['vehicle', 'real_estate', 'luxury', 'VEICULO', 'IMOVEL', 'TECNOLOGIA', 'LUXO'].includes(cat)) return pwr * 500;
         return 50; 
     };
 
-    // Cálculos dinâmicos para a interface
-    const unitCost = getUnitCost(p.cat, p.power);
-    const quantity = parseInt(p.stock) || 1;
-    const totalCost = unitCost * quantity;
-    const canAfford = user.type === 'ADMIN' ? true : (user.data.balance || 0) >= totalCost;
+    // 3. Cálculos da Ordem de Produção
+    const unitCost = getBaseUnitCost(p.cat, p.power);
+    const qtyToProduce = parseInt(p.stock) || 1;
+    const totalProductionBill = unitCost * qtyToProduce;
+    
+    // Verificação de Saldo (Admin ignora cobrança)
+    const companyBalance = user.data?.balance || 0;
+    const hasMoney = user.type === 'ADMIN' ? true : companyBalance >= totalProductionBill;
+
+    // 4. Ação de Salvar com Débito Automático
+    const handleFinalize = async () => {
+        if(!p.name || !p.price) return alert("Preencha Nome e Preço de Venda!");
+        if(!hasMoney) return alert(`A empresa não tem saldo para esta produção!\nCusto Total: ${fmt(totalProductionBill)}`);
+
+        // Debita do banco de dados na hora se não for Admin
+        if (user.type !== 'ADMIN' && totalProductionBill > 0) {
+            await db.collection('companies').doc(user.data.id).update({
+                balance: firebase.firestore.FieldValue.increment(-totalProductionBill)
+            });
+        }
+
+        // Soma o estoque se for edição, ou define se for novo
+        const finalStockCount = isEditing ? (parseInt(initial.stock || 0) + qtyToProduce) : qtyToProduce;
+
+        onSave({
+            ...p,
+            stock: finalStockCount,
+            productionCost: unitCost // Salva o custo da última produção
+        });
+    };
 
     return (
         <div className="modal-bg">
-            <div className="modal-content" style={{border: '2px solid gold'}}>
-                <h3 style={{marginTop:0}}>{isEditing ? '🏭 Gerenciar Estoque' : '🏭 Fábrica: Criar Produto'}</h3>
+            <div className="modal-content" style={{border: '2px solid #FFC400', boxShadow: '0 0 20px rgba(255,196,0,0.2)'}}>
+                <h2 style={{marginTop:0, color:'#FFC400'}}>⚙️ FÁBRICA MATO REAL</h2>
                 
-                {/* === SEÇÃO DE PRODUÇÃO (QUANTIDADE) - AGORA NO TOPO PARA NÃO SUMIR === */}
-                <div style={{background:'rgba(255, 215, 0, 0.15)', padding:15, borderRadius:10, marginBottom:20, border:'1px solid gold'}}>
-                    <h4 style={{marginTop:0, color:'gold', fontSize:14}}>📦 ORDEM DE PRODUÇÃO</h4>
+                {/* --- BLOCO A: DEFINIÇÃO DO ITEM --- */}
+                <div style={{background:'rgba(255,255,255,0.03)', padding:10, borderRadius:8, marginBottom:15}}>
+                    <label>Nome Comercial</label>
+                    <input className="input-field" value={p.name} onChange={e=>setP({...p, name:e.target.value})} disabled={isEditing} placeholder="Ex: Chuteira de Ouro" />
                     
-                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10}}>
-                        <label style={{fontSize:12}}>Quantidade de Itens:</label>
-                        <b style={{fontSize:18, color:'#fff'}}>{quantity} unidades</b>
+                    <label>Categoria de Indústria</label>
+                    <select className="input-field" value={p.cat} onChange={e=>setP({...p, cat:e.target.value})} disabled={isEditing}>
+                        <option value="energy">⚡ Consumíveis (Energia)</option>
+                        <option value="training">👟 Equipamentos (XP/Treino)</option>
+                        <option value="luxury">💎 Bens de Luxo (Fama)</option>
+                    </select>
+
+                    <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
+                        <label>Qualidade/Poder: <b style={{color:'gold'}}>{p.power}</b></label>
                     </div>
-
-                    {/* BARRA DESLIZANTE DE QUANTIDADE */}
-                    <input 
-                        type="range" min="1" max="200" step="1"
-                        className="input-field" 
-                        value={quantity} 
-                        onChange={e=>setP({...p, stock: parseInt(e.target.value)})} 
-                        style={{accentColor:'gold'}}
-                    />
-                    
-                    <div style={{fontSize:12, color:'#ccc', marginTop:10, paddingTop:10, borderTop:'1px solid rgba(255,255,255,0.1)'}}>
-                        <div>Custo por unidade: <b>{fmt(unitCost)}</b></div>
-                        <div style={{fontSize:16, marginTop:5}}>
-                            Total a pagar: <b style={{color: canAfford ? '#00E676' : '#FF1744'}}>{fmt(totalCost)}</b>
-                        </div>
-                        {!canAfford && <div style={{color:'#FF1744', fontWeight:'bold', marginTop:5}}>⚠️ SALDO INSUFICIENTE</div>}
-                    </div>
-                </div>
-
-                {/* === CONFIGURAÇÕES DO ITEM === */}
-                <label>Nome do Produto</label>
-                <input className="input-field" value={p.name} onChange={e=>setP({...p, name:e.target.value})} disabled={isEditing} placeholder="Nome do item..." />
-                
-                <label>Categoria</label>
-                <select className="input-field" value={p.cat} onChange={e=>setP({...p, cat:e.target.value})} disabled={isEditing}>
-                    <option value="energy">⚡ Energético (+Energia)</option>
-                    <option value="training">👟 Equipamento (+XP)</option>
-                    <option value="vehicle">🚗 Veículo (+Fama)</option>
-                    <option value="real_estate">🏠 Imóvel (+Fama)</option>
-                    <option value="luxury">💎 Luxo (+Fama)</option>
-                </select>
-
-                <div style={{background:'#222', padding:10, borderRadius:8, marginBottom:15}}>
-                    <label>Poder / Intensidade: <b style={{color:'gold'}}>{p.power}</b></label>
                     <input type="range" min="1" max="100" className="input-field" value={p.power} onChange={e=>setP({...p, power: parseInt(e.target.value)})} disabled={isEditing} />
                 </div>
 
-                <label>Preço de Venda (por unidade)</label>
-                <input className="input-field" type="number" value={p.price} onChange={e=>setP({...p, price:e.target.value})} placeholder="Valor para o cliente" />
-
-                {/* === BOTÕES === */}
-                <div style={{display:'flex', gap:10, marginTop:15}}>
-                    <button className="btn btn-green" disabled={!canAfford} onClick={async () => {
-                        if(!p.name || !p.price) return alert("Preencha nome e preço!");
-                        if(!canAfford) return alert("A empresa não tem saldo suficiente!");
-                        
-                        // Lógica de Cobrança: O dinheiro sai do saldo da empresa no Firebase
-                        if (totalCost > 0 && user.type !== 'ADMIN') {
-                            await db.collection('companies').doc(user.data.id).update({
-                                balance: firebase.firestore.FieldValue.increment(-totalCost)
-                            });
-                        }
-
-                        // Salvar produto com estoque atualizado
-                        const finalStock = isEditing ? (initial.stock || 0) + quantity : quantity;
-                        onSave({
-                            ...p,
-                            stock: finalStock,
-                            productionCost: unitCost
-                        });
-                    }}>
-                        {isEditing ? `FABRICAR (+${quantity})` : `LANÇAR (-${fmt(totalCost)})`}
-                    </button>
+                {/* --- BLOCO B: ORDEM DE PRODUÇÃO (QUANTIDADE) --- */}
+                <div style={{background:'rgba(255, 196, 0, 0.1)', padding:15, borderRadius:10, border:'1px solid #FFC400', marginBottom:15}}>
+                    <h4 style={{marginTop:0, color:'#FFC400', fontSize:14}}>📦 ORDEM DE PRODUÇÃO</h4>
                     
-                    {isEditing && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>🗑️ EXCLUIR</button>}
-                    <button className="btn" onClick={()=>onSave(null)}>CANCELAR</button>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10}}>
+                        <label style={{margin:0}}>Quantidade a produzir:</label>
+                        <b style={{fontSize:20, color:'#fff'}}>{qtyToProduce} un.</b>
+                    </div>
+
+                    <input 
+                        type="range" min="1" max="200" step="1"
+                        style={{width:'100%', accentColor:'#FFC400'}}
+                        value={qtyToProduce} 
+                        onChange={e=>setP({...p, stock: parseInt(e.target.value)})} 
+                    />
+                    
+                    <div style={{marginTop:15, paddingTop:10, borderTop:'1px solid rgba(255,196,0,0.2)', fontSize:12}}>
+                        <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
+                            <span>Custo Unitário (Qualidade {p.power}):</span>
+                            <b>{fmt(unitCost)}</b>
+                        </div>
+                        <div style={{display:'flex', justifyContent:'space-between', fontSize:16}}>
+                            <span>TOTAL A PAGAR:</span>
+                            <b style={{color: hasMoney ? '#00E676' : '#FF1744'}}>{fmt(totalProductionBill)}</b>
+                        </div>
+                        {!hasMoney && <div style={{color:'#FF1744', textAlign:'right', fontWeight:'bold', marginTop:5}}>SALDO INSUFICIENTE</div>}
+                    </div>
+                </div>
+
+                {/* --- BLOCO C: PREÇO DE MERCADO --- */}
+                <label>Preço de Venda ao Público (₣)</label>
+                <input className="input-field" type="number" value={p.price} onChange={e=>setP({...p, price:e.target.value})} placeholder="Valor na vitrine" />
+
+                <label>Descrição Curta</label>
+                <textarea className="input-field" value={p.desc} onChange={e=>setP({...p, desc:e.target.value})} placeholder="O que este item faz?" style={{height:60}} />
+
+                <div style={{display:'flex', gap:10, marginTop:10}}>
+                    <button className="btn btn-green" disabled={!hasMoney} onClick={handleFinalize} style={{flex:2}}>
+                        {isEditing ? `REPOR (+${qtyToProduce})` : `LANÇAR (-${fmt(totalProductionBill)})`}
+                    </button>
+                    <button className="btn btn-ghost" onClick={()=>onSave(null)} style={{flex:1}}>SAIR</button>
                 </div>
             </div>
         </div>

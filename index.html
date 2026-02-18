@@ -4724,7 +4724,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.81.0</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.81.3</div>
                             </div>
                         </div>
                         
@@ -5019,19 +5019,21 @@ const renewContract = async (p) => {
                             />
                         )}
         
-                        {screen === 'OFFERS' && (
-                            <OffersScreen 
-                                user={user} 
-                                offers={offers} 
-                                teams={teams} 
-                                onAccept={acceptOffer} 
-                                onReject={rejectOffer} 
-                                onCounter={(o) => setModal({ type: 'OFFER', data: { ...players.find(p => p.id === o.playerId), oldOffer: o } })} 
-                                onCoachAccept={handleFinalizeCoachContract} 
-                                onCoachReject={rejectOffer} 
-                                onCoachCounter={handleCounterCoachOffer} 
-                            />
-                        )}                        
+                       {screen === 'OFFERS' && (
+    <OffersScreen 
+        user={user} 
+        offers={offers} 
+        teams={teams} 
+        players={players} 
+        setModal={setModal} // <-- ESSA LINHA É O SEGREDO
+        onAccept={acceptOffer} 
+        onReject={rejectOffer} 
+        onCounter={(o) => setModal({ type: 'OFFER', data: { ...players.find(p => p.id === o.playerId), oldOffer: o } })} 
+        onCoachAccept={handleFinalizeCoachContract} 
+        onCoachReject={rejectOffer} 
+        onCoachCounter={handleCounterCoachOffer} 
+    />
+)}        
                         {/* NOVA TELA DE SERVIÇOS PÚBLICOS (HOSPITAL) */}
 {screen === 'PUBLIC_SERVICES' && (
     <PublicServices 
@@ -5273,7 +5275,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.81.2 MEGA ATUALIZÇÃO TÉCNICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.81.3 MEGA ATUALIZÇÃO TÉCNICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -7618,7 +7620,7 @@ const OffersScreen = ({ user, offers, teams, players, setModal, onAccept, onReje
                                         const pObj = players.find(p => p.id === o.playerId);
                                         if(!pObj) return alert("Jogador não encontrado (talvez aposentado).");
                                         
-                                        // 1. Abre o Modal de Oferta
+                                        // 1. Abre o Modal de Oferta usando a prop setModal recebida
                                         setModal({ type: 'OFFER', data: pObj });
                                         
                                         // 2. Avisa o Técnico
@@ -7630,7 +7632,7 @@ const OffersScreen = ({ user, offers, teams, players, setModal, onAccept, onReje
                                             date: Date.now()
                                         });
                                         
-                                        // 3. Remove a indicação
+                                        // 3. Remove a indicação da caixa de entrada
                                         db.collection('offers').doc(o.id).delete();
                                     }}>TENTAR NEGOCIAÇÃO</button>
                                     
@@ -7736,7 +7738,6 @@ const OffersScreen = ({ user, offers, teams, players, setModal, onAccept, onReje
                                 {o.description}
                             </div>
 
-                            {/*v1.54.5: LÓGICA DE BOTÃO CONDICIONAL (NOTIFICAÇÃO VS OFERTA) */}
                             {o.type === 'NOTIFICACAO' ? (
                                 <div style={{display:'flex', gap:5}}>
                                     <button className="btn btn-green" style={{width:'100%'}} onClick={()=>onAccept(o)}>

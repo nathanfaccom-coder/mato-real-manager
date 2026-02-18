@@ -269,20 +269,20 @@
     'VÁRZEA (VOLANTAÇO)':      ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'VOL', 'VOL', 'VOL', 'VOL', 'MEI', 'ATA']
 };
 
-        const FIELD_POSITIONS = {
-    'GOL': { bottom: '5%', left: '50%' },
-    'ZAG': [{ bottom: '20%', left: '35%' }, { bottom: '20%', left: '65%' }, { bottom: '20%', left: '50%' }], // Varia conforme qtde
-    'LD':  { bottom: '25%', left: '85%' },
-    'LE':  { bottom: '25%', left: '15%' },
-    'VOL': [{ bottom: '40%', left: '50%' }, { bottom: '40%', left: '35%' }, { bottom: '40%', left: '65%' }],
-    'MC':  [{ bottom: '55%', left: '50%' }, { bottom: '55%', left: '30%' }, { bottom: '55%', left: '70%' }],
-    'MEI': { bottom: '70%', left: '50%' },
-    'MD':  { bottom: '55%', left: '85%' },
-    'ME':  { bottom: '55%', left: '15%' },
-    'PTD': { bottom: '80%', left: '80%' },
-    'PTE': { bottom: '80%', left: '20%' },
-    'ATA': [{ bottom: '85%', left: '50%' }, { bottom: '85%', left: '35%' }, { bottom: '85%', left: '65%' }],
-    'SA':  { bottom: '75%', left: '50%' }
+        const FIELD_GRID = {
+    // Linhas horizontais (Eixo Y)
+    rows: {
+        'GOL': '90%',
+        'ZAG': '75%',
+        'LD':  '70%', 'LE': '70%',
+        'VOL': '55%',
+        'MC':  '45%',
+        'MD':  '45%', 'ME': '45%',
+        'MEI': '30%',
+        'PTD': '20%', 'PTE': '20%',
+        'SA':  '20%',
+        'ATA': '10%'
+    }
 };
         
         const POS = ['GOL', 'ZAG', 'LD', 'LE', 'VOL', 'MC', 'MEI', 'PTD', 'PTE', 'ATA'];
@@ -5381,7 +5381,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.81.7 MEGA ATUALIZÇÃO TÉCNICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.81.8MEGA ATUALIZÇÃO TÉCNICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -6552,40 +6552,50 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                     {Object.keys(FORMATIONS).map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
 
-                {/* --- CAMPO VISUAL --- */}
-                <div className="football-field">
+                <div className="football-field" style={{ background: '#2e7d32', position: 'relative', height: '450px', border: '2px solid #fff', borderRadius: '10px' }}>
                     {FORMATIONS[formation].map((posLabel, idx) => {
-                        // Lógica para pegar a coordenada correta
-                        let posStyle = { bottom: '50%', left: '50%' };
-                        const mapping = FIELD_POSITIONS[posLabel];
+                        // 1. Identifica todos os jogadores que estão na mesma "Linha" (Row)
+                        const currentRowY = FIELD_GRID.rows[posLabel] || '50%';
+                        const playersInThisRow = FORMATIONS[formation].filter(p => FIELD_GRID.rows[p] === currentRowY);
                         
-                        if (Array.isArray(mapping)) {
-                            // Se houver múltiplos (ex: 2 ZAG), distribui conforme o index
-                            const occurrence = FORMATIONS[formation].slice(0, idx).filter(l => l === posLabel).length;
-                            posStyle = mapping[occurrence] || mapping[0];
-                        } else if (mapping) {
-                            posStyle = mapping;
-                        }
+                        // 2. Descobre a posição deste jogador específico dentro da sua linha
+                        const indexInRow = FORMATIONS[formation].slice(0, idx).filter(p => FIELD_GRID.rows[p] === currentRowY).length;
+                        const totalInRow = playersInThisRow.length;
+
+                        // 3. Calcula o Eixo X (Horizontal) para espalhar os jogadores
+                        // Se tiver 1 jogador: 50%
+                        // Se tiver 2: 30% e 70%
+                        // Se tiver 3: 20%, 50%, 80%
+                        const spacing = 100 / (totalInRow + 1);
+                        const posX = spacing * (indexInRow + 1);
 
                         const pId = lineup[idx];
                         const player = players.find(p => p.id === pId);
 
                         return (
-                            <div key={idx} className="player-slot" style={posStyle} onClick={() => {
-                                // Abre um prompt ou modal para escolher o jogador para este index
-                                const available = players.filter(p => p.position === posLabel || p.position === 'MC'); // MC pode cobrir mais áreas
-                                const choice = prompt(`Escolha um ${posLabel}:\n` + available.map((p,i) => `${i}: ${p.name}`).join('\n'));
-                                if(choice && available[choice]) handleSetPosition(idx, available[choice].id);
-                            }}>
-                                <div className="player-photo-circle">
+                            <div key={idx} className="player-slot" 
+                                style={{ 
+                                    position: 'absolute', 
+                                    top: currentRowY, 
+                                    left: `${posX}%`, 
+                                    transform: 'translate(-50%, -50%)',
+                                    textAlign: 'center'
+                                }} 
+                                onClick={() => {
+                                    const available = players.filter(p => p.teamId === coach.teamId);
+                                    const choice = prompt(`Escalar jogador para ${posLabel}:\n` + available.map((p,i) => `${i}: ${p.name} (${p.position})`).join('\n'));
+                                    if(choice !== null && available[choice]) handleSetPosition(idx, available[choice].id);
+                                }}
+                            >
+                                <div className="player-photo-circle" style={{ width: '45px', height: '45px', borderRadius: '50%', border: '2px solid gold', background: '#1a237e', overflow: 'hidden', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     {player?.face ? (
-                                        <img src={player.face} alt="" />
+                                        <img src={player.face} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                     ) : (
-                                        <span>{posLabel}</span>
+                                        <span style={{ color: '#fff', fontSize: '10px' }}>{posLabel}</span>
                                     )}
                                 </div>
-                                <div className="player-name-label">
-                                    {player ? player.name.split(' ')[0] : "-- Vazio --"}
+                                <div className="player-name-label" style={{ background: 'rgba(0,0,0,0.8)', color: '#fff', fontSize: '9px', padding: '2px 4px', borderRadius: '4px', marginTop: '2px', whiteSpace: 'nowrap' }}>
+                                    {player ? player.name.split(' ')[0] : "Vazio"}
                                 </div>
                             </div>
                         );

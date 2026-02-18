@@ -4956,7 +4956,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.81.8</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.81.9</div>
                             </div>
                         </div>
                         
@@ -5507,7 +5507,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.81.8 MEGA ATUALIZÇÃO TÉCNICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.81.9 MEGA ATUALIZÇÃO TÉCNICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -6543,6 +6543,7 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
 const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolvePerk, onAddAffinity, onAcceptOffer, onRejectOffer, onCounterOffer, onUpdateSalary, onSelfAction, onUseItem, onSaveTactics }) => {
     const [tab, setTab] = useState('PRANCHETA'); 
     const [selectedPlayers, setSelectedPlayers] = useState([]);
+    const [selectingPos, setSelectingPos] = useState(null); // Guarda qual posição está sendo preenchida
     const [trainingType, setTrainingType] = useState('FISICO_BASE'); 
     const [newSalary, setNewSalary] = useState(coach.salary); 
     const [formation, setFormation] = useState(team?.tactics?.formation || '4-3-3 OFENSIVO');
@@ -6674,7 +6675,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
         {!team ? (
             <div className="card" style={{textAlign:'center', padding:40, border:'1px dashed #666'}}>
                 <i className="fas fa-lock" style={{fontSize:40, color:'#444', marginBottom:15}}></i>
-                <p>Você precisa estar contratado por um clube para acessar a prancheta tática.</p>
+                <p>Contrate um clube para acessar a prancheta tática.</p>
             </div>
         ) : (
             <div className="card" style={{padding:'10px'}}>
@@ -6695,14 +6696,12 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                     boxShadow: 'inset 0 0 60px rgba(0,0,0,0.4)',
                     overflow: 'hidden'
                 }}>
-                    {/* Linhas do Campo Decorativas */}
+                    {/* Linhas do Campo */}
                     <div style={{position:'absolute', top:'50%', left:0, right:0, height:2, background:'rgba(255,255,255,0.5)'}}></div>
                     <div style={{position:'absolute', top:'50%', left:'50%', transform:'translate(-50%, -50%)', width:100, height:100, border:'2px solid rgba(255,255,255,0.5)', borderRadius:'50%'}}></div>
 
                     {FORMATIONS[formation].map((posLabel, idx) => {
-                        // Busca a coordenada mapeada exatamente pelo index
                         const coords = FORMATION_COORDINATES[formation][idx];
-
                         const pId = lineup[idx];
                         const player = players.find(p => p.id === pId);
 
@@ -6716,19 +6715,8 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                                     transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
                                     zIndex: 10
                                 }} 
-                                onClick={() => {
-                                    const available = players.filter(p => p.teamId === coach.teamId);
-                                    if(available.length === 0) return alert("Nenhum jogador no elenco do time!");
-                                    
-                                    const listTxt = available.map((p,i) => `${i}: ${p.name} (${p.position})`).join('\n');
-                                    const choice = prompt(`Escalar ${posLabel}:\n\n${listTxt}`);
-                                    
-                                    if(choice !== null && available[choice]) {
-                                        handleSetPosition(idx, available[choice].id);
-                                    }
-                                }}
+                                onClick={() => setSelectingPos({ label: posLabel, index: idx })}
                             >
-                                {/* Círculo do Jogador */}
                                 <div className="player-photo-circle" style={{ 
                                     width: '46px', height: '46px', 
                                     borderRadius: '50%', 
@@ -6744,8 +6732,6 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                                         <span style={{ color: '#fff', fontSize: '10px', fontWeight:'900' }}>{posLabel}</span>
                                     )}
                                 </div>
-                                
-                                {/* Etiqueta de Nome */}
                                 <div className="player-name-label" style={{ 
                                     background: player ? 'gold' : 'rgba(0,0,0,0.8)', 
                                     color: player ? '#000' : '#fff', 
@@ -6755,10 +6741,8 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                                     marginTop: '4px',
                                     fontWeight: '900',
                                     whiteSpace: 'nowrap',
-                                    boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
                                     maxWidth: '80px',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis'
+                                    overflow: 'hidden'
                                 }}>
                                     {player ? player.name.split(' ')[0].toUpperCase() : "VAZIO"}
                                 </div>
@@ -6775,6 +6759,46 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                        <i className="fas fa-trash"></i>
                     </button>
                 </div>
+
+                {/* MODAL SELETOR DE JOGADORES (FLUTUANTE) */}
+                {selectingPos && (
+                    <div className="modal-overlay" style={{zIndex: 9999}}>
+                        <div className="modal-content" style={{maxHeight:'70vh'}}>
+                            <div style={{display:'flex', justifyContent:'space-between', marginBottom:15}}>
+                                <h3 style={{margin:0}}>Escalar {selectingPos.label}</h3>
+                                <button className="btn btn-red" style={{width:'auto', padding:'5px 10px'}} onClick={()=>setSelectingPos(null)}>X</button>
+                            </div>
+                            
+                            <div style={{display:'flex', flexDirection:'column', gap:8, overflowY:'auto'}}>
+                                <div className="card" style={{background:'#333', border:'1px dashed #666', textAlign:'center', cursor:'pointer'}} 
+                                     onClick={() => { handleSetPosition(selectingPos.index, null); setSelectingPos(null); }}>
+                                    <b>❌ REMOVER JOGADOR</b>
+                                </div>
+                                
+                                {players.filter(p => !Object.values(lineup).includes(p.id) || lineup[selectingPos.index] === p.id).map(p => (
+                                    <div key={p.id} className="card" 
+                                        style={{
+                                            display:'flex', alignItems:'center', gap:10, cursor:'pointer', 
+                                            borderLeft: `4px solid ${getPosColor(p.position)}`,
+                                            background: lineup[selectingPos.index] === p.id ? 'rgba(0,230,118,0.1)' : 'var(--bg-input)'
+                                        }}
+                                        onClick={() => {
+                                            handleSetPosition(selectingPos.index, p.id);
+                                            setSelectingPos(null);
+                                        }}
+                                    >
+                                        {p.face ? <img src={p.face} style={{width:35, height:35, borderRadius:'50%', objectFit:'cover'}} /> : <div style={{width:35, height:35, borderRadius:'50%', background:'#333'}}></div>}
+                                        <div style={{flex:1}}>
+                                            <b>{p.name}</b><br/>
+                                            <small style={{color:'#aaa'}}>{p.position} | OV: {p.overall}</small>
+                                        </div>
+                                        {lineup[selectingPos.index] === p.id && <i className="fas fa-check-circle" style={{color:'var(--primary)'}}></i>}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         )}
     </div>

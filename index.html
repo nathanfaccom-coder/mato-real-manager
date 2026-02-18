@@ -5093,67 +5093,66 @@ const renewContract = async (p) => {
                         }
 
                  <div className="bottom-nav">
-    {/* 1. HOME */}
-    <div className={`nav-item ${['HOME','COMPANY_HOME','COMPANY_DASH','PLAYER_DASH','COACH_DASH','PRESS_DASH'].includes(screen)?'active':''}`} 
-         onClick={() => { 
-             // Lógica de retorno para a home correta
-             if(user.type.includes('PRESS')) setScreen('PRESS_DASH'); 
-             else if(user.type === 'COMPANY') setScreen('COMPANY_HOME'); 
-             else if(user.type === 'PLAYER') setScreen('PLAYER_DASH'); 
-             else if(user.type === 'COACH') setScreen('COACH_DASH'); 
-             else setScreen('HOME'); 
-         }}>
-        <i className="fas fa-home"></i>INÍCIO
-    </div>
-    
-    {/* 2. JOGOS (NOVO - PARA TODOS) */}
-    <div className={`nav-item ${screen==='MATCHES'?'active':''}`} onClick={()=>setScreen('MATCHES')}>
-        <i className="fas fa-futbol"></i>JOGOS
-    </div>
+                    {/* 1. HOME */}
+                    <div className={`nav-item ${['HOME','COMPANY_HOME','COMPANY_DASH','PLAYER_DASH','COACH_DASH','PRESS_DASH'].includes(screen)?'active':''}`} 
+                        onClick={() => { 
+                            if(user.type.includes('PRESS')) setScreen('PRESS_DASH'); 
+                            else if(user.type === 'COMPANY') setScreen('COMPANY_HOME'); 
+                            else if(user.type === 'PLAYER') setScreen('PLAYER_DASH'); 
+                            else if(user.type === 'COACH') setScreen('COACH_DASH'); 
+                            else setScreen('HOME'); 
+                        }}>
+                        <i className="fas fa-home"></i><span>INÍCIO</span>
+                    </div>
+                    
+                    {/* 2. JOGOS (NOVO - PARA TODOS) */}
+                    <div className={`nav-item ${screen==='MATCHES'?'active':''}`} onClick={()=>setScreen('MATCHES')}>
+                        <i className="fas fa-futbol"></i><span>JOGOS</span>
+                    </div>
 
-    {/* NOVO BOTÃO SOCIAL */}
-    <div className={`nav-item ${screen==='SOCIAL'?'active':''}`} onClick={()=>setScreen('SOCIAL')}>
-        <i className="fas fa-camera"></i>SOCIAL
-    </div>
+                    {/* NOVO BOTÃO SOCIAL */}
+                    <div className={`nav-item ${screen==='SOCIAL'?'active':''}`} onClick={()=>setScreen('SOCIAL')}>
+                        <i className="fas fa-camera"></i><span>SOCIAL</span>
+                    </div>
 
-    {/* 3. SERVIÇOS PÚBLICOS (HOSPITAL) */}
-    <div className={`nav-item ${screen==='PUBLIC_SERVICES'?'active':''}`} onClick={()=>setScreen('PUBLIC_SERVICES')}>
-        <i className="fas fa-hospital-symbol"></i>HOSPITAL
-    </div>
-    
-    {/* 4. MERCADO (Esconde para empresas) */}
-    {user.type!=='COMPANY' && 
-        <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}>
-            <i className="fas fa-globe"></i>MERCADO
-        </div>
-    }
-    
-    {/* 5. SHOP (Esconde para empresas) */}
-    {user.type!=='COMPANY' && 
-        <div className={`nav-item ${screen==='SHOPPING'?'active':''}`} onClick={()=>setScreen('SHOPPING')}>
-            <i className="fas fa-shopping-bag"></i>SHOP
-        </div>
-    }
+                    {/* 3. SERVIÇOS PÚBLICOS (HOSPITAL) */}
+                    <div className={`nav-item ${screen==='PUBLIC_SERVICES'?'active':''}`} onClick={()=>setScreen('PUBLIC_SERVICES')}>
+                        <i className="fas fa-hospital-symbol"></i><span>HOSPITAL</span>
+                    </div>
+                    
+                    {/* 4. MERCADO (Esconde para empresas) */}
+                    {user.type!=='COMPANY' && 
+                        <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}>
+                            <i className="fas fa-globe"></i><span>MERCADO</span>
+                        </div>
+                    }
+                    
+                    {/* 5. SHOP (Esconde para empresas) */}
+                    {user.type!=='COMPANY' && 
+                        <div className={`nav-item ${screen==='SHOPPING'?'active':''}`} onClick={()=>setScreen('SHOPPING')}>
+                            <i className="fas fa-shopping-bag"></i><span>SHOP</span>
+                        </div>
+                    }
 
-    {/* 6. PATROCINIO (Só times) */}
-    {user.type==='USER' && 
-        <div className={`nav-item ${screen==='SPONSORSHIPS'?'active':''}`} onClick={()=>setScreen('SPONSORSHIPS')}>
-            <i className="fas fa-handshake"></i>PATRO
-        </div>
-    }
+                    {/* 6. PATROCINIO (Só times) */}
+                    {user.type==='USER' && 
+                        <div className={`nav-item ${screen==='SPONSORSHIPS'?'active':''}`} onClick={()=>setScreen('SPONSORSHIPS')}>
+                            <i className="fas fa-handshake"></i><span>PATRO</span>
+                        </div>
+                    }
 
-    {/* 7. RANKING (RESTAURADO) */}
-    {user.type!=='COMPANY' &&
-        <div className={`nav-item ${screen==='RANKING'?'active':''}`} onClick={()=>setScreen('RANKING')}>
-            <i className="fas fa-trophy"></i>RANK
-        </div>
-    }
+                    {/* 7. RANKING (RESTAURADO) */}
+                    {user.type!=='COMPANY' &&
+                        <div className={`nav-item ${screen==='RANKING'?'active':''}`} onClick={()=>setScreen('RANKING')}>
+                            <i className="fas fa-trophy"></i><span>RANK</span>
+                        </div>
+                    }
 
-    {/* 8. NEWS (Todos) */}
-    <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={()=>{setScreen('NEWS'); setNewNews(false); localStorage.setItem('lastRead', Date.now());}}>
-        <i className="fas fa-newspaper"></i>NEWS
-    </div>
-</div>
+                    {/* 8. NEWS (Todos) */}
+                    <div className={`nav-item ${screen==='NEWS'?'active':''}`} onClick={()=>{setScreen('NEWS'); setNewNews(false); localStorage.setItem('lastRead', Date.now());}}>
+                        <i className="fas fa-newspaper"></i><span>NEWS</span>
+                    </div>
+                </div>
   
                     {modal && <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget && setModal(null)}>
                         <div className="modal-content">
@@ -5164,19 +5163,20 @@ const renewContract = async (p) => {
                             {modal.type==='TEAM_TABLE' && <TeamStandingsEditor teams={teams} onUpdateTeamStats={updateTeamStats} />}
                             {modal.type==='POST_NEWS' && <div><h3>Nova Notícia</h3><input className="input-field" placeholder="Manchete / Texto" id="news-body" /><button className="btn btn-blue" onClick={()=>{postNews(`📰 **${user.data.name}:**\n${document.getElementById('news-body').value}`, 'press'); setModal(null);}}>PUBLICAR</button></div>}
                             {modal.type==='STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
+                            
                             {modal.type === 'MATCH_MANAGER' && (
-    <MatchManagerForm 
-        initialData={modal.data} 
-        teams={teams} 
-        onSave={handleSaveMatch} 
-        onDelete={handleDeleteMatch} 
-    />
-)}
-                            {/* Modal de Relatório da Tela de Jogos usa MATCH_REPORT, se quiser reutilizar MATCH_PERFORMANCE mude acima no MatchCenter */}
+                                <MatchManagerForm 
+                                    initialData={modal.data} 
+                                    teams={teams} 
+                                    onSave={handleSaveMatch} 
+                                    onDelete={handleDeleteMatch} 
+                                />
+                            )}
+                            
                             {modal.type==='MATCH_REPORT' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} />}
                             
                             {modal.type === 'HIRE_COACH' && (
-                                <div>
+                                <div className="modal-content">
                                     <h3>Negociar com {modal.data.name}</h3>
                                     <label>Salário Semanal (₣)</label>
                                     <input className="input-field" type="number" id="c_salary" defaultValue={modal.data.salary} />
@@ -5191,19 +5191,24 @@ const renewContract = async (p) => {
                                     <label>Multa Rescisória (₣)</label>
                                     <input className="input-field" type="number" id="c_clause" defaultValue={modal.data.salary * 10} />
 
-                                    <button className="btn btn-green" onClick={() => {
-                                        const s = document.getElementById('c_salary').value;
-                                        const c = document.getElementById('c_contract').value;
-                                        const cl = document.getElementById('c_clause').value;
-                                        handleSendCoachOffer(modal.data.id, s, c, cl);
-                                    }}>ENVIAR PROPOSTA</button>
+                                    <div style={{display:'flex', gap:10, marginTop:15}}>
+                                        <button className="btn btn-green" onClick={() => {
+                                            const s = document.getElementById('c_salary').value;
+                                            const c = document.getElementById('c_contract').value;
+                                            const cl = document.getElementById('c_clause').value;
+                                            handleSendCoachOffer(modal.data.id, s, c, cl);
+                                            setModal(null);
+                                        }}>ENVIAR PROPOSTA</button>
+                                        <button className="btn btn-red" onClick={()=>setModal(null)}>CANCELAR</button>
+                                    </div>
                                 </div>
                             )}
                         </div>
                     </div>}
-                </div>
-            );
-            }
+            </div>
+        </div>
+    );
+};
 // --- COMPONENTS ---
      const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor, onCreateCoach }) => {
     const [tab, setTab] = useState('LOGIN'); 

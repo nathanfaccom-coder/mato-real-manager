@@ -148,6 +148,54 @@
         const db = firebase.firestore();
         const { useState, useEffect } = React;
 
+        const FORMATIONS = {
+    // --- LINHA DE 4 (OS CLÁSSICOS) ---
+    '4-3-3 OFENSIVO':    ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'VOL', 'MC', 'MEI', 'PTD', 'ATA', 'PTE'],
+    '4-3-3 DEFENSIVO':   ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'VOL', 'VOL', 'MC', 'PTD', 'ATA', 'PTE'],
+    '4-3-3 FALSO 9':     ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'VOL', 'MC', 'MC', 'PTD', 'SA', 'PTE'],
+    '4-3-3 POSSE':       ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'VOL', 'MC', 'MC', 'SA', 'ATA', 'SA'],
+    
+    '4-4-2 CLÁSSICO':    ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'MD', 'MC', 'MC', 'ME', 'ATA', 'ATA'],
+    '4-4-2 LOSANGO':     ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'VOL', 'MC', 'MC', 'MEI', 'ATA', 'ATA'],
+    '4-4-2 LINHA':       ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'VOL', 'VOL', 'MEI', 'MEI', 'ATA', 'ATA'],
+    '4-4-1-1':           ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'MD', 'MC', 'MC', 'ME', 'SA', 'ATA'],
+    
+    '4-2-3-1 LARGO':     ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'VOL', 'VOL', 'MEI', 'PTD', 'ATA', 'PTE'],
+    '4-2-3-1 ESTREITO':  ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'VOL', 'VOL', 'MEI', 'MEI', 'MEI', 'ATA'],
+    
+    '4-1-4-1':           ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'VOL', 'MD', 'MC', 'MC', 'ME', 'ATA'],
+    '4-1-2-1-2':         ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'VOL', 'MC', 'MC', 'MEI', 'ATA', 'ATA'],
+    '4-2-2-2 (BRASIL)':  ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'VOL', 'VOL', 'MEI', 'MEI', 'ATA', 'ATA'],
+    '4-2-4 OFENSIVO':    ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'MC', 'MC', 'PTD', 'ATA', 'ATA', 'PTE'],
+    
+    '4-5-1 RETRANCA':    ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'VOL', 'VOL', 'MC', 'MD', 'ME', 'ATA'],
+    '4-3-2-1 (NATAL)':   ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'VOL', 'MC', 'MC', 'MEI', 'MEI', 'ATA'], // Árvore de Natal
+    
+    // --- LINHA DE 3 (TÁTICOS E MODERNOS) ---
+    '3-5-2 TÁTICO':      ['GOL', 'ZAG', 'ZAG', 'ZAG', 'VOL', 'VOL', 'MD', 'ME', 'MEI', 'ATA', 'ATA'],
+    '3-4-3 (CRUYFF)':    ['GOL', 'ZAG', 'ZAG', 'ZAG', 'VOL', 'MC', 'MD', 'ME', 'PTD', 'ATA', 'PTE'], // Diamante no meio
+    '3-4-3 LINHA':       ['GOL', 'ZAG', 'ZAG', 'ZAG', 'MD', 'MC', 'MC', 'ME', 'PTD', 'ATA', 'PTE'],
+    '3-4-1-2':           ['GOL', 'ZAG', 'ZAG', 'ZAG', 'VOL', 'VOL', 'MD', 'ME', 'MEI', 'ATA', 'ATA'],
+    '3-6-1 CONTROLE':    ['GOL', 'ZAG', 'ZAG', 'ZAG', 'VOL', 'VOL', 'MD', 'MC', 'MC', 'ME', 'ATA'],
+    '3-3-1-3 (BIELSA)':  ['GOL', 'ZAG', 'ZAG', 'ZAG', 'VOL', 'MC', 'MC', 'MEI', 'PTD', 'ATA', 'PTE'],
+    '3-1-4-2':           ['GOL', 'ZAG', 'ZAG', 'ZAG', 'VOL', 'MD', 'MC', 'MC', 'ME', 'ATA', 'ATA'],
+    
+    // --- LINHA DE 5 (PARK THE BUS E CONTRA-ATAQUE) ---
+    '5-4-1 ÔNIBUS':      ['GOL', 'LD', 'ZAG', 'ZAG', 'ZAG', 'LE', 'VOL', 'VOL', 'MD', 'ME', 'ATA'],
+    '5-3-2 CONTRA':      ['GOL', 'LD', 'ZAG', 'ZAG', 'ZAG', 'LE', 'VOL', 'MC', 'MC', 'ATA', 'ATA'],
+    '5-2-3 ALAS':        ['GOL', 'LD', 'ZAG', 'ZAG', 'ZAG', 'LE', 'MC', 'MC', 'PTD', 'ATA', 'PTE'],
+    '5-2-1-2':           ['GOL', 'LD', 'ZAG', 'ZAG', 'ZAG', 'LE', 'VOL', 'VOL', 'MEI', 'ATA', 'ATA'],
+    
+    // --- TÁTICAS ANTIGAS E EXPERIMENTAIS (VÁRZEA E HISTÓRIA) ---
+    'WM (ANOS 30)':      ['GOL', 'ZAG', 'ZAG', 'ZAG', 'VOL', 'VOL', 'MEI', 'MEI', 'PTD', 'ATA', 'PTE'], // 3-2-2-3
+    '2-3-5 (PIRÂMIDE)':  ['GOL', 'ZAG', 'ZAG', 'VOL', 'MC', 'VOL', 'PTD', 'SA', 'ATA', 'SA', 'PTE'], // Ataque Total
+    '4-6-0 (SEM ATA)':   ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'VOL', 'VOL', 'MD', 'ME', 'MEI', 'MEI'], // Espanha 2012
+    '1-1-8 (KAMIKAZE)':  ['GOL', 'ZAG', 'MC', 'PTD', 'SA', 'SA', 'ATA', 'ATA', 'SA', 'SA', 'PTE'],
+    
+    // --- ESPECÍFICAS DA VÁRZEA ---
+    'VÁRZEA (TUDO P/ FRENTE)': ['GOL', 'ZAG', 'ZAG', 'VOL', 'MEI', 'PTD', 'ATA', 'ATA', 'ATA', 'ATA', 'PTE'],
+    'VÁRZEA (VOLANTAÇO)':      ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'VOL', 'VOL', 'VOL', 'VOL', 'MEI', 'ATA']
+};
         const POS = ['GOL', 'ZAG', 'LD', 'LE', 'VOL', 'MC', 'MEI', 'PTD', 'PTE', 'ATA'];
         const SERIES = ['A', 'B', 'C', 'D', 'VARZEA'];
         const COSTS = [0, 5000000, 20000000, 50000000, 100000000];
@@ -2522,7 +2570,7 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
     };
 
             //FIM
-    
+    //AQUI É DENTRO DA App.js
    const buyProduct = async (prod, seller) => {
         const buyerBalance = user.data.balance || 0;
         const price = parseFloat(prod.price);
@@ -2622,9 +2670,129 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
         setLoading(false);
     };
             //FIM
+const handleCoachIndication = async (player, obs) => {
+    // 1. Cria a notificação para o time
+    await db.collection('offers').add({
+        type: 'COACH_SUGGESTION',
+        teamId: user.data.teamId, // Vai para o time do técnico
+        recipientId: user.data.teamId,
+        senderId: user.data.id, // ID do técnico
+        senderName: user.data.name,
+        playerId: player.id,
+        playerName: player.name,
+        playerPos: player.position,
+        playerOv: player.overall,
+        playerVal: player.value,
+        status: 'PENDING',
+        description: `💡 **INDICAÇÃO DO TÉCNICO**\n${user.data.name} sugere a contratação de **${player.name}** (${player.position}).\n\n📝 Obs: "${obs || 'Sem observações'}"`,
+        date: Date.now()
+    });
+    alert("Indicação enviada para a diretoria!");
+};
+        //FIM
+            const saveTactics = async (formation, lineup) => {
+    await db.collection('teams').doc(user.data.teamId).update({
+        tactics: {
+            formation: formation,
+            lineup: lineup
+        }
+    });
+    alert("Escalação salva na súmula!");
+};
+           //FIM
+// --- FUNÇÃO DE CONSUMO DO TÉCNICO (COM SISTEMA DE INTOXICAÇÃO) ---
+    const handleCoachUseItem = async (item) => {
+        // Verificações de segurança
+        if (!user.data || user.type !== 'COACH') return;
+        
+        // 1. Configuração do Dia e Toxicidade
+        const today = new Date().toDateString();
+        const lastDate = user.data.lastToxicityDate || '';
+        // Se mudou o dia, reseta o contador de toxicidade para 0, senão mantém o atual
+        const currentTox = lastDate === today ? (user.data.toxicity || 0) : 0;
+        
+        // Pega a energia atual (se não tiver, assume 100)
+        const currentEnergy = user.data.energy !== undefined ? user.data.energy : 100;
 
+        // Trava: Se já estiver cheio, não deixa gastar o item
+        if (currentEnergy >= 100) return alert("Sua energia já está cheia! Guarde o item para depois.");
+
+        setLoading(true);
+
+        try {
+            const b = db.batch();
+            const coachRef = db.collection('users').doc(user.data.id);
+            const itemRef = db.collection('sales').doc(item.id);
+
+            // 2. Cálculo do Risco (Igual ao do Jogador)
+            let outcome = 'SUCCESS';
             
+            // 3º Uso no dia: 40% de chance de passar mal
+            if (currentTox === 2) { 
+                if (Math.random() < 0.40) outcome = 'SICK';
+            }
+            // 4º Uso ou mais: 95% de chance de Vomitar (Perda total)
+            else if (currentTox >= 3) {
+                if (Math.random() < 0.95) outcome = 'VOMIT';
+            }
 
+            // --- APLICAÇÃO DOS EFEITOS ---
+
+            // CENÁRIO A: VÔMITO / INTOXICAÇÃO (Deu Ruim)
+            if (outcome === 'VOMIT' || outcome === 'SICK') {
+                // Penalidade: Zera a energia
+                b.update(coachRef, {
+                    energy: 0, 
+                    toxicity: currentTox + 1,
+                    lastToxicityDate: today
+                });
+                b.delete(itemRef); // Consome o item
+                await b.commit();
+
+                // Atualiza visualmente na hora
+                setSales(prev => prev.filter(s => s.id !== item.id));
+                setUser(prev => ({...prev, data: {...prev.data, energy: 0, toxicity: currentTox + 1}}));
+                
+                alert(outcome === 'VOMIT' 
+                    ? "🤮 VÔMITO! Você comeu demais e seu estômago rejeitou tudo.\nResultado: Energia ZERADA." 
+                    : "🤢 ENJOO FORTE! O item não caiu bem.\nResultado: Você precisou deitar e sua energia zerou.");
+            }
+            
+            // CENÁRIO B: SUCESSO (Deu Bom)
+            else {
+                const energyGain = parseInt(item.power) || 0;
+                const newEnergy = Math.min(100, currentEnergy + energyGain); // Teto de 100%
+
+                b.update(coachRef, { 
+                    energy: newEnergy,
+                    toxicity: currentTox + 1,
+                    lastToxicityDate: today
+                });
+                b.delete(itemRef); // Consome o item
+                await b.commit();
+                
+                // Atualiza visualmente na hora
+                setSales(prev => prev.filter(s => s.id !== item.id));
+                setUser(prev => ({...prev, data: {...prev.data, energy: newEnergy, toxicity: currentTox + 1}}));
+                
+                // Feedback com Aviso
+                if (currentTox === 1) {
+                    alert(`⚡ Energia recuperada: +${energyGain}% (Total: ${newEnergy}%)\n⚠️ CUIDADO: Foi seu 2º item hoje. O próximo tem risco de intoxicação.`);
+                } else if (currentTox >= 2) {
+                    alert(`⚡ Energia recuperada: +${energyGain}%\n⛔ PERIGO: Seu estômago está no limite! Pare de consumir agora!`);
+                } else {
+                    alert(`⚡ Energia recuperada: +${energyGain}% (Total: ${newEnergy}%)`);
+                }
+            }
+
+        } catch (error) {
+            console.error(error);
+            alert("Erro ao usar item: " + error.message);
+        }
+
+        setLoading(false);
+    };
+        //FIM
             
        const handleUseItem = async (item, action) => {
         if (!user.data || user.type !== 'PLAYER') return;
@@ -4761,7 +4929,7 @@ const renewContract = async (p) => {
                             </div>
                         }
                         
-                        {screen === 'MARKET' && (
+                       {screen === 'MARKET' && (
                             <Market 
                                 me={user.data?.id} 
                                 teams={teams} 
@@ -4769,6 +4937,7 @@ const renewContract = async (p) => {
                                 coaches={coaches} 
                                 open={conf.marketOpen} 
                                 isVis={user.type === 'VISITOR' || user.type === 'COACH'} 
+                                onIndicate={handleCoachIndication}
                                 onNeg={(p) => setModal({ type: 'OFFER', data: p })} 
                                 onPayClause={async (p) => {
                                     const buy = teams.find(t => t.id === user.data.id);
@@ -4894,7 +5063,7 @@ const renewContract = async (p) => {
                         {/* --- PAINEL DO TÉCNICO --- */}
                         {(screen === 'HOME' || screen === 'COACH_DASH') && user.type === 'COACH' && 
                             <div key="coach-home-container">
-                                <CoachDashboard 
+                               <CoachDashboard 
                                     coach={user.data} 
                                     team={teams.find(t => t.id === user.data.teamId)} 
                                     players={players.filter(p => p.teamId === user.data.teamId)} 
@@ -4914,6 +5083,8 @@ const renewContract = async (p) => {
                                     onCounterOffer={handleCounterCoachOffer} 
                                     onUpdateSalary={handleUpdateCoachSalary} 
                                     onSelfAction={handleCoachSelfActions} 
+                                    onSaveTactics={saveTactics}
+                                    onUseItem={handleCoachUseItem}
                                 />
                                 <div style={{marginTop: 20, textAlign:'center', color:'#666', fontSize:12}}>
                                     <i>Acesse a aba <b>JOGOS</b> para ver a tabela e partidas.</i>
@@ -5098,7 +5269,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.81.0 VARZEA </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.81.1 MEGA ATUALIZÇÃO TÉCNICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -6131,22 +6302,23 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
 };
 //FIM
         // --- COMPONENTE DO PAINEL DO TÉCNICO ---
-const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolvePerk, onAddAffinity, onAcceptOffer, onRejectOffer, onCounterOffer, onUpdateSalary, onSelfAction }) => {
-    const [tab, setTab] = useState('TREINO'); 
+const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolvePerk, onAddAffinity, onAcceptOffer, onRejectOffer, onCounterOffer, onUpdateSalary, onSelfAction, onUseItem, onSaveTactics }) => {
+    const [tab, setTab] = useState('PRANCHETA'); 
     const [selectedPlayers, setSelectedPlayers] = useState([]);
     const [trainingType, setTrainingType] = useState('FISICO_BASE'); 
-    
-    // --- CORREÇÃO: O Estado newSalary volta aqui ---
     const [newSalary, setNewSalary] = useState(coach.salary); 
-
-    // State local para contra-proposta
+    const [formation, setFormation] = useState(team?.tactics?.formation || '4-3-3 OFENSIVO');
+    const [lineup, setLineup] = useState(team?.tactics?.lineup || {}); 
     const [editingOffer, setEditingOffer] = useState(null); 
     const [counterVals, setCounterVals] = useState({ s: 0, c: 1, cl: 0 });
 
     const xpNext = coach.level * 100;
     const progress = (coach.xp / xpNext) * 100;
     
-    // Filtros
+    // --- CÁLCULO DE ENERGIA (IGUAL JOGADOR) ---
+    const energy = coach.energy !== undefined ? coach.energy : 100;
+    const isExhausted = energy < 20;
+
     const showPerkSelection = coach.pendingPerks > 0;
     const availablePerks = COACH_PERKS.filter(p => !(coach.perks || []).some(cp => cp.id === p.id));
     const perkOptions = React.useMemo(() => availablePerks.sort(() => 0.5 - Math.random()).slice(0, 3), [coach.pendingPerks]);
@@ -6155,6 +6327,25 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
     const availableAffinities = COACH_AFFINITIES.filter(a => !(coach.affinities || []).includes(a));
 
     const myItems = (sales||[]).filter(s => s.buyerId === coach.id);
+
+    // --- FUNÇÃO DE ESTUDAR TÁTICAS (GANHA XP / GASTA ENERGIA) ---
+    const handleStudy = () => {
+        if (energy < 30) return alert("Você está muito cansado para estudar! Tome um café.");
+        
+        // Gasta 30 de energia, Ganha XP (Ex: 15 a 25)
+        const xpGain = Math.floor(Math.random() * 10) + 15;
+        onTrain([], 'STUDY', 30, xpGain); 
+    };
+
+    // --- FUNÇÃO DE ESCALAR TIME ---
+    const handleSetPosition = (index, playerId) => {
+        const newLineup = { ...lineup, [index]: playerId };
+        setLineup(newLineup);
+    };
+
+    const handleSaveTeam = () => {
+        onSaveTactics(formation, lineup);
+    };
 
     // --- CONFIGURAÇÃO VISUAL IGUAL AO PERFIL DO JOGADOR ---
     const ATTR_LIST = [
@@ -6185,10 +6376,27 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
 
     return (
         <div>
-            {/* CABEÇALHO */}
-            <div className="highlight-card" style={{textAlign:'center', paddingBottom:20, position:'relative'}}>
-                <h2 style={{margin:0}}>👔 {coach.name}</h2>
-                <small style={{color:'#ccc'}}>{team ? team.name : 'Agente Livre'} | Nível {coach.level}</small>
+            {/* CABEÇALHO DO TÉCNICO */}
+            <div className="highlight-card" style={{textAlign:'center', paddingBottom:20, position:'relative', border:'2px solid gold'}}>
+                <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:15}}>
+                    {coach.face ? <img src={coach.face} style={{width:60, height:60, borderRadius:'50%', border:'2px solid white'}} /> : <div style={{fontSize:40}}>👔</div>}
+                    <div>
+                        <h2 style={{margin:0, color:'gold'}}>{coach.name}</h2>
+                        <small style={{color:'#ccc'}}>{team ? team.name : 'Agente Livre'} | Nível {coach.level}</small>
+                    </div>
+                </div>
+                
+                {/* BARRA DE ENERGIA */}
+                <div style={{margin:'15px auto', width:'80%', background:'#333', height:10, borderRadius:5, overflow:'hidden', border:'1px solid #555'}}>
+                    <div style={{width:`${energy}%`, background: energy > 50 ? 'lime' : energy > 20 ? 'orange' : 'red', height:'100%', transition:'0.5s'}}></div>
+                </div>
+                <small style={{color: isExhausted ? 'red' : 'lime'}}>{energy}% Energia {isExhausted && '(Cansado: Treinos rendem 50%)'}</small>
+
+                <div style={{display:'flex', justifyContent:'center', gap:15, marginTop:10}}>
+                    <button className="btn btn-purple" style={{width:'auto', padding:'5px 15px', fontSize:10}} onClick={handleStudy}>
+                        📚 ESTUDAR TÁTICAS (-30⚡ / +XP)
+                    </button>
+                </div>
                 
                 <div style={{display:'flex', justifyContent:'center', gap:15, marginTop:15}}>
                     <div style={{textAlign:'center'}}>
@@ -6213,11 +6421,68 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
             </div>
 
             {/* ABAS */}
-            <div style={{display:'flex', gap:10, marginBottom:15, marginTop:10}}>
-                <button className={`btn ${tab==='TREINO'?'btn-green':'btn-ghost'}`} onClick={()=>setTab('TREINO')}>PRANCHETA</button>
-                <button className={`btn ${tab==='CARREIRA'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('CARREIRA')}>CARREIRA</button>
+            <div style={{display:'flex', gap:5, marginBottom:15, marginTop:10, overflowX:'auto'}}>
+                <button className={`btn ${tab==='PRANCHETA'?'btn-green':'btn-ghost'}`} onClick={()=>setTab('PRANCHETA')}>PRANCHETA</button>
+                <button className={`btn ${tab==='TREINO'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('TREINO')}>TREINOS</button>
                 <button className={`btn ${tab==='MOCHILA'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('MOCHILA')}>MOCHILA</button>
+                <button className={`btn ${tab==='CARREIRA'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('CARREIRA')}>CARREIRA</button>
             </div>
+
+            {/* ABA PRANCHETA (NOVA) */}
+            {tab === 'PRANCHETA' && (
+                <div>
+                    {!team ? <p style={{textAlign:'center', color:'#666'}}>Você precisa de um time para escalar.</p> : (
+                        <div className="card">
+                            <label>Formação Tática</label>
+                            <select className="input-field" value={formation} onChange={e=>setFormation(e.target.value)}>
+                                {Object.keys(FORMATIONS).map(f => <option key={f} value={f}>{f}</option>)}
+                            </select>
+
+                            <div style={{display:'flex', flexDirection:'column', gap:5, marginTop:10}}>
+                                {FORMATIONS[formation].map((posLabel, idx) => (
+                                    <div key={idx} style={{display:'flex', alignItems:'center', gap:10, background:'rgba(0,0,0,0.3)', padding:5, borderRadius:5}}>
+                                        <span className="badge-pos" style={{width:30, textAlign:'center', background: '#333'}}>{posLabel}</span>
+                                        <select 
+                                            className="input-field" 
+                                            style={{marginBottom:0, fontSize:12}} 
+                                            value={lineup[idx] || ''} 
+                                            onChange={(e) => handleSetPosition(idx, e.target.value)}
+                                        >
+                                            <option value="">-- Vazio --</option>
+                                            {players.map(p => (
+                                                <option key={p.id} value={p.id}>
+                                                    {p.name} ({p.position} - {p.overall}) {p.recoveryLeft > 0 ? '❌' : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                ))}
+                            </div>
+                            <button className="btn btn-green" style={{marginTop:15}} onClick={handleSaveTeam}>💾 SALVAR ESCALAÇÃO</button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ABA MOCHILA (Para repor energia) */}
+            {tab === 'MOCHILA' && (
+                <div>
+                    <h3>🎒 Inventário do Técnico</h3>
+                    {myItems.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Compre comida no Shopping para recuperar energia!</p>}
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                        {myItems.map(item => (
+                            <div key={item.id} className="card" style={{border:'1px solid #444', textAlign:'center'}}>
+                                <b>{item.productName}</b>
+                                {['energy','SAUDE','CONSUMIVEL'].includes(item.cat) && (
+                                    <button className="btn btn-green" style={{fontSize:10, marginTop:5}} onClick={() => onUseItem(item)}>
+                                        CONSUMIR (+{item.power}%)
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {tab === 'TREINO' && (
                 <div>
@@ -6243,106 +6508,76 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                         </div>
                     )}
 
-                    <div style={{marginBottom:15}}>
-                        <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
-                            <span>Foco do Treino:</span>
-                            <small>Restantes: <b>{coach.trainingsLeft}</b></small>
-                        </div>
-                        <select className="input-field" style={{margin:0}} value={trainingType} onChange={e=>setTrainingType(e.target.value)}>
-                            <optgroup label="🏋️‍♂️ Físico e Condicionamento">
-                                <option value="FISICO_BASE">Resistência, Equilíbrio e Força</option>
-                                <option value="VELOCIDADE">Velocidade, Aceleração e Agilidade</option>
-                                <option value="IMPULSAO">Impulsão e Condição Física</option>
-                            </optgroup>
-                            <optgroup label="⚽ Técnica com Bola">
-                                <option value="PASSE">Passe Curto, Longo e Visão</option>
-                                <option value="DRIBLE">Drible, Finta e Controle de Bola</option>
-                                <option value="CHUTE">Finalização, Força e Técnica de Chute</option>
-                            </optgroup>
-                            <optgroup label="🧠 Tático e Mental">
-                                <option value="DEFESA">Marcação, Agressividade e Resposta</option>
-                                <option value="MENTAL">Trabalho em Equipe e Mentalidade</option>
-                                <option value="BOLA_PARADA">Faltas, Efeito e Cabeceio</option>
-                            </optgroup>
-                            <optgroup label="🧤 Específico">
-                                <option value="GOLEIRO">Reflexos e Habilidades de GK</option>
-                            </optgroup>
-                        </select>
-                    </div>
-
-                    <p style={{textAlign:'center', color:'#888', fontSize:12, margin:'10px 0'}}>
-                        👉 Selecione até <b>5 jogadores</b> para o treino:
-                    </p>
-                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                        {players.map(p => (
-                            <div key={p.id} className="card" 
-                                style={{
-                                    background: selectedPlayers.includes(p.id) ? 'rgba(0,255,0,0.1)' : 'var(--bg-card)', 
-                                    border: selectedPlayers.includes(p.id) ? '1px solid var(--primary)' : '1px solid #333', 
-                                    cursor: 'pointer', padding: '10px'
-                                }}
-                                onClick={() => handleTogglePlayer(p.id)}
-                            >
-                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                    <div style={{fontWeight:'bold', fontSize:13}}>
-                                        {p.name} <span style={{fontSize:10, fontWeight:'normal', color:'#aaa'}}>({p.position})</span>
-                                    </div>
-                                    <div style={{background:'#222', padding:'2px 6px', borderRadius:4, fontSize:12, fontWeight:'bold', border:'1px solid #444', color:'white'}}>
-                                        {p.overall}
-                                    </div>
-                                </div>
-
-                                <div style={{margin:'6px 0', background:'#222', height:4, borderRadius:2, overflow:'hidden', width:'100%'}}>
-                                    <div style={{
-                                        width:`${p.energy || 100}%`, 
-                                        height:'100%', 
-                                        background: (p.energy||100) > 70 ? 'lime' : (p.energy||100) > 30 ? 'orange' : 'red'
-                                    }}></div>
-                                </div>
-                                <div style={{fontSize:10, display:'flex', justifyContent:'space-between', color:'#ccc', marginBottom:8}}>
-                                    <span>⚡ {p.energy || 100}%</span>
-                                    {(coach.affinities || []).includes(p.position) && <span style={{color:'gold'}}>★ Afinidade</span>}
-                                </div>
-
-                                {p.attributes ? (
-                                    <div style={{
-                                        borderTop:'1px solid #333', 
-                                        paddingTop:8, 
-                                        fontSize:9, 
-                                        color:'#aaa', 
-                                        display:'grid', 
-                                        gridTemplateColumns:'1fr 1fr 1fr', 
-                                        gap: '4px 8px' 
-                                    }}>
-                                        {ATTR_LIST.map((attr) => {
-                                            const val = p.attributes[attr.k];
-                                            return (
-                                                <div key={attr.k} style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                                    <span title={attr.l}>{attr.i} {attr.l.split(' ')[0]}</span>
-                                                    <b style={{color: getAttrColor(val)}}>{val || '-'}</b>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                ) : (
-                                    <div style={{fontSize:9, color:'#444', textAlign:'center', marginTop:5}}>Sem atributos detalhados</div>
-                                )}
+                    <div className="card">
+                        <h3>🏃‍♂️ Aplicar Treino</h3>
+                        {energy < 20 && <div style={{background:'red', color:'white', padding:5, fontSize:10, marginBottom:10}}>⚠️ ENERGIA BAIXA: Rendimento do treino cairá pela metade!</div>}
+                        
+                        <div style={{marginBottom:15}}>
+                            <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
+                                <span>Foco do Treino:</span>
                             </div>
-                        ))}
+                            <select className="input-field" style={{margin:0}} value={trainingType} onChange={e=>setTrainingType(e.target.value)}>
+                                <optgroup label="🏋️‍♂️ Físico e Condicionamento">
+                                    <option value="FISICO_BASE">Resistência, Equilíbrio e Força</option>
+                                    <option value="VELOCIDADE">Velocidade, Aceleração e Agilidade</option>
+                                    <option value="IMPULSAO">Impulsão e Condição Física</option>
+                                </optgroup>
+                                <optgroup label="⚽ Técnica com Bola">
+                                    <option value="PASSE">Passe Curto, Longo e Visão</option>
+                                    <option value="DRIBLE">Drible, Finta e Controle de Bola</option>
+                                    <option value="CHUTE">Finalização, Força e Técnica de Chute</option>
+                                </optgroup>
+                                <optgroup label="🧠 Tático e Mental">
+                                    <option value="DEFESA">Marcação, Agressividade e Resposta</option>
+                                    <option value="MENTAL">Trabalho em Equipe e Mentalidade</option>
+                                    <option value="BOLA_PARADA">Faltas, Efeito e Cabeceio</option>
+                                </optgroup>
+                                <optgroup label="🧤 Específico">
+                                    <option value="GOLEIRO">Reflexos e Habilidades de GK</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        
+                        <button className="btn btn-green" onClick={()=>{
+                            if(energy <= 0) return alert("Você desmaiou de cansaço! Coma algo.");
+                            if(selectedPlayers.length === 0) return alert("Selecione jogadores.");
+                            onTrain(selectedPlayers, trainingType);
+                            setSelectedPlayers([]);
+                        }}>
+                            APLICAR TREINO (-20⚡)
+                        </button>
+
+                         <p style={{textAlign:'center', color:'#888', fontSize:12, margin:'10px 0'}}>
+                            👉 Selecione até <b>5 jogadores</b> para o treino:
+                        </p>
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                            {players.map(p => (
+                                <div key={p.id} className="card" 
+                                    style={{
+                                        background: selectedPlayers.includes(p.id) ? 'rgba(0,255,0,0.1)' : 'var(--bg-card)', 
+                                        border: selectedPlayers.includes(p.id) ? '1px solid var(--primary)' : '1px solid #333', 
+                                        cursor: 'pointer', padding: '10px'
+                                    }}
+                                    onClick={() => handleTogglePlayer(p.id)}
+                                >
+                                    <div style={{fontWeight:'bold', fontSize:12}}>{p.name}</div>
+                                    <div style={{fontSize:10}}>{p.position} | OV: {p.overall}</div>
+                                    <div style={{margin:'6px 0', background:'#222', height:4, borderRadius:2, overflow:'hidden', width:'100%'}}>
+                                        <div style={{
+                                            width:`${p.energy || 100}%`, 
+                                            height:'100%', 
+                                            background: (p.energy||100) > 70 ? 'lime' : (p.energy||100) > 30 ? 'orange' : 'red'
+                                        }}></div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                    
-                    <button className="btn btn-green" style={{marginTop:15, width:'100%', padding:15, fontWeight:'bold'}} onClick={()=>{
-                        if(coach.trainingsLeft <= 0) return alert("Sem treinos!");
-                        if(selectedPlayers.length === 0) return alert("Selecione alguém!");
-                        onTrain(selectedPlayers, trainingType);
-                        setSelectedPlayers([]);
-                    }}>APLICAR TREINO INTENSIVO</button>
                 </div>
             )}
 
             {tab === 'CARREIRA' && (
                 <div>
-                    {/* --- AÇÕES DO TÉCNICO (NOVO) --- */}
                     {coach.teamId !== 'FREE' && (
                         <div className="card" style={{border:'1px solid #444', marginBottom:15}}>
                             <h3>📝 Meu Contrato</h3>
@@ -6357,56 +6592,66 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
 
                     <div className="card" style={{borderLeft:'4px solid var(--primary)'}}>
                         <h3>📩 Propostas de Contrato</h3>
-                        {offers.filter(o => o.type === 'COACH_OFFER' && o.recipientId === coach.id && o.status !== 'REJECTED').length === 0 && <p style={{color:'#666', fontSize:12}}>Nenhuma proposta pendente.</p>}
+                        {offers.filter(o => o.recipientId === coach.id && o.status !== 'REJECTED').length === 0 && <p style={{color:'#666', fontSize:12}}>Nenhuma proposta pendente.</p>}
                         
-                        {offers.filter(o => o.type === 'COACH_OFFER' && o.recipientId === coach.id && o.status !== 'REJECTED').map(o => (
+                        {offers.filter(o => o.recipientId === coach.id && o.status !== 'REJECTED').map(o => (
                             <div key={o.id} style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:5, marginBottom:10}}>
-                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                    <b>{o.teamName}</b>
-                                    {o.status === 'COUNTERED' && <small style={{color:'gold'}}>Aguardando Clube...</small>}
-                                </div>
-                                
-                                {editingOffer === o.id ? (
-                                    <div style={{marginTop:10, background:'#000', padding:10, borderRadius:5}}>
-                                        <label style={{fontSize:10}}>Salário (₣)</label>
-                                        <input className="input-field" type="number" value={counterVals.s} onChange={e=>setCounterVals({...counterVals, s:e.target.value})} />
-                                        
-                                        <label style={{fontSize:10}}>Contrato (Anos)</label>
-                                        <select className="input-field" value={counterVals.c} onChange={e=>setCounterVals({...counterVals, c:e.target.value})}>
-                                            <option value="1">1 Ano</option><option value="2">2 Anos</option><option value="3">3 Anos</option>
-                                        </select>
-
-                                        <label style={{fontSize:10}}>Multa (₣)</label>
-                                        <input className="input-field" type="number" value={counterVals.cl} onChange={e=>setCounterVals({...counterVals, cl:e.target.value})} />
-
-                                        <div style={{display:'flex', gap:5}}>
-                                            <button className="btn btn-gold" onClick={()=>{
-                                                onCounterOffer(o, counterVals.s, counterVals.c, counterVals.cl);
-                                                setEditingOffer(null);
-                                            }}>ENVIAR CONTRA-PROPOSTA</button>
-                                            <button className="btn btn-red" onClick={()=>setEditingOffer(null)}>CANCELAR</button>
-                                        </div>
+                                {o.type === 'SUGESTAO_RESPOSTA' ? (
+                                    <div>
+                                        <b style={{color: o.accepted ? 'lime' : 'red'}}>{o.accepted ? '✅ ACEITO' : '❌ RECUSADO'}</b>
+                                        <p style={{fontSize:11}}>{o.description}</p>
+                                        <button className="btn btn-ghost" style={{fontSize:9}} onClick={()=>onRejectOffer(o)}>OK</button>
                                     </div>
                                 ) : (
-                                    <div style={{fontSize:12, marginTop:5}}>
-                                        <div>💰 Salário: <span style={{color:'lime'}}>{fmt(o.salary)}</span></div>
-                                        <div>📅 Duração: <span style={{color:'white'}}>{o.contract} Temp.</span></div>
-                                        <div>🔒 Multa: <span style={{color:'red'}}>{fmt(o.clause)}</span></div>
+                                    <div>
+                                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                            <b>{o.teamName}</b>
+                                            {o.status === 'COUNTERED' && <small style={{color:'gold'}}>Aguardando Clube...</small>}
+                                        </div>
                                         
-                                        {o.status === 'PENDING' && (
-                                            <div style={{display:'flex', gap:5, marginTop:10}}>
-                                                <button className="btn btn-green" onClick={()=>onAcceptOffer(o)}>ACEITAR</button>
+                                        {editingOffer === o.id ? (
+                                            <div style={{marginTop:10, background:'#000', padding:10, borderRadius:5}}>
+                                                <label style={{fontSize:10}}>Salário (₣)</label>
+                                                <input className="input-field" type="number" value={counterVals.s} onChange={e=>setCounterVals({...counterVals, s:e.target.value})} />
                                                 
-                                                {coach.level >= 2 ? (
-                                                    <button className="btn btn-blue" onClick={()=>{
-                                                        setCounterVals({s: o.salary, c: o.contract, cl: o.clause});
-                                                        setEditingOffer(o.id);
-                                                    }}>NEGOCIAR</button>
-                                                ) : (
-                                                    <button className="btn btn-ghost" disabled style={{opacity:0.5}}>Nív. 2 p/ Negociar</button>
-                                                )}
+                                                <label style={{fontSize:10}}>Contrato (Anos)</label>
+                                                <select className="input-field" value={counterVals.c} onChange={e=>setCounterVals({...counterVals, c:e.target.value})}>
+                                                    <option value="1">1 Ano</option><option value="2">2 Anos</option><option value="3">3 Anos</option>
+                                                </select>
 
-                                                <button className="btn btn-red" onClick={()=>onRejectOffer(o)}>RECUSAR</button>
+                                                <label style={{fontSize:10}}>Multa (₣)</label>
+                                                <input className="input-field" type="number" value={counterVals.cl} onChange={e=>setCounterVals({...counterVals, cl:e.target.value})} />
+
+                                                <div style={{display:'flex', gap:5}}>
+                                                    <button className="btn btn-gold" onClick={()=>{
+                                                        onCounterOffer(o, counterVals.s, counterVals.c, counterVals.cl);
+                                                        setEditingOffer(null);
+                                                    }}>ENVIAR CONTRA-PROPOSTA</button>
+                                                    <button className="btn btn-red" onClick={()=>setEditingOffer(null)}>CANCELAR</button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div style={{fontSize:12, marginTop:5}}>
+                                                <div>💰 Salário: <span style={{color:'lime'}}>{fmt(o.salary)}</span></div>
+                                                <div>📅 Duração: <span style={{color:'white'}}>{o.contract} Temp.</span></div>
+                                                <div>🔒 Multa: <span style={{color:'red'}}>{fmt(o.clause)}</span></div>
+                                                
+                                                {o.status === 'PENDING' && (
+                                                    <div style={{display:'flex', gap:5, marginTop:10}}>
+                                                        <button className="btn btn-green" onClick={()=>onAcceptOffer(o)}>ACEITAR</button>
+                                                        
+                                                        {coach.level >= 2 ? (
+                                                            <button className="btn btn-blue" onClick={()=>{
+                                                                setCounterVals({s: o.salary, c: o.contract, cl: o.clause});
+                                                                setEditingOffer(o.id);
+                                                            }}>NEGOCIAR</button>
+                                                        ) : (
+                                                            <button className="btn btn-ghost" disabled style={{opacity:0.5}}>Nív. 2 p/ Negociar</button>
+                                                        )}
+
+                                                        <button className="btn btn-red" onClick={()=>onRejectOffer(o)}>RECUSAR</button>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -6415,7 +6660,6 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                         ))}
                     </div>
                     
-                    {/* "Salário Pretendido" (Mantido como opção extra) */}
                     <div className="card" style={{marginTop:15}}>
                         <h3>💰 Atualizar Pretensão Salarial</h3>
                         {coach.level >= 2 ? (
@@ -6426,27 +6670,6 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                         ) : (
                             <p style={{color:'#666', fontSize:11}}>Desbloqueia no Nível 2.</p>
                         )}
-                    </div>
-                </div>
-            )}
-
-            {tab === 'MOCHILA' && (
-                <div>
-                    <h3>🎒 Meus Itens</h3>
-                    {myItems.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Vazia. Vá ao Shopping!</p>}
-                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                        {myItems.map((item, index) => (
-                            <div key={index} className="card" style={{border:'1px solid #444', textAlign:'center', padding:10}}>
-                                {/* AQUI É A PARTE ALTERADA PARA MOSTRAR A IMAGEM */}
-                                {item.img ? (
-                                    <img src={item.img} style={{width:60, height:60, objectFit:'contain', marginBottom:5, borderRadius:5}} alt={item.productName} />
-                                ) : (
-                                    <div style={{fontSize:24}}>📦</div>
-                                )}
-                                <div style={{fontWeight:'bold', fontSize:12}}>{item.productName}</div>
-                                <div style={{fontSize:10, color:'#aaa'}}>{fmt(item.price)}</div>
-                            </div>
-                        ))}
                     </div>
                 </div>
             )}
@@ -6774,7 +6997,6 @@ const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, 
             {list.map(p => {
                 const recPrice = getRecommendedPrice(p.overall, p.position);
                 // Lógica de Preço (Se for Várzea, considera preço justo ou baixo)
-                // Se o time for da Várzea, o jogador tende a ser barato, mas usamos a lógica padrão por enquanto.
                 const status = getPriceStatus(p.value, recPrice);
 
                 return (
@@ -6855,9 +7077,24 @@ const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, 
                                 )}
                             </div>
                         )}
+
+                        {/* --- NOVA FUNCIONALIDADE: BOTÃO DE INDICAÇÃO PARA TÉCNICOS --- */}
+                        {user && user.type === 'COACH' && user.data.teamId !== 'FREE' && p.teamId !== user.data.teamId && !p.preContract && (
+                            <div style={{marginTop:12}}>
+                                <button className="btn btn-gold" style={{width:'100%', marginBottom:0}} onClick={() => {
+                                    const obs = prompt("Motivo da indicação (Opcional):", "Jogador ideal para o elenco!");
+                                    if(confirm(`Sugerir ${p.name} para o seu presidente?`)) {
+                                        onIndicate(p, obs);
+                                    }
+                                }}>
+                                    💡 INDICAR AO CLUBE
+                                </button>
+                            </div>
+                        )}
                     </div>
                 );
             })}
+      </div>
         </div>
     );
 };
@@ -7319,7 +7556,7 @@ const ProductForm = ({ initial, onSave, onDelete, user }) => {
 
         //FIM
 
-const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter, onCoachAccept, onCoachReject, onCoachCounter }) => {
+const OffersScreen = ({ user, offers, teams, players, setModal, onAccept, onReject, onCounter, onCoachAccept, onCoachReject, onCoachCounter }) => {
     // FILTRO RIGOROSO: 
     // A proposta só aparece se o usuário logado for o destinatário atual (recipientId).
     // Isso garante o fluxo: Comprador -> Vendedor -> Jogador.
@@ -7347,10 +7584,97 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter, onCo
             )}
             
             {myOffers.map(o => (
-                <div key={o.id} className="card" style={{borderLeft: o.type.includes('URGENTE') ? '4px solid red' : o.type === 'NOTIFICACAO' ? '4px solid #00E676' : o.type === 'COACH_OFFER' ? '4px solid gold' : '4px solid var(--primary)', background: '#1e1e1e'}}>
+                <div key={o.id} className="card" style={{
+                    borderLeft: o.type === 'COACH_SUGGESTION' ? '4px solid #FFD700' : 
+                                o.type === 'SUGESTAO_RESPOSTA' ? (o.accepted ? '4px solid lime' : '4px solid red') :
+                                o.type.includes('URGENTE') ? '4px solid red' : 
+                                o.type === 'NOTIFICACAO' ? '4px solid #00E676' : 
+                                o.type === 'COACH_OFFER' ? '4px solid gold' : '4px solid var(--primary)', 
+                    background: '#1e1e1e'
+                }}>
                     
-                    {/* --- CARD DE TÉCNICO (NOVO) --- */}
-                    {o.type === 'COACH_OFFER' ? (
+                    {/* --- CASO 1: INDICAÇÃO DO TÉCNICO (Novo) --- */}
+                    {o.type === 'COACH_SUGGESTION' ? (
+                        <div>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                <b style={{color:'gold'}}>💡 Indicação de Contratação</b>
+                                <small style={{color:'#aaa'}}>{new Date(o.date).toLocaleDateString()}</small>
+                            </div>
+                            <div style={{fontSize:13, margin:'10px 0', color:'#fff'}}>
+                                O técnico <b>{o.senderName}</b> sugere a contratação de:
+                                <div style={{background:'rgba(255,215,0,0.1)', padding:10, borderRadius:5, marginTop:5, border:'1px solid gold'}}>
+                                    👟 <b>{o.playerName}</b> <small>({o.playerPos} - OV: {o.playerOv})</small>
+                                    <br/>
+                                    <i style={{fontSize:11, color:'#ccc'}}>"{o.description.split('Obs: "')[1]?.replace('"', '') || 'Sem observações'}"</i>
+                                </div>
+                            </div>
+                            
+                            {user.type === 'USER' && (
+                                <div style={{display:'flex', gap:5}}>
+                                    <button className="btn btn-green" onClick={()=>{
+                                        const pObj = players.find(p => p.id === o.playerId);
+                                        if(!pObj) return alert("Jogador não encontrado (talvez aposentado).");
+                                        
+                                        // 1. Abre o Modal de Oferta
+                                        setModal({ type: 'OFFER', data: pObj });
+                                        
+                                        // 2. Avisa o Técnico
+                                        db.collection('offers').add({
+                                            type: 'SUGESTAO_RESPOSTA',
+                                            recipientId: o.senderId,
+                                            accepted: true,
+                                            description: `A diretoria acatou sua indicação e abriu negociações com ${o.playerName}. Torça para dar certo!`,
+                                            date: Date.now()
+                                        });
+                                        
+                                        // 3. Remove a indicação
+                                        db.collection('offers').doc(o.id).delete();
+                                    }}>TENTAR NEGOCIAÇÃO</button>
+                                    
+                                    <button className="btn btn-red" onClick={()=>{
+                                        const reasons = [
+                                            "Jogador muito caro para o orçamento.",
+                                            "Não temos interesse neste perfil.",
+                                            "Posição já está inchada no elenco.",
+                                            "Prioridade é a base no momento."
+                                        ];
+                                        const reasonTxt = reasons.map((r, i) => `${i+1}. ${r}`).join('\n');
+                                        const opt = prompt(`Motivo da Recusa (Digite o número ou texto):\n\n${reasonTxt}`);
+                                        
+                                        let finalReason = "Decisão da diretoria.";
+                                        if(opt == '1') finalReason = reasons[0];
+                                        else if(opt == '2') finalReason = reasons[1];
+                                        else if(opt == '3') finalReason = reasons[2];
+                                        else if(opt == '4') finalReason = reasons[3];
+                                        else if(opt) finalReason = opt;
+
+                                        if(opt) {
+                                            db.collection('offers').add({
+                                                type: 'SUGESTAO_RESPOSTA',
+                                                recipientId: o.senderId,
+                                                accepted: false,
+                                                description: `A diretoria recusou ${o.playerName}.\nMotivo: ${finalReason}`,
+                                                date: Date.now()
+                                            });
+                                            db.collection('offers').doc(o.id).delete();
+                                        }
+                                    }}>RECUSAR</button>
+                                </div>
+                            )}
+                        </div>
+                    ) : o.type === 'SUGESTAO_RESPOSTA' ? (
+                        /* --- CASO 2: RESPOSTA DA DIRETORIA PARA O TÉCNICO (Novo) --- */
+                        <div>
+                            <b style={{color: o.accepted ? 'lime' : 'red'}}>
+                                {o.accepted ? '✅ INDICAÇÃO ACEITA' : '❌ INDICAÇÃO RECUSADA'}
+                            </b>
+                            <div style={{background:'#222', padding:10, borderRadius:5, margin:'10px 0', fontSize:12, color:'#ddd'}}>
+                                {o.description}
+                            </div>
+                            <button className="btn btn-ghost" onClick={()=>db.collection('offers').doc(o.id).delete()}>ENTENDIDO</button>
+                        </div>
+                    ) : o.type === 'COACH_OFFER' ? (
+                        /* --- CASO 3: CONTRATO DE TÉCNICO --- */
                         <div>
                             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                                 <b>{o.status === 'COUNTERED' ? `🔄 Contra-Proposta: ${o.coachName}` : `👔 Proposta: ${o.teamName}`}</b>
@@ -7382,7 +7706,7 @@ const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter, onCo
                             </div>
                         </div>
                     ) : (
-                        /* --- CARD DE JOGADOR (PADRÃO) --- */
+                        /* --- CASO 4: TRANSFERÊNCIA DE JOGADOR (PADRÃO) --- */
                         <div>
                             {/* AVISOS DE STATUS REALISTA PARA O JOGADOR */}
                             {o.sellerAccepted && user.type === 'PLAYER' && (

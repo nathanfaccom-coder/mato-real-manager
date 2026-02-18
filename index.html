@@ -268,25 +268,32 @@ const SURGERIES = [
         
 
         // --- NOVO CUSTO DE PRODUÇÃO (ANTI-INFLAÇÃO) ---
-// Reduzi drasticamente os valores para que as empresas tenham margem de lucro
+// --- CUSTO DE PRODUÇÃO INTELIGENTE (ATUALIZADO) ---
 const getProdCost = (cat, power) => {
     const p = parseInt(power) || 0;
     
-    // Energéticos (Consumíveis) - Custo por Unidade
-    if (cat === 'energy') {
-        if (p <= 20) return 25;   // Antes devia ser 100+
-        if (p <= 50) return 60;
-        if (p <= 80) return 120;
-        return 200; // Energético Top de Linha
+    // 1. SAÚDE / ENERGIA (Mais barato, pois consome muito)
+    // Ex: Power 50 = 50 * 15 = 750
+    // Ex: Power 100 = 100 * 15 = 1.500
+    if (['energy', 'SAUDE', 'CONSUMIVEL'].includes(cat)) {
+        return p * 15; 
     }
     
-    // Treino (Equipamentos)
-    if (cat === 'training') return p * 150; 
+    // 2. TREINO / XP (Médio, pois dá vantagem competitiva)
+    // Ex: Power 50 = 50 * 100 = 5.000
+    // Ex: Power 100 = 100 * 100 = 10.000
+    if (['training', 'CHUTEIRA', 'LUVAS'].includes(cat)) {
+        return p * 100; 
+    }
     
-    // Imóveis/Luxo (Fama)
-    if (cat === 'real_estate' || cat === 'vehicle') return p * 2000;
+    // 3. FAMA / LUXO (Muito caro, pois é status)
+    // Ex: Power 50 = 50 * 500 = 25.000
+    // Ex: Power 100 = 100 * 500 = 50.000
+    if (['vehicle', 'real_estate', 'VEICULO', 'IMOVEL', 'TECNOLOGIA', 'LUXO'].includes(cat)) {
+        return p * 500;
+    }
     
-    return 50; // Padrão
+    return 50; // Custo base de segurança
 };
 
 // ACIMA DAQUI É FORA DA FUNÇÃO APP
@@ -4418,7 +4425,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.79.3</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.79.4</div>
                             </div>
                         </div>
                         
@@ -4944,7 +4951,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.79.3 MATOGRAM </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.79.4 MATOGRAM </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -6718,22 +6725,27 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
     );
 };
 // FIM DO COMPONENTE MARKET E OFFER FORM
+        
 // --- COMPONENTE: FÁBRICA DE PRODUTOS (ADMIN) ---
 const ProductForm = ({ initial, onSave, onDelete, user }) => {
     // Estado inicial do produto
     const [p, setP] = useState(initial || { 
         name:'', cat:'energy', power:10, price:'', 
-        stock: 10, // Padrão: 10 unidades
+        stock: 10, // Quantidade padrão inicial
         desc:'' 
     });
     
     const isEditing = !!initial?.id;
     
-
+    // Calcula custo em tempo real usando a função global
     const unitCost = getProdCost(p.cat, p.power);
-    const totalProductionCost = unitCost * (parseInt(p.stock) || 0);
-    // Verifica se o Admin tem saldo na conta pessoal ou da empresa (aqui usando saldo pessoal do admin)
-    const canAfford = (user.balance || 0) >= totalProductionCost;
+    const quantity = parseInt(p.stock) || 0;
+    const totalProductionCost = unitCost * quantity;
+    
+    // Verifica saldo (se for Admin usa saldo 0 pra teste, se for user usa o dele)
+    // Opcional: Para Admin sempre permitir
+    const userBalance = user.data.balance || 0;
+    const canAfford = user.type === 'ADMIN' ? true : userBalance >= totalProductionCost;
 
     return (
         <div className="modal-bg">
@@ -6741,69 +6753,79 @@ const ProductForm = ({ initial, onSave, onDelete, user }) => {
                 <h3>{isEditing ? '🏭 Repor Estoque / Editar' : '🏭 Nova Linha de Produção'}</h3>
                 
                 <label>Nome do Produto</label>
-                <input className="input-field" value={p.name} onChange={e=>setP({...p, name:e.target.value})} disabled={isEditing} />
+                <input className="input-field" value={p.name} onChange={e=>setP({...p, name:e.target.value})} disabled={isEditing} placeholder="Ex: energético Turbo" />
                 
                 <div style={{display:'flex', gap:10}}>
                     <div style={{flex:1}}>
                         <label>Categoria</label>
                         <select className="input-field" value={p.cat} onChange={e=>setP({...p, cat:e.target.value})} disabled={isEditing}>
-                            <option value="energy">⚡ Energético</option>
-                            <option value="training">🏋️ Equipamento</option>
-                            <option value="vehicle">🚗 Veículo</option>
-                            <option value="real_estate">🏠 Imóvel</option>
+                            <option value="energy">⚡ Energético (+Energia)</option>
+                            <option value="training">👟 Equipamento (+XP)</option>
+                            <option value="vehicle">🚗 Veículo (+Fama)</option>
+                            <option value="real_estate">🏠 Imóvel (+Fama)</option>
+                            <option value="luxury">💎 Luxo (+Fama)</option>
                         </select>
-                    </div>
-                    <div style={{flex:1}}>
-                        <label>Potência/Fama</label>
-                        <input className="input-field" type="number" value={p.power} onChange={e=>setP({...p, power:e.target.value})} disabled={isEditing} />
                     </div>
                 </div>
 
-                {/* ÁREA DE PRODUÇÃO */}
-                <div style={{background:'#222', padding:10, borderRadius:8, margin:'10px 0', border:'1px solid #444'}}>
-                    <h4 style={{marginTop:0, color:'gold'}}>🏭 Linha de Montagem</h4>
+                {/* ÁREA DE CONFIGURAÇÃO DO PRODUTO */}
+                <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8, marginBottom:10, border:'1px solid #444'}}>
+                    <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
+                        <label>⚡ Potência / Fama: <b style={{color:'gold'}}>{p.power}</b></label>
+                        <small style={{color:'#aaa'}}>Afeta o custo!</small>
+                    </div>
+                    
+                    <input type="range" min="1" max="100" className="input-field" value={p.power} onChange={e=>setP({...p, power: parseInt(e.target.value)})} disabled={isEditing} />
+                    
+                    <div style={{fontSize:11, color:'#ccc', marginTop:5}}>
+                        Efeito: 
+                        {['energy','SAUDE','CONSUMIVEL'].includes(p.cat) && <span style={{color:'lime'}}> Recupera {p.power}% de Energia</span>}
+                        {['training','CHUTEIRA','LUVAS'].includes(p.cat) && <span style={{color:'cyan'}}> Bônus de +{p.power}% XP no treino</span>}
+                        {['vehicle','real_estate','luxury','VEICULO','IMOVEL'].includes(p.cat) && <span style={{color:'gold'}}> Gera +{p.power * 100} de Fama</span>}
+                    </div>
+                </div>
+
+                {/* ÁREA DE FÁBRICA (QUANTIDADE) - AQUI ESTAVA FALTANDO */}
+                <div style={{background:'#222', padding:15, borderRadius:8, margin:'15px 0', borderLeft:'4px solid gold'}}>
+                    <h4 style={{marginTop:0, marginBottom:10, color:'gold'}}>🏭 Produção</h4>
                     
                     {isEditing && (
                         <div style={{marginBottom:10, fontSize:12}}>
-                            Estoque Atual: <b style={{color: (p.currentStock||0) > 0 ? 'lime' : 'red'}}>{p.currentStock || 0} unid.</b>
+                            Estoque Atual no Mercado: <b style={{color:'white'}}>{p.currentStock || 0} unid.</b>
                         </div>
                     )}
 
-                    <label>{isEditing ? 'Quantas unidades PRODUZIR a mais?' : 'Quantidade Inicial'}</label>
+                    <label>{isEditing ? 'Fabricar Mais (Quantidade)' : 'Quantidade Inicial'}</label>
                     <input className="input-field" type="number" min="1" value={p.stock} onChange={e=>setP({...p, stock:e.target.value})} />
                     
-                    <div style={{display:'flex', justifyContent:'space-between', fontSize:12, marginTop:5}}>
-                        <span>Custo Unitário: <b style={{color:'red'}}>{fmt(unitCost)}</b></span>
-                        <span>Custo Total: <b style={{color:'red'}}>{fmt(totalProductionCost)}</b></span>
+                    <div style={{display:'flex', justifyContent:'space-between', fontSize:12, marginTop:5, padding:'5px', background:'rgba(0,0,0,0.5)', borderRadius:4}}>
+                        <span>Custo Unitário: <b style={{color:'#ff5252'}}>{fmt(unitCost)}</b></span>
+                        <span>Custo Total: <b style={{color:'#ff5252'}}>{fmt(totalProductionCost)}</b></span>
                     </div>
 
-                    {!canAfford && <small style={{color:'red', display:'block', marginTop:5}}>🚫 Fundo Insuficiente para produzir.</small>}
+                    {!canAfford && <small style={{color:'red', display:'block', marginTop:5, fontWeight:'bold'}}>🚫 FUNDO INSUFICIENTE NA EMPRESA</small>}
                 </div>
 
                 <label>Preço de Venda (por unidade)</label>
-                <input className="input-field" type="number" value={p.price} onChange={e=>setP({...p, price:e.target.value})} />
+                <input className="input-field" type="number" value={p.price} onChange={e=>setP({...p, price:e.target.value})} placeholder="Por quanto vai vender?" />
 
+                {/* BOTÕES DE AÇÃO */}
                 <div style={{display:'flex', gap:10, marginTop:15}}>
                     <button className="btn btn-green" disabled={!canAfford} onClick={() => {
-                        if(!p.name || !p.price) return alert("Preencha tudo!");
+                        if(!p.name || !p.price) return alert("Preencha o nome e o preço!");
                         if(!canAfford) return alert("Sem dinheiro para fabricar!");
                         
-                        // Lógica: Se for edição, soma o estoque. Se for novo, usa o valor inicial.
-                        // Nota: 'stock' aqui é a quantidade sendo produzida AGORA.
-                        // 'currentStock' deve vir do banco se for edição.
-                        
-                        const quantityToAdd = parseInt(p.stock);
-                        
+                        // Envia para a função pai salvar
                         onSave({
                             ...p,
-                            stockAdd: quantityToAdd, // Manda a quantidade para somar no App
-                            productionCost: totalProductionCost
+                            stockAdd: quantity, // Manda a quantidade para somar
+                            productionCost: totalProductionCost // Manda o custo para descontar
                         });
                     }}>
-                        {isEditing ? `PRODUZIR (+${p.stock}) - ${fmt(totalProductionCost)}` : `LANÇAR - ${fmt(totalProductionCost)}`}
+                        {isEditing ? `FABRICAR (+${quantity})` : 'LANÇAR PRODUTO'}
                     </button>
                     
-                    {isEditing && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>🗑️</button>}
+                    {isEditing && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>🗑️ EXCLUIR</button>}
                     <button className="btn" onClick={()=>onSave(null)}>CANCELAR</button>
                 </div>
             </div>

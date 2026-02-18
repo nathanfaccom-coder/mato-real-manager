@@ -704,7 +704,7 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
     const [serie, setSerie] = useState('A');
     const [round, setRound] = useState(1);
 
-    // Filtra jogos (agora ordenados por data ou ID para estabilidade)
+    // Filtra jogos
     const games = matches
         .filter(m => (m.serie || 'A') === serie && parseInt(m.round) === parseInt(round))
         .sort((a,b) => (a.status === 'FINISHED' ? 1 : -1));
@@ -722,10 +722,13 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
 
             <div style={{display:'flex', gap:10, marginBottom:10}}>
                 <select className="input-field" value={serie} onChange={e=>setSerie(e.target.value)}>
-                    {['A','B','C','D','VARZEA'].map(s=><option key={s} value={s}>{s === 'VARZEA' ? 'Várzea' : `Série ${s}`}</option>)}
+                    {/* AGORA USA A LISTA GLOBAL PARA INCLUIR A VÁRZEA */}
+                    {SERIES.map(s => (
+                        <option key={s} value={s}>{s === 'VARZEA' ? '🚜 Terrão (Várzea)' : `Série ${s}`}</option>
+                    ))}
                 </select>
                 <select className="input-field" value={round} onChange={e=>setRound(e.target.value)}>
-                    {[...Array(14).keys()].map(i=><option key={i+1} value={i+1}>Rodada {i+1}</option>)}
+                    {[...Array(38).keys()].map(i=><option key={i+1} value={i+1}>Rodada {i+1}</option>)}
                 </select>
             </div>
 
@@ -734,7 +737,6 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
             {games.map(m => (
                 <div key={m.id} className="card" style={{borderLeft: m.status==='FINISHED' ? '4px solid #444' : '4px solid var(--primary)', position:'relative'}}>
                     
-                    {/* BOTÕES DE ADMIN (NOVO) */}
                     {isAdmin && (
                         <div style={{position:'absolute', top:5, right:5, display:'flex', gap:5}}>
                             <button className="btn btn-ghost" style={{padding:'2px 5px', fontSize:10, border:'1px solid #666'}} onClick={()=>onEditMatch(m)}>✏️</button>
@@ -754,7 +756,6 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
                         </div>
                     </div>
                     
-                    {/* Botão de Súmula (Aparece se não acabou) */}
                     {m.status !== 'FINISHED' && (
                         <button className="btn btn-green" onClick={() => onReportMatch(m)}>
                             📝 LANÇAR SÚMULA
@@ -4555,7 +4556,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.80.9</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.81.0</div>
                             </div>
                         </div>
                         
@@ -4681,51 +4682,67 @@ const renewContract = async (p) => {
                             </div>
                         )}
                         
-                        {/* --- NOVA TELA: JOGOS E CLASSIFICAÇÃO (ACESSÍVEL A TODOS) --- */}
                         {screen === 'MATCHES' && (
-                            <div style={{paddingBottom: 60}}>
-                                <h2 style={{color:'var(--primary)', textAlign:'center'}}>Campeonato Mato Real</h2>
-                                
-                                {/* Renderiza as Tabelas de A a D */}
-                                <div style={{display:'flex', flexDirection:'column', gap:20, marginBottom:30}}>
-                                    <LeagueTable teams={teams} serie="A" />
-                                    <details>
-                                        <summary style={{padding:10, background:'#333', borderRadius:5, cursor:'pointer', fontWeight:'bold'}}>Ver Séries B, C e D</summary>
-                                        <div style={{marginTop:10, display:'grid', gap:15}}>
-                                            <LeagueTable teams={teams} serie="B" />
-                                            <LeagueTable teams={teams} serie="C" />
-                                            <LeagueTable teams={teams} serie="D" />
-                                        </div>
-                                    </details>
-                                </div>
+                <div style={{paddingBottom: 60}}>
+                    <h2 style={{color:'var(--primary)', textAlign:'center'}}>Campeonato Mato Real</h2>
+                    
+                    {/* SÉRIE A (Sempre visível) */}
+                    <div style={{marginBottom: 20}}>
+                        <LeagueTable teams={teams} serie="A" />
+                    </div>
 
-                                <hr style={{borderColor:'#333', margin:'20px 0'}}/>
-                                
-                               {/* Renderiza o MatchCenter com poderes de ADMIN */}
-        <MatchCenter 
-            matches={matches} 
-            teams={teams}
-            isAdmin={user.type === 'ADMIN'} // <--- Importante: Libera os botões
-            onCreateMatch={(serie, round) => setModal({
-                type: 'MATCH_MANAGER', 
-                data: { serie, round, homeId:'', awayId:'', scoreHome:0, scoreAway:0, status:'PENDING' }
-            })}
-            onEditMatch={(m) => setModal({ type: 'MATCH_MANAGER', data: m })}
-            onDeleteMatch={(id) => handleDeleteMatch(id)} // Delete rápido direto da lista
-            onReportMatch={(m) => {
-                if(user.type.includes('PRESS') || user.type === 'ADMIN') {
-                     // Usa o modal de súmula existente
-                     setModal({type:'MATCH_PERFORMANCE', data: { match: m, player: null } }); 
-                     // Obs: Adaptei para abrir o modal de Súmula. 
-                     // Se o seu modal pede 'players' primeiro, ajuste conforme seu fluxo de súmula.
-                     // Normalmente é: setModal({type:'MATCH_PERFORMANCE', data: m });
-                } else {
-                    alert("Apenas imprensa/admin lança súmula.");
-                }
-            }} 
-        />
-                            </div>
-                        )}
+                    {/* SÉRIES B, C e D (Expansível) */}
+                    <details open>
+                        <summary style={{padding:10, background:'#333', borderRadius:5, cursor:'pointer', fontWeight:'bold', marginBottom:10}}>
+                            Divisões de Acesso (B, C, D)
+                        </summary>
+                        <div style={{display:'grid', gap:20}}>
+                            <LeagueTable teams={teams} serie="B" />
+                            <LeagueTable teams={teams} serie="C" />
+                            <LeagueTable teams={teams} serie="D" />
+                        </div>
+                    </details>
+
+                    {/* --- AQUI ESTÁ A VÁRZEA (O QUE FALTAVA) --- */}
+                    <div style={{marginTop: 30, border: '2px dashed gold', borderRadius: 8, overflow: 'hidden'}}>
+                        <div style={{background: 'gold', color: 'black', padding: '10px', textAlign: 'center', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '1px'}}>
+                            🚜 O Terrão (Várzea)
+                        </div>
+                        <div style={{padding: 5, background: 'rgba(255, 215, 0, 0.05)'}}>
+                            <LeagueTable teams={teams} serie="VARZEA" />
+                        </div>
+                        <div style={{padding: 10, textAlign: 'center', fontSize: 10, color: '#aaa'}}>
+                            * Regras de Amador: Sem teto salarial mínimo. G4 sobe para a Série D.
+                        </div>
+                    </div>
+
+                    <hr style={{borderColor:'#333', margin:'20px 0'}}/>
+                    
+                    {/* MATCH CENTER ATUALIZADO PARA VER JOGOS DA VÁRZEA */}
+                    <MatchCenter 
+                        matches={matches} 
+                        teams={teams}
+                        isAdmin={user.type === 'ADMIN'}
+                        onCreateMatch={(serie, round) => setModal({
+                            type: 'MATCH_MANAGER', 
+                            data: { serie, round, homeId:'', awayId:'', scoreHome:0, scoreAway:0, status:'PENDING' }
+                        })}
+                        onEditMatch={(m) => setModal({ type: 'MATCH_MANAGER', data: m })}
+                        onDeleteMatch={(id) => handleDeleteMatch(id)}
+                        onReportMatch={(m) => {
+                            if(user.type.includes('PRESS') || user.type === 'ADMIN') {
+                                setModal({type:'MATCH_PERFORMANCE', data: { match: m, player: null } }); 
+                            } else {
+                                alert("Apenas imprensa/admin lança súmula.");
+                            }
+                        }} 
+                    />
+                </div>
+            )}
+
+
+
+        
 
                         {screen === 'ADMIN_TEAM' && adminTeam && 
                             <div>
@@ -5081,7 +5098,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.80.9 VARZEA </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.81.0 VARZEA </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -6446,7 +6463,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
             return (<div><input className="input-field" placeholder="Buscar jogador..." value={search} onChange={e=>setSearch(e.target.value)} /><div style={{maxHeight:300, overflowY:'auto'}}>{search.length > 0 && filtered.map(p => (<div key={p.id} className="card" onClick={()=>{setSelP(p); setS(p.stats || {goals:0,assists:0,tackles:0,saves:0,yellows:0,reds:0})}}><b>{p.name} {p.recoveryLeft > 0 ? '❌' : ''}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small></div>))}</div></div>);
         };
 
-   const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams, onRenew, isOwner }) => {
+  const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams, onRenew, isOwner }) => {
     // 1. Definição dos dados padrão
     const defaultState = {
         name:'', position:'ATA', overall:45, value:'', salary:'', 
@@ -6475,12 +6492,18 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
             const dataToSave = { ...f };
             const safePos = dataToSave.position || 'ATA'; 
             const ovr = parseInt(dataToSave.overall) || 50;
-            const salary = parseFloat(dataToSave.salary) || 0;
+            
+            // --- CORREÇÃO CRÍTICA: CONVERSÃO DE TIPOS ---
+            // Isso impede que o saldo vire texto e cause o bug do negativo
+            dataToSave.salary = parseFloat(dataToSave.salary) || 0;
+            dataToSave.balance = parseFloat(dataToSave.balance) || 0; // <--- AQUI ESTAVA O PROBLEMA
+            dataToSave.value = parseFloat(dataToSave.value) || 0;
+            dataToSave.clause = parseFloat(dataToSave.clause) || 0;
+            dataToSave.contract = parseInt(dataToSave.contract) || 0;
 
-            // --- TRAVA RÍGIDA DE SALÁRIO (ZERO TOLERÂNCIA) ---
-            if (salary < limits.minSal || salary > limits.maxSal) {
-                alert(`🚫 AÇÃO BLOQUEADA: SALÁRIO IRREGULAR!\n\nCategoria: ${limits.label} (Over ${ovr})\nFaixa Permitida: ${fmt(limits.minSal)} - ${fmt(limits.maxSal)}\n\nVocê tentou colocar: ${fmt(salary)}.\n\nPor favor, ajuste o valor para dentro da faixa permitida para salvar.`);
-                return; // O CÓDIGO PARA AQUI. NÃO SALVA.
+            // Trava de Salário (Lei do Teto)
+            if (dataToSave.salary < limits.minSal || dataToSave.salary > limits.maxSal) {
+                return alert(`🚫 SALÁRIO IRREGULAR!\n\nCategoria: ${limits.label} (Over ${ovr})\nPermitido: ${fmt(limits.minSal)} - ${fmt(limits.maxSal)}\nTentativa: ${fmt(dataToSave.salary)}`);
             }
 
             if (!dataToSave.attributes || Object.keys(dataToSave.attributes).length === 0) {
@@ -6514,7 +6537,8 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                 {isAdmin && (
                     <div style={{border:'1px solid var(--primary)', padding:8, borderRadius:5, marginBottom:10, background:'rgba(0,255,0,0.05)'}}>
                         <label style={{color:'var(--primary)'}}>💰 Saldo em Conta (Admin)</label>
-                        <input className="input-field" type="number" value={f.balance||0} onChange={e=>setF({...f, balance:e.target.value})} />
+                        <input className="input-field" type="number" value={f.balance} onChange={e=>setF({...f, balance:e.target.value})} placeholder="Digite o valor..." />
+                        <small style={{color:'#aaa', fontSize:9}}>*Use apenas números. Ex: 15000</small>
                     </div>
                 )}
 
@@ -6535,13 +6559,11 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                     <div style={{border:'1px solid #444', padding:10, borderRadius:8, margin:'10px 0'}}>
                         <AttributeGrid attrs={f.attributes} pendingXP={f.pendingXP || 0} />
                         {isAdmin && <button className="btn btn-gold" style={{marginTop:5, fontSize:10}} onClick={()=>{
-                            if(confirm("Regerar (Admin)?")) {
-                                try {
-                                    const pos = f.position || 'ATA';
-                                    const n = generateAttributes(pos, parseInt(f.overall)||60);
-                                    const avg = calculateRealOverall(pos, n);
-                                    setF({...f, attributes:n, overall: avg});
-                                } catch(e) { alert("Erro: " + e.message); }
+                            if(confirm("Regerar atributos aleatoriamente?")) {
+                                const pos = f.position || 'ATA';
+                                const n = generateAttributes(pos, parseInt(f.overall)||60);
+                                const avg = calculateRealOverall(pos, n);
+                                setF({...f, attributes:n, overall: avg});
                             }
                         }}>🎲 REGERAR (ADM)</button>}
                     </div>
@@ -6551,7 +6573,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                     </div>
                 )}
 
-                {/* --- VISUALIZADORES DE PREÇO E SALÁRIO (NOVOS) --- */}
+                {/* VISUALIZADORES */}
                 <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:5}}>
                     <div style={{background: 'rgba(0, 230, 118, 0.1)', padding: '5px', borderRadius: '5px', border: '1px dashed #00E676', textAlign: 'center'}}>
                         <small style={{color: '#00E676', fontWeight: 'bold', fontSize:10}}>

@@ -982,30 +982,52 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
 
        const PublicServices = ({ players, user, onDonate }) => {
     const [hTab, setHTab] = useState('HOSPITAL');
-    // Filtra apenas quem tem tempo de molho restante
     const injured = (players || []).filter(p => (p.recoveryLeft || 0) > 0);
 
+    // --- NOVA TABELA DE PROCEDIMENTOS POR CATEGORIA ---
+    const SURGERY_OPTIONS = {
+        MODERADA: [
+            { id: 'M1', name: 'Fisioterapia Intensiva (Aceleração)', timeRed: 1, cost: 300000, success: 0.95, text: "Sessões de choque e ultrassom para acelerar a cicatrização." },
+            { id: 'M2', name: 'Infiltração com Plasma (PRP)', timeRed: 2, cost: 750000, success: 0.85, text: "Tratamento biológico para regenerar tecidos moderadamente lesionados." }
+        ],
+        GRAVE: [
+            { id: 'G1', name: 'Artroscopia de Limpeza', timeRed: 2, cost: 1500000, success: 0.80, text: "Microcirurgia para remover fragmentos e limpar a articulação." },
+            { id: 'G2', name: 'Sutura Meniscal / Tendínea', timeRed: 3, cost: 3500000, success: 0.70, text: "Intervenção cirúrgica para costurar fibras rompidas." }
+        ],
+        EXTREMA: [
+            { id: 'E1', name: 'Reconstrução Ligamentar (Enxerto)', timeRed: 4, cost: 8000000, success: 0.65, text: "Substituição total do ligamento com reforço estrutural." },
+            { id: 'E2', name: 'Cirurgia Robótica de Alta Performance', timeRed: 6, cost: 15000000, success: 0.50, text: "Tecnologia de ponta para casos terminais. Risco alto, mas recuperação massiva." }
+        ]
+    };
+
     const handleSurgery = async (p) => {
-        // --- BLOQUEIO PARA INTOXICAÇÃO (INCURÁVEL POR CIRURGIA) ---
-        if (p.injury && typeof p.injury === 'object' && p.injury.isIncurable) {
-            return alert("🚫 PROCEDIMENTO NEGADO!\n\nEste quadro é de Intoxicação Alimentar. Não há cirurgia que resolva problemas estomacais. O atleta precisa de repouso e hidratação natural. Volte amanhã.");
+        // 1. Identifica a categoria da lesão (Baseado no nome ou banco de lesões)
+        let category = 'LEVE';
+        if (INJURIES_DB.MODERADA.includes(p.injury)) category = 'MODERADA';
+        if (INJURIES_DB.GRAVE.includes(p.injury)) category = 'GRAVE';
+        if (INJURIES_DB.EXTREMA.includes(p.injury)) category = 'EXTREMA';
+
+        // TRAVA: Lesões Leves ou Intoxicação não operam
+        if (category === 'LEVE' || p.injury === 'Intoxicação Alimentar') {
+            return alert(`🚫 PRONTUÁRIO NEGADO!\nA lesão "${p.injury}" é considerada leve ou clínica. O tratamento exige apenas repouso e tempo natural. Não há indicação cirúrgica.`);
         }
 
-        const lista = SURGERIES.map((s, idx) => 
-            `${idx + 1}) ${s.name}\n💰 Custo: ${fmt(s.cost)} | ⏳ Reduz: ${s.timeRed} jogo(s) | ✅ Sucesso: ${s.success * 100}%`
+        const options = SURGERY_OPTIONS[category];
+        const lista = options.map((s, idx) => 
+            `${idx + 1}) ${s.name}\n💰 Custo: ${fmt(s.cost)} | ⏳ Reduz: ${s.timeRed} jogo(s) | 🎯 Sucesso: ${s.success * 100}%\n📝 ${s.text}`
         ).join('\n\n');
 
-        const escolha = prompt(`HOSPITAL MUNICIPAL - PRONTUÁRIO: ${p.name}\nSaldo na Vaquinha: ${fmt(p.hospitalFund || 0)}\n\nEscolha o procedimento (1-5):\n\n${lista}`);
+        const escolha = prompt(`HOSPITAL MUNICIPAL - PACIENTE: ${p.name}\nCategoria: ${category}\nSaldo na Vaquinha: ${fmt(p.hospitalFund || 0)}\n\nEscolha o procedimento (1-${options.length}):\n\n${lista}`);
         
         if (escolha) {
-            const cirurgia = SURGERIES[parseInt(escolha) - 1];
+            const cirurgia = options[parseInt(escolha) - 1];
             if (!cirurgia) return alert("Opção inválida.");
             
             if ((p.hospitalFund || 0) < cirurgia.cost) {
-                return alert("A vaquinha ainda não atingiu o valor necessário para este procedimento!");
+                return alert("Saldo na vaquinha insuficiente para este procedimento!");
             }
 
-            if (confirm(`Confirmar ${cirurgia.name}?\nO valor de ${fmt(cirurgia.cost)} será debitado da vaquinha do jogador.`)) {
+            if (confirm(`Confirmar ${cirurgia.name}?\nO valor de ${fmt(cirurgia.cost)} será usado.`)) {
                 const sucesso = Math.random() < cirurgia.success;
                 const b = db.batch();
                 const pRef = db.collection('players').doc(p.id);
@@ -1015,16 +1037,18 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                     b.update(pRef, { 
                         recoveryLeft: novoTempo,
                         hospitalFund: (p.hospitalFund || 0) - cirurgia.cost,
-                        injury: novoTempo === 0 ? firebase.firestore.FieldValue.delete() : p.injury
+                        injury: novoTempo === 0 ? firebase.firestore.FieldValue.delete() : p.injury,
+                        // Limpa histórico de doações após cirurgia bem-sucedida
+                        donors: {} 
                     });
-                    alert(`✅ SUCESSO!\nA cirurgia de ${p.name} foi um sucesso. Tempo reduzido em ${cirurgia.timeRed} jogo(s).`);
+                    alert(`✅ SUCESSO!\nA operação foi um êxito. ${p.name} deve retornar aos gramados em breve.`);
                 } else {
                     b.update(pRef, { 
                         hospitalFund: (p.hospitalFund || 0) - cirurgia.cost,
-                        recoveryLeft: p.recoveryLeft + 1, // Falha aumenta o tempo
+                        recoveryLeft: p.recoveryLeft + 1, 
                         mood: '😡'
                     });
-                    alert(`❌ COMPLICAÇÕES...\nHouve um erro no procedimento. ${p.name} terá que ficar mais 1 jogo em observação.`);
+                    alert(`❌ COMPLICAÇÕES...\nO corpo do atleta não reagiu bem ao procedimento. Ele ficará mais tempo em observação.`);
                 }
                 await b.commit();
             }
@@ -1049,53 +1073,68 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                         <span style={{fontSize:24}}>🚑</span>
                         <div>
                             <b style={{display:'block'}}>EMERGÊNCIA MUNICIPAL</b>
-                            <small>{injured.length} jogador(es) em tratamento</small>
+                            <small>{injured.length} jogador(es) sob cuidados médicos</small>
                         </div>
                     </div>
 
                     {injured.length === 0 ? (
                         <div className="card" style={{textAlign:'center', padding:40}}>
                             <div style={{fontSize:40, marginBottom:10}}>🥗</div>
-                            <p>Todos os atletas de Mato Real estão saudáveis!</p>
+                            <p>Departamento médico vazio! Todos os atletas estão prontos para o jogo.</p>
                         </div>
                     ) : (
-                        injured.map(p => (
-                            <div key={p.id} className="card" style={{borderLeft:'5px solid #ff1744', position:'relative'}}>
-                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
-                                    <div>
-                                        <b style={{fontSize:16}}>❌ {p.name}</b>
-                                        <div style={{fontSize:11, color:'#ff1744', fontWeight:'bold', marginTop:2}}>
-                                            {/* CORREÇÃO DO CRASH: Renderiza o label se for objeto, ou o texto se for string */}
-                                            {typeof p.injury === 'object' ? p.injury.label : (p.injury || 'Lesão não especificada')}
+                        injured.map(p => {
+                            const isLight = INJURIES_DB.LEVE.includes(p.injury) || p.injury === 'Intoxicação Alimentar';
+                            return (
+                                <div key={p.id} className="card" style={{borderLeft:'5px solid #ff1744', position:'relative'}}>
+                                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+                                        <div>
+                                            <b style={{fontSize:16}}>❌ {p.name}</b>
+                                            <div style={{fontSize:11, color:'#ff1744', fontWeight:'bold', marginTop:2}}>
+                                                {typeof p.injury === 'object' ? p.injury.label : (p.injury || 'Lesão não especificada')}
+                                            </div>
+                                        </div>
+                                        <div style={{textAlign:'right'}}>
+                                            <span style={{background:'#ff1744', color:'white', padding:'2px 8px', borderRadius:10, fontSize:10, fontWeight:'bold'}}>
+                                                {p.recoveryLeft} JOGOS
+                                            </span>
                                         </div>
                                     </div>
-                                    <div style={{textAlign:'right'}}>
-                                        <span style={{background:'#ff1744', color:'white', padding:'2px 8px', borderRadius:10, fontSize:10, fontWeight:'bold'}}>
-                                            {p.recoveryLeft} JOGOS
-                                        </span>
-                                    </div>
-                                </div>
 
-                                {/* ÁREA DA VAQUINHA */}
-                                <div style={{marginTop:15, background:'rgba(0,0,0,0.2)', padding:10, borderRadius:8}}>
-                                    <div style={{display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:5}}>
-                                        <span>Fundo para Cirurgia:</span>
-                                        <b style={{color:'gold'}}>{fmt(p.hospitalFund || 0)}</b>
-                                    </div>
-                                    
-                                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10}}>
-                                        <button className="btn btn-green" style={{fontSize:10, padding:8}} onClick={() => {
-                                            const v = prompt(`Quanto desejas doar para ajudar na cirurgia de ${p.name}?`);
-                                            if(v && !isNaN(v)) onDonate(p, parseFloat(v));
-                                        }}>💸 DOAR</button>
+                                    {/* ÁREA DA VAQUINHA E DOADORES */}
+                                    <div style={{marginTop:15, background:'rgba(0,0,0,0.2)', padding:10, borderRadius:8}}>
+                                        <div style={{display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:10}}>
+                                            <span>Fundo para Cirurgia:</span>
+                                            <b style={{color:'gold'}}>{fmt(p.hospitalFund || 0)}</b>
+                                        </div>
                                         
-                                        <button className="btn btn-blue" style={{fontSize:10, padding:8}} onClick={() => handleSurgery(p)}>
-                                            🏥 OPERAR
-                                        </button>
+                                        {/* Lista de quem já ajudou */}
+                                        <div style={{fontSize:9, color:'#888', marginBottom:10}}>
+                                            <b>Doadores Recentes:</b><br/>
+                                            {p.donors && Object.keys(p.donors).length > 0 ? 
+                                                Object.values(p.donors).map((d, i) => <span key={i}>• {d.name} ({fmt(d.val)}) </span>) 
+                                                : "Nenhuma doação recebida para esta lesão."
+                                            }
+                                        </div>
+                                        
+                                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                                            <button className="btn btn-green" style={{fontSize:10, padding:8}} onClick={() => {
+                                                const v = prompt(`Quanto desejas doar para ${p.name}?`);
+                                                if(v && !isNaN(v)) onDonate(p, parseFloat(v));
+                                            }}>💸 DOAR</button>
+                                            
+                                            <button 
+                                                className={`btn ${isLight ? 'btn-ghost' : 'btn-blue'}`} 
+                                                style={{fontSize:10, padding:8, opacity: isLight ? 0.5 : 1}} 
+                                                onClick={() => handleSurgery(p)}
+                                            >
+                                                {isLight ? '🚫 SEM CIRURGIA' : '🏥 OPERAR'}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
             )}
@@ -1481,26 +1520,44 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
         });
     };
             const handleHospitalDonation = async (player, amount) => {
-        if (!user.data || user.data.balance < amount) return alert("Saldo insuficiente!");
-        if (amount <= 0) return alert("Valor inválido.");
+    if (!user.data || user.data.balance < amount) return alert("Saldo insuficiente!");
+    if (amount <= 0) return alert("Valor inválido.");
 
-        const b = db.batch();
-        
-        // 1. Tira dinheiro de quem está doando (Pode ser time, jogador, empresa...)
-        const donorRef = user.type === 'PLAYER' ? db.collection('players').doc(user.data.id) :
-                         user.type === 'USER' ? db.collection('teams').doc(user.data.id) :
-                         db.collection('companies').doc(user.data.id);
-        
-        b.update(donorRef, { balance: firebase.firestore.FieldValue.increment(-amount) });
+    // 1. TRAVA: Já doou para este jogador?
+    const myDonations = player.donors || {};
+    if (myDonations[user.data.id]) {
+        return alert("🛑 GESTO JÁ REALIZADO!\nVocê já contribuiu para o tratamento atual deste jogador. Aguarde a recuperação ou a cirurgia para ajudar novamente.");
+    }
 
-        // 2. Coloca no fundo do jogador lesionado
-        b.update(db.collection('players').doc(player.id), { 
-            hospitalFund: firebase.firestore.FieldValue.increment(amount) 
-        });
+    // 2. TRAVA: Empresas só pagam até 50% da cirurgia MAIS CARA disponível
+    if (user.type === 'COMPANY') {
+        const tetoMaximo = 15000000; // Custo da cirurgia mais cara (Robótica)
+        const limiteEmpresa = tetoMaximo * 0.5;
+        if (amount > limiteEmpresa) {
+            return alert(`🚫 LIMITE EMPRESARIAL!\nPelas leis de Mato Real, empresas podem doar no máximo ${fmt(limiteEmpresa)} (50% do teto cirúrgico) por procedimento para evitar monopólio de gratidão.`);
+        }
+    }
 
-        await b.commit();
-        alert(`🙏 Obrigado! Você doou ${fmt(amount)} para a recuperação de ${player.name}.`);
+    const b = db.batch();
+    const donorRef = user.type === 'PLAYER' ? db.collection('players').doc(user.data.id) :
+                     user.type === 'USER' ? db.collection('teams').doc(user.data.id) :
+                     db.collection('companies').doc(user.data.id);
+    
+    b.update(donorRef, { balance: firebase.firestore.FieldValue.increment(-amount) });
+
+    // 3. Grava a doação e o nome do doador no perfil do jogador
+    const donationObj = {
+        [user.data.id]: { name: user.data.name, val: amount, date: Date.now() }
     };
+
+    b.update(db.collection('players').doc(player.id), { 
+        hospitalFund: firebase.firestore.FieldValue.increment(amount),
+        donors: { ...myDonations, ...donationObj }
+    });
+
+    await b.commit();
+    alert(`🙏 DOAÇÃO CONFIRMADA!\nObrigado, ${user.data.name}. Seus ${fmt(amount)} foram enviados para o fundo hospitalar.`);
+};
             //FIM
             // --- FUNÇÃO DE LOGIN UNIVERSAL (CORRIGIDA) ---
     const login = async (loginId, loginPass, type) => {
@@ -2427,50 +2484,62 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
     
    const buyProduct = async (prod, seller) => {
         const buyerBalance = user.data.balance || 0;
-        
+        const price = parseFloat(prod.price);
+        const currentStock = parseInt(prod.stock) || 0;
+
         // 1. Validações
-        if (buyerBalance < prod.price) return alert("Saldo insuficiente!");
-        if (!confirm(`Comprar ${prod.name} por ${fmt(prod.price)}?`)) return;
+        if (currentStock <= 0) return alert("Produto Esgotado!");
+        if (buyerBalance < price) return alert("Saldo insuficiente!");
+        if (!confirm(`Comprar ${prod.name} por ${fmt(price)}?`)) return;
 
-        // 2. Cálculo de Custos
-        const getLocalCost = (c, p) => {
-            const pow = parseInt(p);
-            if (!pow || pow <= 0) return 0;
-            if (['SAUDE', 'CONSUMIVEL'].includes(c)) return pow * 7000;
-            if (['CHUTEIRA', 'LUVAS'].includes(c)) return pow * 12000;
-            return pow * 15000; 
-        };
+        setLoading(true);
 
-        const productionCost = getLocalCost(prod.cat, prod.power);
-        const profit = prod.price - productionCost;
-
-        // 3. Prepara dados da Fama (apenas para salvar no item, não no jogador agora)
-        let fameBonus = 0;
-        if (['VEICULO', 'IMOVEL', 'TECNOLOGIA', 'LUXO'].includes(prod.cat)) {
-            fameBonus = (parseInt(prod.power) || 0) * 100; 
-        }
-
+        // 2. Recupera o custo histórico que foi salvo no produto para cálculo de relatório
+        // (Nota: Isso é apenas visual para o histórico, não afeta o saldo)
+        const historicCost = parseFloat(prod.productionCost) || 0; 
+        // O custo unitário aproximado é o custo do lote / quantidade total original... 
+        // Mas para simplificar o log, vamos considerar que o lucro bruto agora é o preço cheio,
+        // já que o custo saiu do caixa da empresa lá atrás (na fabricação).
+        
+        // Se quiser ser muito preciso contabilmente: Lucro da Operação = Preço.
+        // O "Lucro Líquido" real a empresa vê no balanço geral.
+        
         const b = db.batch();
         
-        // 4. Desconta do Comprador
+        // 3. MOVIMENTAÇÃO FINANCEIRA
+        
+        // A. Tira do Comprador (Jogador/Time)
         if (user.type === 'PLAYER') {
-            // NOTA: Removemos a soma de 'fame' aqui. 
-            // O Sincronizador (useEffect) vai detectar o item novo na mochila e calcular a Fama correta automaticamente.
             b.update(db.collection('players').doc(user.data.id), { 
-                balance: buyerBalance - prod.price
+                balance: firebase.firestore.FieldValue.increment(-price) 
             });
         } else if (user.type === 'COACH') { 
-            b.update(db.collection('users').doc(user.data.id), { balance: buyerBalance - prod.price });
+            b.update(db.collection('users').doc(user.data.id), { 
+                balance: firebase.firestore.FieldValue.increment(-price) 
+            });
         } else {
-            b.update(db.collection('teams').doc(user.data.id), { balance: buyerBalance - prod.price });
+            b.update(db.collection('teams').doc(user.data.id), { 
+                balance: firebase.firestore.FieldValue.increment(-price) 
+            });
         }
 
-        // 5. Paga a Empresa
+        // B. Paga a Empresa (VALOR CHEIO, pois o custo já foi pago na fábrica)
         b.update(db.collection('companies').doc(seller.id), { 
-            balance: (seller.balance || 0) + profit 
+            balance: firebase.firestore.FieldValue.increment(price) 
         });
 
-        // 6. Cria o item na Mochila (Sales) com DADOS CONGELADOS
+        // 4. BAIXA NO ESTOQUE (Diminui 1 unidade)
+        b.update(db.collection('products').doc(prod.id), {
+            stock: firebase.firestore.FieldValue.increment(-1)
+        });
+
+        // 5. Gera o Item na Mochila do Jogador
+        // Recalcula Fama/Poder visual para salvar no item
+        let fameBonus = 0;
+        if (['VEICULO', 'IMOVEL', 'TECNOLOGIA', 'LUXO'].includes(prod.cat)) {
+            fameBonus = (parseInt(prod.power) || 0) * 100;
+        }
+
         const saleRef = db.collection('sales').doc();
         b.set(saleRef, { 
             companyId: seller.id, 
@@ -2479,30 +2548,37 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
             
             productOriginalId: prod.id,
             productName: prod.name, 
-            price: parseFloat(prod.price),
-            cost: productionCost, 
+            price: price,
+            cost: 0, // Custo é 0 nesta transação pois já foi pago na fábrica
+            profit: price, // Lucro de caixa imediato é o preço cheio
+            
             img: prod.img, 
             cat: prod.cat,
             
-            // Grava os atributos fixos (Poder e Fama) neste momento
+            // Grava os atributos fixos
             power: parseInt(prod.power) || 0, 
             fameGained: fameBonus, 
             
             date: Date.now() 
         });
         
-        await b.commit();
-        
-        // Atualiza saldo visualmente
-        setUser(prev => ({
-            ...prev,
-            data: { ...prev.data, balance: buyerBalance - prod.price }
-        }));
+        try {
+            await b.commit();
+            
+            // Atualiza saldo visualmente na hora
+            setUser(prev => ({
+                ...prev,
+                data: { ...prev.data, balance: buyerBalance - price }
+            }));
 
-        let msg = `Compra realizada com sucesso!`;
-        if (fameBonus > 0) msg += `\n🌟 FAMA +${fameBonus} (Atualizando...)`;
-        if (profit < 0) msg += `\n(Nota: A empresa teve prejuízo nesta venda)`;
-        alert(msg);
+            let msg = `✅ Compra realizada com sucesso!`;
+            if (fameBonus > 0) msg += `\n🌟 FAMA +${fameBonus} (Verifique seu perfil)`;
+            alert(msg);
+        } catch (error) {
+            console.error(error);
+            alert("Erro ao processar compra: " + error.message);
+        }
+        setLoading(false);
     };
             //FIM
 
@@ -4439,7 +4515,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.80.5</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.80.6</div>
                             </div>
                         </div>
                         
@@ -4965,7 +5041,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.80.5 FIM DA INFLAÇÃO </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.80.6 FIM DA INFLAÇÃO </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

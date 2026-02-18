@@ -4929,8 +4929,9 @@ const renewContract = async (p) => {
                             </div>
                         }
                         
-                       {screen === 'MARKET' && (
+                      {screen === 'MARKET' && (
                             <Market 
+                                user={user}
                                 me={user.data?.id} 
                                 teams={teams} 
                                 players={players} 
@@ -4962,7 +4963,6 @@ const renewContract = async (p) => {
                                 onHireCoach={(c) => setModal({ type: 'HIRE_COACH', data: c })}
                             />
                         )}
-
 
         {screen === 'SHOPPING' && 
                             <ShoppingScreen 
@@ -5273,7 +5273,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.81.1 MEGA ATUALIZÇÃO TÉCNICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.81.2 MEGA ATUALIZÇÃO TÉCNICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -6872,8 +6872,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
 };
 // FIM DO STATS EDITOR E PLAYER FORM
 
-const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, onPre, onHireCoach, onIndicate }) => {
-    const [view, setView] = useState('MENU'); 
+const Market = ({ user, me, teams, players, coaches, open, isVis, onNeg, onPayClause, onPre, onHireCoach, onIndicate }) => {    const [view, setView] = useState('MENU'); 
     const [serie, setSerie] = useState('A'); 
     const [selT, setSelT] = useState(null); 
     const [filt, setFilt] = useState('VENDA');

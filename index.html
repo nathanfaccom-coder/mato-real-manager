@@ -3735,7 +3735,15 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
     // --- LÓGICA DE TREINO (APENAS XP) ---
 const handleCoachTrain = async (playerIds, type) => {
         const currentCoach = user.data;
-        if (!currentCoach || currentCoach.trainingsLeft <= 0) return alert("Sem treinos disponíveis!");
+        const coachEnergy = currentCoach.energy !== undefined ? currentCoach.energy : 100;
+
+        // --- NOVA LÓGICA: TRAVA POR ENERGIA EM VEZ DE QUANTIDADE ---
+        // Treino coletivo ou Estudo tático consomem energia
+        const coachEnergyCost = playerIds.length > 0 ? 20 : 30; 
+        
+        if (coachEnergy < coachEnergyCost) {
+            return alert(`Você está muito cansado para realizar esta atividade! Energia atual: ${coachEnergy}% (Necessário: ${coachEnergyCost}%)`);
+        }
 
         setLoading(true);
         const b = db.batch();
@@ -3745,7 +3753,7 @@ const handleCoachTrain = async (playerIds, type) => {
         // 1. Identificar Perks Ativos do Técnico
         const activePerks = currentCoach.perks || [];
         const energyPerk = activePerks.find(p => p.type === 'ENERGY_SAVE');
-        const energyCost = energyPerk ? Math.round(10 * energyPerk.value) : 10; 
+        const playerEnergyCost = energyPerk ? Math.round(10 * energyPerk.value) : 10; 
         const critPerk = activePerks.find(p => p.type === 'CRIT_CHANCE');
         const critBonus = critPerk ? critPerk.value : 0;
         const minXpPerk = activePerks.find(p => p.type === 'MIN_XP_BOOST');
@@ -3765,6 +3773,7 @@ const handleCoachTrain = async (playerIds, type) => {
         else if(type === 'MENTAL') trainedAttrs = ['teamwork', 'mentality', 'response'];
         else if(type === 'BOLA_PARADA') trainedAttrs = ['freeKick', 'curve', 'header', 'penalties'];
         else if(type === 'GOLEIRO') trainedAttrs = ['gk', 'response', 'jump', 'longPass'];
+        else if(type === 'STUDY') trainedAttrs = []; // Estudo não afeta jogadores
 
         playerIds.forEach(pid => {
             const p = players.find(x => x.id === pid);
@@ -3780,7 +3789,7 @@ const handleCoachTrain = async (playerIds, type) => {
             }
 
             // TRAVA 2: Jogador Exausto (Evita bug de energia infinita)
-            if (currentEnergy < energyCost) {
+            if (currentEnergy < playerEnergyCost) {
                 report.push(`⚠️ ${p.name} ignorado (exausto: ${currentEnergy}%)`);
                 return;
             }
@@ -3799,7 +3808,7 @@ const handleCoachTrain = async (playerIds, type) => {
             }
 
             // Gasto de Energia Seguro
-            const newEnergy = currentEnergy - energyCost;
+            const newEnergy = currentEnergy - playerEnergyCost;
             
             // Cálculo de XP Base
             let xpGain = Math.floor(Math.random() * 5) + 8 + minXpBonus; 
@@ -3859,6 +3868,12 @@ const handleCoachTrain = async (playerIds, type) => {
             coachXpGain += 20;
         });
 
+        // Caso seja ESTUDO TÁTICO (sem jogadores), ganha um XP fixo para o técnico
+        if (type === 'STUDY') {
+            coachXpGain = Math.floor(Math.random() * 10) + 15;
+            report.push("📚 Você dedicou tempo estudando novas táticas e evoluiu como treinador.");
+        }
+
         // Evolução do Técnico
         let newCoachXp = (currentCoach.xp || 0) + coachXpGain;
         let newLevel = currentCoach.level;
@@ -3874,8 +3889,9 @@ const handleCoachTrain = async (playerIds, type) => {
             alert(`🎉 PARABÉNS! Nível ${newLevel} alcançado!`);
         }
 
+        // Atualização final do técnico consumindo energia da barra unificada
         b.update(db.collection('users').doc(currentCoach.id), {
-            trainingsLeft: currentCoach.trainingsLeft - 1,
+            energy: coachEnergy - coachEnergyCost,
             xp: newCoachXp,
             level: newLevel,
             pendingPerks,
@@ -3885,12 +3901,11 @@ const handleCoachTrain = async (playerIds, type) => {
         await b.commit();
         setLoading(false);
         
-        let msg = "Treino realizado com sucesso!";
+        let msg = type === 'STUDY' ? "Estudo concluído!" : "Treino realizado com sucesso!";
         if(report.length > 0) msg += "\n\n" + report.join("\n");
         alert(msg);
     };
-            //FIM
-            
+
     const handleEvolveCoachPerk = async (perk) => {
         // Atualiza no Banco de Dados
         await db.collection('users').doc(user.data.id).update({
@@ -4724,7 +4739,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.81.4</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.81.5</div>
                             </div>
                         </div>
                         
@@ -5275,7 +5290,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.81.4 MEGA ATUALIZÇÃO TÉCNICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.81.5 MEGA ATUALIZÇÃO TÉCNICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -6321,7 +6336,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
     const xpNext = coach.level * 100;
     const progress = (coach.xp / xpNext) * 100;
     
-    // --- CÁLCULO DE ENERGIA (IGUAL JOGADOR) ---
+    // --- CÁLCULO DE ENERGIA UNIFICADO ---
     const energy = coach.energy !== undefined ? coach.energy : 100;
     const isExhausted = energy < 20;
 
@@ -6336,11 +6351,10 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
 
     // --- FUNÇÃO DE ESTUDAR TÁTICAS (GANHA XP / GASTA ENERGIA) ---
     const handleStudy = () => {
-        if (energy < 30) return alert("Você está muito cansado para estudar! Tome um café.");
+        if (energy < 30) return alert("Você está muito cansado para estudar! Tome um café ou energético.");
         
-        // Gasta 30 de energia, Ganha XP (Ex: 15 a 25)
-        const xpGain = Math.floor(Math.random() * 10) + 15;
-        onTrain([], 'STUDY', 30, xpGain); 
+        // Agora o estudo tático chama a função de treino com array vazio para processar XP e Energia do Coach
+        onTrain([], 'STUDY'); 
     };
 
     // --- FUNÇÃO DE ESCALAR TIME ---
@@ -6392,14 +6406,14 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                     </div>
                 </div>
                 
-                {/* BARRA DE ENERGIA */}
+                {/* BARRA DE ENERGIA UNIFICADA */}
                 <div style={{margin:'15px auto', width:'80%', background:'#333', height:10, borderRadius:5, overflow:'hidden', border:'1px solid #555'}}>
                     <div style={{width:`${energy}%`, background: energy > 50 ? 'lime' : energy > 20 ? 'orange' : 'red', height:'100%', transition:'0.5s'}}></div>
                 </div>
-                <small style={{color: isExhausted ? 'red' : 'lime'}}>{energy}% Energia {isExhausted && '(Cansado: Treinos rendem 50%)'}</small>
+                <small style={{color: isExhausted ? 'red' : 'lime', fontWeight:'bold'}}>{energy}% Energia {isExhausted && '(Cansado: Treinos rendem 50%)'}</small>
 
                 <div style={{display:'flex', justifyContent:'center', gap:15, marginTop:10}}>
-                    <button className="btn btn-purple" style={{width:'auto', padding:'5px 15px', fontSize:10}} onClick={handleStudy}>
+                    <button className="btn btn-purple" style={{width:'auto', padding:'5px 15px', fontSize:10, borderRadius:20}} onClick={handleStudy}>
                         📚 ESTUDAR TÁTICAS (-30⚡ / +XP)
                     </button>
                 </div>
@@ -6429,7 +6443,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
             {/* ABAS */}
             <div style={{display:'flex', gap:5, marginBottom:15, marginTop:10, overflowX:'auto'}}>
                 <button className={`btn ${tab==='PRANCHETA'?'btn-green':'btn-ghost'}`} onClick={()=>setTab('PRANCHETA')}>PRANCHETA</button>
-                <button className={`btn ${tab==='TREINO'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('TREINO')}>TREINOS</button>
+                <button className={`btn ${tab==='TREINO'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('TREINO')}>TREINAR TIME</button>
                 <button className={`btn ${tab==='MOCHILA'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('MOCHILA')}>MOCHILA</button>
                 <button className={`btn ${tab==='CARREIRA'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('CARREIRA')}>CARREIRA</button>
             </div>
@@ -6474,7 +6488,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
             {tab === 'MOCHILA' && (
                 <div>
                     <h3>🎒 Inventário do Técnico</h3>
-                    {myItems.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Compre comida no Shopping para recuperar energia!</p>}
+                    {myItems.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Compre energéticos no Shopping para recuperar energia!</p>}
                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
                         {myItems.map(item => (
                             <div key={item.id} className="card" style={{border:'1px solid #444', textAlign:'center'}}>
@@ -6515,8 +6529,11 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                     )}
 
                     <div className="card">
-                        <h3>🏃‍♂️ Aplicar Treino</h3>
-                        {energy < 20 && <div style={{background:'red', color:'white', padding:5, fontSize:10, marginBottom:10}}>⚠️ ENERGIA BAIXA: Rendimento do treino cairá pela metade!</div>}
+                        <h3>🏃‍♂️ Sessão de Treinamento</h3>
+                        <p style={{fontSize:11, color:'#aaa', marginBottom:10}}>
+                            Treinos coletivos consomem a sua energia vital de treinador.<br/>
+                            <span style={{color:'orange'}}>Custo: -20% Energia</span>
+                        </p>
                         
                         <div style={{marginBottom:15}}>
                             <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
@@ -6545,16 +6562,16 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                         </div>
                         
                         <button className="btn btn-green" onClick={()=>{
-                            if(energy <= 0) return alert("Você desmaiou de cansaço! Coma algo.");
-                            if(selectedPlayers.length === 0) return alert("Selecione jogadores.");
+                            if(energy < 20) return alert("Você está exausto! Coma algo para recuperar energia antes de treinar o time.");
+                            if(selectedPlayers.length === 0) return alert("Selecione os jogadores que participarão da atividade.");
                             onTrain(selectedPlayers, trainingType);
                             setSelectedPlayers([]);
                         }}>
-                            APLICAR TREINO (-20⚡)
+                            APLICAR TREINAMENTO (-20⚡)
                         </button>
 
                          <p style={{textAlign:'center', color:'#888', fontSize:12, margin:'10px 0'}}>
-                            👉 Selecione até <b>5 jogadores</b> para o treino:
+                            👉 Selecione até <b>5 jogadores</b>:
                         </p>
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
                             {players.map(p => (

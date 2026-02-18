@@ -6872,7 +6872,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
 };
 // FIM DO STATS EDITOR E PLAYER FORM
 
-const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, onPre, onHireCoach }) => {
+const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, onPre, onHireCoach, onIndicate }) => {
     const [view, setView] = useState('MENU'); 
     const [serie, setSerie] = useState('A'); 
     const [selT, setSelT] = useState(null); 
@@ -6971,7 +6971,7 @@ const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, 
                             <span style={{color:'gold', fontWeight:'bold'}}>★ Nível {c.level}</span>
                         </div>
                         <div style={{fontSize:12, color:'#aaa', margin:'5px 0'}}>
-                            Especialidade: <b style={{color:'#fff'}}>{c.affinities[0]}</b>
+                            Especialidade: <b style={{color:'#fff'}}>{c.affinities ? c.affinities[0] : 'Geral'}</b>
                         </div>
                         <div style={{fontSize:12, fontWeight:'bold', color:'var(--primary)', marginBottom:10}}>
                             Salário Semanal: {fmt(c.salary)}
@@ -6998,6 +6998,7 @@ const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, 
             
             {list.length === 0 && <p style={{textAlign:'center', color:'#666', marginTop:30, fontStyle:'italic'}}>Nenhum jogador disponível nesta categoria.</p>}
             
+            <div style={{display:'grid', gap:10}}>
             {list.map(p => {
                 const recPrice = getRecommendedPrice(p.overall, p.position);
                 // Lógica de Preço (Se for Várzea, considera preço justo ou baixo)
@@ -7073,7 +7074,6 @@ const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, 
                                     </button>
                                 )}
                                 
-                                {/* BOTÃO DE MULTA INVISÍVEL (false && ...) PARA EVITAR BUGS */}
                                 {false && p.teamId !== 'FREE' && parseFloat(p.clause) > 0 && (
                                     <button className="btn btn-gold" style={{width:'auto', marginBottom:0}} onClick={()=>onPayClause(p)}>
                                         <i className="fas fa-gavel"></i> MULTA
@@ -7098,7 +7098,7 @@ const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, 
                     </div>
                 );
             })}
-      </div>
+            </div>
         </div>
     );
 };

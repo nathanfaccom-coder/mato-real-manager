@@ -986,6 +986,11 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     const injured = (players || []).filter(p => (p.recoveryLeft || 0) > 0);
 
     const handleSurgery = async (p) => {
+        // --- BLOQUEIO PARA INTOXICAÇÃO (INCURÁVEL POR CIRURGIA) ---
+        if (p.injury && typeof p.injury === 'object' && p.injury.isIncurable) {
+            return alert("🚫 PROCEDIMENTO NEGADO!\n\nEste quadro é de Intoxicação Alimentar. Não há cirurgia que resolva problemas estomacais. O atleta precisa de repouso e hidratação natural. Volte amanhã.");
+        }
+
         const lista = SURGERIES.map((s, idx) => 
             `${idx + 1}) ${s.name}\n💰 Custo: ${fmt(s.cost)} | ⏳ Reduz: ${s.timeRed} jogo(s) | ✅ Sucesso: ${s.success * 100}%`
         ).join('\n\n');
@@ -1060,7 +1065,8 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                     <div>
                                         <b style={{fontSize:16}}>❌ {p.name}</b>
                                         <div style={{fontSize:11, color:'#ff1744', fontWeight:'bold', marginTop:2}}>
-                                            {p.injury || 'Lesão não especificada'}
+                                            {/* CORREÇÃO DO CRASH: Renderiza o label se for objeto, ou o texto se for string */}
+                                            {typeof p.injury === 'object' ? p.injury.label : (p.injury || 'Lesão não especificada')}
                                         </div>
                                     </div>
                                     <div style={{textAlign:'right'}}>
@@ -2713,7 +2719,7 @@ const resetDatabase = async () => {
     };
         // --- FUNÇÃO 1: CORRIGIR PREÇOS DO SHOP (ANTI-CHEAT) ---
     const fixShopPrices = async () => {
-        if(!confirm("⚠️ ANTI-CHEAT SHOP:\nIsso vai varrer TODOS os produtos e corrigir o preço daqueles que estiverem abaixo do custo de produção.\n\nDeseja aplicar a correção?")) return;
+        if(!confirm("⚠️ MANUTENÇÃO DO SHOP:\n\n1. Resetar ESTOQUE de tudo para 10 unidades.\n2. Corrigir PREÇOS abaixo do custo (Anti-Cheat).\n\nDeseja aplicar essa atualização geral agora?")) return;
         
         try {
             setLoading(true);
@@ -2723,22 +2729,24 @@ const resetDatabase = async () => {
             
             snap.docs.forEach(doc => {
                 const p = doc.data();
+                // Calcula o custo mínimo baseado na nova tabela
                 const minCost = getProdCost(p.cat, p.power); 
                 
-                if (minCost > 0 && (parseFloat(p.price) || 0) < minCost) {
-                    b.update(doc.ref, { price: minCost });
-                    count++;
-                }
+                // Se o preço atual for menor que o custo, ele sobe para o mínimo.
+                // Se for maior, mantemos o preço (lucro da empresa).
+                const correctedPrice = Math.max(parseFloat(p.price) || 0, minCost);
+
+                b.update(doc.ref, { 
+                    price: correctedPrice,
+                    stock: 10 // <--- NOVO: Abastece o estoque para 10 unidades
+                });
+                count++;
             });
             
-            if(count > 0) {
-                await b.commit();
-                alert(`✅ SUCESSO!\n${count} produtos estavam com preço ilegal e foram corrigidos para o valor mínimo.`);
-            } else {
-                alert("👍 Tudo certo! Nenhum produto com preço irregular encontrado.");
-            }
+            await b.commit();
+            alert(`✅ SUCESSO!\n\n${count} produtos foram atualizados para 10 unidades de estoque e tiveram seus preços regularizados.`);
         } catch(e) {
-            alert("Erro: " + e.message);
+            alert("Erro na correção: " + e.message);
         }
         setLoading(false);
     };
@@ -4957,7 +4965,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.80.5 MATOGRAM </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.80.5 FIM DA INFLAÇÃO </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

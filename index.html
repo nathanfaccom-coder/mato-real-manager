@@ -5713,10 +5713,9 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
         // ... continuação do código anterior
 
     const ShoppingScreen = ({ products, companies, user, onBuy, onDeleteProd }) => {
-    const [view, setView] = useState('MALL'); // MALL ou STORE
+    const [view, setView] = useState('MALL'); 
     const [selComp, setSelComp] = useState(null);
     
-    // --- VISÃO GERAL (SHOPPING CENTER - LISTA DE LOJAS) ---
     if (view === 'MALL') return (
         <div>
             <h3>Shopping Center</h3>
@@ -5730,90 +5729,73 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                     </div>
                 ))}
             </div>
-            {companies.filter(c => c.status === 'ACTIVE').length === 0 && <p style={{textAlign:'center', color:'#666'}}>Nenhuma loja aberta.</p>}
         </div>
     );
 
-    // --- VISÃO DA LOJA ESPECÍFICA (VITRINE) ---
     const storeProducts = products.filter(p => p.companyId === selComp.id);
     const isAdmin = user && user.type === 'ADMIN';
     const userTeam = user && (user.type === 'USER' || user.type === 'PLAYER' || user.type === 'COACH');
 
     return (
         <div>
-            <button className="btn" style={{background:'#333', marginBottom:10, width:'auto'}} onClick={()=>{setView('MALL'); setSelComp(null);}}>⬅ VOLTAR AO SHOPPING</button>
+            <button className="btn" style={{background:'#333', marginBottom:10, width:'auto'}} onClick={()=>{setView('MALL'); setSelComp(null);}}>⬅ VOLTAR</button>
             
-            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:20, background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8}}>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:20, background:'rgba(0,0,0,0.3)', padding:10, borderRadius:8, border: '1px solid #333'}}>
                 {selComp.logo && <img src={selComp.logo} style={{width:50, height:50, borderRadius:'50%', objectFit:'cover'}} />}
                 <div>
                     <h2 style={{margin:0}}>{String(selComp.name)}</h2>
-                    <small style={{color:'var(--purple)'}}>Vitrine Oficial</small>
-                    <div style={{fontSize:11, color:'#aaa', marginTop:2}}>Proprietário: <b>{selComp.owner || 'Desconhecido'}</b></div>
+                    <div style={{fontSize:11, color:'#aaa'}}>Proprietário: <b>{selComp.owner || 'Empresa'}</b></div>
                 </div>
             </div>
 
             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
                 {storeProducts.map(p => {
-                    // --- LÓGICA CORRIGIDA PARA EXIBIÇÃO ---
                     const powerVal = parseInt(p.power) || 0;
                     const stock = parseInt(p.stock) || 0;
                     const isSoldOut = stock <= 0;
                     
-                    const isConsumable = ['SAUDE', 'CONSUMIVEL', 'energy'].includes(p.cat);
-                    const isEquippable = ['CHUTEIRA', 'LUVAS', 'training'].includes(p.cat);
-                    const isLuxury = ['VEICULO', 'IMOVEL', 'TECNOLOGIA', 'LUXO', 'vehicle', 'real_estate'].includes(p.cat);
-
                     return (
-                        <div key={p.id} className="card" style={{padding:10, position:'relative'}}>
-                            {p.img ? (
-                                <img src={p.img} style={{width:'100%', height:100, objectFit:'cover', borderRadius:4}} />
-                            ) : (
-                                <div style={{width:'100%', height:100, background:'#222', borderRadius:4, display:'grid', placeItems:'center'}}>📦</div>
-                            )}
-                            
-                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:5}}>
-                                <span style={{fontSize:9, color:'#888'}}>
-                                    {PROD_CATS[p.cat] || p.cat || 'Item'}
+                        <div key={p.id} className="card" style={{padding:10, position:'relative', border: isSoldOut ? '1px solid #444' : '1px solid var(--border)'}}>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5}}>
+                                <span style={{fontSize:9, color:'#888', background:'#222', padding:'2px 4px', borderRadius:3}}>
+                                    {p.cat.toUpperCase()}
                                 </span>
-                                {/* MOSTRADOR DE ESTOQUE */}
-                                <small style={{fontSize:9, fontWeight:'bold', color: isSoldOut ? 'red' : '#aaa'}}>
-                                    {isSoldOut ? '🔴 ESGOTADO' : `📦 Restam: ${stock}`}
+                                <small style={{fontSize:9, fontWeight:'bold', color: isSoldOut ? 'red' : 'lime'}}>
+                                    {isSoldOut ? '🔴 ESGOTADO' : `📦 ${stock} un.`}
                                 </small>
                             </div>
 
-                            <div style={{fontWeight:'bold', fontSize:13, lineHeight:'1.2em', marginTop:2}}>{String(p.name)}</div>
+                            <div style={{fontWeight:'bold', fontSize:13, marginBottom:2}}>{String(p.name)}</div>
                             
-                            <div style={{fontSize:10, color:'gold', margin:'2px 0'}}>
-                                {isConsumable && `⚡ Recuperação: ${powerVal}%`}
-                                {isEquippable && `⚔️ XP +${powerVal}%`}
-                                {isLuxury && `💎 Fama +${powerVal * 100}`}
+                            {/* EXIBIÇÃO DA DESCRIÇÃO (IMPORTANTE) */}
+                            {p.desc && <div style={{fontSize:10, color:'#888', marginBottom:5, fontStyle:'italic', height:25, overflow:'hidden'}}>{p.desc}</div>}
+
+                            <div style={{fontSize:10, color:'gold', marginBottom:8, background:'rgba(255,215,0,0.05)', padding:3, borderRadius:4, textAlign:'center'}}>
+                                {['energy', 'SAUDE', 'CONSUMIVEL'].includes(p.cat) && `⚡ Energia: +${powerVal}%`}
+                                {['training', 'CHUTEIRA', 'LUVAS'].includes(p.cat) && `👟 Treino: +${powerVal}% XP`}
+                                {['vehicle', 'real_estate', 'luxury', 'VEICULO', 'IMOVEL', 'TECNOLOGIA'].includes(p.cat) && `💎 Fama: +${powerVal * 100}`}
                             </div>
 
-                            <div style={{color:'var(--primary)', fontWeight:'900', fontSize:14}}>{fmt(p.price)}</div>
+                            <div style={{color:'var(--primary)', fontWeight:'900', fontSize:15, textAlign:'center', marginBottom:8}}>{fmt(p.price)}</div>
                             
-                            <div style={{display:'flex', gap:5, marginTop:5}}>
-                                {userTeam && (
-                                    <button 
-                                        className={`btn ${isSoldOut ? 'btn-disabled' : 'btn-green'}`} 
-                                        style={{fontSize:10, flex:1, opacity: isSoldOut ? 0.5 : 1, cursor: isSoldOut ? 'not-allowed' : 'pointer'}} 
-                                        onClick={() => !isSoldOut && onBuy(p, selComp)}
-                                        disabled={isSoldOut}
-                                    >
-                                        {isSoldOut ? 'SEM ESTOQUE' : 'COMPRAR'}
-                                    </button>
-                                )}
-                                
-                                {isAdmin && (
-                                    <button className="btn btn-red" style={{width:'auto', padding:'0 10px'}} onClick={()=>onDeleteProd(p.id)}>
-                                        <i className="fas fa-trash"></i>
-                                    </button>
-                                )}
-                            </div>
+                            {userTeam && (
+                                <button 
+                                    className={`btn ${isSoldOut ? 'btn-ghost' : 'btn-green'}`} 
+                                    style={{fontSize:10, padding:8, opacity: isSoldOut ? 0.4 : 1}} 
+                                    onClick={() => !isSoldOut && onBuy(p, selComp)}
+                                    disabled={isSoldOut}
+                                >
+                                    {isSoldOut ? 'SEM ESTOQUE' : 'COMPRAR'}
+                                </button>
+                            )}
+                            
+                            {isAdmin && (
+                                <button className="btn btn-red" style={{marginTop:5, padding:5, fontSize:9}} onClick={()=>onDeleteProd(p.id)}>EXCLUIR</button>
+                            )}
                         </div>
                     );
                 })}
             </div>
-            {storeProducts.length === 0 && <p style={{textAlign:'center', color:'#666'}}>Esta loja está vazia.</p>}
         </div>
     );
 };

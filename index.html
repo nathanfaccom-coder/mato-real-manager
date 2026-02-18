@@ -4425,7 +4425,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.79.5</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.79.6</div>
                             </div>
                         </div>
                         
@@ -4951,7 +4951,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.79.5 MATOGRAM </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.79.6 MATOGRAM </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -6728,24 +6728,61 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
         
 // --- COMPONENTE: FÁBRICA DE PRODUTOS (ADMIN) ---
 const ProductForm = ({ initial, onSave, onDelete, user }) => {
-    // Estado inicial do produto
+    // 1. Definição do Estado Inicial
     const [p, setP] = useState(initial || { 
         name:'', cat:'energy', power:10, price:'', 
-        stock: 10, // Quantidade padrão inicial
+        stock: 10, // Quantidade inicial para produzir
         desc:'' 
     });
     
+    // Se tem ID, é edição (repor estoque). Se não, é criação.
     const isEditing = !!initial?.id;
     
-    // Calcula custo em tempo real usando a função global
-    const unitCost = getProdCost(p.cat, p.power);
-    const quantity = parseInt(p.stock) || 0;
-    const totalProductionCost = unitCost * quantity;
+    // 2. Fórmula de Custo Local (Garante que o preço apareça correto aqui)
+    const getLocalCost = (cat, power) => {
+        const x = parseInt(power) || 0;
+        // Saúde/Energia: Barato pra produzir muito (Volume)
+        if (['energy', 'SAUDE', 'CONSUMIVEL'].includes(cat)) return x * 15; 
+        // Equipamentos: Custo médio
+        if (['training', 'CHUTEIRA', 'LUVAS'].includes(cat)) return x * 100;
+        // Luxo/Fama: Custo altíssimo
+        if (['vehicle', 'real_estate', 'VEICULO', 'IMOVEL', 'TECNOLOGIA', 'LUXO'].includes(cat)) return x * 500;
+        return 50; // Mínimo
+    };
+
+    // 3. Cálculos em Tempo Real
+    const unitCost = getLocalCost(p.cat, p.power);
+    const quantityToMake = parseInt(p.stock) || 1; // Quanto estou produzindo AGORA
+    const totalCost = unitCost * quantityToMake; // Valor total a pagar
     
-    // Verifica saldo (se for Admin usa saldo 0 pra teste, se for user usa o dele)
-    // Opcional: Para Admin sempre permitir
-    const userBalance = user.data.balance || 0;
-    const canAfford = user.type === 'ADMIN' ? true : userBalance >= totalProductionCost;
+    // Verifica se a empresa tem caixa
+    const canAfford = (user.data.balance || 0) >= totalCost;
+
+    // 4. Função de Processar a Produção
+    const handleProduction = async () => {
+        if (!p.name || !p.price) return alert("Preencha o nome e o preço!");
+        if (totalCost > 0 && !canAfford) return alert(`Sem capital de giro! Você precisa de ${fmt(totalCost)}.`);
+
+        // A. Cobra da Empresa (Dinheiro sai do caixa na hora)
+        if (totalCost > 0) {
+            await db.collection('companies').doc(user.data.id).update({
+                balance: firebase.firestore.FieldValue.increment(-totalCost)
+            });
+        }
+
+        // B. Calcula o Estoque Final
+        // Se for edição, soma ao que já existe no banco (initial.stock).
+        // Se for novo, o estoque é o que foi digitado.
+        const currentStockInDb = isEditing ? (initial.stock || 0) : 0;
+        const finalStock = currentStockInDb + quantityToMake;
+
+        // C. Salva o Produto
+        onSave({
+            ...p,
+            stock: finalStock, // Atualiza para o novo total
+            productionCost: unitCost // Grava quanto custou para referência
+        });
+    };
 
     return (
         <div className="modal-bg">
@@ -6753,7 +6790,7 @@ const ProductForm = ({ initial, onSave, onDelete, user }) => {
                 <h3>{isEditing ? '🏭 Repor Estoque / Editar' : '🏭 Nova Linha de Produção'}</h3>
                 
                 <label>Nome do Produto</label>
-                <input className="input-field" value={p.name} onChange={e=>setP({...p, name:e.target.value})} disabled={isEditing} placeholder="Ex: energético Turbo" />
+                <input className="input-field" value={p.name} onChange={e=>setP({...p, name:e.target.value})} disabled={isEditing} placeholder="Ex: Energético Turbo" />
                 
                 <div style={{display:'flex', gap:10}}>
                     <div style={{flex:1}}>
@@ -6768,11 +6805,11 @@ const ProductForm = ({ initial, onSave, onDelete, user }) => {
                     </div>
                 </div>
 
-                {/* ÁREA DE CONFIGURAÇÃO DO PRODUTO */}
+                {/* --- ÁREA DE PODER (SLIDER) --- */}
                 <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8, marginBottom:10, border:'1px solid #444'}}>
                     <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
-                        <label>⚡ Potência / Fama: <b style={{color:'gold'}}>{p.power}</b></label>
-                        <small style={{color:'#aaa'}}>Afeta o custo!</small>
+                        <label>⚡ Potência / Qualidade: <b style={{color:'gold'}}>{p.power}</b></label>
+                        <small style={{color:'#aaa'}}>Quanto maior, mais caro.</small>
                     </div>
                     
                     <input type="range" min="1" max="100" className="input-field" value={p.power} onChange={e=>setP({...p, power: parseInt(e.target.value)})} disabled={isEditing} />
@@ -6781,47 +6818,47 @@ const ProductForm = ({ initial, onSave, onDelete, user }) => {
                         Efeito: 
                         {['energy','SAUDE','CONSUMIVEL'].includes(p.cat) && <span style={{color:'lime'}}> Recupera {p.power}% de Energia</span>}
                         {['training','CHUTEIRA','LUVAS'].includes(p.cat) && <span style={{color:'cyan'}}> Bônus de +{p.power}% XP no treino</span>}
-                        {['vehicle','real_estate','luxury','VEICULO','IMOVEL'].includes(p.cat) && <span style={{color:'gold'}}> Gera +{p.power * 100} de Fama</span>}
+                        {['vehicle','real_estate','luxury','VEICULO','IMOVEL','TECNOLOGIA'].includes(p.cat) && <span style={{color:'gold'}}> Gera +{p.power * 100} de Fama</span>}
                     </div>
                 </div>
 
-                {/* ÁREA DE FÁBRICA (QUANTIDADE) - AQUI ESTAVA FALTANDO */}
+                {/* --- ÁREA DE FÁBRICA / QUANTIDADE (NOVO SLIDER QUE FALTAVA) --- */}
                 <div style={{background:'#222', padding:15, borderRadius:8, margin:'15px 0', borderLeft:'4px solid gold'}}>
-                    <h4 style={{marginTop:0, marginBottom:10, color:'gold'}}>🏭 Produção</h4>
+                    <h4 style={{marginTop:0, marginBottom:10, color:'gold'}}>🏭 Ordem de Produção</h4>
                     
                     {isEditing && (
-                        <div style={{marginBottom:10, fontSize:12}}>
-                            Estoque Atual no Mercado: <b style={{color:'white'}}>{p.currentStock || 0} unid.</b>
+                        <div style={{marginBottom:10, fontSize:12, paddingBottom: 10, borderBottom: '1px solid #444'}}>
+                            Estoque Atual no Mercado: <b style={{color:'white'}}>{initial.stock || 0} unid.</b>
                         </div>
                     )}
 
                     <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
                         <label>{isEditing ? 'Fabricar Mais:' : 'Quantidade Inicial:'}</label>
-                        <b style={{color:'white', fontSize: 16}}>{quantity} un.</b>
+                        <b style={{color:'white', fontSize: 16}}>{quantityToMake} un.</b>
                     </div>
 
-                    {/* SLIDER DE QUANTIDADE */}
+                    {/* SLIDER DE QUANTIDADE (1 a 200) */}
                     <input 
                         type="range" 
                         min="1" 
                         max="200" 
                         step="1"
                         className="input-field" 
-                        value={quantity} 
+                        value={quantityToMake} 
                         onChange={e=>setP({...p, stock: parseInt(e.target.value)})} 
                     />
                     
-                    {/* INPUT MANUAL DE QUANTIDADE (Para ajuste fino) */}
+                    {/* INPUT MANUAL (AJUSTE FINO) */}
                     <input 
                         className="input-field" 
                         type="number" 
                         min="1" 
-                        value={quantity} 
+                        value={quantityToMake} 
                         onChange={e=>setP({...p, stock: parseInt(e.target.value)})} 
                         style={{marginTop: 5}}
                     />
                     
-                    {/* RESUMO DE CUSTOS */}
+                    {/* RESUMO FINANCEIRO */}
                     <div style={{background:'rgba(0,0,0,0.5)', padding:10, borderRadius:6, marginTop:10}}>
                         <div style={{display:'flex', justifyContent:'space-between', fontSize:11, color:'#aaa', marginBottom: 4}}>
                             <span>Custo Unitário:</span>
@@ -6829,34 +6866,25 @@ const ProductForm = ({ initial, onSave, onDelete, user }) => {
                         </div>
                         <div style={{display:'flex', justifyContent:'space-between', fontSize:11, color:'#aaa', marginBottom: 4}}>
                             <span>Quantidade:</span>
-                            <span>x {quantity}</span>
+                            <span>x {quantityToMake}</span>
                         </div>
                         <div style={{borderTop:'1px solid #555', paddingTop:5, display:'flex', justifyContent:'space-between', fontSize:13}}>
-                            <span style={{color:'white'}}>TOTAL A PAGAR:</span>
-                            <b style={{color: canAfford ? 'lime' : 'red'}}>{fmt(totalProductionCost)}</b>
+                            <span style={{color:'white'}}>CUSTO TOTAL:</span>
+                            <b style={{color: canAfford ? 'lime' : 'red'}}>{fmt(totalCost)}</b>
                         </div>
+                        {!canAfford && <div style={{color:'red', fontSize:10, textAlign:'right', marginTop:2}}>Saldo Insuficiente</div>}
                     </div>
-
-                    {!canAfford && <small style={{color:'red', display:'block', marginTop:5, fontWeight:'bold', textAlign:'center'}}>🚫 FUNDO INSUFICIENTE NA EMPRESA</small>}
                 </div>
 
                 <label>Preço de Venda (por unidade)</label>
-                <input className="input-field" type="number" value={p.price} onChange={e=>setP({...p, price:e.target.value})} placeholder="Por quanto vai vender?" />
+                <input className="input-field" type="number" value={p.price} onChange={e=>setP({...p, price:e.target.value})} placeholder="Por quanto vai vender ao público?" />
 
-                {/* BOTÕES DE AÇÃO */}
+                <label>Descrição</label>
+                <textarea className="input-field" value={p.desc} onChange={e=>setP({...p, desc:e.target.value})} placeholder="Detalhes do produto..." />
+
                 <div style={{display:'flex', gap:10, marginTop:15}}>
-                    <button className="btn btn-green" disabled={!canAfford} onClick={() => {
-                        if(!p.name || !p.price) return alert("Preencha o nome e o preço!");
-                        if(!canAfford) return alert("Sem dinheiro para fabricar!");
-                        
-                        // Envia para a função pai salvar
-                        onSave({
-                            ...p,
-                            stockAdd: quantity, // Manda a quantidade para somar
-                            productionCost: totalProductionCost // Manda o custo para descontar
-                        });
-                    }}>
-                        {isEditing ? `FABRICAR (+${quantity})` : `LANÇAR PRODUTO (-${fmt(totalProductionCost)})`}
+                    <button className="btn btn-green" disabled={!canAfford} onClick={handleProduction}>
+                        {isEditing ? `FABRICAR (+${quantityToMake})` : `LANÇAR PRODUTO (-${fmt(totalCost)})`}
                     </button>
                     
                     {isEditing && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>🗑️ EXCLUIR</button>}

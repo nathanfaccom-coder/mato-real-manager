@@ -149,7 +149,7 @@
         const { useState, useEffect } = React;
 
         const POS = ['GOL', 'ZAG', 'LD', 'LE', 'VOL', 'MC', 'MEI', 'PTD', 'PTE', 'ATA'];
-        const SERIES = ['A', 'B', 'C', 'D'];
+        const SERIES = ['A', 'B', 'C', 'D', 'VARZEA'];
         const COSTS = [0, 5000000, 20000000, 50000000, 100000000];
         const fmt = (v) => "₣ " + parseFloat(v||0).toLocaleString('pt-BR');
 const getPosColor = (p) => {
@@ -200,12 +200,12 @@ const getPriceStatus = (askedPrice, recommendedPrice) => {
 
         // --- TABELA DE TETO SALARIAL (REAJUSTADA) ---
 const SALARY_CAPS = [
-    { minOv: 0,  maxOv: 49, minSal: 500,    maxSal: 2000,   label: 'Amador' },
-    { minOv: 50, maxOv: 59, minSal: 1500,   maxSal: 6000,   label: 'Iniciante' },
-    { minOv: 60, maxOv: 69, minSal: 5000,   maxSal: 18000,  label: 'Profissional' },
-    { minOv: 70, maxOv: 79, minSal: 15000,  maxSal: 45000,  label: 'Estrela' },
-    { minOv: 80, maxOv: 89, minSal: 40000,  maxSal: 110000, label: 'Craque' },
-    { minOv: 90, maxOv: 99, minSal: 100000, maxSal: 300000, label: 'Lenda' }
+    { minOv: 0,  maxOv: 45, minSal: 0,    maxSal: 1500,   label: 'Várzea/Amador' }, // Permitir salário 0 ou baixo
+    { minOv: 46, maxOv: 55, minSal: 1500,   maxSal: 6000,   label: 'Iniciante' },
+    { minOv: 56, maxOv: 65, minSal: 5000,   maxSal: 18000,  label: 'Profissional' },
+    { minOv: 66, maxOv: 75, minSal: 15000,  maxSal: 45000,  label: 'Estrela' },
+    { minOv: 76, maxOv: 85, minSal: 40000,  maxSal: 110000, label: 'Craque' },
+    { minOv: 86, maxOv: 99, minSal: 100000, maxSal: 300000, label: 'Lenda' }
 ];
 
 // Função que descobre os limites baseados no Overall
@@ -619,8 +619,11 @@ const formatOfferDetails = (type, v, con, meta, swapIds, players) => {
         
 // --- ATUALIZADO: Tabela com Regra G2/Z2 ---
 const LeagueTable = ({ teams, serie }) => {
+    // Filtro para Várzea ser independente
     const list = teams.filter(t => {
-        const timeSerie = t.serie || 'A'; 
+        const timeSerie = t.serie || 'A';
+        // Se for Várzea, pega todos. Se for outra série, pega só os dessa série.
+        if (serie === 'VARZEA') return timeSerie === 'VARZEA' && t.status !== 'PENDING';
         return timeSerie === serie && t.status !== 'PENDING';
     }).sort((a, b) => {
         const sA = a.stats || {}, sB = b.stats || {};
@@ -633,9 +636,11 @@ const LeagueTable = ({ teams, serie }) => {
 
     return (
         <div className="card" style={{padding:0, overflow:'hidden'}}>
-            <div style={{padding:10, background:'var(--primary)', color:'#000', fontWeight:'bold', display:'flex', justifyContent:'space-between'}}>
-                <span>SÉRIE {serie}</span>
-                <small>G2 Sobe | Z2 Cai</small> {/* TEXTO ATUALIZADO */}
+            <div style={{padding:10, background: serie === 'VARZEA' ? 'gold' : 'var(--primary)', color:'#000', fontWeight:'bold', display:'flex', justifyContent:'space-between'}}>
+                <span>{serie === 'VARZEA' ? 'TERRÃO (VÁRZEA)' : `SÉRIE ${serie}`}</span>
+                <small>
+                    {serie === 'VARZEA' ? 'G3 Sobe' : (serie === 'D' ? 'G2 Sobe | Z3 Cai' : 'G2 Sobe | Z2 Cai')}
+                </small>
             </div>
             <table style={{width:'100%', borderCollapse:'collapse', fontSize:11}}>
                 <thead style={{background:'#222', color:'#888'}}>
@@ -651,9 +656,27 @@ const LeagueTable = ({ teams, serie }) => {
                     {list.map((t, i) => {
                         const s = t.stats || {};
                         let rowColor = 'transparent';
-                        // REGRA ATUALIZADA: Top 2 e Bottom 2
-                        if (i < 2 && serie !== 'A') rowColor = 'rgba(0, 230, 118, 0.1)'; 
-                        if (i >= list.length - 2 && list.length >= 8 && serie !== 'E') rowColor = 'rgba(255, 23, 68, 0.1)'; 
+                        
+                        // REGRA ATUALIZADA:
+                        // Série A: Z2 Cai
+                        // Série B e C: G2 Sobe, Z2 Cai
+                        // Série D: G2 Sobe, Z3 Cai (Para Várzea)
+                        // Várzea: G3 Sobe (Para D)
+
+                        if (serie === 'A') {
+                            if (i >= list.length - 2 && list.length >= 8) rowColor = 'rgba(255, 23, 68, 0.1)'; // Z2
+                        }
+                        else if (serie === 'B' || serie === 'C') {
+                            if (i < 2) rowColor = 'rgba(0, 230, 118, 0.1)'; // G2
+                            if (i >= list.length - 2 && list.length >= 8) rowColor = 'rgba(255, 23, 68, 0.1)'; // Z2
+                        }
+                        else if (serie === 'D') {
+                            if (i < 2) rowColor = 'rgba(0, 230, 118, 0.1)'; // G2
+                            if (i >= list.length - 3 && list.length >= 8) rowColor = 'rgba(255, 23, 68, 0.1)'; // Z3 Cai pra Várzea
+                        }
+                        else if (serie === 'VARZEA') {
+                            if (i < 3) rowColor = 'rgba(255, 215, 0, 0.1)'; // G3 Sobe pra D
+                        }
                         
                         return (
                             <tr key={t.id} style={{borderBottom:'1px solid #333', background: rowColor}}>
@@ -699,7 +722,7 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
 
             <div style={{display:'flex', gap:10, marginBottom:10}}>
                 <select className="input-field" value={serie} onChange={e=>setSerie(e.target.value)}>
-                    {['A','B','C','D'].map(s=><option key={s} value={s}>Série {s}</option>)}
+                    {['A','B','C','D','VARZEA'].map(s=><option key={s} value={s}>{s === 'VARZEA' ? 'Várzea' : `Série ${s}`}</option>)}
                 </select>
                 <select className="input-field" value={round} onChange={e=>setRound(e.target.value)}>
                     {[...Array(14).keys()].map(i=><option key={i+1} value={i+1}>Rodada {i+1}</option>)}
@@ -744,9 +767,9 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
 };
         //FIM
         const MatchManagerForm = ({ initialData, teams, onSave, onDelete }) => {
-    // Estado inicial (se for edição usa os dados, se for novo usa padrão)
+    // Estado inicial
     const [f, setF] = useState(initialData || {
-        homeId: '', awayId: '', serie: 'A', round: 1, 
+        homeId: '', awayId: '', serie: 'VARZEA', round: 1, 
         scoreHome: 0, scoreAway: 0, status: 'PENDING'
     });
 
@@ -754,7 +777,6 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
         if (!f.homeId || !f.awayId) return alert("Selecione os dois times!");
         if (f.homeId === f.awayId) return alert("O time não pode jogar contra si mesmo!");
         
-        // Pega os nomes atualizados dos times escolhidos
         const homeTeam = teams.find(t => t.id === f.homeId);
         const awayTeam = teams.find(t => t.id === f.awayId);
 
@@ -775,13 +797,16 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
     return (
         <div className="modal-bg">
             <div className="modal-content">
-                <h3>{f.id ? 'Editar Partida' : 'Criar Partida'}</h3>
+                <h3>{f.id ? 'Editar Partida' : 'Criar Partida Manual'}</h3>
                 
                 <div style={{display:'flex', gap:10}}>
                     <div style={{flex:1}}>
-                        <label>Série</label>
+                        <label>Série / Liga</label>
+                        {/* AQUI ESTAVA O PROBLEMA: AGORA USA A LISTA GLOBAL */}
                         <select className="input-field" value={f.serie} onChange={e=>setF({...f, serie:e.target.value})}>
-                            {['A','B','C','D'].map(s=><option key={s} value={s}>{s}</option>)}
+                            {SERIES.map(s => (
+                                <option key={s} value={s}>{s === 'VARZEA' ? 'Várzea (Terrão)' : `Série ${s}`}</option>
+                            ))}
                         </select>
                     </div>
                     <div style={{flex:1}}>
@@ -790,16 +815,17 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
                     </div>
                 </div>
 
-                <label>Time Mandante (Casa)</label>
+                <label>Mandante (Casa)</label>
                 <select className="input-field" value={f.homeId} onChange={e=>setF({...f, homeId:e.target.value})}>
                     <option value="">-- Selecione --</option>
-                    {teams.filter(t => t.serie === f.serie).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {/* Filtra times da série selecionada */}
+                    {teams.filter(t => t.serie === f.serie && t.status !== 'PENDING').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
 
-                <label>Time Visitante (Fora)</label>
+                <label>Visitante (Fora)</label>
                 <select className="input-field" value={f.awayId} onChange={e=>setF({...f, awayId:e.target.value})}>
                     <option value="">-- Selecione --</option>
-                    {teams.filter(t => t.serie === f.serie).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {teams.filter(t => t.serie === f.serie && t.status !== 'PENDING').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
 
                 <hr style={{borderColor:'#333', margin:'15px 0'}}/>
@@ -820,7 +846,7 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
 
                 <div style={{marginTop:20, display:'flex', gap:10}}>
                     <button className="btn btn-green" onClick={handleSubmit}>SALVAR</button>
-                    {f.id && <button className="btn btn-red" onClick={()=>onDelete(f.id)}>EXCLUIR JOGO</button>}
+                    {f.id && <button className="btn btn-red" onClick={()=>onDelete(f.id)}>EXCLUIR</button>}
                     <button className="btn" onClick={()=>onSave(null)}>CANCELAR</button>
                 </div>
             </div>
@@ -2272,7 +2298,7 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
 
     // --- NOVO: GERAÇÃO DE CALENDÁRIO (Séries A, B, C, D) ---
     const generateFixtures = async () => {
-        if (!confirm("Gerar tabela de jogos para as Séries A, B, C e D? (Certifique-se de que há 8 times em cada)")) return;
+        if (!confirm("Gerar tabela de jogos para TODAS as séries (A, B, C, D e Várzea)?")) return;
         
         setLoading(true);
         const b = db.batch();
@@ -2281,29 +2307,35 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
         const oldMatches = await db.collection('matches').get();
         oldMatches.forEach(doc => b.delete(doc.ref));
 
-        const seriesToGen = ['A', 'B', 'C', 'D'];
+        // Incluída a VARZEA na lista de geração
+        const seriesToGen = ['A', 'B', 'C', 'D', 'VARZEA'];
         
         seriesToGen.forEach(serie => {
             const leagueTeams = teams.filter(t => t.serie === serie && t.status === 'ACTIVE');
             
+            // Várzea precisa de pelo menos 2 times para ter jogo
             if (leagueTeams.length < 2) return; 
 
             const numRounds = (leagueTeams.length - 1) * 2; 
             const halfSize = leagueTeams.length / 2;
             let ids = leagueTeams.map(t => t.id);
 
+            // Se for ímpar, adiciona um "BYE" (folga) para a matemática funcionar
             if (ids.length % 2 !== 0) ids.push(null);
 
             for (let round = 0; round < numRounds; round++) {
                 const roundNum = round + 1;
                 const isReturnLeg = round >= (numRounds / 2);
 
-                for (let i = 0; i < halfSize; i++) {
+                for (let i = 0; i < ids.length / 2; i++) {
                     const homeIdx = i;
                     const awayIdx = ids.length - 1 - i;
 
                     let home = ids[homeIdx];
                     let away = ids[awayIdx];
+
+                    // Pula se for folga
+                    if (!home || !away) continue;
 
                     if (isReturnLeg) { [home, away] = [away, home]; } 
 
@@ -2334,13 +2366,13 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
 
         await b.commit();
         setLoading(false);
-        postNews("📅 **TABELA DIVULGADA!**\nA Federação liberou o calendário de jogos da temporada.", 'infra');
+        postNews("📅 **TABELA DIVULGADA!**\nA Federação liberou o calendário de jogos da temporada (incluindo Várzea).", 'infra');
         alert("Jogos gerados com sucesso!");
     };
 
-    // --- NOVO: VIRADA DE TEMPORADA 2.0 (COM PROMOÇÃO/REBAIXAMENTO) ---
+    // --- NOVO: VIRADA DE TEMPORADA 2.0 (COM PROMOÇÃO/REBAIXAMENTO VARZEA) ---
     const handleSeasonTurnAdvanced = async () => {
-        if (!confirm("⚠️ ATENÇÃO: Isso encerrará a temporada atual!\n\n1. Atualiza idades\n2. Aplica Promoção/Rebaixamento (se Temp > 1)\n3. Zera estatísticas")) return;
+        if (!confirm("⚠️ ATENÇÃO: Isso encerrará a temporada atual!\n\n1. Atualiza idades\n2. Aplica Promoção/Rebaixamento (A-D e D-Várzea)\n3. Zera estatísticas")) return;
 
         setLoading(true);
         const b = db.batch();
@@ -2364,24 +2396,32 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
             const tB = sortTable(teams.filter(t => t.serie === 'B'));
             const tC = sortTable(teams.filter(t => t.serie === 'C'));
             const tD = sortTable(teams.filter(t => t.serie === 'D'));
+            const tVarzea = sortTable(teams.filter(t => t.serie === 'VARZEA'));
 
             // Rebaixamento A -> B (Últimos 2)
             tA.slice(-2).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'B' }));
             // Promoção B -> A (Primeiros 2)
             tB.slice(0, 2).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'A' }));
 
-            // Rebaixamento B -> C
+            // Rebaixamento B -> C (Últimos 2)
             tB.slice(-2).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'C' }));
-            // Promoção C -> B
+            // Promoção C -> B (Primeiros 2)
             tC.slice(0, 2).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'B' }));
 
-            // Rebaixamento C -> D
+            // Rebaixamento C -> D (Últimos 2)
             tC.slice(-2).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'D' }));
-            // Promoção D -> C
+            // Promoção D -> C (Primeiros 2)
             tD.slice(0, 2).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'C' }));
 
-            // Rebaixamento D -> E (Limbo)
-            tD.slice(-2).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'E' }));
+            // --- REGRAS DA VÁRZEA (D <-> VARZEA) ---
+            
+            // Rebaixamento D -> Várzea (Últimos 3)
+            // Se houver menos de 3 times, rebaixa todos os disponíveis nessa faixa
+            tD.slice(-3).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'VARZEA' }));
+            
+            // Promoção Várzea -> D (Primeiros 3)
+            // Se houver menos de 3 times na Várzea, sobe a quantidade existente
+            tVarzea.slice(0, 3).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'D' }));
         }
 
         // 2. Zera Estatísticas de Times
@@ -4515,7 +4555,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.80.8</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.80.9</div>
                             </div>
                         </div>
                         
@@ -5041,7 +5081,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.80.8 FIM DA INFLAÇÃO </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.80.9 VARZEA </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -5118,8 +5158,60 @@ const renewContract = async (p) => {
                 <div style={{marginTop:20}}><button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button><button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button></div>
             </div>}
 
-            {tab==='CREATE' && <div><input type="file" className="file-input" onChange={handleUpload} /><input className="input-field" placeholder="Nome" value={f.n} onChange={e=>setF({...f, n:e.target.value})} /><input className="input-field" type="number" placeholder="Saldo" value={f.b} onChange={e=>setF({...f, b:e.target.value})} /><select className="input-field" value={f.s} onChange={e=>setF({...f, s:e.target.value})}>{['A','B','C','D'].map(s=><option key={s} value={s}>Série {s}</option>)}</select><input className="input-field" type="number" placeholder="Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} /><button className="btn btn-green" onClick={()=>onCreateTeam(f.n, f.b, f.s, f.p, f.l)}>CRIAR</button></div>}
-            
+{tab==='CREATE' && <div>
+                <h3 style={{color:'var(--primary)'}}>Fundar Novo Clube</h3>
+                <input type="file" className="file-input" onChange={handleUpload} />
+                <input className="input-field" placeholder="Nome do Clube" value={f.n} onChange={e=>setF({...f, n:e.target.value})} />
+                
+                {/* Lógica de Saldo Travado para Várzea */}
+                <input 
+                    className="input-field" 
+                    type="number" 
+                    placeholder="Saldo Inicial" 
+                    value={f.s === 'VARZEA' ? 200000 : f.b} 
+                    onChange={e=>setF({...f, b:e.target.value})} 
+                    disabled={f.s === 'VARZEA'} // Trava se for Várzea
+                    style={{opacity: f.s === 'VARZEA' ? 0.6 : 1, borderColor: f.s === 'VARZEA' ? 'gold' : '#333'}}
+                />
+                
+                <select className="input-field" value={f.s} onChange={e=>{
+                    // Se mudar para Várzea, força 200k. Se sair, volta pro padrão.
+                    const newSerie = e.target.value;
+                    const newBal = newSerie === 'VARZEA' ? '200000' : '10000000';
+                    setF({...f, s:newSerie, b:newBal});
+                }}>
+                    {SERIES.map(s=><option key={s} value={s}>{s === 'VARZEA' ? 'Série E (Várzea)' : `Série ${s}`}</option>)}
+                </select>
+
+                <input className="input-field" type="number" placeholder="Crie uma Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} />
+                
+                <button className="btn btn-green" onClick={()=>{
+                    // Lógica de Aprovação Automática
+                    const statusInicial = f.s === 'VARZEA' ? 'ACTIVE' : 'PENDING';
+                    const finalBal = f.s === 'VARZEA' ? 200000 : parseFloat(f.b);
+                    
+                    if(teams.find(t=>t.name.toLowerCase()===f.n.toLowerCase())) return alert("Nome em uso!");
+                    
+                    db.collection('teams').add({ 
+                        name: f.n, 
+                        balance: finalBal, 
+                        serie: f.s, 
+                        password: f.p, 
+                        stadiumLevel: 1, 
+                        logo: f.l||null, 
+                        status: statusInicial 
+                    }).then(() => {
+                        if(statusInicial === 'ACTIVE') {
+                            alert("✅ Clube de Várzea fundado e APROVADO automaticamente! Bons jogos.");
+                            window.location.reload();
+                        } else {
+                            alert("Solicitação enviada à Federação! Aguarde aprovação.");
+                        }
+                    });
+                }}>FUNDAR CLUBE</button>
+                
+                {f.s === 'VARZEA' && <p style={{fontSize:10, color:'gold'}}>* Times da Várzea iniciam com teto de ₣ 200.000 e aprovação imediata.</p>}
+            </div>}            
             {tab==='PRESS' && <div><div style={{display:'flex', gap:10, marginBottom:10}}><button className="btn btn-ghost" onClick={()=>setSubTab('LOGIN_P')}>LOGIN</button><button className="btn btn-ghost" onClick={()=>setSubTab('NEW_PAPER')}>CRIAR JORNAL</button><button className="btn btn-ghost" onClick={()=>setSubTab('NEW_JOURNO')}>SOU JORNALISTA</button></div>
                 {subTab==='LOGIN_P' && !selPaper && <div><h4>Selecione o Jornal</h4>{(papers||[]).filter(p=>p.status==='ACTIVE').map(p=><div key={p.id} className="card" onClick={()=>setSelPaper(p)}>📰 {p.name}</div>)}</div>}
                 {subTab==='LOGIN_P' && selPaper && <div><button className="btn" style={{marginBottom:10}} onClick={()=>setSelPaper(null)}>⬅ VOLTAR</button><h4>{selPaper.name} - Jornalistas</h4><div className="card" onClick={()=>setSel({...selPaper, type:'PAPER'})} style={{border:'1px solid var(--primary)'}}>👑 {selPaper.ownerName} (Dono)</div>{(journalists||[]).filter(j=>j.newspaperId===selPaper.id && j.status==='ACTIVE').map(j=><div key={j.id} className="card" onClick={()=>setSel({...j, type:'JOURNALIST'})}>✒️ {j.name}</div>)}</div>}
@@ -6580,12 +6672,17 @@ const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, 
             </div>
 
             <h4>Navegar por Séries</h4>
+            {/* --- AQUI ESTÁ A ATUALIZAÇÃO: INCLUSÃO DA VÁRZEA --- */}
             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
                 {['A','B','C','D'].map(s=>(
                     <div key={s} className="card" style={{textAlign:'center', cursor:'pointer', borderLeft:`4px solid var(--secondary)`}} onClick={()=>{setSerie(s); setView('LIST');}}>
                         <b>SÉRIE {s}</b>
                     </div>
                 ))}
+                {/* BOTÃO ESPECÍFICO DA VÁRZEA */}
+                <div className="card" style={{textAlign:'center', cursor:'pointer', borderLeft:`4px solid gold`, gridColumn: 'span 2', background:'rgba(255, 215, 0, 0.05)'}} onClick={()=>{setSerie('VARZEA'); setView('LIST');}}>
+                    <b>TERRÃO (VÁRZEA)</b>
+                </div>
             </div>
         </div>
     );
@@ -6595,7 +6692,7 @@ const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, 
             <button className="btn btn-ghost" style={{marginBottom:15, width:'auto'}} onClick={()=>setView('MENU')}>
                 <i className="fas fa-chevron-left"></i> VOLTAR
             </button>
-            <h3>Clubes da Série {serie}</h3>
+            <h3>{serie === 'VARZEA' ? 'Clubes da Várzea' : `Clubes da Série ${serie}`}</h3>
             {teams.filter(t=>t.serie===serie && t.status!=='PENDING').map(t=>(
                 <div key={t.id} className="card" onClick={()=>{setSelT(t); setView('TEAM');}} style={{display:'flex', alignItems:'center', gap:15, cursor:'pointer'}}>
                     {t.logo ? <img src={t.logo} style={{width:40, height:40, borderRadius:'50%', objectFit:'cover', border:'1px solid #444'}}/> : <div style={{width:40, height:40, borderRadius:'50%', background:'#333', display:'grid', placeItems:'center'}}><i className="fas fa-shield-alt"></i></div>}
@@ -6603,6 +6700,7 @@ const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, 
                     <i className="fas fa-chevron-right" style={{marginLeft:'auto', color:'#555'}}></i>
                 </div>
             ))}
+            {teams.filter(t=>t.serie===serie && t.status!=='PENDING').length === 0 && <p style={{color:'#666', textAlign:'center'}}>Nenhum time nesta divisão.</p>}
         </div>
     );
 
@@ -6652,15 +6750,15 @@ const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, 
             {list.length === 0 && <p style={{textAlign:'center', color:'#666', marginTop:30, fontStyle:'italic'}}>Nenhum jogador disponível nesta categoria.</p>}
             
             {list.map(p => {
-                // CALCULA O STATUS DO PREÇO NA HORA
                 const recPrice = getRecommendedPrice(p.overall, p.position);
+                // Lógica de Preço (Se for Várzea, considera preço justo ou baixo)
+                // Se o time for da Várzea, o jogador tende a ser barato, mas usamos a lógica padrão por enquanto.
                 const status = getPriceStatus(p.value, recPrice);
 
                 return (
                     <div key={p.id} className="card" style={{borderLeft: `4px solid ${getPosColor(p.position)}`, opacity: p.preContract ? 0.7 : 1}}>
                         <div style={{display:'flex', justifyContent:'space-between', alignItems:'start'}}>
                             <div style={{display:'flex', gap: 10, alignItems:'center'}}>
-                                {/* FOTO DO JOGADOR NO MERCADO */}
                                 {p.face ? (
                                     <img src={p.face} style={{width: 45, height: 45, borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border:'2px solid #444'}} />
                                 ) : (
@@ -6669,8 +6767,8 @@ const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, 
                                 
                                 <div>
                                     <b style={{fontSize:16}}>
-    {p.name} <span style={{fontSize:14}}>{p.mood}</span>
-</b>
+                                        {p.name} <span style={{fontSize:14}}>{p.mood}</span>
+                                    </b>
                                     <div style={{fontSize:10, color:'#888', marginTop:2}}>
                                         {p.teamId === 'FREE' ? <b style={{color:'var(--warning)'}}><i className="fas fa-unlock"></i> PASSE LIVRE</b> : <span><i className="fas fa-tshirt"></i> {teams.find(t=>t.id===p.teamId)?.name}</span>}
                                     </div>
@@ -6679,7 +6777,6 @@ const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, 
                             <span className="player-ov">{p.overall}</span>
                         </div>
 
-                        {/* --- NOVA ETIQUETA DE ANÁLISE DE MERCADO --- */}
                         {p.teamId !== 'FREE' && (
                             <div style={{marginTop: 8, textAlign:'center', background: 'rgba(0,0,0,0.4)', padding: '4px', borderRadius: '4px'}}>
                                 <span style={{color: status.color, fontSize: '10px', fontWeight: 'bold', letterSpacing: '0.5px'}}>
@@ -6690,7 +6787,7 @@ const Market = ({ me, teams, players, coaches, open, isVis, onNeg, onPayClause, 
 
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, fontSize:11, color:'#aaa', marginTop:10, background:'rgba(0,0,0,0.2)', padding:8, borderRadius:8}}>
                             <div>Valor: <b style={{color:'#fff'}}>{fmt(p.value)}</b></div>
-                            <div>Contrato: <b style={{color: p.contract === 0 ? 'var(--danger)' : (p.contract === 1 ? 'var(--warning)' : '#fff')}}>{p.contract} Temporada{p.contract !== 1 ? 's' : ''}</b></div>
+                            <div>Contrato: <b style={{color: p.contract === 0 ? 'var(--danger)' : (p.contract === 1 ? 'var(--warning)' : '#fff')}}>{p.contract} Temp.</b></div>
                         </div>
 
                         <div style={{marginTop:8, borderTop:'1px dashed #444', paddingTop:5}}>

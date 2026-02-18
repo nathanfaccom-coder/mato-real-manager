@@ -267,19 +267,29 @@ const SURGERIES = [
 ];
         
 
-        // Função que calcula o Custo de Produção (Permite 0)
-        const getProdCost = (cat, power) => {
-            const p = parseInt(power); 
-            // Se for 0 ou inválido, custo é zero
-            if (!p || p <= 0) return 0; 
+        // --- NOVO CUSTO DE PRODUÇÃO (ANTI-INFLAÇÃO) ---
+// Reduzi drasticamente os valores para que as empresas tenham margem de lucro
+const getProdCost = (cat, power) => {
+    const p = parseInt(power) || 0;
+    
+    // Energéticos (Consumíveis) - Custo por Unidade
+    if (cat === 'energy') {
+        if (p <= 20) return 25;   // Antes devia ser 100+
+        if (p <= 50) return 60;
+        if (p <= 80) return 120;
+        return 200; // Energético Top de Linha
+    }
+    
+    // Treino (Equipamentos)
+    if (cat === 'training') return p * 150; 
+    
+    // Imóveis/Luxo (Fama)
+    if (cat === 'real_estate' || cat === 'vehicle') return p * 2000;
+    
+    return 50; // Padrão
+};
 
-            if (['SAUDE', 'CONSUMIVEL'].includes(cat)) return p * 7000;
-            if (['CHUTEIRA', 'LUVAS'].includes(cat)) return p * 12000;
-            // Luxo, Veículo, Imóvel, Tech
-            return p * 15000;
-        };
-
-// FIM DO BLOCO INICIAL
+// ACIMA DAQUI É FORA DA FUNÇÃO APP
 // --- CONFIGURAÇÕES DE TÉCNICOS ---
 
 // Posições de Afinidade (O técnico escolhe uma para começar)
@@ -2489,14 +2499,88 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
         try {
             const b = db.batch();
             const itemRef = db.collection('sales').doc(item.id); 
+            const playerRef = db.collection('players').doc(user.data.id);
 
-            // AÇÃO 1: CONSUMIR (Energia)
+            // AÇÃO 1: CONSUMIR (Energia + Sistema de Toxicidade)
             if (action === 'CONSUME') {
-                const energyGain = parseInt(item.power) || 0; // AGORA ACEITA 0 (Para itens RP)
+                // --- NOVO: SISTEMA DE TOXICIDADE ---
+                const today = new Date().toDateString();
+                const lastDate = user.data.lastToxicityDate || '';
+                // Se mudou o dia, reseta a toxicidade para 0, senão mantém a atual
+                const currentTox = lastDate === today ? (user.data.toxicity || 0) : 0;
+
+                // 1. Bloqueio: Se já estiver intoxicado, não pode beber nada
+                if (user.data.injury?.type === 'INTOXICACAO') {
+                    alert("🤢 VOCÊ ESTÁ INTOXICADO!\nSeu estômago não aceita nada. Espere o dia virar para melhorar.");
+                    setLoading(false);
+                    return;
+                }
+
+                // 2. Cálculo do Risco
+                let outcome = 'SUCCESS'; 
+                
+                // 3º Uso no dia: 40% de chance de passar mal
+                if (currentTox === 2) { 
+                    if (Math.random() < 0.40) outcome = 'SICK';
+                }
+                // 4º Uso ou mais: 95% de chance de Vomitar
+                else if (currentTox >= 3) {
+                    if (Math.random() < 0.95) outcome = 'VOMIT';
+                }
+
+                // --- APLICAÇÃO DOS EFEITOS ---
+
+                // CENÁRIO A: VÔMITO (Perde Energia e Humor)
+                if (outcome === 'VOMIT') {
+                    b.update(playerRef, {
+                        energy: 0, // Zera energia
+                        mood: '😡', // Fica irritado
+                        toxicity: currentTox + 1,
+                        lastToxicityDate: today
+                    });
+                    b.delete(itemRef);
+                    await b.commit();
+
+                    // Atualização Visual Local
+                    setSales(prev => prev.filter(s => s.id !== item.id));
+                    setUser(prev => ({...prev, data: {...prev.data, energy: 0, mood: '😡', toxicity: currentTox + 1}}));
+                    
+                    alert("🤮 VÔMITO!\n\nVocê consumiu demais! Seu corpo rejeitou tudo.\n\nEfeito: Energia ZERADA e Humor piorado.");
+                    setLoading(false);
+                    return;
+                }
+
+                // CENÁRIO B: INTOXICAÇÃO (Lesão Leve Incurável)
+                if (outcome === 'SICK') {
+                    const sickInjury = {
+                        type: 'INTOXICACAO',
+                        label: 'Intoxicação Alimentar',
+                        games: 1, 
+                        isIncurable: true // Hospital não cura
+                    };
+
+                    b.update(playerRef, {
+                        injury: sickInjury,
+                        recoveryLeft: 1,
+                        toxicity: currentTox + 1,
+                        lastToxicityDate: today
+                    });
+                    b.delete(itemRef);
+                    await b.commit();
+
+                    // Atualização Visual Local
+                    setSales(prev => prev.filter(s => s.id !== item.id));
+                    setUser(prev => ({...prev, data: {...prev.data, injury: sickInjury, toxicity: currentTox + 1}}));
+
+                    alert("🤢 INTOXICAÇÃO ALIMENTAR!\n\nSeu estômago não aguentou.\n\nEfeito: Você foi internado e terá que esperar melhorar naturalmente (1 dia).");
+                    setLoading(false);
+                    return;
+                }
+
+                // CENÁRIO C: SUCESSO (Uso Normal)
+                const energyGain = parseInt(item.power) || 0; 
                 const currentEnergy = user.data.energy || 0;
 
-                // Verificação: Energia Cheia? (Só bloqueia se for ganhar algo e já estiver cheio)
-                // Se for 0, deixa usar mesmo cheio (é roleplay, bebeu porque quis)
                 if (energyGain > 0 && currentEnergy >= 100) {
                     alert("Sua energia já está cheia!");
                     setLoading(false);
@@ -2505,28 +2589,36 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
 
                 const newEnergy = Math.min(100, currentEnergy + energyGain);
                 
-                // Atualiza Banco de Dados
-                b.update(db.collection('players').doc(user.data.id), { energy: newEnergy });
-                b.delete(itemRef); // Deleta item no banco
+                // Atualiza Banco de Dados (Energia + Toxicidade)
+                b.update(playerRef, { 
+                    energy: newEnergy,
+                    toxicity: currentTox + 1,
+                    lastToxicityDate: today
+                });
+                b.delete(itemRef); 
                 
                 await b.commit();
                 
-                // --- ATUALIZAÇÃO VISUAL IMEDIATA (CORREÇÃO DO BUG) ---
-                // Remove o item da lista 'sales' localmente na hora, sem esperar o Firebase
+                // Atualização Visual Imediata
                 setSales(prev => prev.filter(s => s.id !== item.id));
+                setUser(prev => ({...prev, data: {...prev.data, energy: newEnergy, toxicity: currentTox + 1}}));
                 
-                // Atualiza a barra de energia visualmente
-                setUser(prev => ({...prev, data: {...prev.data, energy: newEnergy}}));
-                
-                alert(`⚡ Energia recuperada: +${energyGain}% (Total: ${newEnergy}%)`);
+                // Feedback com Aviso de Risco
+                if (currentTox === 1) {
+                    alert(`⚡ Energia recuperada: +${energyGain}%\n⚠️ CUIDADO: Foi seu 2º energético hoje. O próximo tem risco de intoxicação.`);
+                } else if (currentTox >= 2) {
+                    alert(`⚡ Energia recuperada...\n⛔ PERIGO: Seu estômago está no limite! Pare de consumir agora!`);
+                } else {
+                    alert(`⚡ Energia recuperada: +${energyGain}% (Total: ${newEnergy}%)`);
+                }
             }
 
-            // AÇÃO 2: EQUIPAR (XP Boost)
+            // AÇÃO 2: EQUIPAR (XP Boost) - MANTIDO IGUAL
             if (action === 'EQUIP') {
                 // 1. Grava no perfil do jogador (Movendo o item)
-                b.update(db.collection('players').doc(user.data.id), { 
+                b.update(playerRef, { 
                     equippedItem: {
-                        id: item.id, // Mantemos o ID original apenas como referência histórica
+                        id: item.id, 
                         name: item.productName,
                         cat: item.cat,
                         power: parseInt(item.power) || 0,
@@ -2534,12 +2626,12 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
                     }
                 });
 
-                // 2. DELETA DA MOCHILA (Agora ele sai da lista de baixo e fica só no slot verde)
+                // 2. DELETA DA MOCHILA
                 b.delete(itemRef);
 
                 await b.commit();
 
-                // 3. Atualiza visualmente: Remove da lista de vendas
+                // 3. Atualiza visualmente
                 setSales(prev => prev.filter(s => s.id !== item.id));
                 
                 alert(`🛡️ Item equipado: ${item.productName}\nEle será consumido automaticamente no próximo treino.`);
@@ -2547,12 +2639,13 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
 
         } catch (error) {
             console.error("Erro ao usar item:", error);
-            // Se der erro (ex: item já usado), apenas recarrega para limpar
+            alert("Erro ao processar item. Tente novamente.");
         } finally {
             // 2. DESTRAVA A TELA
             setLoading(false);
         }
     };
+    //FIM
           
             
 const resetDatabase = async () => {
@@ -4325,7 +4418,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.79.1</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.79.3</div>
                             </div>
                         </div>
                         
@@ -4851,7 +4944,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.79.1 MATOGRAM </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.79.3 MATOGRAM </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -5650,10 +5743,12 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                 {storeProducts.map(p => {
                     // --- LÓGICA CORRIGIDA PARA EXIBIÇÃO ---
                     const powerVal = parseInt(p.power) || 0;
+                    const stock = parseInt(p.stock) || 0;
+                    const isSoldOut = stock <= 0;
                     
-                    const isConsumable = ['SAUDE', 'CONSUMIVEL'].includes(p.cat);
-                    const isEquippable = ['CHUTEIRA', 'LUVAS'].includes(p.cat);
-                    const isLuxury = ['VEICULO', 'IMOVEL', 'TECNOLOGIA', 'LUXO'].includes(p.cat);
+                    const isConsumable = ['SAUDE', 'CONSUMIVEL', 'energy'].includes(p.cat);
+                    const isEquippable = ['CHUTEIRA', 'LUVAS', 'training'].includes(p.cat);
+                    const isLuxury = ['VEICULO', 'IMOVEL', 'TECNOLOGIA', 'LUXO', 'vehicle', 'real_estate'].includes(p.cat);
 
                     return (
                         <div key={p.id} className="card" style={{padding:10, position:'relative'}}>
@@ -5662,10 +5757,18 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                             ) : (
                                 <div style={{width:'100%', height:100, background:'#222', borderRadius:4, display:'grid', placeItems:'center'}}>📦</div>
                             )}
-                            <span style={{fontSize:9, color:'#888', display:'block', marginTop:5}}>
-                                {PROD_CATS[p.cat] || 'Item'}
-                            </span>
-                            <div style={{fontWeight:'bold', fontSize:13, lineHeight:'1.2em'}}>{String(p.name)}</div>
+                            
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:5}}>
+                                <span style={{fontSize:9, color:'#888'}}>
+                                    {PROD_CATS[p.cat] || p.cat || 'Item'}
+                                </span>
+                                {/* MOSTRADOR DE ESTOQUE */}
+                                <small style={{fontSize:9, fontWeight:'bold', color: isSoldOut ? 'red' : '#aaa'}}>
+                                    {isSoldOut ? '🔴 ESGOTADO' : `📦 Restam: ${stock}`}
+                                </small>
+                            </div>
+
+                            <div style={{fontWeight:'bold', fontSize:13, lineHeight:'1.2em', marginTop:2}}>{String(p.name)}</div>
                             
                             <div style={{fontSize:10, color:'gold', margin:'2px 0'}}>
                                 {isConsumable && `⚡ Recuperação: ${powerVal}%`}
@@ -5676,7 +5779,16 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                             <div style={{color:'var(--primary)', fontWeight:'900', fontSize:14}}>{fmt(p.price)}</div>
                             
                             <div style={{display:'flex', gap:5, marginTop:5}}>
-                                {userTeam && <button className="btn btn-green" style={{fontSize:10, flex:1}} onClick={()=>onBuy(p, selComp)}>COMPRAR</button>}
+                                {userTeam && (
+                                    <button 
+                                        className={`btn ${isSoldOut ? 'btn-disabled' : 'btn-green'}`} 
+                                        style={{fontSize:10, flex:1, opacity: isSoldOut ? 0.5 : 1, cursor: isSoldOut ? 'not-allowed' : 'pointer'}} 
+                                        onClick={() => !isSoldOut && onBuy(p, selComp)}
+                                        disabled={isSoldOut}
+                                    >
+                                        {isSoldOut ? 'SEM ESTOQUE' : 'COMPRAR'}
+                                    </button>
+                                )}
                                 
                                 {isAdmin && (
                                     <button className="btn btn-red" style={{width:'auto', padding:'0 10px'}} onClick={()=>onDeleteProd(p.id)}>
@@ -6606,7 +6718,99 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
     );
 };
 // FIM DO COMPONENTE MARKET E OFFER FORM
+// --- COMPONENTE: FÁBRICA DE PRODUTOS (ADMIN) ---
+const ProductForm = ({ initial, onSave, onDelete, user }) => {
+    // Estado inicial do produto
+    const [p, setP] = useState(initial || { 
+        name:'', cat:'energy', power:10, price:'', 
+        stock: 10, // Padrão: 10 unidades
+        desc:'' 
+    });
+    
+    const isEditing = !!initial?.id;
+    
 
+    const unitCost = getProdCost(p.cat, p.power);
+    const totalProductionCost = unitCost * (parseInt(p.stock) || 0);
+    // Verifica se o Admin tem saldo na conta pessoal ou da empresa (aqui usando saldo pessoal do admin)
+    const canAfford = (user.balance || 0) >= totalProductionCost;
+
+    return (
+        <div className="modal-bg">
+            <div className="modal-content">
+                <h3>{isEditing ? '🏭 Repor Estoque / Editar' : '🏭 Nova Linha de Produção'}</h3>
+                
+                <label>Nome do Produto</label>
+                <input className="input-field" value={p.name} onChange={e=>setP({...p, name:e.target.value})} disabled={isEditing} />
+                
+                <div style={{display:'flex', gap:10}}>
+                    <div style={{flex:1}}>
+                        <label>Categoria</label>
+                        <select className="input-field" value={p.cat} onChange={e=>setP({...p, cat:e.target.value})} disabled={isEditing}>
+                            <option value="energy">⚡ Energético</option>
+                            <option value="training">🏋️ Equipamento</option>
+                            <option value="vehicle">🚗 Veículo</option>
+                            <option value="real_estate">🏠 Imóvel</option>
+                        </select>
+                    </div>
+                    <div style={{flex:1}}>
+                        <label>Potência/Fama</label>
+                        <input className="input-field" type="number" value={p.power} onChange={e=>setP({...p, power:e.target.value})} disabled={isEditing} />
+                    </div>
+                </div>
+
+                {/* ÁREA DE PRODUÇÃO */}
+                <div style={{background:'#222', padding:10, borderRadius:8, margin:'10px 0', border:'1px solid #444'}}>
+                    <h4 style={{marginTop:0, color:'gold'}}>🏭 Linha de Montagem</h4>
+                    
+                    {isEditing && (
+                        <div style={{marginBottom:10, fontSize:12}}>
+                            Estoque Atual: <b style={{color: (p.currentStock||0) > 0 ? 'lime' : 'red'}}>{p.currentStock || 0} unid.</b>
+                        </div>
+                    )}
+
+                    <label>{isEditing ? 'Quantas unidades PRODUZIR a mais?' : 'Quantidade Inicial'}</label>
+                    <input className="input-field" type="number" min="1" value={p.stock} onChange={e=>setP({...p, stock:e.target.value})} />
+                    
+                    <div style={{display:'flex', justifyContent:'space-between', fontSize:12, marginTop:5}}>
+                        <span>Custo Unitário: <b style={{color:'red'}}>{fmt(unitCost)}</b></span>
+                        <span>Custo Total: <b style={{color:'red'}}>{fmt(totalProductionCost)}</b></span>
+                    </div>
+
+                    {!canAfford && <small style={{color:'red', display:'block', marginTop:5}}>🚫 Fundo Insuficiente para produzir.</small>}
+                </div>
+
+                <label>Preço de Venda (por unidade)</label>
+                <input className="input-field" type="number" value={p.price} onChange={e=>setP({...p, price:e.target.value})} />
+
+                <div style={{display:'flex', gap:10, marginTop:15}}>
+                    <button className="btn btn-green" disabled={!canAfford} onClick={() => {
+                        if(!p.name || !p.price) return alert("Preencha tudo!");
+                        if(!canAfford) return alert("Sem dinheiro para fabricar!");
+                        
+                        // Lógica: Se for edição, soma o estoque. Se for novo, usa o valor inicial.
+                        // Nota: 'stock' aqui é a quantidade sendo produzida AGORA.
+                        // 'currentStock' deve vir do banco se for edição.
+                        
+                        const quantityToAdd = parseInt(p.stock);
+                        
+                        onSave({
+                            ...p,
+                            stockAdd: quantityToAdd, // Manda a quantidade para somar no App
+                            productionCost: totalProductionCost
+                        });
+                    }}>
+                        {isEditing ? `PRODUZIR (+${p.stock}) - ${fmt(totalProductionCost)}` : `LANÇAR - ${fmt(totalProductionCost)}`}
+                    </button>
+                    
+                    {isEditing && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>🗑️</button>}
+                    <button className="btn" onClick={()=>onSave(null)}>CANCELAR</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+        //FIM
 
 const OffersScreen = ({ user, offers, teams, onAccept, onReject, onCounter, onCoachAccept, onCoachReject, onCoachCounter }) => {
     // FILTRO RIGOROSO: 

@@ -4724,7 +4724,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.81.3</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.81.4</div>
                             </div>
                         </div>
                         
@@ -5275,7 +5275,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.81.3 MEGA ATUALIZÇÃO TÉCNICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.81.4 MEGA ATUALIZÇÃO TÉCNICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -7646,22 +7646,25 @@ const OffersScreen = ({ user, offers, teams, players, setModal, onAccept, onReje
                                         const reasonTxt = reasons.map((r, i) => `${i+1}. ${r}`).join('\n');
                                         const opt = prompt(`Motivo da Recusa (Digite o número ou texto):\n\n${reasonTxt}`);
                                         
-                                        let finalReason = "Decisão da diretoria.";
-                                        if(opt == '1') finalReason = reasons[0];
-                                        else if(opt == '2') finalReason = reasons[1];
-                                        else if(opt == '3') finalReason = reasons[2];
-                                        else if(opt == '4') finalReason = reasons[3];
-                                        else if(opt) finalReason = opt;
+                                        if (opt !== null) {
+                                            let finalReason = "Decisão da diretoria.";
+                                            if(opt == '1') finalReason = reasons[0];
+                                            else if(opt == '2') finalReason = reasons[1];
+                                            else if(opt == '3') finalReason = reasons[2];
+                                            else if(opt == '4') finalReason = reasons[3];
+                                            else if(opt.trim() !== "") finalReason = opt;
 
-                                        if(opt) {
                                             db.collection('offers').add({
                                                 type: 'SUGESTAO_RESPOSTA',
                                                 recipientId: o.senderId,
                                                 accepted: false,
+                                                status: 'PENDING',
                                                 description: `A diretoria recusou ${o.playerName}.\nMotivo: ${finalReason}`,
                                                 date: Date.now()
+                                            }).then(() => {
+                                                db.collection('offers').doc(o.id).delete();
+                                                alert("Indicação recusada e técnico notificado.");
                                             });
-                                            db.collection('offers').doc(o.id).delete();
                                         }
                                     }}>RECUSAR</button>
                                 </div>
@@ -7670,10 +7673,13 @@ const OffersScreen = ({ user, offers, teams, players, setModal, onAccept, onReje
                     ) : o.type === 'SUGESTAO_RESPOSTA' ? (
                         /* --- CASO 2: RESPOSTA DA DIRETORIA PARA O TÉCNICO (Novo) --- */
                         <div>
-                            <b style={{color: o.accepted ? 'lime' : 'red'}}>
-                                {o.accepted ? '✅ INDICAÇÃO ACEITA' : '❌ INDICAÇÃO RECUSADA'}
-                            </b>
-                            <div style={{background:'#222', padding:10, borderRadius:5, margin:'10px 0', fontSize:12, color:'#ddd'}}>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                <b style={{color: o.accepted ? 'lime' : 'red'}}>
+                                    {o.accepted ? '✅ INDICAÇÃO ACEITA' : '❌ INDICAÇÃO RECUSADA'}
+                                </b>
+                                <small style={{color:'#aaa'}}>{new Date(o.date).toLocaleDateString()}</small>
+                            </div>
+                            <div style={{background:'#222', padding:10, borderRadius:5, margin:'10px 0', fontSize:12, color:'#ddd', border: o.accepted ? '1px solid lime' : '1px solid red'}}>
                                 {o.description}
                             </div>
                             <button className="btn btn-ghost" onClick={()=>db.collection('offers').doc(o.id).delete()}>ENTENDIDO</button>

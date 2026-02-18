@@ -2361,24 +2361,30 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
         alert("Solicitação enviada! Aguarde a Federação.");
     };
 
-    const saveProduct = async (p) => {
+   const saveProduct = async (p) => {
         const price = parseFloat(p.price);
         const payload = { 
             name: p.name, 
             price, 
             img: p.img, 
             desc: p.desc,
-            cat: p.cat || 'CHUTEIRA', 
+            cat: p.cat || 'CHUTEIRA',
             companyId: user.data.id,
-            power: p.power || 0 // Salva o poder (ou 0 se for decorativo)
+            power: p.power || 0, // Salva o poder
+            
+            // --- CORREÇÃO AQUI: SALVAR O ESTOQUE ---
+            stock: parseInt(p.stock) || 0 
         };
 
         if (p.id) {
             const old = products.find(x=>x.id===p.id);
+            // Se baixou o preço, avisa no jornal
             if (old && price < old.price) { postNews(`🚨 **PROMOÇÃO!**\nA **${user.data.name}** baixou o preço de **${p.name}**!\nDe: ${fmt(old.price)} ➝ Por: ${fmt(price)}`, 'biz'); }
-            delete payload.companyId; 
+            
+            delete payload.companyId; // Não precisa atualizar o ID da empresa
             await db.collection('products').doc(p.id).update(payload);
         } else {
+            // Criação de novo produto
             await db.collection('products').add(payload);
             postNews(`🛍️ **NOVIDADE**\nA **${user.data.name}** lançou: **${p.name}** (${PROD_CATS[payload.cat]}) por ${fmt(price)}.`, 'biz');
         }
@@ -4425,7 +4431,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.79.6</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.79.7</div>
                             </div>
                         </div>
                         
@@ -4951,7 +4957,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.79.6 MATOGRAM </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.79.7 MATOGRAM </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

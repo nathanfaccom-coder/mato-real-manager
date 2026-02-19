@@ -4962,7 +4962,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.82.5</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.82.6</div>
                             </div>
                         </div>
                         
@@ -5600,7 +5600,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.82.5 MEGA ATUALIZÇÃO TÉCNICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.82.6 MEGA ATUALIZÇÃO TÉCNICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -7371,6 +7371,10 @@ const Market = ({ user, me, teams, players, coaches, open, isVis, onNeg, onPayCl
     const [minOvr, setMinOvr] = useState(0);
     const [maxOvr, setMaxOvr] = useState(99);
 
+    // --- BLOQUEIO DE SEGURANÇA ---
+    // Apenas presidentes de clubes (tipo 'USER') podem negociar ou contratar técnicos
+    const isPresident = user && user.type === 'USER';
+
     // Filtros de jogadores (Client-side / Tempo Real)
     const filteredPlayers = React.useMemo(() => {
         let baseList = [];
@@ -7505,7 +7509,8 @@ const Market = ({ user, me, teams, players, coaches, open, isVis, onNeg, onPayCl
                     </div>
                 )}
 
-                {!isVis && !p.preContract && (
+                {/* --- AQUI APLIQUEI A NOVA REGRA (SOMENTE PRESIDENTES PODEM NEGOCIAR) --- */}
+                {isPresident && !p.preContract && (
                     <div style={{marginTop:12, display:'flex', gap:8}}>
                         
                         {(open || p.teamId === 'FREE') && p.status !== 'INTRANSFERIVEL' && (
@@ -7597,11 +7602,13 @@ const Market = ({ user, me, teams, players, coaches, open, isVis, onNeg, onPayCl
                     </div>
                 </div>
 
-                {/* BOTÃO PARA TÉCNICOS */}
-                <div className="card" style={{textAlign:'center', cursor:'pointer', border:'2px solid gold', background:'rgba(255,215,0,0.1)', marginBottom:15}} onClick={()=>{setView('COACHES');}}>
-                    <i className="fas fa-user-tie" style={{fontSize:20, marginBottom:5, color:'gold'}}></i><br/>
-                    <span style={{fontSize:10, fontWeight:'bold'}}>CONTRATAR TÉCNICOS</span>
-                </div>
+                {/* BOTÃO PARA TÉCNICOS SÓ APARECE PARA CLUBES (USERS) */}
+                {isPresident && (
+                    <div className="card" style={{textAlign:'center', cursor:'pointer', border:'2px solid gold', background:'rgba(255,215,0,0.1)', marginBottom:15}} onClick={()=>{setView('COACHES');}}>
+                        <i className="fas fa-user-tie" style={{fontSize:20, marginBottom:5, color:'gold'}}></i><br/>
+                        <span style={{fontSize:10, fontWeight:'bold'}}>CONTRATAR TÉCNICOS</span>
+                    </div>
+                )}
 
                 {/* --- FILTRO GLOBAL NO MENU --- */}
                 {renderFilters("Busca Global Escouter")}
@@ -7672,7 +7679,8 @@ const Market = ({ user, me, teams, players, coaches, open, isVis, onNeg, onPayCl
                             Salário Semanal: {fmt(c.salary)}
                         </div>
                         
-                        {!isVis && me && (
+                        {/* AQUI TAMBÉM GARANTE QUE SÓ PRESIDENTES PODEM CONTRATAR */}
+                        {isPresident && (
                             <button className="btn btn-green" onClick={() => onHireCoach(c)}>
                                 CONTRATAR TÉCNICO
                             </button>
@@ -7702,8 +7710,7 @@ const Market = ({ user, me, teams, players, coaches, open, isVis, onNeg, onPayCl
         </div>
     );
 };
-//fim
-        // --- COMPONENTE OFFER FORM CORRIGIDO (COM TETO SALARIAL) ---
+
 const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
     const old = target.oldOffer || {};
     const isCounter = !!old.id;

@@ -4962,7 +4962,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.82.2</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.82.3</div>
                             </div>
                         </div>
                         
@@ -5600,7 +5600,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.82.2 MEGA ATUALIZÇÃO TÉCNICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.82.3 MEGA ATUALIZÇÃO TÉCNICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -6677,25 +6677,49 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
         onSaveTactics(formation, lineup);
     };
 
-    // --- CONFIGURAÇÃO VISUAL IGUAL AO PERFIL DO JOGADOR ---
-    const ATTR_LIST = [
-        { k: 'weakFootAcc', l: 'Pior Pé Prec.', i: '🦶' }, { k: 'shot', l: 'Finalização', i: '🥅' }, { k: 'condition', l: 'Cond. Física', i: '💪' },
-        { k: 'stamina', l: 'Resistência', i: '🔋' }, { k: 'header', l: 'Cabeceio', i: '🤕' }, { k: 'attack', l: 'Ataque', i: '⚔️' },
-        { k: 'weakFootFreq', l: 'Pior Pé Freq.', i: '🔄' }, { k: 'longPassSpd', l: 'P. Longo Vel.', i: '🚀' }, { k: 'teamwork', l: 'Trabalho Eq.', i: '🤝' },
-        { k: 'freeKick', l: 'Falta', i: '🎯' }, { k: 'aggression', l: 'Agressividade', i: '😡' }, { k: 'defense', l: 'Defesa', i: '🛡️' },
-        { k: 'tech', l: 'Técnica', i: '✨' }, { k: 'dribbleSpd', l: 'Drib. Veloc.', i: '💨' }, { k: 'mentality', l: 'Atitude', i: '🧠' },
-        { k: 'shotTech', l: 'Téc. Chute', i: '👟' }, { k: 'balance', l: 'Equilíbrio', i: '⚖️' }, { k: 'shortPass', l: 'Passe Curto', i: '🎯' },
-        { k: 'longPass', l: 'Passe Longo', i: '📡' }, { k: 'shortPassSpd', l: 'P. Curto Vel.', i: '⏩' }, { k: 'accel', l: 'Aceleração', i: '🏎️' },
-        { k: 'gk', l: 'Hab. Goleiro', i: '🧤' }, { k: 'shotPower', l: 'Força Chute', i: '💣' }, { k: 'jump', l: 'Impulsão', i: '🦘' },
-        { k: 'speed', l: 'Veloc. Máx.', i: '⚡' }, { k: 'curve', l: 'Efeito', i: '🍌' }, { k: 'response', l: 'Resposta', i: '💡' },
-        { k: 'dribble', l: 'Drible', i: '⚽' }, { k: 'agility', l: 'Agilidade', i: '🤸' }
-    ];
+    // --- FUNÇÃO DE UPLOAD DA FOTO DO TÉCNICO (COMPRIMIDA) ---
+    const handleFaceUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
 
-    const getAttrColor = (val) => {
-        if (!val) return '#666';
-        if (val < 50) return '#ff5e5e'; 
-        if (val < 70) return '#ffbb33'; 
-        return '#00C851'; 
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            
+            img.onload = async () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                const MAX_SIZE = 150; 
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
+                } else {
+                    if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+                if (confirm("Salvar esta foto de perfil do treinador?")) {
+                    try {
+                        await firebase.firestore().collection('users').doc(coach.id).update({ face: dataUrl });
+                        alert("Foto atualizada com sucesso!");
+                    } catch (error) {
+                        console.error(error);
+                        alert("Erro ao salvar a foto: " + error.message);
+                    }
+                }
+            };
+        };
     };
 
     const handleTogglePlayer = (pid) => {
@@ -6709,7 +6733,26 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
             {/* CABEÇALHO DO TÉCNICO */}
             <div className="highlight-card" style={{textAlign:'center', paddingBottom:30, position:'relative', border:'2px solid gold'}}>
                 <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:15}}>
-                    {coach.face ? <img src={coach.face} style={{width:60, height:60, borderRadius:'50%', border:'2px solid white', objectFit: 'cover'}} /> : <div style={{fontSize:40}}>👔</div>}
+                    
+                    {/* FOTO DO TÉCNICO COM BOTÃO DE CÂMERA */}
+                    <div style={{position: 'relative', width: 65, height: 65}}>
+                        {coach.face ? (
+                            <img src={coach.face} style={{width:'100%', height:'100%', borderRadius:'50%', border:'2px solid white', objectFit: 'cover', objectPosition: 'top'}} />
+                        ) : (
+                            <div style={{width:'100%', height:'100%', borderRadius:'50%', background:'#333', border:'2px solid white', display:'flex', alignItems:'center', justifyContent:'center', fontSize:30}}>👔</div>
+                        )}
+                        <label style={{
+                            position: 'absolute', bottom: -5, right: -5, 
+                            background: 'var(--primary)', color: 'black', 
+                            borderRadius: '50%', width: 26, height: 26, 
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                            fontSize: 12, border: '2px solid #121212', fontWeight: 'bold', zIndex: 5
+                        }}>
+                            📷
+                            <input type="file" style={{display:'none'}} accept="image/*" onChange={handleFaceUpload} />
+                        </label>
+                    </div>
+
                     <div>
                         <h2 style={{margin:0, color:'gold'}}>{coach.name}</h2>
                         <small style={{color:'#ccc'}}>{team ? team.name : 'Agente Livre'} | Nível {coach.level}</small>
@@ -6820,7 +6863,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                                                 boxShadow: player ? '0 4px 10px rgba(0,0,0,0.5)' : 'none'
                                             }}>
                                                 {player?.face ? (
-                                                    <img src={player.face} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    <img src={player.face} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }} />
                                                 ) : (
                                                     <span style={{ color: '#fff', fontSize: '10px', fontWeight:'900' }}>{posLabel}</span>
                                                 )}
@@ -6881,7 +6924,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                                                         setSelectingPos(null);
                                                     }}
                                                 >
-                                                    {p.face ? <img src={p.face} style={{width:35, height:35, borderRadius:'50%', objectFit:'cover'}} /> : <div style={{width:35, height:35, borderRadius:'50%', background:'#333'}}></div>}
+                                                    {p.face ? <img src={p.face} style={{width:35, height:35, borderRadius:'50%', objectFit:'cover', objectPosition: 'top'}} /> : <div style={{width:35, height:35, borderRadius:'50%', background:'#333', display:'grid', placeItems:'center', fontSize:12}}>👤</div>}
                                                     <div style={{flex:1}}>
                                                         <b>{p.name}</b><br/>
                                                         <small style={{color:'#aaa'}}>{p.position} | OV: {p.overall}</small>
@@ -6898,14 +6941,14 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                 </div>
             )}
 
-            {/* ABA MOCHILA (Para repor energia) */}
+            {/* ABA MOCHILA */}
             {tab === 'MOCHILA' && (
                 <div>
                     <h3>🎒 Inventário do Técnico</h3>
                     {myItems.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Compre energéticos no Shopping para recuperar energia!</p>}
                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
                         {myItems.map(item => (
-                            <div key={item.id} className="card" style={{border:'1px solid #444', textAlign:'center'}}>
+                            <div key={item.id} className="card" style={{textAlign:'center', border:'1px solid #444'}}>
                                 <b>{item.productName}</b>
                                 {['energy','SAUDE','CONSUMIVEL'].includes(item.cat) && (
                                     <button className="btn btn-green" style={{fontSize:10, marginTop:5}} onClick={() => onUseItem(item)}>
@@ -6918,6 +6961,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                 </div>
             )}
 
+            {/* ABA TREINO */}
             {tab === 'TREINO' && (
                 <div>
                     {showPerkSelection && (
@@ -7013,42 +7057,15 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                 </div>
             )}
 
+            {/* ABA CARREIRA */}
             {tab === 'CARREIRA' && (
                 <div>
-                    {/* ADIÇÃO DO GERENCIADOR DE FOTO DE PERFIL AQUI */}
+                    {/* ADIÇÃO DA FOTO DE PERFIL AQUI TAMBÉM (OPCIONAL/REDUNDÂNCIA) */}
                     <div className="card" style={{border:'1px dashed #666', marginBottom:15}}>
-                        <h3 style={{marginTop:0}}>📷 Foto de Perfil</h3>
-                        <div style={{textAlign: 'center', marginBottom: 10}}>
-                            {coach.face ? (
-                                <img src={coach.face} style={{width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '2px solid gold'}} />
-                            ) : (
-                                <div style={{width: 80, height: 80, borderRadius: '50%', background: '#333', margin: '0 auto', display: 'grid', placeItems: 'center', fontSize: 30}}>👔</div>
-                            )}
-                        </div>
+                        <h3 style={{marginTop:0}}>📷 Atualizar Foto de Perfil</h3>
                         <label className="btn btn-ghost" style={{display: 'block', cursor: 'pointer', textAlign: 'center'}}>
-                            <i className="fas fa-camera"></i> ALTERAR FOTO
-                            <input type="file" style={{display:'none'}} accept="image/*" onChange={(e) => {
-                                const file = e.target.files[0];
-                                if (!file) return;
-                                const reader = new FileReader();
-                                reader.readAsDataURL(file);
-                                reader.onload = (event) => {
-                                    const img = new Image();
-                                    img.src = event.target.result;
-                                    img.onload = () => {
-                                        const canvas = document.createElement('canvas');
-                                        const MAX_SIZE = 150; // Compressão leve para avatar
-                                        let w = img.width, h = img.height;
-                                        if (w > h) { if (w > MAX_SIZE) { h *= MAX_SIZE / w; w = MAX_SIZE; } }
-                                        else { if (h > MAX_SIZE) { w *= MAX_SIZE / h; h = MAX_SIZE; } }
-                                        canvas.width = w; canvas.height = h;
-                                        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                                        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                                        // Salva diretamente no banco usando firebase global
-                                        firebase.firestore().collection('users').doc(coach.id).update({ face: dataUrl }).then(() => alert("Foto atualizada!"));
-                                    };
-                                };
-                            }} />
+                            <i className="fas fa-camera"></i> ESCOLHER FOTO
+                            <input type="file" style={{display:'none'}} accept="image/*" onChange={handleFaceUpload} />
                         </label>
                     </div>
 

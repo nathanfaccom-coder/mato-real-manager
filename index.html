@@ -4965,7 +4965,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.82.7</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.82.8</div>
                             </div>
                         </div>
                         
@@ -5603,7 +5603,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.82.7 MEGA ATUALIZÇÃO TÉCNICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.82.8 MEGA ATUALIZÇÃO TÉCNICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -5682,7 +5682,23 @@ const renewContract = async (p) => {
 
 {tab==='CREATE' && <div>
                 <h3 style={{color:'var(--primary)'}}>Fundar Novo Clube</h3>
-                <input type="file" className="file-input" onChange={handleUpload} />
+                
+                {/* --- ÁREA DE PRÉ-VISUALIZAÇÃO E UPLOAD DO ESCUDO --- */}
+                <div style={{textAlign: 'center', marginBottom: 15, background: 'rgba(0,0,0,0.2)', padding: 15, borderRadius: 8}}>
+                    <div style={{marginBottom: 10}}>
+                        {f.l ? (
+                            <img src={f.l} style={{width: 100, height: 100, objectFit: 'contain', borderRadius: '50%', border: '3px solid var(--primary)', background:'#fff'}} />
+                        ) : (
+                            <div style={{width: 100, height: 100, margin: '0 auto', background: '#333', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, border: '3px solid #555'}}>🛡️</div>
+                        )}
+                    </div>
+                    
+                    <label className="btn btn-blue" style={{display: 'block', margin: '0 auto', width: 'fit-content', cursor: 'pointer', padding: '10px 20px'}}>
+                        <i className="fas fa-upload" style={{marginRight: 5}}></i> ESCOLHER ESCUDO
+                        <input type="file" style={{display:'none'}} accept="image/*" onChange={handleUpload} />
+                    </label>
+                </div>
+
                 <input className="input-field" placeholder="Nome do Clube" value={f.n} onChange={e=>setF({...f, n:e.target.value})} />
                 
                 {/* Lógica de Saldo Travado para Várzea */}
@@ -5705,14 +5721,16 @@ const renewContract = async (p) => {
                     {SERIES.map(s=><option key={s} value={s}>{s === 'VARZEA' ? 'Série E (Várzea)' : `Série ${s}`}</option>)}
                 </select>
 
-                <input className="input-field" type="number" placeholder="Crie uma Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} />
+                <input className="input-field" type="password" placeholder="Crie uma Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} />
                 
                 <button className="btn btn-green" onClick={()=>{
+                    // Validações de segurança
+                    if(!f.n || !f.p) return alert("⚠️ Preencha o nome do clube e crie uma senha!");
+                    if(teams.find(t=>t.name && t.name.toLowerCase() === f.n.toLowerCase())) return alert("🚫 Este nome de clube já está em uso!");
+
                     // Lógica de Aprovação Automática
                     const statusInicial = f.s === 'VARZEA' ? 'ACTIVE' : 'PENDING';
                     const finalBal = f.s === 'VARZEA' ? 200000 : parseFloat(f.b);
-                    
-                    if(teams.find(t=>t.name.toLowerCase()===f.n.toLowerCase())) return alert("Nome em uso!");
                     
                     db.collection('teams').add({ 
                         name: f.n, 
@@ -5727,13 +5745,15 @@ const renewContract = async (p) => {
                             alert("✅ Clube de Várzea fundado e APROVADO automaticamente! Bons jogos.");
                             window.location.reload();
                         } else {
-                            alert("Solicitação enviada à Federação! Aguarde aprovação.");
+                            alert("✅ Solicitação enviada à Federação! Aguarde aprovação.");
+                            setF({n:'', b:'10000000', s:'A', p:'', l: null}); // Limpa o formulário
+                            setTab('LOGIN'); // Volta para a aba principal
                         }
                     });
                 }}>FUNDAR CLUBE</button>
                 
-                {f.s === 'VARZEA' && <p style={{fontSize:10, color:'gold'}}>* Times da Várzea iniciam com teto de ₣ 200.000 e aprovação imediata.</p>}
-            </div>}            
+                {f.s === 'VARZEA' && <p style={{fontSize:10, color:'gold', marginTop:10}}>* Times da Várzea iniciam com teto de ₣ 200.000 e aprovação imediata.</p>}
+            </div>}           
             {tab==='PRESS' && <div><div style={{display:'flex', gap:10, marginBottom:10}}><button className="btn btn-ghost" onClick={()=>setSubTab('LOGIN_P')}>LOGIN</button><button className="btn btn-ghost" onClick={()=>setSubTab('NEW_PAPER')}>CRIAR JORNAL</button><button className="btn btn-ghost" onClick={()=>setSubTab('NEW_JOURNO')}>SOU JORNALISTA</button></div>
                 {subTab==='LOGIN_P' && !selPaper && <div><h4>Selecione o Jornal</h4>{(papers||[]).filter(p=>p.status==='ACTIVE').map(p=><div key={p.id} className="card" onClick={()=>setSelPaper(p)}>📰 {p.name}</div>)}</div>}
                 {subTab==='LOGIN_P' && selPaper && <div><button className="btn" style={{marginBottom:10}} onClick={()=>setSelPaper(null)}>⬅ VOLTAR</button><h4>{selPaper.name} - Jornalistas</h4><div className="card" onClick={()=>setSel({...selPaper, type:'PAPER'})} style={{border:'1px solid var(--primary)'}}>👑 {selPaper.ownerName} (Dono)</div>{(journalists||[]).filter(j=>j.newspaperId===selPaper.id && j.status==='ACTIVE').map(j=><div key={j.id} className="card" onClick={()=>setSel({...j, type:'JOURNALIST'})}>✒️ {j.name}</div>)}</div>}

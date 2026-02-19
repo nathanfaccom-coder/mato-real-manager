@@ -4965,7 +4965,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.82.8</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.82.9</div>
                             </div>
                         </div>
                         
@@ -5603,7 +5603,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.82.8 MEGA ATUALIZÇÃO TÉCNICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.82.9 MEGA ATUALIZÇÃO TÉCNICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -7777,6 +7777,20 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                 <h3 style={{color:'var(--primary)'}}>
                     {isUrgentRenewal ? '🚨 Renovação Obrigatória' : (isPreContract ? '📝 Pré-Contrato' : (isCounter ? 'Responder Proposta' : `Negociar ${target.name}`))}
                 </h3>
+                
+                {/* --- NOVO: PAINEL DE REFERÊNCIA DE VALORES --- */}
+                {!isPreContract && !isUrgentRenewal && (
+                    <div style={{background: 'rgba(0, 0, 0, 0.3)', padding: '10px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #444', fontSize: '12px'}}>
+                        <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '5px'}}>
+                            <span style={{color: '#aaa'}}>Valor de Mercado (OVR):</span>
+                            <b style={{color: '#00E676'}}>{fmt(getRecommendedPrice(target.overall, target.position))}</b>
+                        </div>
+                        <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                            <span style={{color: '#aaa'}}>Valor Estipulado pelo Clube:</span>
+                            <b style={{color: '#fff'}}>{fmt(target.value)}</b>
+                        </div>
+                    </div>
+                )}
                 
                 {/* AVISO DE PRÉ-CONTRATO */}
                 {isPreContract && (

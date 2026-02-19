@@ -4962,7 +4962,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.82.3</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.82.4</div>
                             </div>
                         </div>
                         
@@ -5600,7 +5600,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.82.3 MEGA ATUALIZÇÃO TÉCNICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.82.4 MEGA ATUALIZÇÃO TÉCNICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -7359,22 +7359,45 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
 };
 // FIM DO STATS EDITOR E PLAYER FORM
 
-const Market = ({ user, me, teams, players, coaches, open, isVis, onNeg, onPayClause, onPre, onHireCoach, onIndicate }) => {    const [view, setView] = useState('MENU'); 
-    const [serie, setSerie] = useState('A'); 
-    const [selT, setSelT] = useState(null); 
+const Market = ({ user, me, teams, players, coaches, open, isVis, onNeg, onPayClause, onPre, onHireCoach, onIndicate }) => {
+    const [view, setView] = useState('MENU');
+    const [serie, setSerie] = useState('A');
+    const [selT, setSelT] = useState(null);
     const [filt, setFilt] = useState('VENDA');
 
-    // Filtros de jogadores
-    let list = []; 
-    if(view==='GLOBAL') {
-        if(filt === 'FREE') {
-            list = players.filter(p => p.teamId === 'FREE' || !p.teamId).sort((a,b)=>b.overall-a.overall);
-        } else {
-            list = players.filter(p => p.status === filt && p.teamId !== me && p.teamId !== 'FREE').sort((a,b)=>b.overall-a.overall);
+    // --- NOVOS ESTADOS PARA OS FILTROS ---
+    const [searchName, setSearchName] = useState('');
+    const [searchPos, setSearchPos] = useState('');
+    const [minOvr, setMinOvr] = useState(0);
+    const [maxOvr, setMaxOvr] = useState(99);
+
+    // Filtros de jogadores (Client-side)
+    const list = React.useMemo(() => {
+        let baseList = [];
+        if(view==='GLOBAL') {
+            if(filt === 'FREE') {
+                baseList = players.filter(p => p.teamId === 'FREE' || !p.teamId);
+            } else {
+                baseList = players.filter(p => p.status === filt && p.teamId !== me && p.teamId !== 'FREE');
+            }
+        } else if(view==='TEAM' && selT) {
+            baseList = players.filter(p => p.teamId === selT.id);
         }
-    } else if(view==='TEAM' && selT) {
-        list = players.filter(p => p.teamId === selT.id).sort((a,b)=>b.overall-a.overall);
-    }
+
+        // Se estivermos vendo os times (ou outra tela) não precisa filtrar jogadores
+        if (view === 'MENU' || view === 'LIST' || view === 'COACHES') return [];
+
+        // Aplica os filtros do usuário
+        return baseList.filter(p => {
+            const matchName = searchName === '' || (p.name && p.name.toLowerCase().includes(searchName.toLowerCase()));
+            const matchPos = searchPos === '' || p.position === searchPos;
+            const ovr = parseInt(p.overall) || 0;
+            const matchOvr = ovr >= minOvr && ovr <= maxOvr;
+
+            return matchName && matchPos && matchOvr;
+        }).sort((a,b)=>b.overall-a.overall);
+
+    }, [players, view, filt, me, selT, searchName, searchPos, minOvr, maxOvr]);
     
     // Filtro de técnicos livres
     const availableCoaches = (coaches || []).filter(c => c.status === 'ACTIVE' && c.teamId === 'FREE');
@@ -7477,114 +7500,170 @@ const Market = ({ user, me, teams, players, coaches, open, isVis, onNeg, onPayCl
     // --- VIEW DE JOGADORES (GLOBAL ou TEAM) ---
     return (
         <div>
-            <button className="btn btn-ghost" style={{marginBottom:15, width:'auto'}} onClick={()=>view==='GLOBAL' ? setView('MENU') : setView('LIST')}>
-                <i className="fas fa-chevron-left"></i> VOLTAR
-            </button>
-            <h3>{view==='GLOBAL' ? (filt === 'FREE' ? 'Mercado de Agentes Livres' : `Lista de ${filt}`) : selT.name}</h3>
-            
-            {list.length === 0 && <p style={{textAlign:'center', color:'#666', marginTop:30, fontStyle:'italic'}}>Nenhum jogador disponível nesta categoria.</p>}
-            
-            <div style={{display:'grid', gap:10}}>
-            {list.map(p => {
-                const recPrice = getRecommendedPrice(p.overall, p.position);
-                // Lógica de Preço (Se for Várzea, considera preço justo ou baixo)
-                const status = getPriceStatus(p.value, recPrice);
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom:15}}>
+                <button className="btn btn-ghost" style={{width:'auto', margin:0}} onClick={()=>{
+                    // Limpa os filtros ao voltar
+                    setSearchName(''); setSearchPos(''); setMinOvr(0); setMaxOvr(99);
+                    view==='GLOBAL' ? setView('MENU') : setView('LIST');
+                }}>
+                    <i className="fas fa-chevron-left"></i> VOLTAR
+                </button>
+                <h3 style={{margin:0}}>{view==='GLOBAL' ? (filt === 'FREE' ? 'Mercado de Agentes Livres' : `Lista de ${filt}`) : selT.name}</h3>
+            </div>
 
-                return (
-                    <div key={p.id} className="card" style={{borderLeft: `4px solid ${getPosColor(p.position)}`, opacity: p.preContract ? 0.7 : 1}}>
-                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'start'}}>
-                            <div style={{display:'flex', gap: 10, alignItems:'center'}}>
-                                {p.face ? (
-                                    <img src={p.face} style={{width: 45, height: 45, borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border:'2px solid #444'}} />
-                                ) : (
-                                    <span className="badge-pos" style={{background:getPosColor(p.position), width: 40, height: 40, display:'flex', alignItems:'center', justifyContent:'center', fontSize: 12}}>{p.position}</span>
-                                )}
-                                
-                                <div>
-                                    <b style={{fontSize:16}}>
-                                        {p.name} <span style={{fontSize:14}}>{p.mood}</span>
-                                    </b>
-                                    <div style={{fontSize:10, color:'#888', marginTop:2}}>
-                                        {p.teamId === 'FREE' ? <b style={{color:'var(--warning)'}}><i className="fas fa-unlock"></i> PASSE LIVRE</b> : <span><i className="fas fa-tshirt"></i> {teams.find(t=>t.id===p.teamId)?.name}</span>}
+            {/* PAINEL DE FILTROS */}
+            <div className="card" style={{background:'rgba(255,255,255,0.02)', border:'1px solid #333', marginBottom:15}}>
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10}}>
+                    <span style={{fontSize:12, fontWeight:'bold', color:'#aaa'}}><i className="fas fa-filter"></i> Filtros de Pesquisa</span>
+                    <button className="btn btn-ghost" style={{width:'auto', padding:'2px 8px', fontSize:10}} onClick={() => {
+                        setSearchName(''); setSearchPos(''); setMinOvr(0); setMaxOvr(99);
+                    }}>LIMPAR</button>
+                </div>
+
+                <input 
+                    className="input-field" 
+                    placeholder="🔍 Buscar por nome..." 
+                    value={searchName} 
+                    onChange={e => setSearchName(e.target.value)} 
+                    style={{marginBottom:10}}
+                />
+
+                <div style={{display:'flex', gap:10}}>
+                    <div style={{flex:1}}>
+                        <label style={{fontSize:10, color:'#888'}}>Posição</label>
+                        <select className="input-field" value={searchPos} onChange={e => setSearchPos(e.target.value)}>
+                            <option value="">Todas</option>
+                            <option value="GOL">GOL</option>
+                            <option value="ZAG">ZAG</option>
+                            <option value="LD">LD</option>
+                            <option value="LE">LE</option>
+                            <option value="VOL">VOL</option>
+                            <option value="MC">MC</option>
+                            <option value="MEI">MEI</option>
+                            <option value="PTD">PTD</option>
+                            <option value="PTE">PTE</option>
+                            <option value="ATA">ATA</option>
+                        </select>
+                    </div>
+                    <div style={{flex:1}}>
+                        <label style={{fontSize:10, color:'#888'}}>OVR Mín ({minOvr})</label>
+                        <input className="input-field" type="number" min="0" max="99" value={minOvr} onChange={e => setMinOvr(parseInt(e.target.value)||0)} />
+                    </div>
+                    <div style={{flex:1}}>
+                        <label style={{fontSize:10, color:'#888'}}>OVR Máx ({maxOvr})</label>
+                        <input className="input-field" type="number" min="0" max="99" value={maxOvr} onChange={e => setMaxOvr(parseInt(e.target.value)||99)} />
+                    </div>
+                </div>
+            </div>
+            
+            {list.length === 0 ? (
+                <p style={{textAlign:'center', color:'#666', marginTop:30, fontStyle:'italic'}}>Nenhum jogador encontrado com esses filtros.</p>
+            ) : (
+                <div style={{display:'grid', gap:10}}>
+                <div style={{fontSize:10, color:'#aaa', textAlign:'right', marginBottom:-5}}>
+                    Exibindo {list.length} jogador(es)
+                </div>
+                {list.map(p => {
+                    const recPrice = getRecommendedPrice(p.overall, p.position);
+                    // Lógica de Preço (Se for Várzea, considera preço justo ou baixo)
+                    const status = getPriceStatus(p.value, recPrice);
+
+                    return (
+                        <div key={p.id} className="card" style={{borderLeft: `4px solid ${getPosColor(p.position)}`, opacity: p.preContract ? 0.7 : 1}}>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'start'}}>
+                                <div style={{display:'flex', gap: 10, alignItems:'center'}}>
+                                    {p.face ? (
+                                        <img src={p.face} style={{width: 45, height: 45, borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border:'2px solid #444'}} />
+                                    ) : (
+                                        <span className="badge-pos" style={{background:getPosColor(p.position), width: 40, height: 40, display:'flex', alignItems:'center', justifyContent:'center', fontSize: 12}}>{p.position}</span>
+                                    )}
+                                    
+                                    <div>
+                                        <b style={{fontSize:16}}>
+                                            {p.name} <span style={{fontSize:14}}>{p.mood}</span>
+                                        </b>
+                                        <div style={{fontSize:10, color:'#888', marginTop:2}}>
+                                            {p.teamId === 'FREE' ? <b style={{color:'var(--warning)'}}><i className="fas fa-unlock"></i> PASSE LIVRE</b> : <span><i className="fas fa-tshirt"></i> {teams.find(t=>t.id===p.teamId)?.name}</span>}
+                                        </div>
                                     </div>
                                 </div>
+                                <span className="player-ov">{p.overall}</span>
                             </div>
-                            <span className="player-ov">{p.overall}</span>
-                        </div>
 
-                        {p.teamId !== 'FREE' && (
-                            <div style={{marginTop: 8, textAlign:'center', background: 'rgba(0,0,0,0.4)', padding: '4px', borderRadius: '4px'}}>
-                                <span style={{color: status.color, fontSize: '10px', fontWeight: 'bold', letterSpacing: '0.5px'}}>
-                                    {status.label}
-                                </span>
+                            {p.teamId !== 'FREE' && (
+                                <div style={{marginTop: 8, textAlign:'center', background: 'rgba(0,0,0,0.4)', padding: '4px', borderRadius: '4px'}}>
+                                    <span style={{color: status.color, fontSize: '10px', fontWeight: 'bold', letterSpacing: '0.5px'}}>
+                                        {status.label}
+                                    </span>
+                                </div>
+                            )}
+
+                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, fontSize:11, color:'#aaa', marginTop:10, background:'rgba(0,0,0,0.2)', padding:8, borderRadius:8}}>
+                                <div>Valor: <b style={{color:'#fff'}}>{fmt(p.value)}</b></div>
+                                <div>Contrato: <b style={{color: p.contract === 0 ? 'var(--danger)' : (p.contract === 1 ? 'var(--warning)' : '#fff')}}>{p.contract} Temp.</b></div>
                             </div>
-                        )}
 
-                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, fontSize:11, color:'#aaa', marginTop:10, background:'rgba(0,0,0,0.2)', padding:8, borderRadius:8}}>
-                            <div>Valor: <b style={{color:'#fff'}}>{fmt(p.value)}</b></div>
-                            <div>Contrato: <b style={{color: p.contract === 0 ? 'var(--danger)' : (p.contract === 1 ? 'var(--warning)' : '#fff')}}>{p.contract} Temp.</b></div>
-                        </div>
-
-                        <div style={{marginTop:8, borderTop:'1px dashed #444', paddingTop:5}}>
-                            <AttributeGrid attrs={p.attributes} />
-                        </div>
-
-                        {p.preContract && (
-                            <div style={{marginTop:10, background:'rgba(0,0,0,0.5)', padding:5, borderRadius:4, textAlign:'center', border:'1px solid var(--secondary)'}}>
-                                <small style={{color:'var(--secondary)', fontWeight:'bold'}}>📝 JÁ ASSINOU PRÉ-CONTRATO</small><br/>
-                                <small style={{color:'#aaa', fontSize:9}}>Vai para o {p.preContract.teamName} no fim da temporada.</small>
+                            <div style={{marginTop:8, borderTop:'1px dashed #444', paddingTop:5}}>
+                                <AttributeGrid attrs={p.attributes} />
                             </div>
-                        )}
 
-                        {!isVis && !p.preContract && (
-                            <div style={{marginTop:12, display:'flex', gap:8}}>
-                                
-                                {(open || p.teamId === 'FREE') && p.status !== 'INTRANSFERIVEL' && (
-                                    <button className="btn btn-purple" style={{flex:1, marginBottom:0}} onClick={()=>onNeg(p)}>
-                                        <i className="fas fa-handshake"></i> {p.teamId === 'FREE' ? 'CONTRATAR' : 'NEGOCIAR'}
-                                    </button>
-                                )}
+                            {p.preContract && (
+                                <div style={{marginTop:10, background:'rgba(0,0,0,0.5)', padding:5, borderRadius:4, textAlign:'center', border:'1px solid var(--secondary)'}}>
+                                    <small style={{color:'var(--secondary)', fontWeight:'bold'}}>📝 JÁ ASSINOU PRÉ-CONTRATO</small><br/>
+                                    <small style={{color:'#aaa', fontSize:9}}>Vai para o {p.preContract.teamName} no fim da temporada.</small>
+                                </div>
+                            )}
 
-                                {p.contract === 1 && p.teamId !== 'FREE' && p.status !== 'INTRANSFERIVEL' && (
-                                    <button className="btn btn-blue" style={{flex:1, marginBottom:0}} onClick={()=>{
-                                        const dummyOffer = { type: 'PRE_CONTRATO', value: 0 };
-                                        onNeg({...p, oldOffer: dummyOffer});
+                            {!isVis && !p.preContract && (
+                                <div style={{marginTop:12, display:'flex', gap:8}}>
+                                    
+                                    {(open || p.teamId === 'FREE') && p.status !== 'INTRANSFERIVEL' && (
+                                        <button className="btn btn-purple" style={{flex:1, marginBottom:0}} onClick={()=>onNeg(p)}>
+                                            <i className="fas fa-handshake"></i> {p.teamId === 'FREE' ? 'CONTRATAR' : 'NEGOCIAR'}
+                                        </button>
+                                    )}
+
+                                    {p.contract === 1 && p.teamId !== 'FREE' && p.status !== 'INTRANSFERIVEL' && (
+                                        <button className="btn btn-blue" style={{flex:1, marginBottom:0}} onClick={()=>{
+                                            const dummyOffer = { type: 'PRE_CONTRATO', value: 0 };
+                                            onNeg({...p, oldOffer: dummyOffer});
+                                        }}>
+                                            <i className="fas fa-file-signature"></i> PRÉ-CONTRATO
+                                        </button>
+                                    )}
+                                    
+                                    {!open && p.teamId !== 'FREE' && p.contract !== 1 && (
+                                        <button className="btn btn-ghost" style={{flex:1, marginBottom:0, opacity:0.5}} disabled>
+                                            <i className="fas fa-lock"></i> FECHADO
+                                        </button>
+                                    )}
+                                    
+                                    {false && p.teamId !== 'FREE' && parseFloat(p.clause) > 0 && (
+                                        <button className="btn btn-gold" style={{width:'auto', marginBottom:0}} onClick={()=>onPayClause(p)}>
+                                            <i className="fas fa-gavel"></i> MULTA
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* --- NOVA FUNCIONALIDADE: BOTÃO DE INDICAÇÃO PARA TÉCNICOS --- */}
+                            {user && user.type === 'COACH' && user.data.teamId !== 'FREE' && p.teamId !== user.data.teamId && !p.preContract && (
+                                <div style={{marginTop:12}}>
+                                    <button className="btn btn-gold" style={{width:'100%', marginBottom:0}} onClick={() => {
+                                        const obs = prompt("Motivo da indicação (Opcional):", "Jogador ideal para o elenco!");
+                                        if(confirm(`Sugerir ${p.name} para o seu presidente?`)) {
+                                            onIndicate(p, obs);
+                                        }
                                     }}>
-                                        <i className="fas fa-file-signature"></i> PRÉ-CONTRATO
+                                        💡 INDICAR AO CLUBE
                                     </button>
-                                )}
-                                
-                                {!open && p.teamId !== 'FREE' && p.contract !== 1 && (
-                                    <button className="btn btn-ghost" style={{flex:1, marginBottom:0, opacity:0.5}} disabled>
-                                        <i className="fas fa-lock"></i> FECHADO
-                                    </button>
-                                )}
-                                
-                                {false && p.teamId !== 'FREE' && parseFloat(p.clause) > 0 && (
-                                    <button className="btn btn-gold" style={{width:'auto', marginBottom:0}} onClick={()=>onPayClause(p)}>
-                                        <i className="fas fa-gavel"></i> MULTA
-                                    </button>
-                                )}
-                            </div>
-                        )}
-
-                        {/* --- NOVA FUNCIONALIDADE: BOTÃO DE INDICAÇÃO PARA TÉCNICOS --- */}
-                        {user && user.type === 'COACH' && user.data.teamId !== 'FREE' && p.teamId !== user.data.teamId && !p.preContract && (
-                            <div style={{marginTop:12}}>
-                                <button className="btn btn-gold" style={{width:'100%', marginBottom:0}} onClick={() => {
-                                    const obs = prompt("Motivo da indicação (Opcional):", "Jogador ideal para o elenco!");
-                                    if(confirm(`Sugerir ${p.name} para o seu presidente?`)) {
-                                        onIndicate(p, obs);
-                                    }
-                                }}>
-                                    💡 INDICAR AO CLUBE
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                );
-            })}
-            </div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+                </div>
+            )}
         </div>
     );
 };

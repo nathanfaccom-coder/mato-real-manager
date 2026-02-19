@@ -4962,7 +4962,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.82.1</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.82.2</div>
                             </div>
                         </div>
                         
@@ -5600,7 +5600,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.82.1 MEGA ATUALIZÇÃO TÉCNICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.82.2 MEGA ATUALIZÇÃO TÉCNICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -6709,7 +6709,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
             {/* CABEÇALHO DO TÉCNICO */}
             <div className="highlight-card" style={{textAlign:'center', paddingBottom:30, position:'relative', border:'2px solid gold'}}>
                 <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:15}}>
-                    {coach.face ? <img src={coach.face} style={{width:60, height:60, borderRadius:'50%', border:'2px solid white'}} /> : <div style={{fontSize:40}}>👔</div>}
+                    {coach.face ? <img src={coach.face} style={{width:60, height:60, borderRadius:'50%', border:'2px solid white', objectFit: 'cover'}} /> : <div style={{fontSize:40}}>👔</div>}
                     <div>
                         <h2 style={{margin:0, color:'gold'}}>{coach.name}</h2>
                         <small style={{color:'#ccc'}}>{team ? team.name : 'Agente Livre'} | Nível {coach.level}</small>
@@ -6794,7 +6794,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                                 <div style={{position:'absolute', top:'50%', left:'50%', transform:'translate(-50%, -50%)', width:100, height:100, border:'2px solid rgba(255,255,255,0.5)', borderRadius:'50%'}}></div>
 
                                 {FORMATIONS[formation].map((posLabel, idx) => {
-                                    const coords = FORMATION_COORDINATES[formation][idx];
+                                    const coords = FORMATION_COORDINATES[formation] ? FORMATION_COORDINATES[formation][idx] : { t: `${Math.floor(idx/3)*25 + 10}%`, l: `${(idx%3)*30 + 20}%` };
                                     const pId = lineup[idx];
                                     const player = players.find(p => p.id === pId);
 
@@ -6835,7 +6835,8 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                                                 fontWeight: '900',
                                                 whiteSpace: 'nowrap',
                                                 maxWidth: '80px',
-                                                overflow: 'hidden'
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis'
                                             }}>
                                                 {player ? player.name.split(' ')[0].toUpperCase() : "VAZIO"}
                                             </div>
@@ -6846,7 +6847,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
 
                             <div style={{marginTop:15, display:'flex', gap:10}}>
                                 <button className="btn btn-green" style={{flex:1, fontWeight:'900', height:50}} onClick={handleSaveTeam}>
-                                   <i className="fas fa-check-circle"></i> CONFIRMAR TÁTICA
+                                   <i className="fas fa-save"></i> SALVAR ESCALAÇÃO
                                 </button>
                                 <button className="btn btn-red" style={{width:50}} onClick={() => {if(confirm("Limpar escalação?")) setLineup({});}}>
                                    <i className="fas fa-trash"></i>
@@ -6865,10 +6866,10 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                                         <div style={{display:'flex', flexDirection:'column', gap:8, overflowY:'auto'}}>
                                             <div className="card" style={{background:'#333', border:'1px dashed #666', textAlign:'center', cursor:'pointer'}} 
                                                  onClick={() => { handleSetPosition(selectingPos.index, null); setSelectingPos(null); }}>
-                                                <b>❌ REMOVER JOGADOR</b>
+                                                <b>❌ REMOVER JOGADOR DESTA VAGA</b>
                                             </div>
                                             
-                                            {players.filter(p => !Object.values(lineup).includes(p.id) || lineup[selectingPos.index] === p.id).map(p => (
+                                            {players.filter(p => p.teamId === coach.teamId).filter(p => !Object.values(lineup).includes(p.id) || lineup[selectingPos.index] === p.id).map(p => (
                                                 <div key={p.id} className="card" 
                                                     style={{
                                                         display:'flex', alignItems:'center', gap:10, cursor:'pointer', 
@@ -7014,6 +7015,43 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
 
             {tab === 'CARREIRA' && (
                 <div>
+                    {/* ADIÇÃO DO GERENCIADOR DE FOTO DE PERFIL AQUI */}
+                    <div className="card" style={{border:'1px dashed #666', marginBottom:15}}>
+                        <h3 style={{marginTop:0}}>📷 Foto de Perfil</h3>
+                        <div style={{textAlign: 'center', marginBottom: 10}}>
+                            {coach.face ? (
+                                <img src={coach.face} style={{width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '2px solid gold'}} />
+                            ) : (
+                                <div style={{width: 80, height: 80, borderRadius: '50%', background: '#333', margin: '0 auto', display: 'grid', placeItems: 'center', fontSize: 30}}>👔</div>
+                            )}
+                        </div>
+                        <label className="btn btn-ghost" style={{display: 'block', cursor: 'pointer', textAlign: 'center'}}>
+                            <i className="fas fa-camera"></i> ALTERAR FOTO
+                            <input type="file" style={{display:'none'}} accept="image/*" onChange={(e) => {
+                                const file = e.target.files[0];
+                                if (!file) return;
+                                const reader = new FileReader();
+                                reader.readAsDataURL(file);
+                                reader.onload = (event) => {
+                                    const img = new Image();
+                                    img.src = event.target.result;
+                                    img.onload = () => {
+                                        const canvas = document.createElement('canvas');
+                                        const MAX_SIZE = 150; // Compressão leve para avatar
+                                        let w = img.width, h = img.height;
+                                        if (w > h) { if (w > MAX_SIZE) { h *= MAX_SIZE / w; w = MAX_SIZE; } }
+                                        else { if (h > MAX_SIZE) { w *= MAX_SIZE / h; h = MAX_SIZE; } }
+                                        canvas.width = w; canvas.height = h;
+                                        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                                        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                                        // Salva diretamente no banco usando firebase global
+                                        firebase.firestore().collection('users').doc(coach.id).update({ face: dataUrl }).then(() => alert("Foto atualizada!"));
+                                    };
+                                };
+                            }} />
+                        </label>
+                    </div>
+
                     {coach.teamId !== 'FREE' && (
                         <div className="card" style={{border:'1px solid #444', marginBottom:15}}>
                             <h3>📝 Meu Contrato</h3>
@@ -7111,7 +7149,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
             )}
         </div>
     );
-                            };
+};
         //FIM
 
 

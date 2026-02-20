@@ -1414,7 +1414,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                             // Verifica se é leve
                             const isLight = INJURIES_DB.LEVE.includes(injuryName) || isIntoxication;
 
-                            return (
+                           return (
                                 <div key={p.id} className="card" style={{borderLeft:'5px solid #ff1744', position:'relative'}}>
                                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
                                         <div>
@@ -1447,23 +1447,23 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                         </div>
                                         
                                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                                            {/* BOTÃO DOAR COM TRAVA ANTI-INTOXICAÇÃO */}
+                                            {/* BOTÃO DOAR COM TRAVA PARA TODAS AS LESÕES LEVES/CLÍNICAS */}
                                             <button 
-                                                className={`btn ${isIntoxication ? 'btn-ghost' : 'btn-green'}`} 
+                                                className={`btn ${isLight ? 'btn-ghost' : 'btn-green'}`} 
                                                 style={{
                                                     fontSize:10, 
                                                     padding:8, 
-                                                    opacity: isIntoxication ? 0.5 : 1, 
-                                                    cursor: isIntoxication ? 'not-allowed' : 'pointer'
+                                                    opacity: isLight ? 0.5 : 1, 
+                                                    cursor: isLight ? 'not-allowed' : 'pointer'
                                                 }} 
-                                                disabled={isIntoxication}
+                                                disabled={isLight}
                                                 onClick={() => {
-                                                    if(isIntoxication) return alert("Intoxicação não precisa de doação, apenas repouso.");
+                                                    if(isLight) return alert("Lesões leves e clínicas (como câimbras, fadiga ou intoxicação) precisam apenas de repouso natural. Não é possível arrecadar fundos para cirurgia.");
                                                     const v = prompt(`Quanto desejas doar para ${p.name}?`);
                                                     if(v && !isNaN(v)) onDonate(p, parseFloat(v));
                                                 }}
                                             >
-                                                {isIntoxication ? '🚫 REPOUSO' : '💸 DOAR'}
+                                                {isLight ? '🚫 APENAS REPOUSO' : '💸 DOAR'}
                                             </button>
                                             
                                             <button 
@@ -5011,7 +5011,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.83.1</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.83.2</div>
                             </div>
                         </div>
                         
@@ -5650,7 +5650,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.83.1 MEGA ATUALIZÇÃO TÉCNICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.83.2 MEGA ATUALIZÇÃO TÉCNICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

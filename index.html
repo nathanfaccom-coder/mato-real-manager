@@ -64,16 +64,17 @@
         .bottom-nav::-webkit-scrollbar { display: none; } /* Esconde barra no Chrome/Android */
         
         .nav-item { 
-            flex: 0 0 auto; /* Impede que o botão encolha */
-            min-width: 70px; /* Garante largura mínima clicável */
-            padding: 12px 5px; 
+            flex: 0 0 auto; 
+            min-width: 85px; /* Aumentado para facilitar o clique no iPhone */
+            padding: 15px 5px; /* Mais espaço para o dedo */
             text-align: center; 
             color: #666; 
-            font-size: 9px; 
+            font-size: 11px; /* Fonte mais legível */
             cursor: pointer; 
+            -webkit-tap-highlight-color: transparent; /* Remove pisca azul feio no mobile */
         }
         .nav-item.active { color: var(--primary); }
-        .nav-item i { font-size: 20px; margin-bottom: 4px; display: block; }
+        .nav-item i { font-size: 24px; margin-bottom: 6px; display: block; } /* Ícone maior */
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 99999; display: grid; place-items: center; padding: 15px; backdrop-filter: blur(5px); }
         .modal-content { background: var(--bg-card); width: 100%; max-width: 450px; padding: 20px; border-radius: 12px; border: 1px solid var(--border); max-height: 90vh; overflow-y: auto; }
         .login-tabs { display: flex; border-bottom: 1px solid #333; margin-bottom: 20px; }
@@ -81,6 +82,28 @@
         .tab.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
         .pulse { animation: pulse 2s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+        .scroll-hint {
+            position: fixed;
+            bottom: 80px; /* Fica flutuando bem em cima do menu */
+            right: 15px;
+            background: rgba(0, 230, 118, 0.9);
+            color: #000;
+            border-radius: 20px;
+            padding: 5px 12px;
+            font-size: 10px;
+            font-weight: 900;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            z-index: 99;
+            pointer-events: none; /* Para o dedo passar direto por ela e clicar no que tem atrás */
+            animation: slideHint 1.5s infinite ease-in-out;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+        }
+        @keyframes slideHint {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(-8px); }
+        }
         .rating-badge { color: var(--warning); font-weight: bold; font-size: 11px; margin-left: 5px; display: flex; align-items: center; gap: 2px; text-shadow: 0 1px 2px black; }
         .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 10px; margin-top: 10px; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px; }
         .stat-item { display: flex; flex-direction: column; align-items: center; justify-content: center; }
@@ -4965,7 +4988,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.82.9</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.83.0</div>
                             </div>
                         </div>
                         
@@ -5353,7 +5376,8 @@ const renewContract = async (p) => {
                                 </div>
                             </div>
                         }
-
+                {/* INDICADOR DE ROLAGEM ANIMADO */}
+                    <div className="scroll-hint">Deslize <i className="fas fa-arrow-right"></i></div>
                  <div className="bottom-nav">
                     {/* 1. HOME */}
                     <div className={`nav-item ${['HOME','COMPANY_HOME','COMPANY_DASH','PLAYER_DASH','COACH_DASH','PRESS_DASH'].includes(screen)?'active':''}`} 
@@ -5603,7 +5627,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.82.9 MEGA ATUALIZÇÃO TÉCNICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.83.0 MEGA ATUALIZÇÃO TÉCNICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

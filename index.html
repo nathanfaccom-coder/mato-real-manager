@@ -3075,11 +3075,17 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
                const healthCost = t.healthPlan ? (t.healthPlan.cost || 0) : 0;
                 
                 // --- COTA DA FEDERAÇÃO ---
+                // --- COTA DA FEDERAÇÃO ---
                 const serieBonuses = { 'A': 650000, 'B': 500000, 'C': 400000, 'D': 300000, 'VARZEA': 100000 };
                 const cotaFederacao = serieBonuses[t.serie || 'VARZEA'] || 100000;
-                // -------------------------
+                
+                // --- MANUTENÇÃO DO ESTÁDIO ---
+                const stadiumLvl = t.stadiumLevel || 1;
+                // Puxa o custo de manutenção lá do nosso Banco de Dados de Estádios do topo do arquivo
+                const maintCost = STADIUM_DB[stadiumLvl] ? STADIUM_DB[stadiumLvl].maint : 0; 
 
-                let newBalance = currentBal + income + cotaFederacao - wages - healthCost;
+                // O novo saldo agora desconta a conta de luz do estádio também!
+                let newBalance = currentBal + income + cotaFederacao - wages - healthCost - maintCost;
                 let updates = {};
 
                 // --- LÓGICA DO BANCO ---
@@ -5453,9 +5459,10 @@ const renewContract = async (p) => {
                 alert("Tabela atualizada!"); 
             };
 
-            // 2. Função para lançar Súmula (ATUALIZADA: CÁLCULO DA MÉDIA)
+            // 2. Função para lançar Súmula (ATUALIZADA: CÁLCULO DA MÉDIA + BILHETERIA E LOJA)
             // --- FUNÇÃO INTELIGENTE DE SÚMULA (INDIVIDUAL OU EM MASSA) ---
-           const saveMatchStats = async (dataPayload, legacyMatch, legacyXp) => {
+            // ⚠️ NOVO PARÂMETRO 'homeTeam' ADICIONADO NO FINAL
+            const saveMatchStats = async (dataPayload, legacyMatch, legacyXp, homeTeam = null) => {
                 let batchData = [];
 
                 // 1. Compatibilidade com chamadas antigas (player, match, xp)
@@ -5538,13 +5545,48 @@ const renewContract = async (p) => {
                     count++;
                 });
                 
+                // ==========================================
+                // --- INTEGRAÇÃO DO ESTÁDIO E LOJA (MATCHDAY) ---
+                // Roda fora do forEach para não multiplicar a renda pelos 11 jogadores!
+                // ==========================================
+                if (homeTeam && homeTeam.id) {
+                    const lvl = homeTeam.stadiumLevel || 1;
+                    const sDb = STADIUM_DB[lvl] || STADIUM_DB[1]; // Puxa do Banco de Estádios global
+                    const ticPrice = homeTeam.ticketPrice || sDb.minTic;
+
+                    // 1. O Peso do Preço
+                    const priceFactor = 1.0 - (((ticPrice - sDb.minTic) / ((sDb.maxTic - sDb.minTic) || 1)) * 0.6);
+
+                    // 2. Fator Surpresa (Varia de 80% a 120%)
+                    const rngFactor = (Math.floor(Math.random() * 41) + 80) / 100;
+
+                    // Calcula o público final e trava no teto do estádio
+                    let attendance = Math.floor(sDb.cap * priceFactor * rngFactor);
+                    if (attendance > sDb.cap) attendance = sDb.cap;
+
+                    const ticketRevenue = attendance * ticPrice;
+
+                    // 3. Vendas da Loja Oficial (10% do público consome)
+                    const potentialBuyers = Math.floor(attendance * 0.10);
+                    const currentStock = homeTeam.storeStock || 0;
+                    const itemsSold = Math.min(potentialBuyers, currentStock); // Só vende o que tem em estoque
+                    const storeRevenue = itemsSold * 80; // Preço de venda (varejo)
+
+                    // 4. Salva o dinheiro no clube
+                    const teamRef = db.collection('teams').doc(homeTeam.id);
+                    b.update(teamRef, {
+                        balance: firebase.firestore.FieldValue.increment(ticketRevenue),
+                        storeBalance: firebase.firestore.FieldValue.increment(storeRevenue),
+                        storeStock: firebase.firestore.FieldValue.increment(-itemsSold)
+                    });
+                }
+                // ==========================================
+
                 await b.commit();
                 setLoading(false);
                 setModal(null);
-                alert(`${count} súmula(s) lançada(s) com sucesso!`);
+                alert(`${count} súmula(s) lançada(s) com sucesso!${homeTeam ? '\n🏟️ Bilheteria e vendas da Loja contabilizadas!' : ''}`);
             };
-
-// FIM DA LÓGICA DE IMPRENSA E SÚMULAS
             // --- TREINO SOLO DO JOGADOR ---
  const handlePlayerSoloTrain = async (player, type) => {
         // CORREÇÃO CRÍTICA: Define energia atual aceitando o ZERO
@@ -5755,7 +5797,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.83.6</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.83.7</div>
                             </div>
                         </div>
                         
@@ -6212,7 +6254,7 @@ const renewContract = async (p) => {
                             {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={async(id)=>{db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} onRenew={renewContract} isOwner={user.type==='USER' && modal.data?.teamId===user.data?.id} />}
                             {modal.type==='OFFER' && <OfferForm target={modal.data} myPlayers={players.filter(p => p.teamId === user.data.id)} onSend={sendOffer} setModal={setModal} user={user} />}
                             {modal.type==='SETTINGS' && <SettingsForm team={modal.data || user.data} isAdmin={user.type==='ADMIN'} onUp={(d)=>{const tid=(modal.data?.id)||user.data.id; db.collection('teams').doc(tid).update(d); setModal(null);}} onUpgrade={()=>{/*Up*/}} onReq={(t,a,d)=>{db.collection('financeRequests').add({teamId:user.data.id, teamName:user.data.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!");}} onWithdraw={withdrawMoney} />}
-                            {modal.type==='MATCH_PERFORMANCE' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} />}
+                            {modal.type==='MATCH_PERFORMANCE' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} matchData={modal.data?.match} />}
                             {modal.type==='TEAM_TABLE' && <TeamStandingsEditor teams={teams} onUpdateTeamStats={updateTeamStats} />}
                             {modal.type==='POST_NEWS' && <div><h3>Nova Notícia</h3><input className="input-field" placeholder="Manchete / Texto" id="news-body" /><button className="btn btn-blue" onClick={()=>{postNews(`📰 **${user.data.name}:**\n${document.getElementById('news-body').value}`, 'press'); setModal(null);}}>PUBLICAR</button></div>}
                             {modal.type==='STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
@@ -6394,7 +6436,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.83.6 BANCO   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.83.7 BANCO   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -9377,7 +9419,8 @@ const Ranking = ({ teams, players, sales }) => {
 
 // --- COMPONENTES QUE FALTAVAM (Súmula e Tabela) ---
 
-      const MatchPerformanceForm = ({ players, teams, onSaveStats }) => {
+      
+    const MatchPerformanceForm = ({ players, teams, onSaveStats, matchData }) => {
     const [mode, setMode] = useState('TEAM'); 
     
     // --- ESTADOS DO MODO SÚMULA RÁPIDA (TIME) ---
@@ -9460,7 +9503,15 @@ const Ranking = ({ teams, players, sales }) => {
         if (payload.length === 0) return alert("Preencha a NOTA de pelo menos um jogador para salvar.");
         
         if (confirm(`Confirmar súmula para ${payload.length} jogadores?`)) {
-            onSaveStats(payload); 
+            // Descobre quem é o mandante da partida e envia para cobrar bilheteria
+            const homeTeamObj = matchData ? teams.find(t => t.id === matchData.homeId) : null;
+            
+            // Só cobra bilheteria se a súmula for do time mandante!
+            if (homeTeamObj && selTeamId === homeTeamObj.id) {
+                onSaveStats(payload, null, undefined, homeTeamObj);
+            } else {
+                onSaveStats(payload); // Se for o visitante, não cobra bilheteria
+            }
         }
     };
 

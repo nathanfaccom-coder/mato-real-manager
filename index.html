@@ -2535,14 +2535,52 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
                 }
             });
 
-            // 2.2. TIMES (Salários e Patrocínios)
+            // 2.2. TIMES (Salários, Patrocínios e BANCO)
             teams.forEach(t => {
                 const currentBal = parseFloat(t.balance) || 0;
                 const wages = players.filter(p => p.teamId === t.id).reduce((a, p) => a + (parseFloat(p.salary) || 0), 0);
                 const income = sps.filter(s => s.teamId === t.id && s.status === 'ACTIVE').reduce((a, s) => a + parseFloat(s.value), 0);
-                b.update(db.collection('teams').doc(t.id), {
-                    balance: currentBal + income - wages
-                });
+                
+                let newBalance = currentBal + income - wages;
+                let updates = {};
+
+                // --- LÓGICA DO BANCO ---
+                
+                // A) Investimentos (Rende 2% por semana)
+                if (t.bankInvestment && t.bankInvestment.amount > 0) {
+                    const currentInv = t.bankInvestment.amount;
+                    const interest = currentInv * 0.02; // Juros Compostos de 2%
+                    const newLocked = Math.max(0, (t.bankInvestment.weeksLocked || 0) - 1); // Reduz 1 semana de bloqueio
+                    
+                    updates.bankInvestment = {
+                        amount: currentInv + interest,
+                        weeksLocked: newLocked
+                    };
+                }
+
+                // B) Empréstimos (Desconta a parcela automaticamente)
+                if (t.bankLoan && t.bankLoan.installments > 0) {
+                    const payment = t.bankLoan.weeklyPayment;
+                    const remainingInstallments = t.bankLoan.installments - 1;
+                    
+                    newBalance -= payment; // Tira o dinheiro direto da conta do time
+
+                    if (remainingInstallments <= 0) {
+                        // Se pagou a última parcela, apaga a dívida
+                        updates.bankLoan = firebase.firestore.FieldValue.delete();
+                    } else {
+                        // Atualiza as parcelas restantes
+                        updates.bankLoan = {
+                            ...t.bankLoan,
+                            installments: remainingInstallments
+                        };
+                    }
+                }
+
+                // Salva o novo saldo consolidado
+                updates.balance = newBalance;
+                
+                b.update(db.collection('teams').doc(t.id), updates);
             });
 
             // 2.3. EMPRESAS (Imposto)

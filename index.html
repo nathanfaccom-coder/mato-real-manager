@@ -2064,8 +2064,8 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     };
 
     return (
-        <div className="modal-bg">
-            <div className="modal-content" style={{maxWidth: '500px'}}>
+        <div className="modal-overlay" style={{zIndex: 99999}} onClick={onClose}>
+            <div className="modal-content" style={{maxWidth: '500px'}} onClick={e => e.stopPropagation()}>
                 <div style={{display:'flex', gap:5, marginBottom:15}}>
                     <button className={`btn ${tab==='ARENA'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('ARENA')} style={{flex:1}}>🏟️ ARENA</button>
                     <button className={`btn ${tab==='LOJA'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('LOJA')} style={{flex:1}}>🛍️ LOJA OFICIAL</button>

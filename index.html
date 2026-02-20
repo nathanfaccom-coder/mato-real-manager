@@ -1321,6 +1321,86 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         ]
     };
 
+           // ==========================================
+    // LÓGICA DO BANCO (EMPRÉSTIMOS E INVESTIMENTO)
+    // ==========================================
+    const LOAN_LIMITS = { 'VARZEA': 500000, 'D': 2000000, 'C': 5000000, 'B': 10000000, 'A': 20000000 };
+
+    const handleTakeLoan = async () => {
+        if (user.type !== 'USER') return alert("Apenas clubes podem solicitar empréstimos comerciais.");
+        const team = user.data;
+        if (team.bankLoan && team.bankLoan.installments > 0) return alert("Você já possui um empréstimo ativo. Quite-o antes de pedir outro.");
+        
+        const limit = LOAN_LIMITS[team.serie || 'VARZEA'] || 500000;
+        const amountStr = prompt(`💸 EMPRÉSTIMO COMERCIAL\n\nSeu limite aprovado para a Série ${team.serie || 'Várzea'} é de ${fmt(limit)}.\nJuros: 20% divididos em 10 semanas.\n\nQuanto deseja pegar emprestado?`);
+        if (!amountStr) return;
+        const amount = parseFloat(amountStr);
+        
+        if (isNaN(amount) || amount <= 0) return alert("Valor inválido.");
+        if (amount > limit) return alert(`Valor excede seu limite de crédito (${fmt(limit)}).`);
+        
+        const totalToPay = amount * 1.20; 
+        const weekly = totalToPay / 10;
+        
+        if (confirm(`Confirmar empréstimo de ${fmt(amount)}?\nVocê pagará 10 parcelas de ${fmt(weekly)}.\n(Total com juros: ${fmt(totalToPay)}).`)) {
+            await db.collection('teams').doc(team.id).update({
+                balance: firebase.firestore.FieldValue.increment(amount),
+                bankLoan: { amountBorrowed: amount, totalOwed: totalToPay, weeklyPayment: weekly, installments: 10 }
+            });
+            alert("✅ Empréstimo aprovado! O dinheiro já está na sua conta.");
+        }
+    };
+
+    const handleInvest = async () => {
+        if (user.type !== 'USER') return alert("Apenas clubes podem investir.");
+        const team = user.data;
+        const currentInvested = team.bankInvestment?.amount || 0;
+        const maxInvestment = 50000000; 
+        
+        if (currentInvested >= maxInvestment) return alert(`Você já atingiu o teto máximo de investimento (${fmt(maxInvestment)}).`);
+        
+        const amountStr = prompt(`📈 FUNDO DE RENDA FIXA\n\nRendimento: 2% na virada de semana.\nBloqueio de Saque: 3 Semanas.\n\nSeu Saldo Atual: ${fmt(team.balance)}\nLivre para investir: ${fmt(maxInvestment - currentInvested)}\n\nQuanto deseja aplicar?`);
+        if (!amountStr) return;
+        const amount = parseFloat(amountStr);
+        
+        if (isNaN(amount) || amount <= 0) return alert("Valor inválido.");
+        if (amount > team.balance) return alert("Você não tem esse saldo disponível no caixa do clube.");
+        if (currentInvested + amount > maxInvestment) return alert(`O valor ultrapassa o teto permitido.`);
+        
+        if (confirm(`Confirmar aplicação de ${fmt(amount)}?\nO dinheiro sairá do seu caixa e ficará bloqueado rendendo juros.`)) {
+            await db.collection('teams').doc(team.id).update({
+                balance: firebase.firestore.FieldValue.increment(-amount),
+                bankInvestment: { amount: currentInvested + amount, weeksLocked: 3 }
+            });
+            alert("✅ Investimento realizado! Ele renderá juros a cada virada de semana.");
+        }
+    };
+
+    const handleWithdraw = async () => {
+        const team = user.data;
+        const inv = team.bankInvestment;
+        if (!inv || inv.amount <= 0) return alert("Você não possui dinheiro investido.");
+        
+        let amountToReceive = inv.amount;
+        let msg = `Resgatar ${fmt(inv.amount)}?`;
+        
+        if ((inv.weeksLocked || 0) > 0) {
+            const penalty = inv.amount * 0.05;
+            amountToReceive = inv.amount - penalty;
+            msg = `⚠️ RESGATE ANTECIPADO!\n\nSeu dinheiro ainda está bloqueado por ${inv.weeksLocked} semana(s).\nSe sacar agora, o banco cobrará uma multa de 5% por quebra de contrato (${fmt(penalty)}).\n\nValor a receber: ${fmt(amountToReceive)}\n\nConfirmar saque emergencial?`;
+        } else {
+            msg = `✅ RESGATE TOTAL\n\nSeu dinheiro já cumpriu a carência e pode ser sacado sem multas.\n\nValor a receber: ${fmt(amountToReceive)}\n\nConfirmar saque?`;
+        }
+        
+        if (confirm(msg)) {
+            await db.collection('teams').doc(team.id).update({
+                balance: firebase.firestore.FieldValue.increment(amountToReceive),
+                bankInvestment: firebase.firestore.FieldValue.delete()
+            });
+            alert("Dinheiro transferido para o caixa do clube com sucesso!");
+        }
+    };
+           
     const handleSurgery = async (p) => {
         // 1. Identifica a categoria da lesão (Baseado no nome ou banco de lesões)
         let category = 'LEVE';
@@ -1481,45 +1561,89 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                     )}
                 </div>
             )}
-        {/* --- NOVA ABA: BANCO MUNICIPAL --- */}
+        {/* --- ABA: BANCO MUNICIPAL --- */}
             {hTab === 'BANCO' && (
                 <div>
                     <div style={{background:'linear-gradient(90deg, #0d47a1, #1976d2)', padding:10, borderRadius:8, color:'white', marginBottom:15, display:'flex', alignItems:'center', gap:10, boxShadow: '0 4px 6px rgba(0,0,0,0.3)'}}>
                         <span style={{fontSize:24}}>🏦</span>
                         <div>
                             <b style={{display:'block'}}>BANCO DE MATO REAL</b>
-                            <small>Crédito e Investimentos para Clubes</small>
+                            <small>Crédito e Investimentos Financeiros</small>
                         </div>
                     </div>
 
-                    <div className="card" style={{borderLeft: '4px solid var(--secondary)', marginBottom: 15}}>
-                        <h4 style={{marginTop: 0, color: 'var(--secondary)'}}>💸 Linhas de Crédito</h4>
-                        <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>
-                            Precisa de caixa rápido para uma contratação ou para fechar as contas? Pegue um empréstimo. 
-                            As parcelas serão debitadas automaticamente com juros.
-                        </p>
-                        <div style={{display: 'flex', gap: 10}}>
-                            <button className="btn btn-ghost" style={{opacity: 0.5, border: '1px dashed var(--secondary)'}} disabled>
-                                💰 EMPRÉSTIMO RÁPIDO (Em Breve)
-                            </button>
+                    {user.type !== 'USER' ? (
+                        <div className="card" style={{textAlign:'center', padding:30, color:'#888'}}>
+                            <i className="fas fa-lock" style={{fontSize:40, marginBottom:10}}></i>
+                            <p>Serviços de crédito corporativo e fundos de investimento são exclusivos para Diretorias de Clubes.<br/><br/><b style={{color:'var(--primary)'}}>Os Planos de Saúde Individuais estarão disponíveis aqui em breve!</b></p>
+                        </div>
+                    ) : (
+                        <div className="animate-in">
+                            {/* EMPRÉSTIMOS */}
+                            <div className="card" style={{borderLeft: '4px solid var(--secondary)', marginBottom: 15}}>
+                                <h4 style={{marginTop: 0, color: 'var(--secondary)'}}>💸 Linhas de Crédito</h4>
+                                
+                                {user.data.bankLoan && user.data.bankLoan.installments > 0 ? (
+                                    <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid #333'}}>
+                                        <b style={{color: 'var(--danger)'}}>Empréstimo Ativo</b>
+                                        <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 10, borderBottom:'1px dashed #444', paddingBottom:5}}>
+                                            <span>Faltam: <b>{user.data.bankLoan.installments} parcelas</b></span>
+                                            <span>Pagamento: <b style={{color:'var(--danger)'}}>{fmt(user.data.bankLoan.weeklyPayment)}/sem</b></span>
+                                        </div>
+                                        <div style={{textAlign:'right', fontSize:10, color:'#aaa', marginTop:5}}>
+                                            Dívida Restante: {fmt(user.data.bankLoan.weeklyPayment * user.data.bankLoan.installments)}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>
+                                            Precisa de caixa rápido? Pegue um empréstimo. As parcelas serão debitadas automaticamente com 20% de juros na virada de semana.
+                                            <br/><br/>Seu limite atual (Série {user.data.serie || 'Várzea'}): <b style={{color:'#fff'}}>{fmt(LOAN_LIMITS[user.data.serie || 'VARZEA'])}</b>
+                                        </p>
+                                        <button className="btn btn-blue" onClick={handleTakeLoan}>
+                                            💰 SOLICITAR EMPRÉSTIMO
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* INVESTIMENTOS */}
+                            <div className="card" style={{borderLeft: '4px solid #00E676'}}>
+                                <h4 style={{marginTop: 0, color: '#00E676'}}>📈 Fundo de Renda Fixa</h4>
+                                
+                                {user.data.bankInvestment && user.data.bankInvestment.amount > 0 ? (
+                                    <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid #333'}}>
+                                        <b style={{color: '#00E676'}}>Investimento Ativo</b>
+                                        <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 10}}>
+                                            <span>Valor Aplicado: <b>{fmt(user.data.bankInvestment.amount)}</b></span>
+                                            <span style={{color: (user.data.bankInvestment.weeksLocked || 0) > 0 ? 'var(--warning)' : 'lime'}}>
+                                                {(user.data.bankInvestment.weeksLocked || 0) > 0 ? `Bloqueado (${user.data.bankInvestment.weeksLocked} sem)` : 'Livre para Saque'}
+                                            </span>
+                                        </div>
+                                        <button className="btn btn-red" style={{marginTop: 15}} onClick={handleWithdraw}>
+                                            🏦 RESGATAR DINHEIRO
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>
+                                            O caixa está cheio? Aplique seu dinheiro no banco. Ele ficará rendendo <b style={{color:'#00E676'}}>2% de juros a cada virada de semana</b>.<br/><br/>
+                                            (Carência de 3 semanas para não pagar multa de resgate antecipado).
+                                        </p>
+                                        <button className="btn btn-green" style={{color:'#000'}} onClick={handleInvest}>
+                                            📊 APLICAR SALDO
+                                        </button>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
-
-                    <div className="card" style={{borderLeft: '4px solid #00E676'}}>
-                        <h4 style={{marginTop: 0, color: '#00E676'}}>📈 Fundo de Renda Fixa</h4>
-                        <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>
-                            O caixa está cheio? Aplique seu dinheiro no banco. Ele ficará rendendo juros a cada virada de semana.
-                        </p>
-                        <button className="btn btn-ghost" style={{opacity: 0.5, border: '1px dashed #00E676'}} disabled>
-                            📊 INVESTIR SALDO (Em Breve)
-                        </button>
-                    </div>
-                </div>
-            )}
+                )}
+            </div>
+        )}
         </div>
     );
 };
-          
         //FIM
        // --- COMPONENTE DE REDE SOCIAL (MATOGRAM) ---
 const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSubChat, messages, onFollow }) => {
@@ -5046,7 +5170,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.83.3</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.83.4</div>
                             </div>
                         </div>
                         
@@ -5685,7 +5809,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.83.3 MEGA ATUALIZÇÃO TÉCNICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.83.4 BANCO   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

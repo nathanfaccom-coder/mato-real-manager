@@ -1405,13 +1405,13 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                         </div>
                     ) : (
                         injured.map(p => {
-                            // Normaliza o nome da lesão (pode ser string ou objeto dependendo da versão)
+                            // Normaliza o nome da lesão
                             const injuryName = typeof p.injury === 'object' ? p.injury.label : p.injury;
                             
                             // Verifica especificamente se é Intoxicação
                             const isIntoxication = injuryName === 'Intoxicação Alimentar';
                             
-                            // Verifica se é leve (inclui intoxicação na lógica visual de 'Sem Cirurgia')
+                            // Verifica se é leve
                             const isLight = INJURIES_DB.LEVE.includes(injuryName) || isIntoxication;
 
                             return (
@@ -1478,15 +1478,13 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                 </div>
                             );
                         })
-                    </div>
-                            );
-                        })
                     )}
                 </div>
             )}
         </div>
     );
 };
+          
         //FIM
        // --- COMPONENTE DE REDE SOCIAL (MATOGRAM) ---
 const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSubChat, messages, onFollow }) => {

@@ -1986,7 +1986,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     );
 };
         //FIM
-        const StadiumManager = ({ team, onClose }) => {
+      const StadiumManager = ({ team, onClose }) => {
     const lvl = team.stadiumLevel || 1;
     const db = STADIUM_DB[lvl];
     const nextDb = STADIUM_DB[lvl + 1];
@@ -1996,9 +1996,8 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     
     // Estados da Loja
     const storeBal = team.storeBalance || 0;
-    const storeStock = team.storeStock || 0;
-    const [injVal, setInjVal] = useState(10000);
-    const [buyStock, setBuyStock] = useState(100);
+    const [editP, setEditP] = useState(null); 
+    const [buyStock, setBuyStock] = useState(10);
 
     const handleSaveTicket = async () => {
         await firebase.firestore().collection('teams').doc(team.id).update({ ticketPrice: ticPrice });
@@ -2012,35 +2011,10 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             await firebase.firestore().collection('teams').doc(team.id).update({
                 balance: firebase.firestore.FieldValue.increment(-db.upgCost),
                 stadiumLevel: lvl + 1,
-                ticketPrice: nextDb.minTic // Reseta o preço pro mínimo do novo nível
+                ticketPrice: nextDb.minTic
             });
             alert("Estádio evoluído com sucesso!");
             onClose();
-        }
-    };
-
-    const handleInjectStore = async () => {
-        if ((team.balance || 0) < injVal) return alert("O clube não tem esse saldo.");
-        if (confirm(`Transferir ${fmt(injVal)} do Clube para o Caixa da Loja?`)) {
-            await firebase.firestore().collection('teams').doc(team.id).update({
-                balance: firebase.firestore.FieldValue.increment(-injVal),
-                storeBalance: firebase.firestore.FieldValue.increment(injVal)
-            });
-            alert("Dinheiro injetado na loja!");
-            setInjVal(10000); // Reseta slider
-        }
-    };
-
-    const handleBuyStock = async () => {
-        const cost = buyStock * 20; // Custo de ₣ 20 por camisa no atacado
-        if (storeBal < cost) return alert("O caixa da loja não tem saldo suficiente.");
-        if (confirm(`Comprar ${buyStock} produtos por ${fmt(cost)}?\nEles serão vendidos automaticamente nos dias de jogo em casa.`)) {
-            await firebase.firestore().collection('teams').doc(team.id).update({
-                storeBalance: firebase.firestore.FieldValue.increment(-cost),
-                storeStock: firebase.firestore.FieldValue.increment(buyStock)
-            });
-            alert("Estoque reabastecido!");
-            setBuyStock(10); // Reseta slider
         }
     };
 
@@ -2101,23 +2075,27 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             <div className="modal-content" style={{maxWidth: '500px'}} onClick={e => e.stopPropagation()}>
                 <div style={{display:'flex', gap:5, marginBottom:15}}>
                     <button className={`btn ${tab==='ARENA'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('ARENA')} style={{flex:1}}>🏟️ ARENA</button>
-                    <button className={`btn ${tab==='LOJA'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('LOJA')} style={{flex:1}}>🛍️ LOJA OFICIAL</button>
+                    <button className={`btn ${tab==='LOJA'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('LOJA')} style={{flex:1}}>🛍️ LOJA OFICIAL</button>
                 </div>
 
                 {tab === 'ARENA' && (
                     <div className="animate-in">
-                        {/* IMAGEM E INFO DO ESTÁDIO */}
-                        <div style={{position:'relative', height:150, background:'#111', borderRadius:8, overflow:'hidden', marginBottom:15, border:'2px solid #333'}}>
+                        {/* IMAGEM E INFO DO ESTÁDIO (PANORÂMICA) */}
+                        <div style={{position:'relative', height:150, background:'#111', borderRadius:8, overflow:'hidden', marginBottom:15, border:'2px solid cyan', boxShadow: '0 4px 8px rgba(0,0,0,0.5)'}}>
                             {team.stadiumPic ? (
                                 <img src={team.stadiumPic} alt="Estádio" style={{width:'100%', height:'100%', objectFit:'cover', opacity:0.6}} />
                             ) : (
                                 <div style={{display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'#555'}}><i className="fas fa-image fa-3x"></i></div>
                             )}
-                            <div style={{position:'absolute', bottom:10, left:10}}>
-                                <span style={{background:'rgba(0,0,0,0.8)', padding:'2px 8px', borderRadius:4, fontSize:10, color:'gold'}}>Nível {lvl}</span>
-                                <h3 style={{margin:0, color:'#fff', textShadow:'1px 1px 3px black'}}>{db.name}</h3>
+                            <div style={{position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.95))', padding: '30px 10px 10px 10px'}}>
+                                <b style={{color: 'cyan', fontSize: 15, display: 'block', marginBottom: 4, textShadow: '1px 1px 2px black'}}>{db.name} <small style={{color:'gold'}}>(Nvl {lvl})</small></b>
+                                <div style={{display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#ddd', textShadow: '1px 1px 2px black'}}>
+                                    <span>👥 Cap: <b style={{color:'#fff'}}>{db.cap.toLocaleString('pt-BR')}</b></span>
+                                    <span>🎫 Ingresso: <b style={{color:'#00E676'}}>{fmt(ticPrice)}</b></span>
+                                    <span>💸 Mnt: <b style={{color:'var(--danger)'}}>{fmt(db.maint)}/s</b></span>
+                                </div>
                             </div>
-                        <label className="btn btn-ghost" style={{position:'absolute', top:5, right:5, padding:5, width:'auto', background:'rgba(0,0,0,0.5)', color:'white', fontSize:10, cursor:'pointer', margin:0, zIndex: 10}}>
+                            <label className="btn btn-ghost" style={{position:'absolute', top:5, right:5, padding:5, width:'auto', background:'rgba(0,0,0,0.5)', color:'white', fontSize:10, cursor:'pointer', margin:0, zIndex: 10}}>
                                 <i className="fas fa-camera"></i> Trocar Foto
                                 <input type="file" style={{display:'none'}} accept="image/*" onChange={handleStadiumPicUpload} />
                             </label>
@@ -2187,7 +2165,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                         {/* BOTÕES DE AÇÃO GERAL */}
                         <div style={{display:'flex', gap:10, marginBottom:15}}>
                             <button className="btn btn-green" style={{flex:2}} onClick={handleWithdrawStore} disabled={storeBal <= 0}>
-                                💸 SACAR LUCROS PARA O CLUBE
+                                💸 SACAR LUCROS
                             </button>
                             <button className="btn btn-purple" style={{flex:1}} onClick={() => {
                                 if ((team.storeProducts || []).length >= 6) return alert("Sua vitrine está cheia! Máximo de 6 produtos.");
@@ -2200,7 +2178,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                         {/* MODO CRIAÇÃO/EDIÇÃO DE PRODUTO */}
                         {editP && (
                             <div className="card" style={{border:'2px solid var(--purple)', marginBottom:15}}>
-                                <h4 style={{marginTop:0, color:'var(--purple)'}}>{editP.stock === undefined ? 'Novo Produto' : 'Repor Estoque'}</h4>
+                                <h4 style={{marginTop:0, color:'var(--purple)'}}>{editP.stock === undefined || editP.stock === 0 ? 'Novo Produto' : 'Repor Estoque'}</h4>
                                 
                                 <div style={{display:'flex', gap:10, marginBottom:10}}>
                                     <div style={{width:80, height:80, background:'#222', borderRadius:8, border:'1px dashed #666', overflow:'hidden', position:'relative'}}>
@@ -2248,7 +2226,6 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                             
                                             if(confirm(`Pagar ${fmt(cost)} para fabricar ${buyStock}x ${editP.name}?`)) {
                                                 let currentProducts = team.storeProducts || [];
-                                                // Se já existe, atualiza o estoque. Se não, adiciona.
                                                 const existingIdx = currentProducts.findIndex(p => p.id === editP.id);
                                                 if (existingIdx >= 0) {
                                                     currentProducts[existingIdx].stock += buyStock;
@@ -2263,7 +2240,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                                 alert("Produção enviada para o estoque!");
                                                 setEditP(null); setBuyStock(10);
                                             }
-                                        }}>FABRICAR LOTE</button>
+                                        }}>FABRICAR</button>
                                         <button className="btn btn-ghost" onClick={()=>{setEditP(null); setBuyStock(10);}}>CANCELAR</button>
                                     </div>
                                 </div>
@@ -2289,18 +2266,13 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                     
                                     <div style={{fontSize:9, color: p.stock > 0 ? 'lime' : 'red', margin:'5px 0'}}>Estoque: {p.stock} un.</div>
                                     
-                                    <button className="btn btn-ghost" style={{fontSize:9, padding:5, margin:0, borderColor:'var(--purple)', color:'white'}} onClick={() => setEditP(p)}>
+                                    <button className="btn btn-ghost" style={{fontSize:9, padding:5, margin:0, borderColor:'var(--purple)', color:'white'}} onClick={() => { setEditP(p); setBuyStock(10); }}>
                                         REPOR ESTOQUE
                                     </button>
                                 </div>
                             ))}
                         </div>
                         {(team.storeProducts || []).length === 0 && !editP && <p style={{textAlign:'center', color:'#666', fontSize:11}}>Sua vitrine está vazia. Crie produtos para vender em dias de jogo!</p>}
-                    </div>
-                )}
-
-                        {/* BOTÃO SACAR LUCRO */}
-                        <button className="btn btn-green" style={{marginTop:10}} onClick={handleWithdrawStore} disabled={storeBal <= 0}>💸 SACAR LUCRO PARA O CLUBE</button>
                     </div>
                 )}
                 

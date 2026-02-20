@@ -1304,6 +1304,10 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
      
         const PublicServices = ({ players, user, onDonate }) => {
     const [hTab, setHTab] = useState('HOSPITAL');
+            // Estados do Banco (Empréstimo Interativo)
+    const [showLoanUI, setShowLoanUI] = useState(false);
+    const [loanAmount, setLoanAmount] = useState(100000);
+    const [loanInst, setLoanInst] = useState(5);
     const injured = (players || []).filter(p => (p.recoveryLeft || 0) > 0);
 
     // --- NOVA TABELA DE PROCEDIMENTOS POR CATEGORIA ---
@@ -1384,28 +1388,37 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     // ==========================================
     const LOAN_LIMITS = { 'VARZEA': 500000, 'D': 2000000, 'C': 5000000, 'B': 10000000, 'A': 20000000 };
 
-    const handleTakeLoan = async () => {
+    // Abre a interface e ajusta o valor inicial baseado no limite do time
+    const openLoanUI = () => {
         if (user.type !== 'USER') return alert("Apenas clubes podem solicitar empréstimos comerciais.");
         const team = user.data;
         if (team.bankLoan && team.bankLoan.installments > 0) return alert("Você já possui um empréstimo ativo. Quite-o antes de pedir outro.");
         
         const limit = LOAN_LIMITS[team.serie || 'VARZEA'] || 500000;
-        const amountStr = prompt(`💸 EMPRÉSTIMO COMERCIAL\n\nSeu limite aprovado para a Série ${team.serie || 'Várzea'} é de ${fmt(limit)}.\nJuros: 20% divididos em 10 semanas.\n\nQuanto deseja pegar emprestado?`);
-        if (!amountStr) return;
-        const amount = parseFloat(amountStr);
+        setLoanAmount(Math.min(100000, limit)); // Começa com 100k ou o limite
+        setLoanInst(5); // Começa em 5x por padrão
+        setShowLoanUI(true);
+    };
+
+    // Processa o empréstimo com os valores escolhidos na barrinha
+    const handleConfirmLoan = async () => {
+        const team = user.data;
+        const limit = LOAN_LIMITS[team.serie || 'VARZEA'] || 500000;
         
-        if (isNaN(amount) || amount <= 0) return alert("Valor inválido.");
-        if (amount > limit) return alert(`Valor excede seu limite de crédito (${fmt(limit)}).`);
+        if (loanAmount <= 0 || loanAmount > limit) return alert("Valor inválido.");
         
-        const totalToPay = amount * 1.20; 
-        const weekly = totalToPay / 10;
+        // Matemática dos Juros: 5% base + 2% por parcela extra
+        const interestRate = 0.05 + ((loanInst - 1) * 0.02); 
+        const totalToPay = loanAmount * (1 + interestRate);
+        const weekly = totalToPay / loanInst;
         
-        if (confirm(`Confirmar empréstimo de ${fmt(amount)}?\nVocê pagará 10 parcelas de ${fmt(weekly)}.\n(Total com juros: ${fmt(totalToPay)}).`)) {
+        if (confirm(`Assinar contrato com o banco?\nValor pego: ${fmt(loanAmount)}\nVocê pagará ${loanInst}x de ${fmt(weekly)}.\n(Total com juros: ${fmt(totalToPay)})`)) {
             await db.collection('teams').doc(team.id).update({
-                balance: firebase.firestore.FieldValue.increment(amount),
-                bankLoan: { amountBorrowed: amount, totalOwed: totalToPay, weeklyPayment: weekly, installments: 10 }
+                balance: firebase.firestore.FieldValue.increment(loanAmount),
+                bankLoan: { amountBorrowed: loanAmount, totalOwed: totalToPay, weeklyPayment: weekly, installments: loanInst }
             });
-            alert("✅ Empréstimo aprovado! O dinheiro já está na sua conta.");
+            alert("✅ Dinheiro na conta! As parcelas serão debitadas automaticamente.");
+            setShowLoanUI(false); // Fecha a interface
         }
     };
 
@@ -1599,14 +1612,61 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                         </div>
                                     </div>
                                 ) : (
-                                    <>
-                                        <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>
-                                            Precisa de caixa rápido? Pegue um empréstimo. As parcelas serão debitadas automaticamente com 20% de juros na virada de semana.
-                                            <br/><br/>Seu limite atual (Série {user.data.serie || 'Várzea'}): <b style={{color:'#fff'}}>{fmt(LOAN_LIMITS[user.data.serie || 'VARZEA'])}</b>
-                                        </p>
-                                        <button className="btn btn-blue" onClick={handleTakeLoan}>
-                                            💰 SOLICITAR EMPRÉSTIMO
-                                        </button>
+                                   <>
+                                        {!showLoanUI ? (
+                                            <>
+                                                <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>
+                                                    Precisa de caixa rápido? Pegue um empréstimo. As parcelas serão debitadas automaticamente na virada de semana. (Juros menores para prazos curtos).
+                                                    <br/><br/>Seu limite atual (Série {user.data.serie || 'Várzea'}): <b style={{color:'#fff'}}>{fmt(LOAN_LIMITS[user.data.serie || 'VARZEA'])}</b>
+                                                </p>
+                                                <button className="btn btn-blue" onClick={openLoanUI}>
+                                                    💰 SIMULAR EMPRÉSTIMO
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid var(--secondary)'}}>
+                                                <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
+                                                    <label style={{color:'var(--secondary)', fontSize:12, fontWeight:'bold'}}>Valor do Empréstimo</label>
+                                                    <b style={{color:'#fff'}}>{fmt(loanAmount)}</b>
+                                                </div>
+                                                <input 
+                                                    type="range" min="10000" max={LOAN_LIMITS[user.data.serie || 'VARZEA'] || 500000} step="10000" 
+                                                    value={loanAmount} onChange={e => setLoanAmount(Number(e.target.value))} 
+                                                    style={{width:'100%', accentColor:'var(--secondary)', marginBottom: 15}}
+                                                />
+
+                                                <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
+                                                    <label style={{color:'var(--secondary)', fontSize:12, fontWeight:'bold'}}>Parcelas (Semanas)</label>
+                                                    <b style={{color:'#fff'}}>{loanInst}x</b>
+                                                </div>
+                                                <input 
+                                                    type="range" min="1" max="10" step="1" 
+                                                    value={loanInst} onChange={e => setLoanInst(Number(e.target.value))} 
+                                                    style={{width:'100%', accentColor:'var(--secondary)', marginBottom: 15}}
+                                                />
+
+                                                {/* PAINEL DE RESULTADO DINÂMICO */}
+                                                {(() => {
+                                                    const interestRate = 0.05 + ((loanInst - 1) * 0.02);
+                                                    const totalToPay = loanAmount * (1 + interestRate);
+                                                    const weekly = totalToPay / loanInst;
+                                                    return (
+                                                        <div style={{background:'#111', padding:10, borderRadius:5, fontSize:11, borderLeft:'3px solid var(--secondary)', marginBottom:15}}>
+                                                            <div style={{display:'flex', justifyContent:'space-between'}}><span>Taxa de Juros:</span> <b style={{color:'gold'}}>{(interestRate * 100).toFixed(0)}%</b></div>
+                                                            <div style={{display:'flex', justifyContent:'space-between', margin:'5px 0'}}><span>Pagamento Semanal:</span> <b style={{color:'var(--danger)'}}>{fmt(weekly)}</b></div>
+                                                            <div style={{display:'flex', justifyContent:'space-between', borderTop:'1px dashed #333', paddingTop:5, marginTop:5}}>
+                                                                <span>Total a Devolver:</span> <b>{fmt(totalToPay)}</b>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
+
+                                                <div style={{display:'flex', gap:10}}>
+                                                    <button className="btn btn-green" onClick={handleConfirmLoan}>ASSINAR CONTRATO</button>
+                                                    <button className="btn btn-red" onClick={() => setShowLoanUI(false)}>CANCELAR</button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </>
                                 )}
                             </div>

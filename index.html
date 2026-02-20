@@ -522,7 +522,17 @@ const getSalaryLimits = (ovr) => {
             'LUXO': '💎 Luxo/Moda (+Fama)'
         };
         //FIM
-
+// ==========================================
+// BANCO DE DADOS DE ESTÁDIOS
+// ==========================================
+const STADIUM_DB = {
+    1: { name: 'O Terrão', cap: 1000, minTic: 10, maxTic: 30, upgCost: 5000000, maint: 0, prompt: "Campo de futebol de terra e grama falha, alambrado enferrujado, pequena arquibancada de concreto, dia ensolarado, futebol de várzea --ar 16:9" },
+    2: { name: 'Estádio Municipal', cap: 5000, minTic: 20, maxTic: 60, upgCost: 15000000, maint: 15000, prompt: "Estádio municipal pequeno, gramado razoável, arquibancadas baixas de concreto, luzes simples, dia de jogo --ar 16:9" },
+    3: { name: 'Estádio Profissional', cap: 15000, minTic: 40, maxTic: 100, upgCost: 35000000, maint: 60000, prompt: "Estádio de futebol profissional, arquibancadas cobertas de um lado, cadeiras de plástico coloridas, refletores altos, torcida --ar 16:9" },
+    4: { name: 'Arena Moderna', cap: 40000, minTic: 80, maxTic: 200, upgCost: 80000000, maint: 150000, prompt: "Arena de futebol moderna, dois anéis de arquibancada, cobertura completa, telões digitais, cadeiras padronizadas --ar 16:9" },
+    5: { name: 'Padrão FIFA', cap: 80000, minTic: 120, maxTic: 350, upgCost: 0, maint: 400000, prompt: "Estádio de futebol padrão Copa do Mundo, arquitetura futurista de vidro e aço, 80 mil lugares, iluminação cênica de LED noturna, lotado --ar 16:9" }
+};
+        //fim
         const INJURIES_DB = {
     LEVE: [
         "Fadiga Muscular", "Entorse de Tornozelo G1", "Contusão na Canela", "Corte no Supercílio", "Bolhas no Pé", 
@@ -1151,6 +1161,7 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
         //FIM
 const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireCoach, onRenewCoach }) => {
     const [tab, setTab] = useState('ELENCO'); 
+    const [showStadiumUI, setShowStadiumUI] = useState(false); // NOVO: Estado para controlar a tela do Estádio
     
     // Calcula salários somando jogadores + técnico (se houver)
     const wageBill = players.reduce((a,p) => a + (parseFloat(p.salary)||0), 0) + (coach ? parseFloat(coach.salary) : 0);
@@ -1182,6 +1193,15 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                 </div>
                 {!isVisitor && <button className="btn btn-green" style={{width:'auto'}} onClick={onAdd}>+ JOGADOR</button>}
             </div>
+
+            {/* NOVO: BOTÃO DE GESTÃO DE ARENA (Aparece apenas para o dono do time) */}
+            {!isVisitor && (
+                <div style={{marginBottom: 15}}>
+                    <button className="btn btn-blue" onClick={() => setShowStadiumUI(true)} style={{width: '100%', padding: '12px'}}>
+                        🏟️ GESTÃO DE ARENA
+                    </button>
+                </div>
+            )}
 
             {/* ABAS DE NAVEGAÇÃO */}
             <div style={{display:'flex', gap:10, marginBottom:15}}>
@@ -1295,6 +1315,11 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                         </div>
                     )}
                 </div>
+            )}
+
+            {/* NOVO: RENDERIZAÇÃO DO MODAL DO ESTÁDIO */}
+            {showStadiumUI && (
+                <StadiumManager team={team} onClose={() => setShowStadiumUI(false)} />
             )}
         </div>
     );
@@ -1961,6 +1986,198 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     );
 };
         //FIM
+        const StadiumManager = ({ team, onClose }) => {
+    const lvl = team.stadiumLevel || 1;
+    const db = STADIUM_DB[lvl];
+    const nextDb = STADIUM_DB[lvl + 1];
+
+    const [tab, setTab] = useState('ARENA');
+    const [ticPrice, setTicPrice] = useState(team.ticketPrice || db.minTic);
+    
+    // Estados da Loja
+    const storeBal = team.storeBalance || 0;
+    const storeStock = team.storeStock || 0;
+    const [injVal, setInjVal] = useState(10000);
+    const [buyStock, setBuyStock] = useState(100);
+
+    const handleSaveTicket = async () => {
+        await firebase.firestore().collection('teams').doc(team.id).update({ ticketPrice: ticPrice });
+        alert("Preço do ingresso atualizado para o próximo jogo em casa!");
+    };
+
+    const handleUpgrade = async () => {
+        if (!nextDb) return;
+        if ((team.balance || 0) < db.upgCost) return alert("Saldo insuficiente do clube!");
+        if (confirm(`Evoluir para ${nextDb.name} por ${fmt(db.upgCost)}?\n\nA manutenção semanal passará a ser de ${fmt(nextDb.maint)}.`)) {
+            await firebase.firestore().collection('teams').doc(team.id).update({
+                balance: firebase.firestore.FieldValue.increment(-db.upgCost),
+                stadiumLevel: lvl + 1,
+                ticketPrice: nextDb.minTic // Reseta o preço pro mínimo do novo nível
+            });
+            alert("Estádio evoluído com sucesso!");
+            onClose();
+        }
+    };
+
+    const handleInjectStore = async () => {
+        if ((team.balance || 0) < injVal) return alert("O clube não tem esse saldo.");
+        if (confirm(`Transferir ${fmt(injVal)} do Clube para o Caixa da Loja?`)) {
+            await firebase.firestore().collection('teams').doc(team.id).update({
+                balance: firebase.firestore.FieldValue.increment(-injVal),
+                storeBalance: firebase.firestore.FieldValue.increment(injVal)
+            });
+            alert("Dinheiro injetado na loja!");
+            setInjVal(10000); // Reseta slider
+        }
+    };
+
+    const handleBuyStock = async () => {
+        const cost = buyStock * 20; // Custo de ₣ 20 por camisa no atacado
+        if (storeBal < cost) return alert("O caixa da loja não tem saldo suficiente.");
+        if (confirm(`Comprar ${buyStock} produtos por ${fmt(cost)}?\nEles serão vendidos automaticamente nos dias de jogo em casa.`)) {
+            await firebase.firestore().collection('teams').doc(team.id).update({
+                storeBalance: firebase.firestore.FieldValue.increment(-cost),
+                storeStock: firebase.firestore.FieldValue.increment(buyStock)
+            });
+            alert("Estoque reabastecido!");
+            setBuyStock(10); // Reseta slider
+        }
+    };
+
+    const handleWithdrawStore = async () => {
+        if (storeBal <= 0) return alert("A loja não tem lucros para sacar.");
+        if (confirm(`Transferir todo o lucro da loja (${fmt(storeBal)}) para o cofre do Clube?`)) {
+            await firebase.firestore().collection('teams').doc(team.id).update({
+                balance: firebase.firestore.FieldValue.increment(storeBal),
+                storeBalance: 0
+            });
+            alert("Lucro sacado para o clube!");
+        }
+    };
+
+    // Atualiza imagem do estádio via URL
+    const updateStadiumPic = async () => {
+        const url = prompt("Cole o Link (URL) da imagem do seu estádio:");
+        if (url) {
+            await firebase.firestore().collection('teams').doc(team.id).update({ stadiumPic: url });
+        }
+    };
+
+    return (
+        <div className="modal-bg">
+            <div className="modal-content" style={{maxWidth: '500px'}}>
+                <div style={{display:'flex', gap:5, marginBottom:15}}>
+                    <button className={`btn ${tab==='ARENA'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('ARENA')} style={{flex:1}}>🏟️ ARENA</button>
+                    <button className={`btn ${tab==='LOJA'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('LOJA')} style={{flex:1}}>🛍️ LOJA OFICIAL</button>
+                </div>
+
+                {tab === 'ARENA' && (
+                    <div className="animate-in">
+                        {/* IMAGEM E INFO DO ESTÁDIO */}
+                        <div style={{position:'relative', height:150, background:'#111', borderRadius:8, overflow:'hidden', marginBottom:15, border:'2px solid #333'}}>
+                            {team.stadiumPic ? (
+                                <img src={team.stadiumPic} alt="Estádio" style={{width:'100%', height:'100%', objectFit:'cover', opacity:0.6}} />
+                            ) : (
+                                <div style={{display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'#555'}}><i className="fas fa-image fa-3x"></i></div>
+                            )}
+                            <div style={{position:'absolute', bottom:10, left:10}}>
+                                <span style={{background:'rgba(0,0,0,0.8)', padding:'2px 8px', borderRadius:4, fontSize:10, color:'gold'}}>Nível {lvl}</span>
+                                <h3 style={{margin:0, color:'#fff', textShadow:'1px 1px 3px black'}}>{db.name}</h3>
+                            </div>
+                            <button onClick={updateStadiumPic} className="btn btn-ghost" style={{position:'absolute', top:5, right:5, padding:5, width:'auto', background:'rgba(0,0,0,0.5)', color:'white', fontSize:10}}><i className="fas fa-camera"></i> Trocar Foto</button>
+                        </div>
+
+                        {/* GERADOR DE PROMPT */}
+                        <div style={{background:'rgba(213, 0, 249, 0.1)', border:'1px dashed #D500F9', padding:10, borderRadius:8, marginBottom:15}}>
+                            <b style={{color:'#D500F9', fontSize:11}}><i className="fas fa-robot"></i> Gerador de Imagem IA:</b>
+                            <p style={{fontSize:10, color:'#aaa', margin:'5px 0'}}>Copie o texto abaixo e cole no seu gerador de IA favorito (ChatGPT, Bing, Midjourney) para criar a foto ideal do seu estádio atual:</p>
+                            <code style={{display:'block', background:'#000', padding:8, borderRadius:4, fontSize:9, color:'#00E676', userSelect:'all'}}>{db.prompt}</code>
+                        </div>
+
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:15}}>
+                            <div style={{background:'#111', padding:10, borderRadius:8, textAlign:'center'}}>
+                                <span style={{color:'#888', fontSize:10}}>Capacidade Máxima</span><br/><b style={{color:'#fff', fontSize:14}}>{db.cap.toLocaleString('pt-BR')}</b>
+                            </div>
+                            <div style={{background:'#111', padding:10, borderRadius:8, textAlign:'center'}}>
+                                <span style={{color:'#888', fontSize:10}}>Custo de Manutenção</span><br/><b style={{color:'var(--danger)', fontSize:14}}>{fmt(db.maint)}/sem</b>
+                            </div>
+                        </div>
+
+                        {/* BILHETERIA (SLIDER) */}
+                        <div className="card" style={{borderLeft:'4px solid cyan'}}>
+                            <h4 style={{marginTop:0, color:'cyan'}}>🎫 Valor do Ingresso</h4>
+                            <p style={{fontSize:10, color:'#aaa', marginBottom:10}}>
+                                Ajuste o preço do ingresso para os jogos em casa. <br/>
+                                <b style={{color:'var(--warning)'}}>Atenção:</b> Preços muito altos espantam a torcida. O momento do time na tabela também afeta a lotação!
+                            </p>
+                            
+                            <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
+                                <label style={{color:'cyan', fontSize:12, fontWeight:'bold'}}>Preço da Entrada</label>
+                                <b style={{color:'#fff'}}>{fmt(ticPrice)}</b>
+                            </div>
+                            <input type="range" min={db.minTic} max={db.maxTic} step="5" value={ticPrice} onChange={e=>setTicPrice(Number(e.target.value))} style={{width:'100%', accentColor:'cyan', marginBottom:10}} />
+                            
+                            <div style={{background:'rgba(0,0,0,0.5)', padding:8, borderRadius:5, fontSize:11, display:'flex', justifyContent:'space-between', marginBottom:10}}>
+                                <span>Renda Máxima (Casa Cheia):</span> <b style={{color:'#00E676'}}>{fmt(ticPrice * db.cap)}</b>
+                            </div>
+                            <button className="btn btn-blue" onClick={handleSaveTicket} disabled={ticPrice === team.ticketPrice}>SALVAR PREÇO</button>
+                        </div>
+
+                        {/* EVOLUÇÃO */}
+                        {nextDb && (
+                            <div style={{marginTop:15, padding:15, border:'1px dashed gold', borderRadius:8, textAlign:'center'}}>
+                                <b style={{color:'gold'}}>Próximo Nível: {nextDb.name}</b>
+                                <p style={{fontSize:10, color:'#aaa'}}>Capacidade sobe para {nextDb.cap.toLocaleString('pt-BR')}. Custo de manutenção subirá para {fmt(nextDb.maint)}/semana.</p>
+                                <button className="btn btn-gold" onClick={handleUpgrade} style={{color:'#000', margin:0}}>EVOLUIR ESTÁDIO ({fmt(db.upgCost)})</button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {tab === 'LOJA' && (
+                    <div className="animate-in">
+                        <div style={{background:'linear-gradient(45deg, #1b5e20, #000)', padding:15, borderRadius:8, marginBottom:15, border:'1px solid #00E676', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                            <div>
+                                <small style={{color:'#888'}}>Caixa da Loja</small><br/>
+                                <b style={{fontSize:18, color:'#00E676'}}>{fmt(storeBal)}</b>
+                            </div>
+                            <div style={{textAlign:'right'}}>
+                                <small style={{color:'#888'}}>Produtos em Estoque</small><br/>
+                                <b style={{fontSize:18, color:'#fff'}}>{storeStock} un.</b>
+                            </div>
+                        </div>
+
+                        <p style={{fontSize:10, color:'#aaa', marginBottom:15, textAlign:'center'}}>A loja só vende produtos <b style={{color:'white'}}>em dia de jogo em casa</b>. Em média, 10% do público pagante consome na loja. Mantenha o estoque cheio!</p>
+
+                        {/* SLIDER 1: Injetar Dinheiro */}
+                        <div className="card" style={{borderLeft:'3px solid #D500F9', marginBottom:10}}>
+                            <b style={{fontSize:12, color:'#D500F9'}}>1. Injetar Capital na Loja</b>
+                            <p style={{fontSize:9, color:'#888', marginBottom:10}}>Tira saldo do clube e manda para a Loja comprar produtos.</p>
+                            <input type="range" min="1000" max={Math.min(team.balance || 0, 500000)} step="1000" value={injVal} onChange={e=>setInjVal(Number(e.target.value))} style={{width:'100%', accentColor:'#D500F9', marginBottom:5}} />
+                            <div style={{display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:10}}><span>Valor: <b>{fmt(injVal)}</b></span></div>
+                            <button className="btn btn-ghost" style={{border:'1px solid #D500F9', color:'#D500F9', margin:0}} onClick={handleInjectStore}>INJETAR CAPITAL</button>
+                        </div>
+
+                        {/* SLIDER 2: Comprar Estoque */}
+                        <div className="card" style={{borderLeft:'3px solid gold', marginBottom:10}}>
+                            <b style={{fontSize:12, color:'gold'}}>2. Comprar Produtos (Atacado)</b>
+                            <p style={{fontSize:9, color:'#888', marginBottom:10}}>Custo de {fmt(20)} por produto. Venda na partida por {fmt(80)} (Lucro de 300%).</p>
+                            <input type="range" min="10" max={Math.max(10, Math.floor(storeBal / 20))} step="10" value={buyStock} onChange={e=>setBuyStock(Number(e.target.value))} style={{width:'100%', accentColor:'gold', marginBottom:5}} />
+                            <div style={{display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:10}}><span>Qtd: <b>{buyStock}</b></span><span>Custo Total: <b style={{color:'var(--danger)'}}>{fmt(buyStock * 20)}</b></span></div>
+                            <button className="btn btn-gold" style={{color:'#000', margin:0}} onClick={handleBuyStock}>COMPRAR ESTOQUE</button>
+                        </div>
+
+                        {/* BOTÃO SACAR LUCRO */}
+                        <button className="btn btn-green" style={{marginTop:10}} onClick={handleWithdrawStore} disabled={storeBal <= 0}>💸 SACAR LUCRO PARA O CLUBE</button>
+                    </div>
+                )}
+                
+                <button className="btn btn-red" style={{marginTop:15}} onClick={onClose}>FECHAR</button>
+            </div>
+        </div>
+    );
+};
+       
        // --- COMPONENTE DE REDE SOCIAL (MATOGRAM) ---
 const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSubChat, messages, onFollow }) => {
     const [tab, setTab] = useState('FEED'); // FEED, PERFIL, CHAT
@@ -4394,7 +4611,7 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
             <input className="input-field" value={form.name} onChange={e=>setF({...form, name:e.target.value})} />
             
             <label>Escudo / Logo</label>
-            {/* --- ÁREA DE PRÉ-VISUALIZAÇÃO E UPLOAD (NOVO!) --- */}
+            {/* --- ÁREA DE PRÉ-VISUALIZAÇÃO E UPLOAD --- */}
             <div style={{textAlign: 'center', marginBottom: 15, background: 'rgba(0,0,0,0.2)', padding: 15, borderRadius: 8}}>
                 <div style={{marginBottom: 10}}>
                     {form.logo ? (
@@ -4423,10 +4640,8 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
             <hr style={{borderColor:'#444', margin: '20px 0'}}/>
             
             <div style={{background: 'rgba(255,255,255,0.05)', padding: 15, borderRadius: 8}}>
-                <p style={{marginTop:0}}>Estádio Nível {team.stadiumLevel||1}</p>
-                <button className="btn btn-purple" onClick={onUpgrade}>EVOLUIR (₣ {fmt(COSTS[team.stadiumLevel]||0).replace('₣ ','')})</button>
-                
-                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10}}>
+                <p style={{marginTop:0, color: '#aaa', fontSize: 12}}><b>Operações Financeiras</b></p>
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:5}}>
                     <button className="btn btn-green" onClick={()=>{const v=prompt("Valor");const m=prompt("Motivo"); if(v)onReq('INJECTION',v,m)}}>PEDIR INJEÇÃO</button>
                     <button className="btn btn-gold" onClick={()=>{const v=prompt("Valor");const m=prompt("Empresa"); if(v)onReq('SPONSORSHIP',v,m)}}>PEDIR PATROCÍNIO</button>
                 </div>

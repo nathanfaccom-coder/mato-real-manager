@@ -2855,8 +2855,14 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
                 const wages = players.filter(p => p.teamId === t.id).reduce((a, p) => a + (parseFloat(p.salary) || 0), 0);
                 const income = sps.filter(s => s.teamId === t.id && s.status === 'ACTIVE').reduce((a, s) => a + parseFloat(s.value), 0);
                 
-                const healthCost = t.healthPlan ? (t.healthPlan.cost || 0) : 0;
-                let newBalance = currentBal + income - wages - healthCost;
+               const healthCost = t.healthPlan ? (t.healthPlan.cost || 0) : 0;
+                
+                // --- COTA DA FEDERAÇÃO ---
+                const serieBonuses = { 'A': 650000, 'B': 500000, 'C': 400000, 'D': 300000, 'VARZEA': 100000 };
+                const cotaFederacao = serieBonuses[t.serie || 'VARZEA'] || 100000;
+                // -------------------------
+
+                let newBalance = currentBal + income + cotaFederacao - wages - healthCost;
                 let updates = {};
 
                 // --- LÓGICA DO BANCO ---
@@ -2897,7 +2903,15 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
                 
                 b.update(db.collection('teams').doc(t.id), updates);
             });
-
+            // 2.3. GERAR NOTÍCIA DA COTA DA FEDERAÇÃO
+            const newsRef = db.collection('news').doc();
+            b.set(newsRef, {
+                title: "💰 COTAS DA FEDERAÇÃO PAGAS!",
+                content: "O apoio financeiro semanal foi depositado na conta de todos os clubes ativos pela Federação de Mato Real:\n\n🏆 Série A: ₣ 650.000\n🥈 Série B: ₣ 500.000\n🥉 Série C: ₣ 400.000\n🏅 Série D: ₣ 300.000\n🚜 Várzea: ₣ 100.000\n\nDiretorias, confiram o novo saldo do seu clube na aba do Banco Municipal!",
+                date: new Date().toISOString(),
+                type: 'FINANCE',
+                likes: []
+            });
             // 2.3. EMPRESAS (Imposto)
             companies.forEach(c => {
                 if (c.status === 'ACTIVE') {

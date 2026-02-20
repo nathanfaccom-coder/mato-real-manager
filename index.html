@@ -1407,8 +1407,8 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         
         if (loanAmount <= 0 || loanAmount > limit) return alert("Valor inválido.");
         
-        // Matemática dos Juros: 5% base + 2% por parcela extra
-        const interestRate = 0.05 + ((loanInst - 1) * 0.02); 
+        // Matemática dos Juros: 10% base + 5% por parcela extra (Máx 55%)
+        const interestRate = 0.10 + ((loanInst - 1) * 0.05); 
         const totalToPay = loanAmount * (1 + interestRate);
         const weekly = totalToPay / loanInst;
         
@@ -1645,9 +1645,9 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                                     style={{width:'100%', accentColor:'var(--secondary)', marginBottom: 15}}
                                                 />
 
-                                                {/* PAINEL DE RESULTADO DINÂMICO */}
+                                               {/* PAINEL DE RESULTADO DINÂMICO */}
                                                 {(() => {
-                                                    const interestRate = 0.05 + ((loanInst - 1) * 0.02);
+                                                    const interestRate = 0.10 + ((loanInst - 1) * 0.05);
                                                     const totalToPay = loanAmount * (1 + interestRate);
                                                     const weekly = totalToPay / loanInst;
                                                     return (
@@ -5271,7 +5271,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.83.4</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.83.5</div>
                             </div>
                         </div>
                         
@@ -5910,7 +5910,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.83.4 BANCO   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.83.5 BANCO   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

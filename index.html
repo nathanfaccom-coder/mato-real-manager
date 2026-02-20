@@ -1350,14 +1350,35 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         const escolha = prompt(`HOSPITAL MUNICIPAL - PACIENTE: ${p.name}\nCategoria: ${category}\nSaldo na Vaquinha: ${fmt(p.hospitalFund || 0)}\n\nEscolha o procedimento (1-${options.length}):\n\n${lista}`);
         
         if (escolha) {
-            const cirurgia = options[parseInt(escolha) - 1];
+           const cirurgia = options[parseInt(escolha) - 1];
             if (!cirurgia) return alert("Opção inválida.");
+
+            // --- LÓGICA DE COBERTURA DO PLANO DE SAÚDE ---
+            let teamCoverage = 0;
+            // Busca se o time do jogador tem plano corporativo
+            if (p.teamId && p.teamId !== 'FREE') {
+                const teamDoc = await firebase.firestore().collection('teams').doc(p.teamId).get();
+                if (teamDoc.exists && teamDoc.data().healthPlan) {
+                    teamCoverage = teamDoc.data().healthPlan.coverage || 0;
+                }
+            }
             
-            if ((p.hospitalFund || 0) < cirurgia.cost) {
-                return alert("Saldo na vaquinha insuficiente para este procedimento!");
+            const playerCoverage = p.healthPlan ? (p.healthPlan.coverage || 0) : 0;
+            const bestCoverage = Math.max(teamCoverage, playerCoverage); // A regra do "Maior Cobre"
+            
+            const discountAmount = bestCoverage > 0 ? (cirurgia.cost * (bestCoverage / 100)) : 0;
+            const finalCost = cirurgia.cost - discountAmount;
+            // ----------------------------------------------
+            
+            if ((p.hospitalFund || 0) < finalCost) {
+                return alert(`Saldo na vaquinha insuficiente!\nCusto com desconto: ${fmt(finalCost)}\nSaldo atual: ${fmt(p.hospitalFund || 0)}`);
             }
 
-            if (confirm(`Confirmar ${cirurgia.name}?\nO valor de ${fmt(cirurgia.cost)} será usado.`)) {
+            let confirmMsg = `Confirmar ${cirurgia.name}?`;
+            if (bestCoverage > 0) confirmMsg += `\n\n🛡️ SEGURO ATIVADO (-${bestCoverage}%)\nDe: ${fmt(cirurgia.cost)}\nPor: ${fmt(finalCost)}`;
+            else confirmMsg += `\n\n⚠️ SEM SEGURO\nCusto Total: ${fmt(finalCost)}`;
+
+            if (confirm(confirmMsg)) {
                 const sucesso = Math.random() < cirurgia.success;
                 const b = db.batch();
                 const pRef = db.collection('players').doc(p.id);
@@ -1366,7 +1387,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                     const novoTempo = Math.max(0, p.recoveryLeft - cirurgia.timeRed);
                     b.update(pRef, { 
                         recoveryLeft: novoTempo,
-                        hospitalFund: (p.hospitalFund || 0) - cirurgia.cost,
+                        hospitalFund: (p.hospitalFund || 0) - finalCost,
                         injury: novoTempo === 0 ? firebase.firestore.FieldValue.delete() : p.injury,
                         // Limpa histórico de doações após cirurgia bem-sucedida
                         donors: {} 
@@ -1374,7 +1395,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                     alert(`✅ SUCESSO!\nA operação foi um êxito. ${p.name} deve retornar aos gramados em breve.`);
                 } else {
                     b.update(pRef, { 
-                        hospitalFund: (p.hospitalFund || 0) - cirurgia.cost,
+                        hospitalFund: (p.hospitalFund || 0) - finalCost,
                         recoveryLeft: p.recoveryLeft + 1, 
                         mood: '😡'
                     });
@@ -2327,12 +2348,12 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
         return alert("🛑 GESTO JÁ REALIZADO!\nVocê já contribuiu para o tratamento atual deste jogador. Aguarde a recuperação ou a cirurgia para ajudar novamente.");
     }
 
-    // 2. TRAVA: Empresas só pagam até 50% da cirurgia MAIS CARA disponível
+    // 2. TRAVA: Empresas só pagam até 1% da cirurgia MAIS CARA disponível
     if (user.type === 'COMPANY') {
         const tetoMaximo = 15000000; // Custo da cirurgia mais cara (Robótica)
-        const limiteEmpresa = tetoMaximo * 0.5;
+        const limiteEmpresa = tetoMaximo * 0.01; // Restrito a 1%
         if (amount > limiteEmpresa) {
-            return alert(`🚫 LIMITE EMPRESARIAL!\nPelas leis de Mato Real, empresas podem doar no máximo ${fmt(limiteEmpresa)} (50% do teto cirúrgico) por procedimento para evitar monopólio de gratidão.`);
+            return alert(`🚫 LIMITE EMPRESARIAL!\nPelas leis de Mato Real, empresas podem doar no máximo ${fmt(limiteEmpresa)} (1% do teto cirúrgico) por procedimento para evitar monopólio.`);
         }
     }
 
@@ -2814,7 +2835,8 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
                         const currentBal = parseFloat(p.balance) || 0;
                         const salary = parseFloat(p.salary) || 0;
                         const tax = currentBal * 0.03;
-                        const finalBalance = (currentBal + salary) - tax;
+                        const healthCost = p.healthPlan ? (p.healthPlan.cost || 0) : 0;
+                        const finalBalance = (currentBal + salary) - tax - healthCost;
                         const xpTotal = (p.xp || 0) + (p.pendingXP || 0);
 
                         b.update(db.collection('players').doc(p.id), {
@@ -2833,7 +2855,8 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
                 const wages = players.filter(p => p.teamId === t.id).reduce((a, p) => a + (parseFloat(p.salary) || 0), 0);
                 const income = sps.filter(s => s.teamId === t.id && s.status === 'ACTIVE').reduce((a, s) => a + parseFloat(s.value), 0);
                 
-                let newBalance = currentBal + income - wages;
+                const healthCost = t.healthPlan ? (t.healthPlan.cost || 0) : 0;
+                let newBalance = currentBal + income - wages - healthCost;
                 let updates = {};
 
                 // --- LÓGICA DO BANCO ---

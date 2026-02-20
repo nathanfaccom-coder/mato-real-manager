@@ -2172,36 +2172,132 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
 
                 {tab === 'LOJA' && (
                     <div className="animate-in">
+                        {/* CABEÇALHO DA LOJA */}
                         <div style={{background:'linear-gradient(45deg, #1b5e20, #000)', padding:15, borderRadius:8, marginBottom:15, border:'1px solid #00E676', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                             <div>
-                                <small style={{color:'#888'}}>Caixa da Loja</small><br/>
-                                <b style={{fontSize:18, color:'#00E676'}}>{fmt(storeBal)}</b>
+                                <small style={{color:'#888'}}>Caixa da Loja (Lucro)</small><br/>
+                                <b style={{fontSize:20, color:'#00E676'}}>{fmt(storeBal)}</b>
                             </div>
                             <div style={{textAlign:'right'}}>
-                                <small style={{color:'#888'}}>Produtos em Estoque</small><br/>
-                                <b style={{fontSize:18, color:'#fff'}}>{storeStock} un.</b>
+                                <small style={{color:'#888'}}>Nível da Loja</small><br/>
+                                <b style={{fontSize:16, color:'gold'}}>⭐ Nvl {lvl}</b>
                             </div>
                         </div>
 
-                        <p style={{fontSize:10, color:'#aaa', marginBottom:15, textAlign:'center'}}>A loja só vende produtos <b style={{color:'white'}}>em dia de jogo em casa</b>. Em média, 10% do público pagante consome na loja. Mantenha o estoque cheio!</p>
-
-                        {/* SLIDER 1: Injetar Dinheiro */}
-                        <div className="card" style={{borderLeft:'3px solid #D500F9', marginBottom:10}}>
-                            <b style={{fontSize:12, color:'#D500F9'}}>1. Injetar Capital na Loja</b>
-                            <p style={{fontSize:9, color:'#888', marginBottom:10}}>Tira saldo do clube e manda para a Loja comprar produtos.</p>
-                            <input type="range" min="1000" max={Math.min(team.balance || 0, 500000)} step="1000" value={injVal} onChange={e=>setInjVal(Number(e.target.value))} style={{width:'100%', accentColor:'#D500F9', marginBottom:5}} />
-                            <div style={{display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:10}}><span>Valor: <b>{fmt(injVal)}</b></span></div>
-                            <button className="btn btn-ghost" style={{border:'1px solid #D500F9', color:'#D500F9', margin:0}} onClick={handleInjectStore}>INJETAR CAPITAL</button>
+                        {/* BOTÕES DE AÇÃO GERAL */}
+                        <div style={{display:'flex', gap:10, marginBottom:15}}>
+                            <button className="btn btn-green" style={{flex:2}} onClick={handleWithdrawStore} disabled={storeBal <= 0}>
+                                💸 SACAR LUCROS PARA O CLUBE
+                            </button>
+                            <button className="btn btn-purple" style={{flex:1}} onClick={() => {
+                                if ((team.storeProducts || []).length >= 6) return alert("Sua vitrine está cheia! Máximo de 6 produtos.");
+                                setEditP({ id: Date.now().toString(), name: '', price: 50, stock: 0, img: null });
+                            }}>
+                                + CRIAR ITEM
+                            </button>
                         </div>
 
-                        {/* SLIDER 2: Comprar Estoque */}
-                        <div className="card" style={{borderLeft:'3px solid gold', marginBottom:10}}>
-                            <b style={{fontSize:12, color:'gold'}}>2. Comprar Produtos (Atacado)</b>
-                            <p style={{fontSize:9, color:'#888', marginBottom:10}}>Custo de {fmt(20)} por produto. Venda na partida por {fmt(80)} (Lucro de 300%).</p>
-                            <input type="range" min="10" max={Math.max(10, Math.floor(storeBal / 20))} step="10" value={buyStock} onChange={e=>setBuyStock(Number(e.target.value))} style={{width:'100%', accentColor:'gold', marginBottom:5}} />
-                            <div style={{display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:10}}><span>Qtd: <b>{buyStock}</b></span><span>Custo Total: <b style={{color:'var(--danger)'}}>{fmt(buyStock * 20)}</b></span></div>
-                            <button className="btn btn-gold" style={{color:'#000', margin:0}} onClick={handleBuyStock}>COMPRAR ESTOQUE</button>
+                        {/* MODO CRIAÇÃO/EDIÇÃO DE PRODUTO */}
+                        {editP && (
+                            <div className="card" style={{border:'2px solid var(--purple)', marginBottom:15}}>
+                                <h4 style={{marginTop:0, color:'var(--purple)'}}>{editP.stock === undefined ? 'Novo Produto' : 'Repor Estoque'}</h4>
+                                
+                                <div style={{display:'flex', gap:10, marginBottom:10}}>
+                                    <div style={{width:80, height:80, background:'#222', borderRadius:8, border:'1px dashed #666', overflow:'hidden', position:'relative'}}>
+                                        {editP.img ? <img src={editP.img} style={{width:'100%', height:'100%', objectFit:'cover'}} /> : <div style={{display:'grid', placeItems:'center', height:'100%', fontSize:24}}>📷</div>}
+                                        <input type="file" style={{position:'absolute', inset:0, opacity:0, cursor:'pointer'}} accept="image/*" onChange={(e) => {
+                                            const file = e.target.files[0];
+                                            if (!file) return;
+                                            const reader = new FileReader();
+                                            reader.readAsDataURL(file);
+                                            reader.onload = (ev) => {
+                                                const img = new Image();
+                                                img.src = ev.target.result;
+                                                img.onload = () => {
+                                                    const canvas = document.createElement('canvas');
+                                                    const MAX_W = 300; 
+                                                    let w = img.width, h = img.height;
+                                                    if (w > MAX_W) { h *= MAX_W / w; w = MAX_W; }
+                                                    canvas.width = w; canvas.height = h;
+                                                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                                                    setEditP({...editP, img: canvas.toDataURL('image/jpeg', 0.8)});
+                                                };
+                                            };
+                                        }} />
+                                    </div>
+                                    <div style={{flex:1}}>
+                                        <input className="input-field" placeholder="Nome (Ex: Copo Térmico)" value={editP.name} onChange={e=>setEditP({...editP, name:e.target.value})} disabled={editP.stock > 0} style={{marginBottom:5}} />
+                                        <input className="input-field" type="number" placeholder="Preço de Venda (₣)" value={editP.price} onChange={e=>setEditP({...editP, price:e.target.value})} disabled={editP.stock > 0} style={{marginBottom:0}} />
+                                        <small style={{color:'#aaa', fontSize:9}}>Custo de fabricação: 30% do valor.</small>
+                                    </div>
+                                </div>
+
+                                {/* SLIDER DE FABRICAÇÃO */}
+                                <div style={{background:'rgba(0,0,0,0.3)', padding:10, borderRadius:8}}>
+                                    <div style={{display:'flex', justifyContent:'space-between', fontSize:11}}>
+                                        <span>Produzir: <b>{buyStock} un.</b></span>
+                                        <span>Custo: <b style={{color:'var(--danger)'}}>{fmt(buyStock * (editP.price * 0.3))}</b></span>
+                                    </div>
+                                    <input type="range" min="10" max="500" step="10" value={buyStock} onChange={e=>setBuyStock(Number(e.target.value))} style={{width:'100%', accentColor:'var(--purple)', margin:'10px 0'}} />
+                                    
+                                    <div style={{display:'flex', gap:5}}>
+                                        <button className="btn btn-green" onClick={async () => {
+                                            if(!editP.name || !editP.price) return alert("Preencha nome e preço!");
+                                            const cost = Math.floor(buyStock * (editP.price * 0.3));
+                                            if ((team.balance || 0) < cost) return alert("O clube não tem saldo para fabricar este lote!");
+                                            
+                                            if(confirm(`Pagar ${fmt(cost)} para fabricar ${buyStock}x ${editP.name}?`)) {
+                                                let currentProducts = team.storeProducts || [];
+                                                // Se já existe, atualiza o estoque. Se não, adiciona.
+                                                const existingIdx = currentProducts.findIndex(p => p.id === editP.id);
+                                                if (existingIdx >= 0) {
+                                                    currentProducts[existingIdx].stock += buyStock;
+                                                } else {
+                                                    currentProducts.push({ ...editP, stock: buyStock, price: Number(editP.price) });
+                                                }
+
+                                                await firebase.firestore().collection('teams').doc(team.id).update({
+                                                    balance: firebase.firestore.FieldValue.increment(-cost),
+                                                    storeProducts: currentProducts
+                                                });
+                                                alert("Produção enviada para o estoque!");
+                                                setEditP(null); setBuyStock(10);
+                                            }
+                                        }}>FABRICAR LOTE</button>
+                                        <button className="btn btn-ghost" onClick={()=>{setEditP(null); setBuyStock(10);}}>CANCELAR</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* VITRINE DE PRODUTOS */}
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                            {(team.storeProducts || []).map(p => (
+                                <div key={p.id} className="card" style={{padding:10, textAlign:'center', position:'relative'}}>
+                                    <i className="fas fa-trash" style={{position:'absolute', top:5, right:5, color:'#ff1744', cursor:'pointer', fontSize:12}} onClick={async()=>{
+                                        if(confirm(`Excluir ${p.name}? O estoque atual será perdido sem reembolso.`)) {
+                                            const newProds = team.storeProducts.filter(x => x.id !== p.id);
+                                            await firebase.firestore().collection('teams').doc(team.id).update({ storeProducts: newProds });
+                                        }
+                                    }}></i>
+                                    
+                                    <div style={{width:50, height:50, margin:'0 auto', borderRadius:5, overflow:'hidden', background:'#222', marginBottom:5}}>
+                                        {p.img ? <img src={p.img} style={{width:'100%', height:'100%', objectFit:'cover'}}/> : <span style={{fontSize:20, lineHeight:'50px'}}>📦</span>}
+                                    </div>
+                                    <b style={{fontSize:11, display:'block', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{p.name}</b>
+                                    <div style={{color:'var(--primary)', fontWeight:'bold', fontSize:13}}>{fmt(p.price)}</div>
+                                    
+                                    <div style={{fontSize:9, color: p.stock > 0 ? 'lime' : 'red', margin:'5px 0'}}>Estoque: {p.stock} un.</div>
+                                    
+                                    <button className="btn btn-ghost" style={{fontSize:9, padding:5, margin:0, borderColor:'var(--purple)', color:'white'}} onClick={() => setEditP(p)}>
+                                        REPOR ESTOQUE
+                                    </button>
+                                </div>
+                            ))}
                         </div>
+                        {(team.storeProducts || []).length === 0 && !editP && <p style={{textAlign:'center', color:'#666', fontSize:11}}>Sua vitrine está vazia. Crie produtos para vender em dias de jogo!</p>}
+                    </div>
+                )}
 
                         {/* BOTÃO SACAR LUCRO */}
                         <button className="btn btn-green" style={{marginTop:10}} onClick={handleWithdrawStore} disabled={storeBal <= 0}>💸 SACAR LUCRO PARA O CLUBE</button>
@@ -5602,18 +5698,40 @@ const renewContract = async (p) => {
 
                     const ticketRevenue = attendance * ticPrice;
 
-                    // 3. Vendas da Loja Oficial (10% do público consome)
-                    const potentialBuyers = Math.floor(attendance * 0.10);
-                    const currentStock = homeTeam.storeStock || 0;
-                    const itemsSold = Math.min(potentialBuyers, currentStock); // Só vende o que tem em estoque
-                    const storeRevenue = itemsSold * 80; // Preço de venda (varejo)
+                    // 3. Vendas da Loja Oficial (Algoritmo Dinâmico de Produtos)
+                    // A conversão base depende do nível da Loja (Estádio). Nvl 1 = 5%, Nvl 5 = 25%
+                    const baseConversionRate = [0, 0.05, 0.10, 0.15, 0.20, 0.25][lvl] || 0.05; 
+                    
+                    let totalStoreRevenue = 0;
+                    let currentProducts = [...(homeTeam.storeProducts || [])];
 
-                    // 4. Salva o dinheiro no clube
+                    // Calcula a venda para CADA produto separadamente
+                    const updatedProducts = currentProducts.map(prod => {
+                        // Fator de Dificuldade pelo Preço: 
+                        // Itens de até ₣30 vendem 100% do potencial. Quanto mais caro, menos vende.
+                        let priceDifficulty = 1;
+                        if (prod.price > 30) {
+                            priceDifficulty = Math.max(0.05, 30 / prod.price); // Nunca cai pra 0, mínimo de 5% de chance
+                        }
+
+                        // Quantos torcedores TENTARAM comprar esse item específico
+                        const potentialBuyers = Math.floor(attendance * baseConversionRate * priceDifficulty);
+                        
+                        // Quantos realmente compraram (limitado pelo estoque)
+                        const itemsSold = Math.min(potentialBuyers, prod.stock);
+
+                        totalStoreRevenue += (itemsSold * prod.price);
+                        
+                        // Retorna o produto atualizado com o estoque deduzido
+                        return { ...prod, stock: prod.stock - itemsSold };
+                    });
+
+                    // 4. Salva o dinheiro no clube e atualiza o estoque dos produtos
                     const teamRef = db.collection('teams').doc(homeTeam.id);
                     b.update(teamRef, {
-                        balance: firebase.firestore.FieldValue.increment(ticketRevenue),
-                        storeBalance: firebase.firestore.FieldValue.increment(storeRevenue),
-                        storeStock: firebase.firestore.FieldValue.increment(-itemsSold)
+                        balance: firebase.firestore.FieldValue.increment(ticketRevenue), // Dinheiro do Ingresso direto pro time
+                        storeBalance: firebase.firestore.FieldValue.increment(totalStoreRevenue), // Lucro da loja vai pro cofre da loja
+                        storeProducts: updatedProducts // Salva o novo estoque
                     });
                 }
                 // ==========================================

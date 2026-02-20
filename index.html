@@ -1405,14 +1405,22 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                         </div>
                     ) : (
                         injured.map(p => {
-                            const isLight = INJURIES_DB.LEVE.includes(p.injury) || p.injury === 'Intoxicação Alimentar';
+                            // Normaliza o nome da lesão (pode ser string ou objeto dependendo da versão)
+                            const injuryName = typeof p.injury === 'object' ? p.injury.label : p.injury;
+                            
+                            // Verifica especificamente se é Intoxicação
+                            const isIntoxication = injuryName === 'Intoxicação Alimentar';
+                            
+                            // Verifica se é leve (inclui intoxicação na lógica visual de 'Sem Cirurgia')
+                            const isLight = INJURIES_DB.LEVE.includes(injuryName) || isIntoxication;
+
                             return (
                                 <div key={p.id} className="card" style={{borderLeft:'5px solid #ff1744', position:'relative'}}>
                                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
                                         <div>
                                             <b style={{fontSize:16}}>❌ {p.name}</b>
                                             <div style={{fontSize:11, color:'#ff1744', fontWeight:'bold', marginTop:2}}>
-                                                {typeof p.injury === 'object' ? p.injury.label : (p.injury || 'Lesão não especificada')}
+                                                {injuryName || 'Lesão não especificada'}
                                             </div>
                                         </div>
                                         <div style={{textAlign:'right'}}>
@@ -1434,15 +1442,29 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                             <b>Doadores Recentes:</b><br/>
                                             {p.donors && Object.keys(p.donors).length > 0 ? 
                                                 Object.values(p.donors).map((d, i) => <span key={i}>• {d.name} ({fmt(d.val)}) </span>) 
-                                                : "Nenhuma doação recebida para esta lesão."
+                                                : "Nenhuma doação recebida."
                                             }
                                         </div>
                                         
                                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                                            <button className="btn btn-green" style={{fontSize:10, padding:8}} onClick={() => {
-                                                const v = prompt(`Quanto desejas doar para ${p.name}?`);
-                                                if(v && !isNaN(v)) onDonate(p, parseFloat(v));
-                                            }}>💸 DOAR</button>
+                                            {/* BOTÃO DOAR COM TRAVA ANTI-INTOXICAÇÃO */}
+                                            <button 
+                                                className={`btn ${isIntoxication ? 'btn-ghost' : 'btn-green'}`} 
+                                                style={{
+                                                    fontSize:10, 
+                                                    padding:8, 
+                                                    opacity: isIntoxication ? 0.5 : 1, 
+                                                    cursor: isIntoxication ? 'not-allowed' : 'pointer'
+                                                }} 
+                                                disabled={isIntoxication}
+                                                onClick={() => {
+                                                    if(isIntoxication) return alert("Intoxicação não precisa de doação, apenas repouso.");
+                                                    const v = prompt(`Quanto desejas doar para ${p.name}?`);
+                                                    if(v && !isNaN(v)) onDonate(p, parseFloat(v));
+                                                }}
+                                            >
+                                                {isIntoxication ? '🚫 REPOUSO' : '💸 DOAR'}
+                                            </button>
                                             
                                             <button 
                                                 className={`btn ${isLight ? 'btn-ghost' : 'btn-blue'}`} 
@@ -1456,12 +1478,6 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                 </div>
                             );
                         })
-                    )}
-                </div>
-            )}
-        </div>
-    );
-};
         //FIM
        // --- COMPONENTE DE REDE SOCIAL (MATOGRAM) ---
 const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSubChat, messages, onFollow }) => {
@@ -4988,7 +5004,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.83.0</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.83.1</div>
                             </div>
                         </div>
                         
@@ -5627,7 +5643,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.83.0 MEGA ATUALIZÇÃO TÉCNICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.83.1 MEGA ATUALIZÇÃO TÉCNICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

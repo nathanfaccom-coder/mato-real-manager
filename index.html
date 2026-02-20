@@ -1602,10 +1602,93 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                         </div>
                     </div>
 
-                    {user.type !== 'USER' ? (
+                   {user.type !== 'USER' && user.type !== 'PLAYER' ? (
                         <div className="card" style={{textAlign:'center', padding:30, color:'#888'}}>
                             <i className="fas fa-lock" style={{fontSize:40, marginBottom:10}}></i>
-                            <p>Serviços de crédito corporativo e fundos de investimento são exclusivos para Diretorias de Clubes.<br/><br/><b style={{color:'var(--primary)'}}>Os Planos de Saúde Individuais estarão disponíveis aqui em breve!</b></p>
+                            <p>Esta área é exclusiva para Clubes e Jogadores.</p>
+                        </div>
+                    ) : user.type === 'PLAYER' ? (
+                        <div className="animate-in">
+                            {/* SEGUROS INDIVIDUAIS (SÓ JOGADORES) */}
+                            <div className="card" style={{borderLeft: '4px solid #00E676', marginBottom: 15}}>
+                                <h4 style={{marginTop: 0, color: '#00E676'}}>🛡️ Meu Seguro Saúde Particular</h4>
+                                
+                                {user.data.healthPlan ? (
+                                    <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid #333'}}>
+                                        <b style={{color: '#00E676'}}>Cobertura Ativa</b>
+                                        <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 10, borderBottom:'1px dashed #444', paddingBottom:5}}>
+                                            <span>Plano: <b>{user.data.healthPlan.name}</b></span>
+                                            <span>Cobre: <b style={{color:'lime'}}>{user.data.healthPlan.coverage}% de Cirurgias</b></span>
+                                        </div>
+                                        <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 5}}>
+                                            <span>Mensalidade:</span>
+                                            <b style={{color:'var(--danger)'}}>{fmt(user.data.healthPlan.cost)}/sem</b>
+                                        </div>
+                                        <button className="btn btn-red" style={{marginTop: 15}} onClick={async () => {
+                                            if(confirm("Cancelar seu Seguro Particular? Você ficará desprotegido caso o clube não tenha um plano.")) {
+                                                await db.collection('players').doc(user.data.id).update({
+                                                    healthPlan: firebase.firestore.FieldValue.delete()
+                                                });
+                                                alert("Plano cancelado.");
+                                            }
+                                        }}>
+                                            ❌ CANCELAR PLANO
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>
+                                            O presidente do clube não paga seu seguro? Contrate um particular! Ele cobre suas cirurgias e o valor é descontado automaticamente do seu salário toda semana.
+                                            <br/><br/><b style={{color:'var(--warning)'}}>⚠️ Importante:</b> O seguro não cobre lesões preexistentes.
+                                        </p>
+                                        
+                                        {/* Tabela de Preços Fixa para Jogadores */}
+                                        <div style={{display:'grid', gap:10}}>
+                                            <div style={{background:'#111', padding:10, borderRadius:5, border:'1px solid silver', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                                <div>
+                                                    <b style={{color:'silver', fontSize:13}}>Prata</b><br/><small style={{color:'#00E676'}}>Cobre 30%</small>
+                                                </div>
+                                                <div style={{textAlign:'right'}}>
+                                                    <b style={{color:'var(--danger)', display:'block'}}>{fmt(1500)}/s</b>
+                                                    <button className="btn btn-ghost" style={{padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5}} onClick={async () => {
+                                                        if(confirm(`Contratar o Plano Prata por ${fmt(1500)}/semana?`)) {
+                                                            await db.collection('players').doc(user.data.id).update({ healthPlan: { name: 'Prata', coverage: 30, cost: 1500 } });
+                                                        }
+                                                    }}>ASSINAR</button>
+                                                </div>
+                                            </div>
+
+                                            <div style={{background:'#111', padding:10, borderRadius:5, border:'1px solid gold', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                                <div>
+                                                    <b style={{color:'gold', fontSize:13}}>Ouro</b><br/><small style={{color:'#00E676'}}>Cobre 50%</small>
+                                                </div>
+                                                <div style={{textAlign:'right'}}>
+                                                    <b style={{color:'var(--danger)', display:'block'}}>{fmt(4000)}/s</b>
+                                                    <button className="btn btn-ghost" style={{padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5, borderColor:'gold', color:'gold'}} onClick={async () => {
+                                                        if(confirm(`Contratar o Plano Ouro por ${fmt(4000)}/semana?`)) {
+                                                            await db.collection('players').doc(user.data.id).update({ healthPlan: { name: 'Ouro', coverage: 50, cost: 4000 } });
+                                                        }
+                                                    }}>ASSINAR</button>
+                                                </div>
+                                            </div>
+
+                                            <div style={{background:'linear-gradient(45deg, #111, #1a237e)', padding:10, borderRadius:5, border:'1px solid cyan', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                                <div>
+                                                    <b style={{color:'cyan', fontSize:13}}>Diamante</b><br/><small style={{color:'#00E676'}}>Cobre 70%</small>
+                                                </div>
+                                                <div style={{textAlign:'right'}}>
+                                                    <b style={{color:'var(--danger)', display:'block'}}>{fmt(10000)}/s</b>
+                                                    <button className="btn btn-blue" style={{padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5}} onClick={async () => {
+                                                        if(confirm(`Contratar o Plano Diamante por ${fmt(10000)}/semana?`)) {
+                                                            await db.collection('players').doc(user.data.id).update({ healthPlan: { name: 'Diamante', coverage: 70, cost: 10000 } });
+                                                        }
+                                                    }}>ASSINAR</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     ) : (
                         <div className="animate-in">
@@ -1758,6 +1841,94 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                                 </div>
                                             </div>
                                         )}
+                                    </>
+                                )}
+                            </div>
+                            {/* SEGUROS CORPORATIVOS (SÓ CLUBES) */}
+                            <div className="card" style={{borderLeft: '4px solid #D500F9', marginTop: 15}}>
+                                <h4 style={{marginTop: 0, color: '#D500F9'}}>🏥 Plano de Saúde do Elenco</h4>
+                                
+                                {user.data.healthPlan ? (
+                                    <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid #333'}}>
+                                        <b style={{color: '#D500F9'}}>Cobertura Ativa</b>
+                                        <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 10, borderBottom:'1px dashed #444', paddingBottom:5}}>
+                                            <span>Plano: <b>{user.data.healthPlan.name}</b></span>
+                                            <span>Cobre: <b style={{color:'lime'}}>{user.data.healthPlan.coverage}% de Cirurgias</b></span>
+                                        </div>
+                                        <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 5}}>
+                                            <span>Mensalidade:</span>
+                                            <b style={{color:'var(--danger)'}}>{fmt(user.data.healthPlan.cost)}/sem</b>
+                                        </div>
+                                        <button className="btn btn-red" style={{marginTop: 15}} onClick={async () => {
+                                            if(confirm("Cancelar o Plano de Saúde de todo o elenco? Novas lesões não terão cobertura.")) {
+                                                await db.collection('teams').doc(user.data.id).update({
+                                                    healthPlan: firebase.firestore.FieldValue.delete()
+                                                });
+                                                alert("Plano cancelado.");
+                                            }
+                                        }}>
+                                            ❌ CANCELAR PLANO
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>
+                                            Proteja seu elenco! Se um jogador se lesionar gravemente e precisar de cirurgia, o seguro cobre grande parte do custo. A cobrança é semanal.
+                                            <br/><br/><b style={{color:'var(--warning)'}}>⚠️ Importante:</b> O seguro não cobre lesões preexistentes (ocorridas antes da contratação).
+                                        </p>
+                                        
+                                        {/* Tabela de Preços Baseada na Série */}
+                                        {(() => {
+                                            const s = user.data.serie || 'VARZEA';
+                                            const costs = {
+                                                'VARZEA': { basic: 5000, master: 15000 },
+                                                'D': { basic: 15000, master: 40000 },
+                                                'C': { basic: 30000, master: 80000 },
+                                                'B': { basic: 60000, master: 150000 },
+                                                'A': { basic: 150000, master: 350000 }
+                                            };
+                                            const myCost = costs[s] || costs['VARZEA'];
+
+                                            return (
+                                                <div style={{display:'grid', gap:10}}>
+                                                    <div style={{background:'#111', padding:10, borderRadius:5, border:'1px solid #333', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                                        <div>
+                                                            <b style={{color:'silver', fontSize:13}}>Plano Básico</b><br/>
+                                                            <small style={{color:'#00E676'}}>Cobre 30%</small>
+                                                        </div>
+                                                        <div style={{textAlign:'right'}}>
+                                                            <b style={{color:'var(--danger)', display:'block'}}>{fmt(myCost.basic)}/s</b>
+                                                            <button className="btn btn-ghost" style={{padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5, border:'1px solid silver'}} onClick={async () => {
+                                                                if(confirm(`Contratar o Plano Básico por ${fmt(myCost.basic)}/semana?`)) {
+                                                                    await db.collection('teams').doc(user.data.id).update({
+                                                                        healthPlan: { name: 'Básico', coverage: 30, cost: myCost.basic }
+                                                                    });
+                                                                    alert("Plano Básico ativado!");
+                                                                }
+                                                            }}>ASSINAR</button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div style={{background:'#111', padding:10, borderRadius:5, border:'1px solid gold', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                                        <div>
+                                                            <b style={{color:'gold', fontSize:13}}>Plano Master</b><br/>
+                                                            <small style={{color:'#00E676'}}>Cobre 70%</small>
+                                                        </div>
+                                                        <div style={{textAlign:'right'}}>
+                                                            <b style={{color:'var(--danger)', display:'block'}}>{fmt(myCost.master)}/s</b>
+                                                            <button className="btn btn-gold" style={{color:'#000', padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5}} onClick={async () => {
+                                                                if(confirm(`Contratar o Plano Master por ${fmt(myCost.master)}/semana?`)) {
+                                                                    await db.collection('teams').doc(user.data.id).update({
+                                                                        healthPlan: { name: 'Master', coverage: 70, cost: myCost.master }
+                                                                    });
+                                                                    alert("Plano Master ativado!");
+                                                                }
+                                                            }}>ASSINAR</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
                                     </>
                                 )}
                             </div>
@@ -5332,7 +5503,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.83.5</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.83.6</div>
                             </div>
                         </div>
                         
@@ -5971,7 +6142,7 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.83.5 BANCO   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.83.6 BANCO   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

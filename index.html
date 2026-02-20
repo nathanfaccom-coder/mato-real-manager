@@ -1308,7 +1308,9 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     const [showLoanUI, setShowLoanUI] = useState(false);
     const [loanAmount, setLoanAmount] = useState(100000);
     const [loanInst, setLoanInst] = useState(5);
-    const injured = (players || []).filter(p => (p.recoveryLeft || 0) > 0);
+   const [showInvestUI, setShowInvestUI] = useState(false);
+    const [investAmount, setInvestAmount] = useState(100000);
+            const injured = (players || []).filter(p => (p.recoveryLeft || 0) > 0);
 
     // --- NOVA TABELA DE PROCEDIMENTOS POR CATEGORIA ---
     const SURGERY_OPTIONS = {
@@ -1422,28 +1424,39 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         }
     };
 
-    const handleInvest = async () => {
+    // Abre a interface do Investimento
+    const openInvestUI = () => {
         if (user.type !== 'USER') return alert("Apenas clubes podem investir.");
         const team = user.data;
         const currentInvested = team.bankInvestment?.amount || 0;
         const maxInvestment = 50000000; 
         
         if (currentInvested >= maxInvestment) return alert(`Você já atingiu o teto máximo de investimento (${fmt(maxInvestment)}).`);
+        if ((team.balance || 0) <= 0) return alert("Você não tem saldo em caixa para investir.");
+
+        // Ajusta a barrinha para um valor inicial justo (100k ou o máximo que ele tem)
+        const availableToInvest = Math.min(team.balance, maxInvestment - currentInvested);
+        setInvestAmount(Math.min(100000, availableToInvest)); 
+        setShowInvestUI(true);
+    };
+
+    // Confirma a aplicação puxando da barrinha
+    const handleConfirmInvest = async () => {
+        const team = user.data;
+        const currentInvested = team.bankInvestment?.amount || 0;
+        const maxInvestment = 50000000; 
+
+        if (investAmount <= 0) return alert("Valor inválido.");
+        if (investAmount > team.balance) return alert("Você não tem esse saldo disponível no caixa do clube.");
+        if (currentInvested + investAmount > maxInvestment) return alert(`O valor ultrapassa o teto permitido.`);
         
-        const amountStr = prompt(`📈 FUNDO DE RENDA FIXA\n\nRendimento: 2% na virada de semana.\nBloqueio de Saque: 3 Semanas.\n\nSeu Saldo Atual: ${fmt(team.balance)}\nLivre para investir: ${fmt(maxInvestment - currentInvested)}\n\nQuanto deseja aplicar?`);
-        if (!amountStr) return;
-        const amount = parseFloat(amountStr);
-        
-        if (isNaN(amount) || amount <= 0) return alert("Valor inválido.");
-        if (amount > team.balance) return alert("Você não tem esse saldo disponível no caixa do clube.");
-        if (currentInvested + amount > maxInvestment) return alert(`O valor ultrapassa o teto permitido.`);
-        
-        if (confirm(`Confirmar aplicação de ${fmt(amount)}?\nO dinheiro sairá do seu caixa e ficará bloqueado rendendo juros.`)) {
+        if (confirm(`Confirmar aplicação de ${fmt(investAmount)}?\nO dinheiro sairá do seu caixa e ficará bloqueado rendendo 2% ao mês.\n(Carência de 3 semanas para saque sem multa).`)) {
             await db.collection('teams').doc(team.id).update({
-                balance: firebase.firestore.FieldValue.increment(-amount),
-                bankInvestment: { amount: currentInvested + amount, weeksLocked: 3 }
+                balance: firebase.firestore.FieldValue.increment(-investAmount),
+                bankInvestment: { amount: currentInvested + investAmount, weeksLocked: 3 }
             });
             alert("✅ Investimento realizado! Ele renderá juros a cada virada de semana.");
+            setShowInvestUI(false); // Fecha a UI
         }
     };
 
@@ -1690,13 +1703,61 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                     </div>
                                 ) : (
                                     <>
-                                        <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>
-                                            O caixa está cheio? Aplique seu dinheiro no banco. Ele ficará rendendo <b style={{color:'#00E676'}}>2% de juros a cada virada de semana</b>.<br/><br/>
-                                            (Carência de 3 semanas para não pagar multa de resgate antecipado).
-                                        </p>
-                                        <button className="btn btn-green" style={{color:'#000'}} onClick={handleInvest}>
-                                            📊 APLICAR SALDO
-                                        </button>
+                                        {!showInvestUI ? (
+                                            <>
+                                                <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>
+                                                    O caixa está cheio? Aplique seu dinheiro no banco. Ele ficará rendendo <b style={{color:'#00E676'}}>2% de juros a cada virada de semana</b>.<br/><br/>
+                                                    (Carência de 3 semanas para não pagar multa de resgate antecipado).
+                                                </p>
+                                                <button className="btn btn-green" style={{color:'#000'}} onClick={openInvestUI}>
+                                                    📊 SIMULAR INVESTIMENTO
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid #00E676'}}>
+                                                <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
+                                                    <label style={{color:'#00E676', fontSize:12, fontWeight:'bold'}}>Valor a Aplicar</label>
+                                                    <b style={{color:'#fff'}}>{fmt(investAmount)}</b>
+                                                </div>
+                                                
+                                                {/* O limite do slider é o saldo do time ou o espaço restante até o teto de 50 Milhões */}
+                                                <input 
+                                                    type="range" 
+                                                    min="10000" 
+                                                    max={Math.min(user.data.balance || 0, 50000000 - (user.data.bankInvestment?.amount || 0))} 
+                                                    step="10000" 
+                                                    value={investAmount} 
+                                                    onChange={e => setInvestAmount(Number(e.target.value))} 
+                                                    style={{width:'100%', accentColor:'#00E676', marginBottom: 15}}
+                                                />
+
+                                                {/* PAINEL DE RENDIMENTO */}
+                                                {(() => {
+                                                    const rendimento = investAmount * 0.02; // 2%
+                                                    return (
+                                                        <div style={{background:'#111', padding:10, borderRadius:5, fontSize:11, borderLeft:'3px solid #00E676', marginBottom:15}}>
+                                                            <div style={{display:'flex', justifyContent:'space-between'}}>
+                                                                <span>Rendimento Semanal (2%):</span> 
+                                                                <b style={{color:'lime'}}>+ {fmt(rendimento)}</b>
+                                                            </div>
+                                                            <div style={{display:'flex', justifyContent:'space-between', margin:'5px 0'}}>
+                                                                <span>Carência de Saque:</span> 
+                                                                <b style={{color:'var(--warning)'}}>3 Semanas</b>
+                                                            </div>
+                                                            <div style={{display:'flex', justifyContent:'space-between', borderTop:'1px dashed #333', paddingTop:5, marginTop:5}}>
+                                                                <span>Retorno Bruto após 1 semana:</span> 
+                                                                <b>{fmt(investAmount + rendimento)}</b>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
+
+                                                <div style={{display:'flex', gap:10}}>
+                                                    <button className="btn btn-green" style={{color:'#000'}} onClick={handleConfirmInvest}>CONFIRMAR APLICAÇÃO</button>
+                                                    <button className="btn btn-red" onClick={() => setShowInvestUI(false)}>CANCELAR</button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </>
                                 )}
                             </div>

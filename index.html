@@ -1742,6 +1742,20 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                             <div className="card" style={{borderLeft: '4px solid var(--secondary)', marginBottom: 15}}>
                                 <h4 style={{marginTop: 0, color: 'var(--secondary)'}}>💸 Linhas de Crédito</h4>
                                 
+                                {/* MOSTRADOR DO FINANCIAMENTO DE ESTÁDIO */}
+                                {user.data.stadiumLoan && user.data.stadiumLoan.installments > 0 && (
+                                    <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid cyan', marginBottom: 10}}>
+                                        <b style={{color: 'cyan'}}>🏟️ Financiamento da Arena</b>
+                                        <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 10, borderBottom:'1px dashed #444', paddingBottom:5}}>
+                                            <span>Faltam: <b>{user.data.stadiumLoan.installments} parcelas</b></span>
+                                            <span>Pagamento: <b style={{color:'var(--danger)'}}>{fmt(user.data.stadiumLoan.weeklyPayment)}/sem</b></span>
+                                        </div>
+                                        <div style={{textAlign:'right', fontSize:10, color:'#aaa', marginTop:5}}>
+                                            Dívida Restante: {fmt(user.data.stadiumLoan.weeklyPayment * user.data.stadiumLoan.installments)}
+                                        </div>
+                                    </div>
+                                )}
+                                
                                 {user.data.bankLoan && user.data.bankLoan.installments > 0 ? (
                                     <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid #333'}}>
                                         <b style={{color: 'var(--danger)'}}>Empréstimo Ativo</b>
@@ -2004,6 +2018,25 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         alert("Preço do ingresso atualizado para o próximo jogo em casa!");
     };
 
+          const handleFinanceStadium = async () => {
+        if (!nextDb) return;
+        if (team.stadiumLoan && team.stadiumLoan.installments > 0) return alert("🚫 Você já possui um financiamento de estádio em andamento. Quite-o antes de fazer outra obra.");
+        
+        const upgCost = db.upgCost;
+        const totalOwed = upgCost * 1.10; // Juros fixos subsidiados de 10%
+        const weekly = totalOwed / 10; // 10 parcelas
+
+        if (confirm(`🏦 FINANCIAMENTO CAIXA\n\nO banco pagará a construtora diretamente e seu estádio evoluirá AGORA!\n\nValor da Obra: ${fmt(upgCost)}\nCondições: 10x de ${fmt(weekly)}\nTotal com juros (10%): ${fmt(totalOwed)}\n\nAssinar contrato e iniciar obras?`)) {
+            await firebase.firestore().collection('teams').doc(team.id).update({
+                stadiumLevel: lvl + 1,
+                ticketPrice: nextDb.minTic,
+                stadiumLoan: { amountBorrowed: upgCost, totalOwed: totalOwed, weeklyPayment: weekly, installments: 10 }
+            });
+            alert("✅ Contrato assinado! A construtora já terminou as obras e seu novo estádio está pronto.");
+            onClose(); // Fecha para atualizar
+        }
+    };
+        
     const handleUpgrade = async () => {
         if (!nextDb) return;
         if ((team.balance || 0) < db.upgCost) return alert("Saldo insuficiente do clube!");
@@ -2139,14 +2172,21 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
 
                         {/* EVOLUÇÃO */}
                         {nextDb && (
-                            <div style={{marginTop:15, padding:15, border:'1px dashed gold', borderRadius:8, textAlign:'center'}}>
+                            <div style={{marginTop:15, padding:15, border:'1px dashed gold', borderRadius:8, textAlign:'center', background:'rgba(255,215,0,0.05)'}}>
                                 <b style={{color:'gold'}}>Próximo Nível: {nextDb.name}</b>
-                                <p style={{fontSize:10, color:'#aaa'}}>Capacidade sobe para {nextDb.cap.toLocaleString('pt-BR')}. Custo de manutenção subirá para {fmt(nextDb.maint)}/semana.</p>
-                                <button className="btn btn-gold" onClick={handleUpgrade} style={{color:'#000', margin:0}}>EVOLUIR ESTÁDIO ({fmt(db.upgCost)})</button>
+                                <p style={{fontSize:10, color:'#aaa', marginBottom:10}}>Capacidade sobe para {nextDb.cap.toLocaleString('pt-BR')}. Manutenção subirá para {fmt(nextDb.maint)}/sem.</p>
+                                
+                                <div style={{display:'flex', gap:10}}>
+                                    <button className="btn btn-gold" onClick={handleUpgrade} style={{color:'#000', margin:0, flex:1, fontSize:10}}>
+                                        PAGAR À VISTA<br/>({fmt(db.upgCost)})
+                                    </button>
+                                    
+                                    <button className="btn btn-ghost" onClick={handleFinanceStadium} style={{margin:0, flex:1, fontSize:10, borderColor:'cyan', color:'cyan'}}>
+                                        FINANCIAR OBRA<br/>(10x de {fmt((db.upgCost * 1.10) / 10)})
+                                    </button>
+                                </div>
                             </div>
                         )}
-                    </div>
-                )}
 
                 {tab === 'LOJA' && (
                     <div className="animate-in">
@@ -3225,11 +3265,29 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
                     }
                 }
 
+                // C) Financiamento de Estádio (Arena)
+                if (t.stadiumLoan && t.stadiumLoan.installments > 0) {
+                    const payment = t.stadiumLoan.weeklyPayment;
+                    const remainingInstallments = t.stadiumLoan.installments - 1;
+                    
+                    newBalance -= payment; // Tira o dinheiro direto da conta
+
+                    if (remainingInstallments <= 0) {
+                        updates.stadiumLoan = firebase.firestore.FieldValue.delete();
+                    } else {
+                        updates.stadiumLoan = {
+                            ...t.stadiumLoan,
+                            installments: remainingInstallments
+                        };
+                    }
+                }
+
                 // Salva o novo saldo consolidado
                 updates.balance = newBalance;
                 
                 b.update(db.collection('teams').doc(t.id), updates);
             });
+
             // 2.3. GERAR NOTÍCIA DA COTA DA FEDERAÇÃO
             const newsRef = db.collection('news').doc();
             b.set(newsRef, {

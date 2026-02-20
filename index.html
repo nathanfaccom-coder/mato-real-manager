@@ -6188,6 +6188,13 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
     
     const attrCount = player.attributes ? Object.keys(player.attributes).length : 30;
     const projectedOvIncrease = Math.floor(pointsToGain / attrCount);
+    // --- CÁLCULO DA ESTIMATIVA DE TREINOS SOLOS PARA +1 OVR ---
+    const xpNeededForNextOv = attrCount * 100; // XP total necessário para subir +1 OVR inteiro
+    const currentProgressForOv = xpCurrent % xpNeededForNextOv; // XP acumulado focado no próximo OVR
+    const missingXpForOv = xpNeededForNextOv - currentProgressForOv;
+    const avgSoloXp = 4.5; // Um treino solo dá entre 3 e 6 XP (média 4.5)
+    const estSoloTrains = Math.ceil(missingXpForOv / avgSoloXp);
+    // ----------------------------------------------------------
 
     const energy = player.energy !== undefined ? player.energy : 100;
 
@@ -6386,8 +6393,16 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                                 );
                             })}
                         </div>
-                    ) : (
+                   ) : (
                         <p style={{textAlign:'center', color:'#666'}}>Atributos não gerados.</p>
+                    )}
+
+                    {/* --- CARD DE ESTIMATIVA DE TREINO --- */}
+                    {player.attributes && (
+                        <div style={{background:'rgba(0,0,0,0.3)', padding:10, borderRadius:8, marginTop:15, fontSize:11, color:'#ddd', textAlign:'center', border:'1px dashed #444'}}>
+                            ⏳ <b>Estimativa Evolutiva:</b> Faltam cerca de <b style={{color:'var(--warning)'}}>{estSoloTrains} treinos individuais</b> para você garantir <b style={{color:'#00E676'}}>+1 de Overall</b>.<br/>
+                            <span style={{fontSize:9, color:'#888'}}>*Cálculo base isolado. Jogar partidas, ter um Técnico e usar Itens da Loja acelera este tempo drasticamente!</span>
+                        </div>
                     )}
                 </div>
 

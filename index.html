@@ -1375,15 +1375,13 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
      
         const PublicServices = ({ players, user, onDonate }) => {
     const [hTab, setHTab] = useState('HOSPITAL');
-            // Estados do Banco (Empréstimo Interativo)
     const [showLoanUI, setShowLoanUI] = useState(false);
     const [loanAmount, setLoanAmount] = useState(100000);
     const [loanInst, setLoanInst] = useState(5);
-   const [showInvestUI, setShowInvestUI] = useState(false);
+    const [showInvestUI, setShowInvestUI] = useState(false);
     const [investAmount, setInvestAmount] = useState(100000);
-            const injured = (players || []).filter(p => (p.recoveryLeft || 0) > 0);
+    const injured = (players || []).filter(p => (p.recoveryLeft || 0) > 0);
 
-    // --- NOVA TABELA DE PROCEDIMENTOS POR CATEGORIA ---
     const SURGERY_OPTIONS = {
         MODERADA: [
             { id: 'M1', name: 'Fisioterapia Intensiva (Aceleração)', timeRed: 1, cost: 300000, success: 0.95, text: "Sessões de choque e ultrassom para acelerar a cicatrização." },
@@ -1400,7 +1398,6 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     };
 
     const handleSurgery = async (p) => {
-        // 1. Identifica a categoria da lesão
         let category = 'LEVE';
         const injuryName = typeof p.injury === 'object' ? p.injury.label : p.injury;
         
@@ -1408,7 +1405,6 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         if (INJURIES_DB.GRAVE.includes(injuryName)) category = 'GRAVE';
         if (INJURIES_DB.EXTREMA.includes(injuryName)) category = 'EXTREMA';
 
-        // TRAVA: Lesões Leves ou Intoxicação não operam
         if (category === 'LEVE' || injuryName === 'Intoxicação Alimentar') {
             return alert(`🚫 PRONTUÁRIO NEGADO!\nA lesão "${injuryName}" é considerada leve ou clínica. O tratamento exige apenas repouso e tempo natural. Não há indicação cirúrgica.`);
         }
@@ -1424,9 +1420,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
            const cirurgia = options[parseInt(escolha) - 1];
             if (!cirurgia) return alert("Opção inválida.");
 
-            // --- LÓGICA DE COBERTURA DO PLANO DE SAÚDE ---
             let teamCoverage = 0;
-            // Busca se o time do jogador tem plano corporativo
             if (p.teamId && p.teamId !== 'FREE') {
                 const teamDoc = await firebase.firestore().collection('teams').doc(p.teamId).get();
                 if (teamDoc.exists && teamDoc.data().healthPlan) {
@@ -1435,11 +1429,10 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             }
             
             const playerCoverage = p.healthPlan ? (p.healthPlan.coverage || 0) : 0;
-            const bestCoverage = Math.max(teamCoverage, playerCoverage); // A regra do "Maior Cobre"
+            const bestCoverage = Math.max(teamCoverage, playerCoverage); 
             
             const discountAmount = bestCoverage > 0 ? (cirurgia.cost * (bestCoverage / 100)) : 0;
             const finalCost = cirurgia.cost - discountAmount;
-            // ----------------------------------------------
             
             if ((p.hospitalFund || 0) < finalCost) {
                 return alert(`Saldo na vaquinha insuficiente!\nCusto com desconto: ${fmt(finalCost)}\nSaldo atual: ${fmt(p.hospitalFund || 0)}`);
@@ -1460,7 +1453,6 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                         recoveryLeft: novoTempo,
                         hospitalFund: (p.hospitalFund || 0) - finalCost,
                         injury: novoTempo === 0 ? firebase.firestore.FieldValue.delete() : p.injury,
-                        // Limpa histórico de doações após cirurgia bem-sucedida
                         donors: {} 
                     });
                     alert(`✅ SUCESSO!\nA operação foi um êxito. ${p.name} deve retornar aos gramados em breve.`);
@@ -1477,31 +1469,25 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         }
     };
 
-    // ==========================================
-    // LÓGICA DO BANCO (EMPRÉSTIMOS E INVESTIMENTO)
-    // ==========================================
     const LOAN_LIMITS = { 'VARZEA': 500000, 'D': 2000000, 'C': 5000000, 'B': 10000000, 'A': 20000000 };
 
-    // Abre a interface e ajusta o valor inicial baseado no limite do time
     const openLoanUI = () => {
         if (user.type !== 'USER') return alert("Apenas clubes podem solicitar empréstimos comerciais.");
         const team = user.data;
         if (team.bankLoan && team.bankLoan.installments > 0) return alert("Você já possui um empréstimo ativo. Quite-o antes de pedir outro.");
         
         const limit = LOAN_LIMITS[team.serie || 'VARZEA'] || 500000;
-        setLoanAmount(Math.min(100000, limit)); // Começa com 100k ou o limite
-        setLoanInst(5); // Começa em 5x por padrão
+        setLoanAmount(Math.min(100000, limit));
+        setLoanInst(5);
         setShowLoanUI(true);
     };
 
-    // Processa o empréstimo com os valores escolhidos na barrinha
     const handleConfirmLoan = async () => {
         const team = user.data;
         const limit = LOAN_LIMITS[team.serie || 'VARZEA'] || 500000;
         
         if (loanAmount <= 0 || loanAmount > limit) return alert("Valor inválido.");
         
-        // Matemática dos Juros: 10% base + 5% por parcela extra (Máx 55%)
         const interestRate = 0.10 + ((loanInst - 1) * 0.05); 
         const totalToPay = loanAmount * (1 + interestRate);
         const weekly = totalToPay / loanInst;
@@ -1512,11 +1498,10 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                 bankLoan: { amountBorrowed: loanAmount, totalOwed: totalToPay, weeklyPayment: weekly, installments: loanInst }
             });
             alert("✅ Dinheiro na conta! As parcelas serão debitadas automaticamente.");
-            setShowLoanUI(false); // Fecha a interface
+            setShowLoanUI(false); 
         }
     };
 
-    // Abre a interface do Investimento
     const openInvestUI = () => {
         if (user.type !== 'USER') return alert("Apenas clubes podem investir.");
         const team = user.data;
@@ -1526,13 +1511,11 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         if (currentInvested >= maxInvestment) return alert(`Você já atingiu o teto máximo de investimento (${fmt(maxInvestment)}).`);
         if ((team.balance || 0) <= 0) return alert("Você não tem saldo em caixa para investir.");
 
-        // Ajusta a barrinha para um valor inicial justo (100k ou o máximo que ele tem)
         const availableToInvest = Math.min(team.balance, maxInvestment - currentInvested);
         setInvestAmount(Math.min(100000, availableToInvest)); 
         setShowInvestUI(true);
     };
 
-    // Confirma a aplicação puxando da barrinha
     const handleConfirmInvest = async () => {
         const team = user.data;
         const currentInvested = team.bankInvestment?.amount || 0;
@@ -1548,7 +1531,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                 bankInvestment: { amount: currentInvested + investAmount, weeksLocked: 3 }
             });
             alert("✅ Investimento realizado! Ele renderá juros a cada virada de semana.");
-            setShowInvestUI(false); // Fecha a UI
+            setShowInvestUI(false);
         }
     };
 
@@ -1574,6 +1557,72 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                 bankInvestment: firebase.firestore.FieldValue.delete()
             });
             alert("Dinheiro transferido para o caixa do clube com sucesso!");
+        }
+    };
+
+    // ==========================================
+    // LÓGICA DA BALADA (ROLETA DE EVENTOS)
+    // ==========================================
+    const handleNightclub = async () => {
+        if (user.type !== 'PLAYER' && user.type !== 'COACH') {
+            return alert("Apenas Pessoas Físicas (Jogadores e Técnicos) podem curtir a noitada!");
+        }
+
+        const entryFee = 5000;
+        if ((user.data.balance || 0) < entryFee) {
+            return alert(`O segurança barrou você na porta!\nVocê precisa de ${fmt(entryFee)} para pagar a entrada VIP.`);
+        }
+
+        if (!confirm(`🎟️ ENTRADA ÁREA VIP: ${fmt(entryFee)}\n\nAviso: A noite de Mato Real é imprevisível. Você pode fazer contatos incríveis, arrumar confusão ou acordar de ressaca sem energia. Entrar?`)) return;
+
+        const rand = Math.random();
+        let msg = "";
+        let updates = { balance: firebase.firestore.FieldValue.increment(-entryFee) };
+        let newsMsg = null;
+
+        if (rand < 0.15) {
+            updates.balance = firebase.firestore.FieldValue.increment(50000 - entryFee); 
+            msg = "🤝 CONTATOS VIP!\nVocê conheceu um magnata de Mato Real fumando charuto. Ele adorou sua visão e fez um PIX de ₣ 50.000 como patrocínio pessoal!";
+        } else if (rand < 0.35) {
+            if (user.type === 'PLAYER') {
+                updates.fame = (user.data.fame || 0) + 500;
+                updates.mood = '🤩';
+            }
+            updates.energy = 100;
+            msg = "🍾 O REI DO CAMAROTE!\nVocê estourou champanhe pra todo mundo! Ganhou MUITA fama (+500), saiu nas colunas de fofoca e recuperou sua energia.";
+        } else if (rand < 0.65) {
+            updates.energy = 100;
+            msg = "🍹 NOITE DE BOA.\nVocê ficou no seu canto, curtiu uma música, bebeu água e descansou a mente. Sua Energia foi restaurada para 100%!";
+        } else if (rand < 0.90) {
+            updates.energy = 0;
+            if (user.type === 'PLAYER') updates.mood = '😐';
+            msg = "🤢 RESSACA MONSTRA...\nA noite foi boa até demais. Você misturou tudo o que não devia e acordou abraçado com o vaso. Sua Energia ZEROU!";
+        } else {
+            if (user.type === 'PLAYER') {
+                updates.recoveryLeft = 1;
+                updates.injury = "Corte no Rosto (Briga de Boate)";
+                updates.mood = '😡';
+                updates.fame = Math.max(0, (user.data.fame || 0) - 200);
+                updates.energy = 0;
+                msg = "👊 TRETA NA BOATE!\nVocê se envolveu numa briga com torcedores na saída. Ganhou um corte no rosto, perdeu fama e ficará 1 JOGO AFASTADO no DM!";
+                newsMsg = `🚨 **POLÊMICA NA NOITE!**\nO jogador **${user.data.name}** foi flagrado em uma confusão generalizada na boate e se machucou. A diretoria vai cobrar explicações!`;
+            } else {
+                 updates.energy = 0;
+                 msg = "📸 VAZOU NA IMPRENSA!\nFotos suas em estado lamentável vazaram na internet. A diretoria não gostou nada do seu comportamento.";
+                 newsMsg = `🚨 **CRISE NOS BASTIDORES!**\nO técnico **${user.data.name}** foi flagrado em situação constrangedora na balada e o clima pesou no vestiário!`;
+            }
+        }
+
+        try {
+            const col = user.type === 'PLAYER' ? 'players' : 'users'; 
+            await db.collection(col).doc(user.data.id).update(updates);
+            
+            if (newsMsg) {
+                await db.collection('news').add({ text: newsMsg, type: 'press', date: Date.now(), likes: [] });
+            }
+            alert(msg);
+        } catch (e) {
+            alert("Erro no evento: " + e.message);
         }
     };
 
@@ -1607,87 +1656,10 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                         </div>
                     ) : (
                         injured.map(p => {
-                            // Normaliza o nome da lesão (pode ser string ou objeto dependendo da versão)
                             const injuryName = typeof p.injury === 'object' ? p.injury.label : p.injury;
-                            
-                            // Verifica especificamente se é Intoxicação
                             const isIntoxication = injuryName === 'Intoxicação Alimentar';
-                            
-                            // Verifica se é leve (inclui intoxicação na lógica visual de 'Sem Cirurgia')
                             const isLight = INJURIES_DB.LEVE.includes(injuryName) || isIntoxication;
 
-                            // ==========================================
-    // LÓGICA DA BALADA (ROLETA DE EVENTOS)
-    // ==========================================
-    const handleNightclub = async () => {
-        if (user.type !== 'PLAYER' && user.type !== 'COACH') {
-            return alert("Apenas Pessoas Físicas (Jogadores e Técnicos) podem curtir a noitada!");
-        }
-
-        const entryFee = 5000;
-        if ((user.data.balance || 0) < entryFee) {
-            return alert(`O segurança barrou você na porta!\nVocê precisa de ${fmt(entryFee)} para pagar a entrada VIP.`);
-        }
-
-        if (!confirm(`🎟️ ENTRADA ÁREA VIP: ${fmt(entryFee)}\n\nAviso: A noite de Mato Real é imprevisível. Você pode fazer contatos incríveis, arrumar confusão ou acordar de ressaca sem energia. Entrar?`)) return;
-
-        const rand = Math.random();
-        let msg = "";
-        let updates = { balance: firebase.firestore.FieldValue.increment(-entryFee) };
-        let newsMsg = null;
-
-        if (rand < 0.15) {
-            // 15% - Encontro de Negócios (Jackpot)
-            updates.balance = firebase.firestore.FieldValue.increment(50000 - entryFee); 
-            msg = "🤝 CONTATOS VIP!\nVocê conheceu um magnata de Mato Real fumando charuto. Ele adorou sua visão e fez um PIX de ₣ 50.000 como patrocínio pessoal!";
-        } else if (rand < 0.35) {
-            // 20% - O Rei do Camarote
-            if (user.type === 'PLAYER') {
-                updates.fame = (user.data.fame || 0) + 500;
-                updates.mood = '🤩';
-            }
-            updates.energy = 100;
-            msg = "🍾 O REI DO CAMAROTE!\nVocê estourou champanhe pra todo mundo! Ganhou MUITA fama (+500), saiu nas colunas de fofoca e recuperou sua energia.";
-        } else if (rand < 0.65) {
-            // 30% - Noite Tranquila
-            updates.energy = 100;
-            msg = "🍹 NOITE DE BOA.\nVocê ficou no seu canto, curtiu uma música, bebeu água e descansou a mente. Sua Energia foi restaurada para 100%!";
-        } else if (rand < 0.90) {
-            // 25% - Ressaca Braba
-            updates.energy = 0;
-            if (user.type === 'PLAYER') updates.mood = '😐';
-            msg = "🤢 RESSACA MONSTRA...\nA noite foi boa até demais. Você misturou tudo o que não devia e acordou abraçado com o vaso. Sua Energia ZEROU!";
-        } else {
-            // 10% - Briga / Polêmica (Lesão Mágica)
-            if (user.type === 'PLAYER') {
-                updates.recoveryLeft = 1; // 1 jogo de gancho
-                updates.injury = "Corte no Rosto (Briga de Boate)";
-                updates.mood = '😡';
-                updates.fame = Math.max(0, (user.data.fame || 0) - 200); // Perde fama
-                updates.energy = 0;
-                msg = "👊 TRETA NA BOATE!\nVocê se envolveu numa briga com torcedores na saída. Ganhou um corte no rosto, perdeu fama e ficará 1 JOGO AFASTADO no DM!";
-                newsMsg = `🚨 **POLÊMICA NA NOITE!**\nO jogador **${user.data.name}** foi flagrado em uma confusão generalizada na boate e se machucou. A diretoria vai cobrar explicações!`;
-            } else {
-                 updates.energy = 0;
-                 msg = "📸 VAZOU NA IMPRENSA!\nFotos suas em estado lamentável vazaram na internet. A diretoria não gostou nada do seu comportamento.";
-                 newsMsg = `🚨 **CRISE NOS BASTIDORES!**\nO técnico **${user.data.name}** foi flagrado em situação constrangedora na balada e o clima pesou no vestiário!`;
-            }
-        }
-
-        try {
-            const col = user.type === 'PLAYER' ? 'players' : 'users'; 
-            await db.collection(col).doc(user.data.id).update(updates);
-            
-            // Joga no jornal pra fofoca rolar
-            if (newsMsg) {
-                await db.collection('news').add({ text: newsMsg, type: 'press', date: Date.now(), likes: [] });
-            }
-            alert(msg);
-        } catch (e) {
-            alert("Erro no evento: " + e.message);
-        }
-    };
-                            
                             return (
                                 <div key={p.id} className="card" style={{borderLeft:'5px solid #ff1744', position:'relative'}}>
                                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
@@ -1704,14 +1676,12 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                         </div>
                                     </div>
 
-                                    {/* ÁREA DA VAQUINHA E DOADORES */}
                                     <div style={{marginTop:15, background:'rgba(0,0,0,0.2)', padding:10, borderRadius:8}}>
                                         <div style={{display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:10}}>
                                             <span>Fundo para Cirurgia:</span>
                                             <b style={{color:'gold'}}>{fmt(p.hospitalFund || 0)}</b>
                                         </div>
                                         
-                                        {/* Lista de quem já ajudou */}
                                         <div style={{fontSize:9, color:'#888', marginBottom:10}}>
                                             <b>Doadores Recentes:</b><br/>
                                             {p.donors && Object.keys(p.donors).length > 0 ? 
@@ -1721,18 +1691,12 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                         </div>
                                         
                                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                                            {/* BOTÃO DOAR COM TRAVA PARA TODAS AS LESÕES LEVES/CLÍNICAS */}
                                             <button 
                                                 className={`btn ${isLight ? 'btn-ghost' : 'btn-green'}`} 
-                                                style={{
-                                                    fontSize:10, 
-                                                    padding:8, 
-                                                    opacity: isLight ? 0.5 : 1, 
-                                                    cursor: isLight ? 'not-allowed' : 'pointer'
-                                                }} 
+                                                style={{fontSize:10, padding:8, opacity: isLight ? 0.5 : 1, cursor: isLight ? 'not-allowed' : 'pointer'}} 
                                                 disabled={isLight}
                                                 onClick={() => {
-                                                    if(isLight) return alert("Lesões leves e clínicas (como câimbras, fadiga ou intoxicação) precisam apenas de repouso natural. Não é possível arrecadar fundos para cirurgia.");
+                                                    if(isLight) return alert("Lesões leves e clínicas precisam apenas de repouso natural.");
                                                     const v = prompt(`Quanto desejas doar para ${p.name}?`);
                                                     if(v && !isNaN(v)) onDonate(p, parseFloat(v));
                                                 }}
@@ -1756,7 +1720,6 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                 </div>
             )}
 
-            {/* --- ABA: BANCO MUNICIPAL --- */}
             {hTab === 'BANCO' && (
                 <div>
                     <div style={{background:'linear-gradient(90deg, #0d47a1, #1976d2)', padding:10, borderRadius:8, color:'white', marginBottom:15, display:'flex', alignItems:'center', gap:10, boxShadow: '0 4px 6px rgba(0,0,0,0.3)'}}>
@@ -1774,7 +1737,6 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                         </div>
                     ) : user.type === 'PLAYER' ? (
                         <div className="animate-in">
-                            {/* SEGUROS INDIVIDUAIS (SÓ JOGADORES) */}
                             <div className="card" style={{borderLeft: '4px solid #00E676', marginBottom: 15}}>
                                 <h4 style={{marginTop: 0, color: '#00E676'}}>🛡️ Meu Seguro Saúde Particular</h4>
                                 
@@ -1790,7 +1752,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                             <b style={{color:'var(--danger)'}}>{fmt(user.data.healthPlan.cost)}/sem</b>
                                         </div>
                                         <button className="btn btn-red" style={{marginTop: 15}} onClick={async () => {
-                                            if(confirm("Cancelar seu Seguro Particular? Você ficará desprotegido caso o clube não tenha um plano.")) {
+                                            if(confirm("Cancelar seu Seguro Particular?")) {
                                                 await db.collection('players').doc(user.data.id).update({
                                                     healthPlan: firebase.firestore.FieldValue.delete()
                                                 });
@@ -1804,51 +1766,22 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                     <>
                                         <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>
                                             O presidente do clube não paga seu seguro? Contrate um particular! Ele cobre suas cirurgias e o valor é descontado automaticamente do seu salário toda semana.
-                                            <br/><br/><b style={{color:'var(--warning)'}}>⚠️ Importante:</b> O seguro não cobre lesões preexistentes.
                                         </p>
                                         
-                                        {/* Tabela de Preços Fixa para Jogadores */}
                                         <div style={{display:'grid', gap:10}}>
                                             <div style={{background:'#111', padding:10, borderRadius:5, border:'1px solid silver', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                                <div>
-                                                    <b style={{color:'silver', fontSize:13}}>Prata</b><br/><small style={{color:'#00E676'}}>Cobre 30%</small>
-                                                </div>
-                                                <div style={{textAlign:'right'}}>
-                                                    <b style={{color:'var(--danger)', display:'block'}}>{fmt(1500)}/s</b>
-                                                    <button className="btn btn-ghost" style={{padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5}} onClick={async () => {
-                                                        if(confirm(`Contratar o Plano Prata por ${fmt(1500)}/semana?`)) {
-                                                            await db.collection('players').doc(user.data.id).update({ healthPlan: { name: 'Prata', coverage: 30, cost: 1500 } });
-                                                        }
-                                                    }}>ASSINAR</button>
-                                                </div>
+                                                <div><b style={{color:'silver', fontSize:13}}>Prata</b><br/><small style={{color:'#00E676'}}>Cobre 30%</small></div>
+                                                <div style={{textAlign:'right'}}><b style={{color:'var(--danger)', display:'block'}}>{fmt(1500)}/s</b><button className="btn btn-ghost" style={{padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5}} onClick={async () => { if(confirm(`Contratar o Plano Prata por ${fmt(1500)}/semana?`)) { await db.collection('players').doc(user.data.id).update({ healthPlan: { name: 'Prata', coverage: 30, cost: 1500 } }); } }}>ASSINAR</button></div>
                                             </div>
 
                                             <div style={{background:'#111', padding:10, borderRadius:5, border:'1px solid gold', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                                <div>
-                                                    <b style={{color:'gold', fontSize:13}}>Ouro</b><br/><small style={{color:'#00E676'}}>Cobre 50%</small>
-                                                </div>
-                                                <div style={{textAlign:'right'}}>
-                                                    <b style={{color:'var(--danger)', display:'block'}}>{fmt(4000)}/s</b>
-                                                    <button className="btn btn-ghost" style={{padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5, borderColor:'gold', color:'gold'}} onClick={async () => {
-                                                        if(confirm(`Contratar o Plano Ouro por ${fmt(4000)}/semana?`)) {
-                                                            await db.collection('players').doc(user.data.id).update({ healthPlan: { name: 'Ouro', coverage: 50, cost: 4000 } });
-                                                        }
-                                                    }}>ASSINAR</button>
-                                                </div>
+                                                <div><b style={{color:'gold', fontSize:13}}>Ouro</b><br/><small style={{color:'#00E676'}}>Cobre 50%</small></div>
+                                                <div style={{textAlign:'right'}}><b style={{color:'var(--danger)', display:'block'}}>{fmt(4000)}/s</b><button className="btn btn-ghost" style={{padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5, borderColor:'gold', color:'gold'}} onClick={async () => { if(confirm(`Contratar o Plano Ouro por ${fmt(4000)}/semana?`)) { await db.collection('players').doc(user.data.id).update({ healthPlan: { name: 'Ouro', coverage: 50, cost: 4000 } }); } }}>ASSINAR</button></div>
                                             </div>
 
                                             <div style={{background:'linear-gradient(45deg, #111, #1a237e)', padding:10, borderRadius:5, border:'1px solid cyan', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                                <div>
-                                                    <b style={{color:'cyan', fontSize:13}}>Diamante</b><br/><small style={{color:'#00E676'}}>Cobre 70%</small>
-                                                </div>
-                                                <div style={{textAlign:'right'}}>
-                                                    <b style={{color:'var(--danger)', display:'block'}}>{fmt(10000)}/s</b>
-                                                    <button className="btn btn-blue" style={{padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5}} onClick={async () => {
-                                                        if(confirm(`Contratar o Plano Diamante por ${fmt(10000)}/semana?`)) {
-                                                            await db.collection('players').doc(user.data.id).update({ healthPlan: { name: 'Diamante', coverage: 70, cost: 10000 } });
-                                                        }
-                                                    }}>ASSINAR</button>
-                                                </div>
+                                                <div><b style={{color:'cyan', fontSize:13}}>Diamante</b><br/><small style={{color:'#00E676'}}>Cobre 70%</small></div>
+                                                <div style={{textAlign:'right'}}><b style={{color:'var(--danger)', display:'block'}}>{fmt(10000)}/s</b><button className="btn btn-blue" style={{padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5}} onClick={async () => { if(confirm(`Contratar o Plano Diamante por ${fmt(10000)}/semana?`)) { await db.collection('players').doc(user.data.id).update({ healthPlan: { name: 'Diamante', coverage: 70, cost: 10000 } }); } }}>ASSINAR</button></div>
                                             </div>
                                         </div>
                                     </>
@@ -1857,20 +1790,15 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                         </div>
                     ) : (
                         <div className="animate-in">
-                            {/* EMPRÉSTIMOS */}
                             <div className="card" style={{borderLeft: '4px solid var(--secondary)', marginBottom: 15}}>
                                 <h4 style={{marginTop: 0, color: 'var(--secondary)'}}>💸 Linhas de Crédito</h4>
                                 
-                                {/* MOSTRADOR DO FINANCIAMENTO DE ESTÁDIO */}
                                 {user.data.stadiumLoan && user.data.stadiumLoan.installments > 0 && (
                                     <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid cyan', marginBottom: 10}}>
                                         <b style={{color: 'cyan'}}>🏟️ Financiamento da Arena</b>
                                         <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 10, borderBottom:'1px dashed #444', paddingBottom:5}}>
                                             <span>Faltam: <b>{user.data.stadiumLoan.installments} parcelas</b></span>
                                             <span>Pagamento: <b style={{color:'var(--danger)'}}>{fmt(user.data.stadiumLoan.weeklyPayment)}/sem</b></span>
-                                        </div>
-                                        <div style={{textAlign:'right', fontSize:10, color:'#aaa', marginTop:5}}>
-                                            Dívida Restante: {fmt(user.data.stadiumLoan.weeklyPayment * user.data.stadiumLoan.installments)}
                                         </div>
                                     </div>
                                 )}
@@ -1882,21 +1810,13 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                             <span>Faltam: <b>{user.data.bankLoan.installments} parcelas</b></span>
                                             <span>Pagamento: <b style={{color:'var(--danger)'}}>{fmt(user.data.bankLoan.weeklyPayment)}/sem</b></span>
                                         </div>
-                                        <div style={{textAlign:'right', fontSize:10, color:'#aaa', marginTop:5}}>
-                                            Dívida Restante: {fmt(user.data.bankLoan.weeklyPayment * user.data.bankLoan.installments)}
-                                        </div>
                                     </div>
                                 ) : (
                                    <>
                                         {!showLoanUI ? (
                                             <>
-                                                <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>
-                                                    Precisa de caixa rápido? Pegue um empréstimo. As parcelas serão debitadas automaticamente na virada de semana. (Juros menores para prazos curtos).
-                                                    <br/><br/>Seu limite atual (Série {user.data.serie || 'Várzea'}): <b style={{color:'#fff'}}>{fmt(LOAN_LIMITS[user.data.serie || 'VARZEA'])}</b>
-                                                </p>
-                                                <button className="btn btn-blue" onClick={openLoanUI}>
-                                                    💰 SIMULAR EMPRÉSTIMO
-                                                </button>
+                                                <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>Precisa de caixa rápido? Pegue um empréstimo.</p>
+                                                <button className="btn btn-blue" onClick={openLoanUI}>💰 SIMULAR EMPRÉSTIMO</button>
                                             </>
                                         ) : (
                                             <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid var(--secondary)'}}>
@@ -1904,23 +1824,14 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                                     <label style={{color:'var(--secondary)', fontSize:12, fontWeight:'bold'}}>Valor do Empréstimo</label>
                                                     <b style={{color:'#fff'}}>{fmt(loanAmount)}</b>
                                                 </div>
-                                                <input 
-                                                    type="range" min="10000" max={LOAN_LIMITS[user.data.serie || 'VARZEA'] || 500000} step="10000" 
-                                                    value={loanAmount} onChange={e => setLoanAmount(Number(e.target.value))} 
-                                                    style={{width:'100%', accentColor:'var(--secondary)', marginBottom: 15}}
-                                                />
+                                                <input type="range" min="10000" max={LOAN_LIMITS[user.data.serie || 'VARZEA'] || 500000} step="10000" value={loanAmount} onChange={e => setLoanAmount(Number(e.target.value))} style={{width:'100%', accentColor:'var(--secondary)', marginBottom: 15}} />
 
                                                 <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
                                                     <label style={{color:'var(--secondary)', fontSize:12, fontWeight:'bold'}}>Parcelas (Semanas)</label>
                                                     <b style={{color:'#fff'}}>{loanInst}x</b>
                                                 </div>
-                                                <input 
-                                                    type="range" min="1" max="10" step="1" 
-                                                    value={loanInst} onChange={e => setLoanInst(Number(e.target.value))} 
-                                                    style={{width:'100%', accentColor:'var(--secondary)', marginBottom: 15}}
-                                                />
+                                                <input type="range" min="1" max="10" step="1" value={loanInst} onChange={e => setLoanInst(Number(e.target.value))} style={{width:'100%', accentColor:'var(--secondary)', marginBottom: 15}} />
 
-                                               {/* PAINEL DE RESULTADO DINÂMICO */}
                                                 {(() => {
                                                     const interestRate = 0.10 + ((loanInst - 1) * 0.05);
                                                     const totalToPay = loanAmount * (1 + interestRate);
@@ -1929,9 +1840,6 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                                         <div style={{background:'#111', padding:10, borderRadius:5, fontSize:11, borderLeft:'3px solid var(--secondary)', marginBottom:15}}>
                                                             <div style={{display:'flex', justifyContent:'space-between'}}><span>Taxa de Juros:</span> <b style={{color:'gold'}}>{(interestRate * 100).toFixed(0)}%</b></div>
                                                             <div style={{display:'flex', justifyContent:'space-between', margin:'5px 0'}}><span>Pagamento Semanal:</span> <b style={{color:'var(--danger)'}}>{fmt(weekly)}</b></div>
-                                                            <div style={{display:'flex', justifyContent:'space-between', borderTop:'1px dashed #333', paddingTop:5, marginTop:5}}>
-                                                                <span>Total a Devolver:</span> <b>{fmt(totalToPay)}</b>
-                                                            </div>
                                                         </div>
                                                     );
                                                 })()}
@@ -1946,7 +1854,6 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                 )}
                             </div>
 
-                            {/* INVESTIMENTOS */}
                             <div className="card" style={{borderLeft: '4px solid #00E676'}}>
                                 <h4 style={{marginTop: 0, color: '#00E676'}}>📈 Fundo de Renda Fixa</h4>
                                 
@@ -1959,21 +1866,14 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                                 {(user.data.bankInvestment.weeksLocked || 0) > 0 ? `Bloqueado (${user.data.bankInvestment.weeksLocked} sem)` : 'Livre para Saque'}
                                             </span>
                                         </div>
-                                        <button className="btn btn-red" style={{marginTop: 15}} onClick={handleWithdraw}>
-                                            🏦 RESGATAR DINHEIRO
-                                        </button>
+                                        <button className="btn btn-red" style={{marginTop: 15}} onClick={handleWithdraw}>🏦 RESGATAR DINHEIRO</button>
                                     </div>
                                 ) : (
                                     <>
                                         {!showInvestUI ? (
                                             <>
-                                                <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>
-                                                    O caixa está cheio? Aplique seu dinheiro no banco. Ele ficará rendendo <b style={{color:'#00E676'}}>2% de juros a cada virada de semana</b>.<br/><br/>
-                                                    (Carência de 3 semanas para não pagar multa de resgate antecipado).
-                                                </p>
-                                                <button className="btn btn-green" style={{color:'#000'}} onClick={openInvestUI}>
-                                                    📊 SIMULAR INVESTIMENTO
-                                                </button>
+                                                <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>Aplique seu dinheiro no banco rendendo <b style={{color:'#00E676'}}>2% de juros</b> na virada de semana.</p>
+                                                <button className="btn btn-green" style={{color:'#000'}} onClick={openInvestUI}>📊 SIMULAR INVESTIMENTO</button>
                                             </>
                                         ) : (
                                             <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid #00E676'}}>
@@ -1982,34 +1882,13 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                                     <b style={{color:'#fff'}}>{fmt(investAmount)}</b>
                                                 </div>
                                                 
-                                                {/* O limite do slider é o saldo do time ou o espaço restante até o teto de 50 Milhões */}
-                                                <input 
-                                                    type="range" 
-                                                    min="10000" 
-                                                    max={Math.min(user.data.balance || 0, 50000000 - (user.data.bankInvestment?.amount || 0))} 
-                                                    step="10000" 
-                                                    value={investAmount} 
-                                                    onChange={e => setInvestAmount(Number(e.target.value))} 
-                                                    style={{width:'100%', accentColor:'#00E676', marginBottom: 15}}
-                                                />
+                                                <input type="range" min="10000" max={Math.min(user.data.balance || 0, 50000000 - (user.data.bankInvestment?.amount || 0))} step="10000" value={investAmount} onChange={e => setInvestAmount(Number(e.target.value))} style={{width:'100%', accentColor:'#00E676', marginBottom: 15}} />
 
-                                                {/* PAINEL DE RENDIMENTO */}
                                                 {(() => {
-                                                    const rendimento = investAmount * 0.02; // 2%
+                                                    const rendimento = investAmount * 0.02;
                                                     return (
                                                         <div style={{background:'#111', padding:10, borderRadius:5, fontSize:11, borderLeft:'3px solid #00E676', marginBottom:15}}>
-                                                            <div style={{display:'flex', justifyContent:'space-between'}}>
-                                                                <span>Rendimento Semanal (2%):</span> 
-                                                                <b style={{color:'lime'}}>+ {fmt(rendimento)}</b>
-                                                            </div>
-                                                            <div style={{display:'flex', justifyContent:'space-between', margin:'5px 0'}}>
-                                                                <span>Carência de Saque:</span> 
-                                                                <b style={{color:'var(--warning)'}}>3 Semanas</b>
-                                                            </div>
-                                                            <div style={{display:'flex', justifyContent:'space-between', borderTop:'1px dashed #333', paddingTop:5, marginTop:5}}>
-                                                                <span>Retorno Bruto após 1 semana:</span> 
-                                                                <b>{fmt(investAmount + rendimento)}</b>
-                                                            </div>
+                                                            <div style={{display:'flex', justifyContent:'space-between'}}><span>Rendimento Semanal (2%):</span> <b style={{color:'lime'}}>+ {fmt(rendimento)}</b></div>
                                                         </div>
                                                     );
                                                 })()}
@@ -2023,7 +1902,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                     </>
                                 )}
                             </div>
-                            {/* SEGUROS CORPORATIVOS (SÓ CLUBES) */}
+
                             <div className="card" style={{borderLeft: '4px solid #D500F9', marginTop: 15}}>
                                 <h4 style={{marginTop: 0, color: '#D500F9'}}>🏥 Plano de Saúde do Elenco</h4>
                                 
@@ -2034,29 +1913,15 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                             <span>Plano: <b>{user.data.healthPlan.name}</b></span>
                                             <span>Cobre: <b style={{color:'lime'}}>{user.data.healthPlan.coverage}% de Cirurgias</b></span>
                                         </div>
-                                        <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 5}}>
-                                            <span>Mensalidade:</span>
-                                            <b style={{color:'var(--danger)'}}>{fmt(user.data.healthPlan.cost)}/sem</b>
-                                        </div>
                                         <button className="btn btn-red" style={{marginTop: 15}} onClick={async () => {
-                                            if(confirm("Cancelar o Plano de Saúde de todo o elenco? Novas lesões não terão cobertura.")) {
-                                                await db.collection('teams').doc(user.data.id).update({
-                                                    healthPlan: firebase.firestore.FieldValue.delete()
-                                                });
+                                            if(confirm("Cancelar o Plano de Saúde?")) {
+                                                await db.collection('teams').doc(user.data.id).update({ healthPlan: firebase.firestore.FieldValue.delete() });
                                                 alert("Plano cancelado.");
                                             }
-                                        }}>
-                                            ❌ CANCELAR PLANO
-                                        </button>
+                                        }}>❌ CANCELAR PLANO</button>
                                     </div>
                                 ) : (
                                     <>
-                                        <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>
-                                            Proteja seu elenco! Se um jogador se lesionar gravemente e precisar de cirurgia, o seguro cobre grande parte do custo. A cobrança é semanal.
-                                            <br/><br/><b style={{color:'var(--warning)'}}>⚠️ Importante:</b> O seguro não cobre lesões preexistentes (ocorridas antes da contratação).
-                                        </p>
-                                        
-                                       {/* Tabela de Preços Baseada na Série */}
                                         {(() => {
                                             const s = user.data.serie || 'VARZEA';
                                             const costs = {
@@ -2071,17 +1936,12 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                             return (
                                                 <div style={{display:'grid', gap:10}}>
                                                     <div style={{background:'#111', padding:10, borderRadius:5, border:'1px solid #333', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                                        <div>
-                                                            <b style={{color:'silver', fontSize:13}}>Plano Básico</b><br/>
-                                                            <small style={{color:'#00E676'}}>Cobre 30%</small>
-                                                        </div>
+                                                        <div><b style={{color:'silver', fontSize:13}}>Plano Básico</b><br/><small style={{color:'#00E676'}}>Cobre 30%</small></div>
                                                         <div style={{textAlign:'right'}}>
                                                             <b style={{color:'var(--danger)', display:'block'}}>{fmt(myCost.basic)}/s</b>
                                                             <button className="btn btn-ghost" style={{padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5, border:'1px solid silver'}} onClick={async () => {
                                                                 if(confirm(`Contratar o Plano Básico por ${fmt(myCost.basic)}/semana?`)) {
-                                                                    await db.collection('teams').doc(user.data.id).update({
-                                                                        healthPlan: { name: 'Básico', coverage: 30, cost: myCost.basic }
-                                                                    });
+                                                                    await db.collection('teams').doc(user.data.id).update({ healthPlan: { name: 'Básico', coverage: 30, cost: myCost.basic } });
                                                                     alert("Plano Básico ativado!");
                                                                 }
                                                             }}>ASSINAR</button>
@@ -2089,17 +1949,12 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                                     </div>
 
                                                     <div style={{background:'#111', padding:10, borderRadius:5, border:'1px solid gold', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                                        <div>
-                                                            <b style={{color:'gold', fontSize:13}}>Plano Master</b><br/>
-                                                            <small style={{color:'#00E676'}}>Cobre 70%</small>
-                                                        </div>
+                                                        <div><b style={{color:'gold', fontSize:13}}>Plano Master</b><br/><small style={{color:'#00E676'}}>Cobre 70%</small></div>
                                                         <div style={{textAlign:'right'}}>
                                                             <b style={{color:'var(--danger)', display:'block'}}>{fmt(myCost.master)}/s</b>
                                                             <button className="btn btn-gold" style={{color:'#000', padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5}} onClick={async () => {
                                                                 if(confirm(`Contratar o Plano Master por ${fmt(myCost.master)}/semana?`)) {
-                                                                    await db.collection('teams').doc(user.data.id).update({
-                                                                        healthPlan: { name: 'Master', coverage: 70, cost: myCost.master }
-                                                                    });
+                                                                    await db.collection('teams').doc(user.data.id).update({ healthPlan: { name: 'Master', coverage: 70, cost: myCost.master } });
                                                                     alert("Plano Master ativado!");
                                                                 }
                                                             }}>ASSINAR</button>

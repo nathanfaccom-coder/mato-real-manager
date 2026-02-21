@@ -667,7 +667,7 @@ const AdminPlayerModal = ({ player, teams, onClose }) => {
                     {/* ESTATÍSTICAS E NOTA */}
                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:15}}>
                         <div><label style={{fontSize:10}}>Humor</label><select className="input-field" value={formData.mood} onChange={e=>setFormData({...formData, mood:e.target.value})}><option>🤩</option><option>😐</option><option>😡</option></select></div>
-                        <div><label style={{fontSize:10, color:'var(--purple)'}}>Nota da Imprensa (Manual)</label><input className="input-field" type="number" step="0.1" value={formData.rating} onChange={e=>setFormData({...formData, rating:e.target.value})} /></div>
+                        <div>                             <label style={{fontSize:10, color:'var(--purple)'}}>Nota Oficial da Federação</label>                             <div style={{fontSize:9, color:'#888', marginBottom:4}}>Média dos Jornalistas: <b style={{color:'cyan'}}>{player?.pressRatingAvg ? player.pressRatingAvg.toFixed(1) : 'Sem avaliações'}</b></div>                             <input className="input-field" type="number" step="0.1" value={formData.rating} onChange={e=>setFormData({...formData, rating:e.target.value})} />                         </div>
                     </div>
 
                     {/* XP, ENERGIA E FAMA */}
@@ -1443,11 +1443,13 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             {/* --- ABA 1: ELENCO (ORDENADO) --- */}
             {tab === 'ELENCO' && (
                 <div>
-                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10}}>
-                        <b>Jogadores ({sortedPlayers.length})</b>
+                   <div style={{marginBottom:15}}>
+                        <div style={{fontSize:16, fontWeight:'bold', marginBottom:10}}>Jogadores ({sortedPlayers.length})</div>
+                        
+                        {/* BOTÃO EXCLUSIVO DO ADMIN NA TELA DO TIME */}
                         {isAdmin && (
-                            <button className="btn btn-green" style={{width:'auto', padding:'5px 10px', margin:0, fontSize:10}} onClick={onAdd}>
-                                + CRIAR JOGADOR AQUI
+                            <button className="btn btn-green" style={{width:'100%', padding:'12px', fontSize:12, fontWeight:'900', border:'1px solid lime'}} onClick={onAdd}>
+                                ✨ + CRIAR NOVO JOGADOR NESTE CLUBE
                             </button>
                         )}
                     </div>
@@ -1481,17 +1483,25 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                     <AttributeGrid attrs={p.attributes} pendingXP={p.pendingXP} />
                             </div>
 
-                           {isAdmin && (
-                                <div style={{marginTop:10, display:'flex', justifyContent:'flex-end'}}>
-                                    <button className="btn btn-ghost" style={{width:'auto', fontSize:12}} onClick={()=>onEdit(p)}>
-                                        <i className="fas fa-edit"></i> EDITAR
+                           {/* --- CONTROLES DE AÇÃO (ADMIN VS DONO DO TIME) --- */}
+                            {isAdmin && (
+                                <div style={{marginTop:10, display:'flex', gap:5}}>
+                                    <button className="btn btn-blue" style={{width:'100%', fontSize:10, padding:'8px'}} onClick={()=>onEdit(p)}>
+                                        ✏️ EDITAR JOGADOR (ADM)
                                     </button>
                                 </div>
                             )}
-                        </div>
-                    ))}
-                </div>
-            )}
+
+                            {!isAdmin && !isVisitor && (
+                                <div style={{marginTop:10, display:'flex', gap:5}}>
+                                    <button className="btn btn-purple" style={{flex:1, fontSize:10, padding:'8px'}} onClick={()=>setModal({type:'OFFER', data: p})}>
+                                        🤝 NEGOCIAR / RENOVAR
+                                    </button>
+                                    <button className="btn btn-ghost" style={{flex:1, fontSize:10, padding:'8px', borderColor:'var(--primary)', color:'var(--primary)'}} onClick={()=>setModal({type:'PLAYER', data:p})}>
+                                        🏷️ MERCADO
+                                    </button>
+                                </div>
+                            )}
 
             {/* --- ABA 2: COMISSÃO TÉCNICA --- */}
             {tab === 'STAFF' && (
@@ -9114,121 +9124,35 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
     return (
         <div className="modal-bg">
             <div className="modal-content" style={{maxHeight:'90vh', overflowY:'auto'}}>
-                <h3>{isEditing ? 'Ficha do Jogador' : 'Criar Jogador'}</h3>
-                
-                <label>Nome</label>
-                <input className="input-field" value={f.name} onChange={e=>setF({...f, name:e.target.value})} disabled={!isAdmin && isEditing} />
-                
-                <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:5, marginBottom:10, border:'1px solid #444'}}>
-                    <label style={{color:'var(--secondary)'}}>🔐 Senha de Acesso</label>
-                    <input className="input-field" type="text" placeholder="Crie uma senha provisória" value={f.password || ''} onChange={e=>setF({...f, password:e.target.value})} />
-                </div>
-
-                {isAdmin && (
-                    <div style={{border:'1px solid var(--primary)', padding:8, borderRadius:5, marginBottom:10, background:'rgba(0,255,0,0.05)'}}>
-                        <label style={{color:'var(--primary)'}}>💰 Saldo em Conta (Admin)</label>
-                        <input className="input-field" type="number" value={f.balance} onChange={e=>setF({...f, balance:e.target.value})} placeholder="Digite o valor..." />
-                        <small style={{color:'#aaa', fontSize:9}}>*Use apenas números. Ex: 15000</small>
-                    </div>
-                )}
-
-                <div style={{display:'flex', gap:5}}>
-                    <div style={{flex:1}}>
-                        <label>Posição</label>
-                        <select className="input-field" value={f.position} onChange={e=>setF({...f, position:e.target.value})} disabled={!isAdmin && isEditing}>
-                            {POS.map(p=><option key={p} value={p}>{p}</option>)}
+                {/* SE FOR APENAS O DONO DO TIME (NÃO ADMIN), MOSTRA O PAINEL RESUMIDO DE MERCADO */}
+                {!isAdmin && isOwner ? (
+                    <div>
+                        <h3 style={{color:'var(--primary)'}}>🏷️ Gerenciar Mercado: {f.name}</h3>
+                        <p style={{fontSize:11, color:'#aaa', marginBottom:15}}>Altere o status do jogador e o valor exigido para compra.</p>
+                        
+                        <label>Status no Mercado</label>
+                        <select className="input-field" value={f.status} onChange={e=>setF({...f, status:e.target.value})}>
+                            <option value="NAO_A_VENDA">🔒 Não Listado (Privado)</option>
+                            <option value="VENDA">🛒 À Venda</option>
+                            <option value="EMPRESTIMO">🤝 Disponível para Empréstimo</option>
                         </select>
-                    </div>
-                    <div style={{flex:1}}>
-                        <label>Overall (Meta)</label>
-                        <input className="input-field" type="number" value={f.overall} onChange={e=>setF({...f, overall:e.target.value})} disabled={!isAdmin && isEditing} />
-                    </div>
-                </div>
 
-                {f.attributes ? (
-                    <div style={{border:'1px solid #444', padding:10, borderRadius:8, margin:'10px 0'}}>
-                        <AttributeGrid attrs={f.attributes} pendingXP={f.pendingXP || 0} />
-                        {isAdmin && <button className="btn btn-gold" style={{marginTop:5, fontSize:10}} onClick={()=>{
-                            if(confirm("Regerar atributos aleatoriamente?")) {
-                                const pos = f.position || 'ATA';
-                                const n = generateAttributes(pos, parseInt(f.overall)||60);
-                                const avg = calculateRealOverall(pos, n);
-                                setF({...f, attributes:n, overall: avg});
-                            }
-                        }}>🎲 REGERAR (ADM)</button>}
+                        <label>Valor Exigido (₣)</label>
+                        <div style={{fontSize:10, color:'#aaa', marginBottom:5}}>Valor Justo (Federação): <b style={{color:'#00E676'}}>{fmt(getRecommendedPrice(f.overall, f.position))}</b></div>
+                        <input className="input-field" type="number" value={f.value} onChange={e=>setF({...f, value:e.target.value})} />
+
+                        <div style={{display:'flex', gap:10, marginTop:15}}>
+                            <button className="btn btn-green" onClick={handleSave}>SALVAR NO MERCADO</button>
+                            <button className="btn btn-ghost" onClick={()=>setF(null)}>CANCELAR</button>
+                        </div>
                     </div>
                 ) : (
-                    <div style={{padding:15, textAlign:'center', color:'#aaa', border:'1px dashed #666', borderRadius:8, margin:'10px 0', background:'rgba(0,0,0,0.2)'}}>
-                        <i className="fas fa-magic" style={{fontSize:20, marginBottom:5}}></i><br/>Atributos gerados ao salvar.
+                    /* SE CAIR AQUI POR ENGANO, FECHA (Admin já usa o AdminPlayerModal) */
+                    <div style={{textAlign:'center'}}>
+                        <p>Use o Painel de Administração para editar jogadores.</p>
+                        <button className="btn btn-ghost" onClick={()=>setF(null)}>FECHAR</button>
                     </div>
                 )}
-
-                {/* VISUALIZADORES */}
-                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:5}}>
-                    <div style={{background: 'rgba(0, 230, 118, 0.1)', padding: '5px', borderRadius: '5px', border: '1px dashed #00E676', textAlign: 'center'}}>
-                        <small style={{color: '#00E676', fontWeight: 'bold', fontSize:10}}>
-                            ⚖️ Passe: {fmt(getRecommendedPrice(f.overall, f.position))}
-                        </small>
-                    </div>
-                    <div style={{background: 'rgba(41, 121, 255, 0.1)', padding: '5px', borderRadius: '5px', border: '1px dashed #2979FF', textAlign: 'center'}}>
-                        <small style={{color: '#2979FF', fontWeight: 'bold', fontSize:10}}>
-                            💵 Salário: {fmt(limits.minSal)} - {fmt(limits.maxSal)}
-                        </small>
-                    </div>
-                </div>
-
-                <div style={{display:'flex', gap:5}}>
-                    <div style={{flex:1}}><label>Valor</label><input className="input-field" type="number" value={f.value} onChange={e=>setF({...f, value:e.target.value})} /></div>
-                    <div style={{flex:1}}><label>Salário</label><input className="input-field" type="number" value={f.salary} onChange={e=>setF({...f, salary:e.target.value})} /></div>
-                </div>
-                <div style={{display:'flex', gap:5}}>
-                    <div style={{flex:1}}><label>Multa</label><input className="input-field" type="number" value={f.clause} onChange={e=>setF({...f, clause:e.target.value})} /></div>
-                    <div style={{flex:1}}><label>Contrato</label><input className="input-field" type="number" value={f.contract} onChange={e=>setF({...f, contract:e.target.value})} /></div>
-                </div>
-                
-                <label>Status</label>
-                <select className="input-field" value={f.status} onChange={e=>setF({...f, status:e.target.value})}>
-                    <option value="NAO_A_VENDA">Não Listado</option>
-                    <option value="VENDA">À Venda</option>
-                    <option value="EMPRESTIMO">Empréstimo</option>
-                    <option value="INTRANSFERIVEL">Bloqueado</option>
-                </select>
-                <label>Humor</label>
-                <select className="input-field" value={f.mood} onChange={e=>setF({...f, mood:e.target.value})}><option>🤩</option><option>😐</option><option>😡</option></select>
-                
-                {isAdmin && (
-                    <div style={{border:'1px solid var(--purple)', padding:8, borderRadius:5, margin:'5px 0'}}>
-                        <label style={{color:'var(--purple)'}}>Nota Oficial (XP)</label>
-                        <input className="input-field" type="number" step="0.1" value={f.rating} onChange={e=>setF({...f, rating:e.target.value})} />
-                    </div>
-                )}
-
-                {isAdmin && <div style={{border:'1px solid var(--primary)', padding:8, borderRadius:8, marginTop:10}}>
-                    <label style={{color:'var(--primary)'}}>Estatísticas (Admin)</label>
-                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:5}}>
-                        <div><small>⚽ Gols</small><input className="input-field" type="number" value={f.stats?.goals||0} onChange={e=>setF({...f, stats:{...f.stats, goals:e.target.value}})} /></div>
-                        <div><small>👟 Assis</small><input className="input-field" type="number" value={f.stats?.assists||0} onChange={e=>setF({...f, stats:{...f.stats, assists:e.target.value}})} /></div>
-                        <div><small>🛡️ Desar</small><input className="input-field" type="number" value={f.stats?.tackles||0} onChange={e=>setF({...f, stats:{...f.stats, tackles:e.target.value}})} /></div>
-                        <div><small>🧤 Defes</small><input className="input-field" type="number" value={f.stats?.saves||0} onChange={e=>setF({...f, stats:{...f.stats, saves:e.target.value}})} /></div>
-                        <div><small>🟨 Amar</small><input className="input-field" type="number" value={f.stats?.yellows||0} onChange={e=>setF({...f, stats:{...f.stats, yellows:e.target.value}})} /></div>
-                        <div><small>🟥 Verm</small><input className="input-field" type="number" value={f.stats?.reds||0} onChange={e=>setF({...f, stats:{...f.stats, reds:e.target.value}})} /></div>
-                    </div>
-                </div>}
-
-                {isAdmin && <div style={{border:'1px solid gold', padding:5, marginTop:5}}>
-                    <label style={{color:'gold'}}>Mover Time (Adm)</label>
-                    <select className="input-field" onChange={e=>setF({...f, forcedTeamId:e.target.value})}>
-                        <option value="">-- Manter --</option>
-                        {teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
-                </div>}
-                
-                <div style={{display:'flex', gap:10, marginTop:15}}>
-                    <button className="btn btn-green" onClick={handleSave}>SALVAR</button>
-                    {isOwner && isEditing && <button className="btn btn-blue" onClick={()=>onRenew(initial)}>RENOVAR</button>}
-                    {isEditing && <button className="btn btn-red" onClick={()=>onDelete(initial.id)}>X</button>}
-                    <button className="btn" onClick={()=>setF(null)}>CANCELAR</button>
-                </div>
             </div>
         </div>
     );

@@ -6273,7 +6273,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.90.0</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.90.1</div>
                             </div>
                         </div>
                         
@@ -6946,7 +6946,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.0 ESTADIOS   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.1 ESTADIOS   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -7647,7 +7647,7 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
             {tab==='PERFIL' && <div>
                 <div className="card" style={{borderLeft:'4px solid var(--primary)', background:'linear-gradient(90deg, #1b2e1b, #1E1E1E)'}}>
                     <h3 style={{marginTop:0, color:'var(--primary)'}}>🏦 {fmt(player.balance || 0)}</h3>
-                    <small style={{color:'#aaa'}}>Salário: {fmt(player.salary)} | Passe: {fmt(player.value)}</small>
+<small style={{color:'#aaa'}}>Salário: {fmt(player.salary)} | Passe: {player.teamId === 'FREE' ? <span style={{color:'lime'}}>GRÁTIS</span> : fmt(player.value)}</small>
                 </div>
                 
                 <div className="card">
@@ -8898,7 +8898,7 @@ const Market = ({ user, me, teams, players, coaches, open, isVis, onNeg, onPayCl
                 )}
 
                 <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, fontSize:11, color:'#aaa', marginTop:10, background:'rgba(0,0,0,0.2)', padding:8, borderRadius:8}}>
-                    <div>Valor: <b style={{color:'#fff'}}>{fmt(p.value)}</b></div>
+                    <div>Valor: <b style={{color: p.teamId === 'FREE' ? 'lime' : '#fff'}}>{p.teamId === 'FREE' ? 'GRÁTIS' : fmt(p.value)}</b></div>
                     <div>Contrato: <b style={{color: p.contract === 0 ? 'var(--danger)' : (p.contract === 1 ? 'var(--warning)' : '#fff')}}>{p.contract} Temp.</b></div>
                 </div>
 

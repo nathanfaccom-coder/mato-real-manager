@@ -1329,13 +1329,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                     <AttributeGrid attrs={p.attributes} pendingXP={p.pendingXP} />
                             </div>
 
-                            {!isVisitor && (
-                                <div style={{marginTop:10, display:'flex', justifyContent:'flex-end'}}>
-                                    <button className="btn btn-ghost" style={{width:'auto', fontSize:12}} onClick={()=>onEdit(p)}>
-                                        <i className="fas fa-edit"></i> EDITAR
-                                    </button>
-                                </div>
-                            )}
+                           
                         </div>
                     ))}
                 </div>
@@ -4470,65 +4464,120 @@ const resetDatabase = async () => {
     setLoading(false);
 };
 //FIM
-    const AdminPanel = ({ teams, players, onGenFixtures, onTurnSeasonAdvanced, papers, journalists, companies, coaches, reqs, sps, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onApprovePaper, onDeletePaper, onDeleteJourno, onRejectPaper, onConfig, onReset, onApproveComp, onDeleteComp, onUpdateCompBal, onGenAttrs }) => {      
-    const [tab, setTab] = useState('DASH');
-    const [selTeamPlayers, setSelTeamPlayers] = useState(null); // Estado para abrir a lista de senhas dos jogadores
-
-    const tabStyle = (active) => ({
-        background: active ? 'var(--primary)' : '#333',
-        color: '#fff',
-        border: 'none',
-        padding: '10px 15px',
-        borderRadius: '5px',
-        cursor: 'pointer',
-        fontWeight: 'bold'
+       // ==========================================
+// MODAL DO ADMIN: EDITAR / CRIAR JOGADOR
+// ==========================================
+const AdminPlayerModal = ({ player, teams, onClose }) => {
+    const isNew = !player;
+    const [formData, setFormData] = useState({
+        name: player ? player.name : '',
+        position: player ? player.position : 'ATA',
+        teamId: player ? player.teamId : 'FREE',
+        overall: player ? player.overall : 45,
+        energy: player ? (player.energy !== undefined ? player.energy : 100) : 100,
+        fame: player ? (player.fame || 0) : 0,
+        xp: player ? (player.xp || 0) : 0,
+        value: player ? (player.value || 0) : 40000,
+        salary: player ? (player.salary || 0) : 1500,
     });
 
-    const fedSpons = (sps || []).filter(s => s.companyId === 'FEDERACAO');
-
-    // --- FUNÇÃO MESTRE DAS SENHAS 🔑 (ADICIONADA) ---
-    const managePassword = async (collection, docId, currentPass, name) => {
-        const newPass = prompt(`🔐 GESTÃO DE SENHAS\nUsuário: ${name}\n\nSenha Atual: ${currentPass || 'Vazia'}\n\nDigite a NOVA SENHA para alterar:`, currentPass);
-        if (newPass !== null && newPass !== currentPass) {
-            try {
-                await db.collection(collection).doc(docId).update({ password: newPass });
-                alert(`✅ Senha de ${name} alterada com sucesso!`);
-            } catch (e) { alert("Erro: " + e.message); }
-        }
-    };
-        // --- FUNÇÃO 1: CORRIGIR PREÇOS DO SHOP (ANTI-CHEAT) ---
-    const fixShopPrices = async () => {
-        if(!confirm("⚠️ MANUTENÇÃO DO SHOP:\n\n1. Resetar ESTOQUE de tudo para 10 unidades.\n2. Corrigir PREÇOS abaixo do custo (Anti-Cheat).\n\nDeseja aplicar essa atualização geral agora?")) return;
+    const handleSave = async () => {
+        if (!formData.name) return alert("O nome é obrigatório!");
         
+        const db = firebase.firestore();
         try {
-            setLoading(true);
-            const snap = await db.collection('products').get();
-            const b = db.batch();
-            let count = 0;
-            
-            snap.docs.forEach(doc => {
-                const p = doc.data();
-                // Calcula o custo mínimo baseado na nova tabela
-                const minCost = getProdCost(p.cat, p.power); 
-                
-                // Se o preço atual for menor que o custo, ele sobe para o mínimo.
-                // Se for maior, mantemos o preço (lucro da empresa).
-                const correctedPrice = Math.max(parseFloat(p.price) || 0, minCost);
-
-                b.update(doc.ref, { 
-                    price: correctedPrice,
-                    stock: 10 // <--- NOVO: Abastece o estoque para 10 unidades
+            if (isNew) {
+                const newAttrs = generateAttributes(formData.position, formData.overall);
+                await db.collection('players').add({
+                    ...formData,
+                    attributes: newAttrs,
+                    status: 'VENDA',
+                    balance: 0,
+                    contract: 0,
+                    mood: '😐',
+                    stats: {goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0}
                 });
-                count++;
-            });
-            
-            await b.commit();
-            alert(`✅ SUCESSO!\n\n${count} produtos foram atualizados para 10 unidades de estoque e tiveram seus preços regularizados.`);
-        } catch(e) {
-            alert("Erro na correção: " + e.message);
+                alert("Jogador criado com sucesso!");
+            } else {
+                await db.collection('players').doc(player.id).update(formData);
+                alert("Dados atualizados com sucesso!");
+            }
+            onClose();
+        } catch (e) {
+            alert("Erro ao salvar: " + e.message);
         }
-        setLoading(false);
     };
+
+    return (
+        <div className="modal-overlay" style={{zIndex: 99999}} onClick={onClose}>
+            <div className="modal-content" style={{maxWidth: '500px', padding: '20px', background:'#121212', border:'1px solid var(--primary)'}} onClick={e => e.stopPropagation()}>
+                <h3 style={{marginTop:0, color:'var(--primary)'}}>
+                    {isNew ? '✨ Criar Novo Jogador' : `✏️ Editando: ${player.name}`}
+                </h3>
+                
+                <div style={{maxHeight:'60vh', overflowY:'auto', paddingRight:5}}>
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10}}>
+                        <div>
+                            <label style={{fontSize:11, color:'#aaa'}}>Nome do Jogador</label>
+                            <input className="input-field" value={formData.name} onChange={e=>setFormData({...formData, name:e.target.value})} />
+                        </div>
+                        <div>
+                            <label style={{fontSize:11, color:'#aaa'}}>Posição</label>
+                            <select className="input-field" value={formData.position} onChange={e=>setFormData({...formData, position:e.target.value})}>
+                                {POS.map(p => <option key={p} value={p}>{p}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:15}}>
+                        <div>
+                            <label style={{fontSize:11, color:'#aaa'}}>Clube Atual</label>
+                            <select className="input-field" value={formData.teamId} onChange={e=>setFormData({...formData, teamId:e.target.value})}>
+                                <option value="FREE">Agente Livre (Sem Clube)</option>
+                                {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label style={{fontSize:11, color:'#aaa'}}>Overall Base</label>
+                            <input className="input-field" type="number" value={formData.overall} onChange={e=>setFormData({...formData, overall:Number(e.target.value)})} />
+                        </div>
+                    </div>
+
+                    {/* CAIXA DE INFORMAÇÃO DO XP */}
+                    <div style={{background:'rgba(255,165,0,0.1)', borderLeft:'4px solid orange', padding:10, borderRadius:5, marginBottom:15}}>
+                        <b style={{color:'orange', fontSize:12}}>⚠️ GUIA DA FEDERAÇÃO: Experiência (XP)</b>
+                        <p style={{fontSize:10, color:'#ddd', margin:'5px 0 0 0', lineHeight:'1.4'}}>
+                            O XP mostra o quão "esforçado" o jogador é nos treinos. <br/>
+                            <span style={{color:'cyan'}}>Atenção:</span> Alterar o XP aqui <b>NÃO</b> aumenta os atributos automaticamente. Use isso para dar bônus de eventos manuais (Ex: +500 XP) ou corrigir bugs.
+                        </p>
+                        <div style={{marginTop:10}}>
+                            <label style={{fontSize:11, color:'orange', fontWeight:'bold'}}>XP Atual:</label>
+                            <input className="input-field" type="number" style={{borderColor:'orange'}} value={formData.xp} onChange={e=>setFormData({...formData, xp:Number(e.target.value)})} />
+                        </div>
+                    </div>
+
+                    {/* CAIXA DE ENERGIA E FAMA */}
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:15}}>
+                        <div style={{background:'rgba(0,255,0,0.05)', borderLeft:'4px solid lime', padding:10, borderRadius:5}}>
+                            <b style={{color:'lime', fontSize:11}}>⚡ Energia (0-100)</b>
+                            <input className="input-field" type="number" min="0" max="100" style={{borderColor:'lime', margin:0, marginTop:5}} value={formData.energy} onChange={e=>setFormData({...formData, energy:Number(e.target.value)})} />
+                        </div>
+
+                        <div style={{background:'rgba(0,255,255,0.05)', borderLeft:'4px solid cyan', padding:10, borderRadius:5}}>
+                            <b style={{color:'cyan', fontSize:11}}>💎 Fama</b>
+                            <input className="input-field" type="number" style={{borderColor:'cyan', margin:0, marginTop:5}} value={formData.fame} onChange={e=>setFormData({...formData, fame:Number(e.target.value)})} />
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{display:'flex', gap:10, marginTop:15}}>
+                    <button className="btn btn-green" onClick={handleSave}>💾 SALVAR DADOS</button>
+                    <button className="btn btn-red" onClick={onClose}>CANCELAR</button>
+                </div>
+            </div>
+        </div>
+    );
+};
     //FIM
         // --- NOVA FUNÇÃO: REAJUSTE SALARIAL EM MASSA (TETO/PISO) ---
     const fixAllSalaries = async () => {
@@ -4847,9 +4896,16 @@ const resetDatabase = async () => {
                     </button>
                 </div>
             </div>}
-            {/* --- ABA TIMES --- */}
+           {/* --- ABA TIMES E JOGADORES --- */}
             {tab==='TEAMS' && !selTeamPlayers && (
                 <div>
+                    {/* --- BOTÃO GLOBAL DE CRIAR JOGADOR NPC --- */}
+                    <div style={{marginBottom: 20, textAlign: 'center'}}>
+                        <button className="btn btn-green" onClick={() => setModal({type: 'ADMIN_PLAYER', data: null})}>
+                            ✨ CRIAR NOVO JOGADOR (MANUAL)
+                        </button>
+                    </div>
+
                     {/* --- CENTRAL DE APROVAÇÃO DE JOGADORES (INSTAGRAM) --- */}
                     {(players||[]).some(p=>p.status==='PENDING') && <h4>📝 Novatos Pendentes (Verificar)</h4>}
                     {(players||[]).filter(p=>p.status==='PENDING').map(p => (
@@ -4867,19 +4923,25 @@ const resetDatabase = async () => {
 
                             <div style={{display:'flex', gap:5}}>
                                 <button className="btn btn-green" onClick={async () => {
-                                    await db.collection('players').doc(p.id).update({ status: 'VENDA' });
+                                    await firebase.firestore().collection('players').doc(p.id).update({ status: 'VENDA' });
                                     alert(`${p.name} foi aprovado e já está nos Agentes Livres!`);
                                 }}>APROVAR</button>
                                 
                                 <button className="btn btn-red" onClick={async () => {
                                     if(confirm("Recusar e excluir inscrição?")) {
-                                        await db.collection('players').doc(p.id).delete();
+                                        await firebase.firestore().collection('players').doc(p.id).delete();
                                     }
                                 }}>RECUSAR FAKE</button>
+
+                                {/* Botão de Editar do Modal Novo para Pendentes */}
+                                <button className="btn btn-blue" style={{width:'auto'}} onClick={() => setModal({type: 'ADMIN_PLAYER', data: p})}>✏️</button>
                             </div>
                         </div>
                     ))}
+                    
                     <hr style={{borderColor:'#444', margin:'20px 0'}}/>
+                    
+                    {/* --- TIMES PENDENTES --- */}
                     {(teams||[]).filter(t=>t.status==='PENDING').map(t=>(
                         <div key={t.id} className="card" style={{borderLeft:'4px solid var(--warning)'}}>
                             <b>{t.name} (PENDENTE)</b>
@@ -4890,33 +4952,66 @@ const resetDatabase = async () => {
                             </div>
                         </div>
                     ))}
-                   <h4>Clubes Ativos</h4>
-                {(teams||[]).filter(t=>t.status!=='PENDING').map(t=>(
-                    <div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                        <span><b>{t.name}</b></span>
-                        <div style={{display:'flex', gap:5}}>
-                            {/* --- BOTÃO DE CONFIGURAÇÕES RESTAURADO PARA O ADMIN --- */}
-                            <button className="btn btn-ghost" style={{width:'auto', fontSize:10}} onClick={()=>onConfig(t)}>⚙️ CONFIG</button>
-
-                            {/* 1. Senha do Clube */}
-                            <button className="btn btn-ghost" style={{width:'auto', fontSize:10}} onClick={()=>managePassword('teams', t.id, t.password, t.name)}>🔑 TIME</button>
-                            
-                            {/* 2. Saldo */}
-                            <button className="btn btn-green" style={{width:'auto', fontSize:10}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button>
-                            
-                            {/* 3. Senhas dos Jogadores (A tela que você está vendo agora) */}
-                            <button className="btn btn-purple" style={{width:'auto', fontSize:10}} onClick={()=>setSelTeamPlayers(t)}>🔐 SENHAS</button>
-                            
-                            {/* 4. GERENCIAR (Edição completa, Over, Posição) */}
-                            <button className="btn btn-blue" style={{width:'auto', fontSize:10}} onClick={()=>onEditT(t)}>📝 EDITAR</button>
-                            
-                            {/* 5. Excluir */}
-                            <button className="btn btn-red" style={{width:'auto', fontSize:10}} onClick={()=>onDeleteTeam(t.id)}>🗑️</button>
+                    
+                    <h4>Clubes Ativos</h4>
+                    {(teams||[]).filter(t=>t.status!=='PENDING').map(t=>(
+                        <div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                            <span><b>{t.name}</b></span>
+                            <div style={{display:'flex', gap:5}}>
+                                <button className="btn btn-ghost" style={{width:'auto', fontSize:10}} onClick={()=>onConfig(t)}>⚙️ CONFIG</button>
+                                <button className="btn btn-ghost" style={{width:'auto', fontSize:10}} onClick={()=>managePassword('teams', t.id, t.password, t.name)}>🔑 TIME</button>
+                                <button className="btn btn-green" style={{width:'auto', fontSize:10}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, n)}}>$</button>
+                                
+                                {/* O botão "SENHAS" e "EDITAR" abrem os jogadores do time, onde você pode editar cada um */}
+                                <button className="btn btn-purple" style={{width:'auto', fontSize:10}} onClick={()=>setSelTeamPlayers(t)}>👥 ELENCO</button>
+                                
+                                <button className="btn btn-blue" style={{width:'auto', fontSize:10}} onClick={()=>onEditT(t)}>📝 EDITAR CLUBE</button>
+                                <button className="btn btn-red" style={{width:'auto', fontSize:10}} onClick={()=>onDeleteTeam(t.id)}>🗑️</button>
+                            </div>
                         </div>
-                    </div>
-                ))}
-            </div>
-        )}
+                    ))}
+
+                    <hr style={{borderColor:'#444', margin:'20px 0'}}/>
+                    
+                    {/* --- LISTA GLOBAL DE AGENTES LIVRES (LIVRES DE VERDADE) --- */}
+                    <h4>🏃‍♂️ Agentes Livres</h4>
+                    {(players||[]).filter(p=>p.teamId==='FREE' && p.status!=='PENDING').map(p=>(
+                        <div key={p.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                            <div>
+                                <b>{p.name}</b> <span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span><br/>
+                                <small style={{color:'#aaa'}}>OVR: {p.overall} | XP: {p.xp || 0}</small>
+                            </div>
+                            <div style={{display:'flex', gap:5}}>
+                                {/* O BOTÃO DE EDITAR NOVO */}
+                                <button className="btn btn-blue" style={{width:'auto', fontSize:10}} onClick={() => setModal({type: 'ADMIN_PLAYER', data: p})}>✏️ EDITAR</button>
+                                <button className="btn btn-red" style={{width:'auto', fontSize:10}} onClick={async()=>{if(confirm("Excluir "+p.name+"?")) await firebase.firestore().collection('players').doc(p.id).delete()}}>🗑️</button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* --- ABA SECUNDÁRIA: QUANDO O ADMIN CLICA EM "ELENCO" NO CLUBE --- */}
+            {tab==='TEAMS' && selTeamPlayers && (
+                <div className="animate-in">
+                    <button className="btn btn-ghost" onClick={()=>setSelTeamPlayers(null)}>⬅ Voltar aos Times</button>
+                    <h3>Elenco: {selTeamPlayers.name}</h3>
+                    {(players||[]).filter(p=>p.teamId===selTeamPlayers.id).map(p=>(
+                        <div key={p.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                            <div>
+                                <b>{p.name}</b> <span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span><br/>
+                                <small style={{color:'#aaa'}}>OVR: {p.overall} | XP: {p.xp || 0} | 🔑 {p.password}</small>
+                            </div>
+                            <div style={{display:'flex', gap:5}}>
+                                {/* O BOTÃO DE EDITAR NOVO AQUI TAMBÉM */}
+                                <button className="btn btn-blue" style={{width:'auto', fontSize:10}} onClick={() => setModal({type: 'ADMIN_PLAYER', data: p})}>✏️ EDITAR</button>
+                                <button className="btn btn-ghost" style={{width:'auto', fontSize:10}} onClick={()=>managePassword('players', p.id, p.password, p.name)}>🔑</button>
+                                <button className="btn btn-red" style={{width:'auto', fontSize:10}} onClick={async()=>{if(confirm("Excluir "+p.name+"?")) await firebase.firestore().collection('players').doc(p.id).delete()}}>🗑️</button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {/* SUB-ABA: SENHAS DOS JOGADORES (A que aparece no seu print) */}
             {tab==='TEAMS' && selTeamPlayers && (
@@ -6815,7 +6910,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {modal.type==='POST_NEWS' && <div><h3>Nova Notícia</h3><input className="input-field" placeholder="Manchete / Texto" id="news-body" /><button className="btn btn-blue" onClick={()=>{postNews(`📰 **${user.data.name}:**\n${document.getElementById('news-body').value}`, 'press'); setModal(null);}}>PUBLICAR</button></div>}
                             {modal.type==='EDIT_PRIZES' && <PrizeEditor initialData={modal.data} onSave={async (newPrizes) => { await db.collection('config').doc('system').update({ prizes: newPrizes }); alert("Premiações Atualizadas! Elas serão pagas na próxima Virada de Temporada."); setModal(null); }} onClose={() => setModal(null)} />}
                             {modal.type==='STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
-                            
+                            {modal.type === 'ADMIN_PLAYER' && <AdminPlayerModal player={modal.data} teams={teams} onClose={() => setModal(null)} />}
                             {modal.type === 'MATCH_MANAGER' && (
                                 <MatchManagerForm 
                                     initialData={modal.data} 

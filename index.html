@@ -5955,9 +5955,7 @@ const handleCoachTrain = async (playerIds, type) => {
         alert(`Habilidade "${perk.name}" aprendida!`);
     };
             //FIM
-            // --- FUNÇÃO PARA CONTRATAR TÉCNICO ---
 
-// FIM DA GESTÃO ADMINISTRATIVA E SALVAR JOGADOR
 
 // --- SISTEMA DE NEGOCIAÇÃO E MERCADO (VERSÃO REALISTA 3.3 - FINAL BLINDADA) ---
 const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
@@ -5973,9 +5971,11 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
         if (meta.installments > 1) details += `📅 Parcelamento: ${meta.installments}x de ${fmt(v / meta.installments)}\n`;
         if (meta.sellOn > 0) details += `📈 Revenda: ${meta.sellOn}%\n`;
 
-        // --- AJUSTE VISUAL: SE FOR PRÉ-CONTRATO ---
+        // --- AJUSTE VISUAL: SE FOR PRÉ-CONTRATO OU RENOVAÇÃO ---
         if (type === 'PRE_CONTRATO') {
             details = `⚖️ **LEI BOSMAN (PRÉ-CONTRATO)**\nO jogador virá a custo zero no início da próxima temporada.\n`;
+        } else if (type === 'RENOVACAO') {
+            details = `📝 **PROPOSTA DE RENOVAÇÃO**\nA diretoria ofereceu um novo contrato.\n`;
         }
 
         details += `📝 Contrato: ${contractYears} anos\n`;
@@ -6004,8 +6004,6 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
             }
         } else {
             // OFERTA NOVA (Primeiro contato)
-            
-           
             // >>> CORREÇÃO: SE FOR PRÉ-CONTRATO OU RENOVAÇÃO, VAI DIRETO PRO JOGADOR <<<
             if (type === 'PRE_CONTRATO' || type === 'RENOVACAO') {
                 recipientId = target.id; 
@@ -6016,6 +6014,7 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
                     ? target.id 
                     : target.teamId;
             }
+        }
 
         const pl = {
             playerId: target.id,
@@ -6049,7 +6048,7 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
         await b.commit();
 
         // Título da notícia ajustado
-        const msgHead = (old && old.id) ? "🔄 CONTRAPROPOSTA" : (type === 'PRE_CONTRATO' ? "⚖️ PRÉ-CONTRATO" : "💼 NOVA OFERTA");
+        const msgHead = (old && old.id) ? "🔄 CONTRAPROPOSTA" : (type === 'PRE_CONTRATO' ? "⚖️ PRÉ-CONTRATO" : (type === 'RENOVACAO' ? "📝 RENOVAÇÃO" : "💼 NOVA OFERTA"));
         
         postNews(`${msgHead}\n**${actingTeamName}** enviou uma proposta para **${targetPlayerName}**!\n\n${details}`, 'transfer');
         

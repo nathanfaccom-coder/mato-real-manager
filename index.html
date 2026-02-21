@@ -3044,8 +3044,47 @@ const PrizeEditor = ({ initialData, onSave, onClose }) => {
            // ... continuação do código anterior
             const loginAdmin = () => { setUser({ type: 'ADMIN', data: { id: 'admin', name: 'FEDERAÇÃO (ADM)', balance: 0, logo: null, stadiumLevel: 1, serie: 'ADM' } }); setScreen('HOME'); };
 
-            const createTeam = async (name, bal, serie, pass, logo) => { if(teams.find(t=>t.name.toLowerCase()===name.toLowerCase())) return alert("Nome em uso!"); await db.collection('teams').add({ name, balance: parseFloat(bal), serie, password: pass, stadiumLevel: 1, logo: logo||null, status: 'PENDING' }); alert("Criado! Aguarde aprovação."); };
-// --- FUNÇÃO PARA CRIAR TÉCNICO (App.js) ---
+          
+           const createTeam = async (name, bal, serie, pass, logo) => { if(teams.find(t=>t.name.toLowerCase()===name.toLowerCase())) return alert("Nome em uso!"); await db.collection('teams').add({ name, balance: parseFloat(bal), serie, password: pass, stadiumLevel: 1, logo: logo||null, status: 'PENDING' }); alert("Criado! Aguarde aprovação."); };
+
+           // --- CRIAR JOGADOR NOVATO (VIA TELA INICIAL) ---
+    const createPlayerAccount = async (data) => {
+        if (!data.name || !data.password || !data.instagram) return alert("Preencha todos os campos!");
+        setLoading(true);
+        try {
+            // Regra: Linha começa com 45, Goleiro com 60
+            const baseOvr = data.position === 'GOL' ? 60 : 45;
+            
+            // Gera atributos balanceados baseados nesse OVR e Posição
+            const newAttrs = generateAttributes(data.position, baseOvr);
+            
+            await db.collection('players').add({
+                name: data.name,
+                instagram: data.instagram, // Salva o @ para o Admin ver
+                position: data.position,
+                password: data.password,
+                overall: baseOvr,
+                attributes: newAttrs,
+                teamId: 'FREE',       // Vai direto para os passes livres
+                status: 'PENDING',    // Fica invisível até o admin aprovar
+                balance: 0,
+                salary: 1500,         // Salário base
+                value: 40000,         // Valor de passe de base
+                contract: 0,
+                mood: '😐',
+                fame: 0,
+                stats: {goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0}
+            });
+
+            alert("✅ Inscrição enviada!\nA Federação avaliará seu Instagram em breve. Assim que aprovado, você aparecerá no mercado de Agentes Livres.");
+            window.location.reload();
+        } catch(e) {
+            alert("Erro ao criar: " + e.message);
+            setLoading(false);
+        }
+    };
+           
+           // --- FUNÇÃO PARA CRIAR TÉCNICO (App.js) ---
     const createCoach = async (data) => {
         setLoading(true);
         try {
@@ -4743,6 +4782,36 @@ const resetDatabase = async () => {
             {/* --- ABA TIMES --- */}
             {tab==='TEAMS' && !selTeamPlayers && (
                 <div>
+                    {/* --- CENTRAL DE APROVAÇÃO DE JOGADORES (INSTAGRAM) --- */}
+                    {(players||[]).some(p=>p.status==='PENDING') && <h4>📝 Novatos Pendentes (Verificar)</h4>}
+                    {(players||[]).filter(p=>p.status==='PENDING').map(p => (
+                        <div key={p.id} className="card" style={{borderLeft:'4px solid cyan', background:'rgba(0, 255, 255, 0.05)'}}>
+                            <div style={{display:'flex', justifyContent:'space-between'}}>
+                                <b>{p.name}</b>
+                                <span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span>
+                            </div>
+                            
+                            <div style={{margin:'10px 0'}}>
+                                <a href={`https://instagram.com/${p.instagram.replace('@','')}`} target="_blank" style={{color:'cyan', textDecoration:'none', fontWeight:'bold', display:'flex', alignItems:'center', gap:5}}>
+                                    <i className="fab fa-instagram" style={{fontSize:18}}></i> {p.instagram}
+                                </a>
+                            </div>
+
+                            <div style={{display:'flex', gap:5}}>
+                                <button className="btn btn-green" onClick={async () => {
+                                    await db.collection('players').doc(p.id).update({ status: 'VENDA' });
+                                    alert(`${p.name} foi aprovado e já está nos Agentes Livres!`);
+                                }}>APROVAR</button>
+                                
+                                <button className="btn btn-red" onClick={async () => {
+                                    if(confirm("Recusar e excluir inscrição?")) {
+                                        await db.collection('players').doc(p.id).delete();
+                                    }
+                                }}>RECUSAR FAKE</button>
+                            </div>
+                        </div>
+                    ))}
+                    <hr style={{borderColor:'#444', margin:'20px 0'}}/>
                     {(teams||[]).filter(t=>t.status==='PENDING').map(t=>(
                         <div key={t.id} className="card" style={{borderLeft:'4px solid var(--warning)'}}>
                             <b>{t.name} (PENDENTE)</b>
@@ -6196,8 +6265,7 @@ const renewContract = async (p) => {
      
           // --- RENDER ---
           if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
-            if(!user) return <LoginScreen teams={teams} players={players} papers={papers} journalists={journalists} companies={companies} coaches={coaches} onLogin={login} onCreateTeam={createTeam} onCreatePaper={createNewspaper} onCreateJourno={createJournalist} onCreateCompany={createCompany} onAdmin={loginAdmin} onVisitor={()=>{setUser({type:'VISITOR'}); setScreen('RANKING');}} onCreateCoach={createCoach} />;
-
+if(!user) return <LoginScreen teams={teams} players={players} papers={papers} journalists={journalists} companies={companies} coaches={coaches} onLogin={login} onCreateTeam={createTeam} onCreatePaper={createNewspaper} onCreateJourno={createJournalist} onCreateCompany={createCompany} onAdmin={loginAdmin} onVisitor={()=>{setUser({type:'VISITOR'}); setScreen('RANKING');}} onCreateCoach={createCoach} onCreatePlayer={createPlayerAccount} />;
             return (
                 <div>
                     <div className="header">
@@ -6205,7 +6273,7 @@ const renewContract = async (p) => {
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.83.8</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.90.0</div>
                             </div>
                         </div>
                         
@@ -6826,7 +6894,8 @@ const renewContract = async (p) => {
     
     // --- NOVO: Estados para criação de técnico ---
     const [coachData, setCoachData] = useState({ name: '', password: '', affinity: 'ATA' });
-
+    const [playerData, setPlayerData] = useState({ name: '', instagram: '', position: 'ATA', password: '' });
+         
     const handleUpload = (e) => { const file=e.target.files[0]; const reader=new FileReader(); reader.onloadend=()=>setF({...f, l:reader.result}); if(file) reader.readAsDataURL(file); };
     
     const selectedTypeInfo = COMPANY_TYPES[fc.type] || {};
@@ -6877,15 +6946,15 @@ const renewContract = async (p) => {
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.83.8 ESTADIOS   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.0 ESTADIOS   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
                 <div className={`tab ${tab==='CREATE'?'active':''}`} onClick={()=>setTab('CREATE')}>CRIAR TIME</div>
                 <div className={`tab ${tab==='PRESS'?'active':''}`} onClick={()=>setTab('PRESS')}>IMPRENSA</div>
                 <div className={`tab ${tab==='COMPANY'?'active':''}`} onClick={()=>setTab('COMPANY')}>EMPRESAS</div>
-                {/* NOVO: Aba de Técnico */}
                 <div className={`tab ${tab==='COACH'?'active':''}`} onClick={()=>setTab('COACH')}>TÉCNICO</div>
+                <div className={`tab ${tab==='NEW_PLAYER'?'active':''}`} onClick={()=>setTab('NEW_PLAYER')}>JOGADOR</div>
             </div>
 
             {tab==='LOGIN' && <div>
@@ -7087,6 +7156,29 @@ const renewContract = async (p) => {
                 </select>
 
                 <button className="btn btn-gold" onClick={() => onCreateCoach(coachData)}>SOLICITAR LICENÇA</button>
+            </div>}
+            {/* --- ABA INSCRIÇÃO DE JOGADOR --- */}
+            {tab==='NEW_PLAYER' && <div>
+                <h3 style={{color:'cyan'}}>⚽ Inscrição de Atleta</h3>
+                <p style={{fontSize:12, color:'#aaa'}}>Crie seu jogador. Você começará nos Agentes Livres.</p>
+                
+                <div className="card" style={{border:'1px solid cyan', background:'rgba(0, 255, 255, 0.05)', marginBottom:15}}>
+                    <div style={{display:'flex', justifyContent:'space-between', fontSize:12}}>
+                        <span>OVR Inicial (Linha): <b>45</b></span>
+                        <span>OVR Inicial (Goleiro): <b>60</b></span>
+                    </div>
+                </div>
+
+                <input className="input-field" value={playerData.name} onChange={e=>setPlayerData({...playerData, name:e.target.value})} placeholder="Nome no Jogo (Ex: João Silva)" />
+                <input className="input-field" value={playerData.instagram} onChange={e=>setPlayerData({...playerData, instagram:e.target.value})} placeholder="@ do seu Instagram (Para verificação)" />
+                <input className="input-field" type="password" value={playerData.password} onChange={e=>setPlayerData({...playerData, password:e.target.value})} placeholder="Crie uma Senha de Acesso" />
+
+                <label style={{textAlign:'left', display:'block', color:'#aaa', fontSize:12}}>Posição Inicial</label>
+                <select className="input-field" value={playerData.position} onChange={e=>setPlayerData({...playerData, position:e.target.value})}>
+                    {POS.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+
+                <button className="btn btn-blue" onClick={() => onCreatePlayer(playerData)}>ENVIAR INSCRIÇÃO</button>
             </div>}
             
             {sel && <div className="modal-overlay"><div className="modal-content"><h3>{sel.name}</h3><input className="input-field" type="password" placeholder="Senha" value={lp} onChange={e=>setLp(e.target.value)} /><button className="btn btn-green" onClick={handleLoginSubmit}>ENTRAR</button><button className="btn" onClick={()=>setSel(null)}>CANCELAR</button></div></div>}

@@ -6273,7 +6273,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.90.1</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.90.2</div>
                             </div>
                         </div>
                         
@@ -6946,7 +6946,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.1 ESTADIOS   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.2 ESTADIOS   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -9116,12 +9116,15 @@ const Market = ({ user, me, teams, players, coaches, open, isVis, onNeg, onPayCl
 };
 
 const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
-    const old = target.oldOffer || {};
+const old = target.oldOffer || {};
     const isCounter = !!old.id;
     const isPlayerActing = user?.type === 'PLAYER';
     const clubsHaveAgreed = old?.sellerAccepted === true;
     const isUrgentRenewal = old?.type === 'RENOVACAO_URGENTE';
-    const shouldHidePart1 = isPlayerActing || clubsHaveAgreed || isUrgentRenewal;
+    // NOVA REGRA: Verifica se é agente livre
+    const isFreeAgent = target.teamId === 'FREE' || !target.teamId; 
+    // ESCONDE A PARTE 1 SE FOR AGENTE LIVRE!
+    const shouldHidePart1 = isPlayerActing || clubsHaveAgreed || isUrgentRenewal || isFreeAgent;
     const maxLoanAllowed = parseInt(target.contract) || 1;
 
     // --- NOVO: PEGA LIMITES SALARIAIS PARA O OVERALL DO ALVO ---
@@ -9307,8 +9310,8 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                         }
 
                         // Se for pré-contrato, o valor é 0
-                        const finalVal = isPreContract ? 0 : v;
-                        onSend(target, t, finalVal, swaps, (t === 'EMPRESTIMO' ? meta.loanDuration : con), {...meta, hasBuyOption, newSalary: finalSal, role, status: 'PENDING'}, old);
+const finalVal = (isPreContract || isFreeAgent) ? 0 : v;
+            onSend(target, t, finalVal, swaps, (t === 'EMPRESTIMO' ? meta.loanDuration : con), {...meta, hasBuyOption, newSalary: finalSal, role, status: 'PENDING'}, old);
                     }}>
                         {isUrgentRenewal ? 'OFERECER RENOVAÇÃO' : (isPreContract ? 'ENVIAR PRÉ-CONTRATO' : 'ENVIAR RESPOSTA')}
                     </button>

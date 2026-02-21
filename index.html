@@ -1365,7 +1365,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
 
             {/* NOVO: RENDERIZAÇÃO DO MODAL DO ESTÁDIO */}
             {showStadiumUI && (
-                <StadiumManager team={team} onClose={() => setShowStadiumUI(false)} />
+                <StadiumManager team={team} players={players} onClose={() => setShowStadiumUI(false)} />
             )}
         </div>
     );
@@ -2046,7 +2046,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     );
 };
         //FIM
-     const StadiumManager = ({ team, onClose }) => {
+     const StadiumManager = ({ team, players, onClose }) => {
     const lvl = team.stadiumLevel || 1;
     const db = STADIUM_DB[lvl];
     const nextDb = STADIUM_DB[lvl + 1];

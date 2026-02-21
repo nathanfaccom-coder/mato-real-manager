@@ -4633,6 +4633,7 @@ const resetDatabase = async () => {
                     <button className="btn btn-red" style={{marginTop: 10}} onClick={()=>onAct('SEASON')}>VIRAR TEMPORADA</button>
                     <button className="btn btn-gold" onClick={()=>{ const t=prompt("Título"); const b=prompt("Texto"); if(t)onPost(t,b,'admin'); }}>COMUNICADO</button>
                     <button className="btn btn-blue" style={{marginTop:10}} onClick={onGenFixtures}>🗓️ GERAR TABELA DE JOGOS</button>
+                    <button className="btn btn-gold" style={{marginTop:10}} onClick={() => onAct('EDIT_PRIZES')}>⚙️ CONFIGURAR PREMIAÇÕES DA TEMPORADA</button>
                     <button className="btn btn-purple" style={{marginTop:10}} onClick={onTurnSeasonAdvanced}>🏆 VIRAR TEMPORADA (AVANÇADO)</button>
                     <button className="btn" style={{background:'#333', border:'1px solid #666', marginTop:10}} onClick={onGenAttrs}>
                         🎲 GERAR ATRIBUTOS (ALL)
@@ -6553,6 +6554,7 @@ const renewContract = async (p) => {
                             {modal.type==='MATCH_PERFORMANCE' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} matchData={modal.data?.match} />}
                             {modal.type==='TEAM_TABLE' && <TeamStandingsEditor teams={teams} onUpdateTeamStats={updateTeamStats} />}
                             {modal.type==='POST_NEWS' && <div><h3>Nova Notícia</h3><input className="input-field" placeholder="Manchete / Texto" id="news-body" /><button className="btn btn-blue" onClick={()=>{postNews(`📰 **${user.data.name}:**\n${document.getElementById('news-body').value}`, 'press'); setModal(null);}}>PUBLICAR</button></div>}
+                            {modal.type==='EDIT_PRIZES' && <PrizeEditor initialData={modal.data} onSave={async (newPrizes) => { await db.collection('config').doc('system').update({ prizes: newPrizes }); alert("Premiações Atualizadas! Elas serão pagas na próxima Virada de Temporada."); setModal(null); }} onClose={() => setModal(null)} />}
                             {modal.type==='STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
                             
                             {modal.type === 'MATCH_MANAGER' && (

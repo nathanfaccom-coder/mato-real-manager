@@ -6882,8 +6882,8 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
     );
 };
 // --- COMPONENTS ---
-     const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor, onCreateCoach }) => {
-    const [tab, setTab] = useState('LOGIN'); 
+const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor, onCreateCoach, onCreatePlayer }) => {
+        const [tab, setTab] = useState('LOGIN'); 
     const [subTab, setSubTab] = useState('TEAM'); 
     const [f, setF] = useState({n:'', b:'10000000', s:'A', p:''}); 
     const [fc, setFC] = useState({n:'', owner:'', p:'', type:'COMERCIO'});

@@ -485,7 +485,41 @@ const getPriceStatus = (askedPrice, recommendedPrice) => {
     return { label: '✅ PREÇO JUSTO', color: '#00E676' };
 };
         //FIM
+// --- CALCULADORA DE SÓCIO TORCEDOR EM TEMPO REAL ---
+const calculateSocios = (team, teamPlayers) => {
+    if (!team) return 0;
+    const baseBySerie = { 'A': 10000, 'B': 4000, 'C': 1500, 'D': 500, 'VARZEA': 100 };
+    const base = baseBySerie[team.serie || 'VARZEA'] || 100;
 
+    // 1. Fator Fama (Soma da fama do elenco / 20)
+    const totalFame = teamPlayers.reduce((acc, p) => acc + (p.fame || 0), 0);
+    const fameBonus = Math.floor(totalFame / 20);
+
+    // 2. Fator Fase do Time (Últimos 5 jogos)
+    const form = team.recentForm || []; // Ex: ['VITORIA', 'EMPATE', 'DERROTA']
+    let formMultiplier = 1.0;
+    if (form.length > 0) {
+        const wins = form.filter(r => r === 'VITORIA').length;
+        const losses = form.filter(r => r === 'DERROTA').length;
+        if (wins > losses) formMultiplier += (wins * 0.06); // Até +30%
+        if (losses > wins) formMultiplier -= (losses * 0.08); // Até -40%
+    }
+
+    const potentialSocios = Math.floor((base + fameBonus) * formMultiplier);
+
+    // 3. Fator Ganância (Preço)
+    const price = team.socioPrice || 40;
+    let priceMultiplier = 1.0;
+    if (price > 10) {
+        // Equação linear: 10 = 100% de adesão | 150 = 10% de adesão
+        priceMultiplier = 1.0 - ((price - 10) * 0.006428); 
+    }
+    if (priceMultiplier < 0.05) priceMultiplier = 0.05; // Mínimo de 5% de loucos que pagam qualquer preço
+
+    return Math.max(0, Math.floor(potentialSocios * priceMultiplier));
+};
+// ----------------------------------------------------
+        
         // --- TABELA DE TETO SALARIAL (REAJUSTADA) ---
 const SALARY_CAPS = [
     { minOv: 0,  maxOv: 45, minSal: 0,    maxSal: 1500,   label: 'Várzea/Amador' }, // Permitir salário 0 ou baixo
@@ -2018,7 +2052,8 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     const nextDb = STADIUM_DB[lvl + 1];
 
     const [tab, setTab] = useState('ARENA');
-    const [ticPrice, setTicPrice] = useState(team.ticketPrice || db.minTic);
+    const [socioPrice, setSocioPrice] = useState(team.socioPrice || 40);
+         const [ticPrice, setTicPrice] = useState(team.ticketPrice || db.minTic);
     
     // Estados da Loja
     const storeBal = team.storeBalance || 0;
@@ -2116,6 +2151,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                 <div style={{display:'flex', gap:5, marginBottom:15}}>
                     <button className={`btn ${tab==='ARENA'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('ARENA')} style={{flex:1}}>🏟️ ARENA</button>
                     <button className={`btn ${tab==='LOJA'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('LOJA')} style={{flex:1}}>🛍️ LOJA OFICIAL</button>
+                   <button className={`btn ${tab==='SOCIO'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('SOCIO')} style={{flex:1}}>🎟️ SÓCIO</button>
                 </div>
 
                 {tab === 'ARENA' && (
@@ -2305,7 +2341,58 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                         {(team.storeProducts || []).length === 0 && !editP && <p style={{textAlign:'center', color:'#666', fontSize:11}}>Sua vitrine está vazia. Crie produtos para vender em dias de jogo!</p>}
                     </div>
                 )}
-                
+                {/* --- NOVA ABA: PROGRAMA SÓCIO TORCEDOR --- */}
+                {tab === 'SOCIO' && (
+                    <div className="animate-in">
+                        <div style={{background:'linear-gradient(45deg, #FFD700, #FF8F00)', padding:15, borderRadius:8, marginBottom:15, border:'1px solid #fff', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                            <div>
+                                <small style={{color:'#000', fontWeight:'bold'}}>Sócios Ativos (Em tempo real)</small><br/>
+                                <b style={{fontSize:24, color:'#000'}}>
+                                    {/* A MÁGICA DO TEMPO REAL AQUI */}
+                                    {calculateSocios(
+                                        {...team, socioPrice: socioPrice}, // Simula a mudança antes de salvar
+                                        players.filter(p => p.teamId === team.id)
+                                    ).toLocaleString('pt-BR')} 👤
+                                </b>
+                            </div>
+                        </div>
+
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:15}}>
+                            <div className="card" style={{padding:10, textAlign:'center'}}>
+                                <span style={{fontSize:10, color:'#aaa'}}>Renda Semanal Projetada</span><br/>
+                                <b style={{color:'lime', fontSize:14}}>
+                                    {fmt(calculateSocios({...team, socioPrice: socioPrice}, players.filter(p => p.teamId === team.id)) * socioPrice)}
+                                </b>
+                            </div>
+                            <div className="card" style={{padding:10, textAlign:'center'}}>
+                                <span style={{fontSize:10, color:'#aaa'}}>Fase do Time (Últ. 5)</span><br/>
+                                <b style={{color:'#fff', fontSize:14, letterSpacing:2}}>
+                                    {(team.recentForm || []).length > 0 
+                                        ? team.recentForm.map(r => r==='VITORIA'?'🟢':r==='EMPATE'?'⚪':'🔴').join('') 
+                                        : '➖'}
+                                </b>
+                            </div>
+                        </div>
+
+                        <div className="card" style={{borderLeft:'4px solid gold'}}>
+                            <h4 style={{marginTop:0, color:'gold'}}>💳 Mensalidade do Sócio</h4>
+                            <p style={{fontSize:10, color:'#aaa', marginBottom:10}}>
+                                Defina o valor da assinatura. Se cobrar muito caro, a massa torcedora cancelará o plano!
+                            </p>
+                            
+                            <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
+                                <label style={{color:'gold', fontSize:12, fontWeight:'bold'}}>Preço Cobrado</label>
+                                <b style={{color:'#fff'}}>{fmt(socioPrice)}</b>
+                            </div>
+                            <input type="range" min="10" max="150" step="5" value={socioPrice} onChange={e=>setSocioPrice(Number(e.target.value))} style={{width:'100%', accentColor:'gold', marginBottom:15}} />
+                            
+                            <button className="btn btn-green" onClick={async () => {
+                                await firebase.firestore().collection('teams').doc(team.id).update({ socioPrice: socioPrice });
+                                alert("Valor da mensalidade atualizado! Os sócios atuais já reagiram à mudança.");
+                            }} disabled={socioPrice === team.socioPrice}>SALVAR NOVA MENSALIDADE</button>
+                        </div>
+                    </div>
+                )}
                 <button className="btn btn-red" style={{marginTop:15}} onClick={onClose}>FECHAR</button>
             </div>
         </div>
@@ -3324,7 +3411,12 @@ const PrizeEditor = ({ initialData, onSave, onClose }) => {
                         };
                     }
                 }
-
+// D) Renda Passiva: Sócio Torcedor
+                const myPlayers = players.filter(p => p.teamId === t.id);
+                const activeSocios = calculateSocios(t, myPlayers);
+                const socioIncome = activeSocios * (t.socioPrice || 40);
+                
+                newBalance += socioIncome; // Injeta o dinheiro do sócio na conta!
                 // Salva o novo saldo consolidado
                 updates.balance = newBalance;
                 
@@ -5878,7 +5970,26 @@ const renewContract = async (p) => {
                     });
                 }
                 // ==========================================
-
+// --- ATUALIZA A SEQUÊNCIA DE JOGOS (RECENT FORM) DOS TIMES ---
+                const teamResults = {};
+                batchData.forEach(item => {
+                    if (item.player && item.player.teamId && item.player.teamId !== 'FREE') {
+                        teamResults[item.player.teamId] = item.match.result; // Salva o resultado do time
+                    }
+                });
+                
+                Object.keys(teamResults).forEach(tid => {
+                    if (teamResults[tid] !== 'NENHUM') {
+                        const tObj = teams.find(t => t.id === tid);
+                        if (tObj) {
+                            let form = tObj.recentForm || [];
+                            form.unshift(teamResults[tid]); // Adiciona o jogo atual no topo da lista
+                            if (form.length > 5) form.pop(); // Mantém apenas os últimos 5 jogos
+                            b.update(db.collection('teams').doc(tid), { recentForm: form });
+                        }
+                    }
+                });
+                
                 await b.commit();
                 setLoading(false);
                 setModal(null);
@@ -9677,7 +9788,8 @@ const Ranking = ({ teams, players, sales }) => {
             <h3>Ranking e Estatísticas</h3>
             <div className="rank-tabs">
                 <div className={`rank-tab ${view === 'TEAMS' ? 'active' : ''}`} onClick={() => setView('TEAMS')}>💰 Clubes</div>
-                <div className={`rank-tab ${view === 'FAME' ? 'active' : ''}`} onClick={() => setView('FAME')}>💎 Celebridades</div>
+               <div className={`rank-tab ${view === 'SOCIOS' ? 'active' : ''}`} onClick={() => setView('SOCIOS')}>🎟️ Maior Torcida</div>
+                                        <div className={`rank-tab ${view === 'FAME' ? 'active' : ''}`} onClick={() => setView('FAME')}>💎 Celebridades</div>
                 <div className={`rank-tab ${view === 'OVERALL' ? 'active' : ''}`} onClick={() => setView('OVERALL')}>⭐ Craques</div>
                 <div className={`rank-tab ${view === 'SALARY' ? 'active' : ''}`} onClick={() => setView('SALARY')}>💸 Salários</div>
                 <div className={`rank-tab ${view === 'GOALS' ? 'active' : ''}`} onClick={() => setView('GOALS')}>⚽ Gols</div>
@@ -9689,7 +9801,22 @@ const Ranking = ({ teams, players, sales }) => {
 
             <div style={{ marginTop: 10 }}>
                 {view === 'TEAMS' && renderTeams()}
-                {view === 'FAME' && renderPlayers('fame', 'Fama:', 'var(--purple)', false)}
+                {view === 'SOCIOS' && teams.filter(t=>t.status!=='PENDING')
+                    .sort((a,b) => calculateSocios(b, players.filter(p=>p.teamId===b.id)) - calculateSocios(a, players.filter(p=>p.teamId===a.id)))
+                    .map((t, i) => (
+                        <div key={t.id} className="card" onClick={() => setInspect({ type: 'TEAM', data: t })} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                            <b style={{ fontSize: 20, color: '#555', width: 30, textAlign: 'center' }}>{i + 1}</b>
+                            {t.logo ? <img src={t.logo} style={{ width: 35, height: 35, borderRadius: '50%', objectFit: 'cover' }} /> : <div style={{ width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'grid', placeItems:'center' }}>🛡️</div>}
+                            <div style={{ flex: 1 }}>
+                                <b>{t.name}</b> <small style={{color:'#aaa'}}>(Série {t.serie})</small>
+                            </div>
+                            <div style={{ fontWeight: 'bold', fontSize: 16, color: 'gold' }}>
+                                {calculateSocios(t, players.filter(p=>p.teamId===t.id)).toLocaleString('pt-BR')} 👤
+                            </div>
+                        </div>
+                    ))
+                }            
+    {view === 'FAME' && renderPlayers('fame', 'Fama:', 'var(--purple)', false)}
                 {view === 'OVERALL' && renderPlayers('overall', 'Overall:', 'var(--warning)', false)}
                 {view === 'SALARY' && renderPlayers('salary', 'Salário:', 'var(--primary)', false)}
                 {view === 'GOALS' && renderPlayers('goals', '⚽', '#fff')}

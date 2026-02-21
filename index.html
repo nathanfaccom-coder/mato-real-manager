@@ -2148,7 +2148,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     );
 };
         //FIM
-        const TrainingCenterManager = ({ team, players, user, onClose, onTrain, onTrainSolo }) => {
+        const TrainingCenterManager = ({ team, players, coach, user, onClose, onTrain, onTrainSolo }) => {
     const lvl = team.ctLevel || 1;
     const db = CT_DB[lvl];
     const nextDb = CT_DB[lvl + 1];
@@ -2160,6 +2160,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     const [trainingType, setTrainingType] = useState('FISICO_BASE');
     const [selectedPlayers, setSelectedPlayers] = useState([]);
     
+    // Busca a energia atualizada do usuário logado
     const energy = user.data?.energy !== undefined ? user.data.energy : 100;
 
     const handleUpgrade = async () => {
@@ -2200,26 +2201,27 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
 
     return (
         <div className="modal-overlay" style={{zIndex: 99999}} onClick={onClose}>
-            <div className="modal-content" style={{maxWidth: '600px', padding: '15px'}} onClick={e => e.stopPropagation()}>
+            <div className="modal-content" style={{maxWidth: '600px', padding: '15px', background:'#121212'}} onClick={e => e.stopPropagation()}>
                 
-                <div style={{position:'relative', height:120, background:'#111', borderRadius:8, overflow:'hidden', marginBottom:15, border:'2px solid #00E676', boxShadow: '0 4px 8px rgba(0,0,0,0.5)'}}>
-                    <div style={{display:'flex', alignItems:'center', justifyContent:'center', height:'100%', fontSize:40, color:'#333'}}>🏋️‍♂️</div>
+                {/* CABEÇALHO DO CT */}
+                <div style={{position:'relative', height:120, background:'#1a1a1a', borderRadius:8, overflow:'hidden', marginBottom:15, border:'2px solid #00E676', boxShadow: '0 4px 15px rgba(0,230,118,0.2)'}}>
+                    <div style={{display:'flex', alignItems:'center', justifyContent:'center', height:'100%', fontSize:50, color:'#222'}}>🏋️‍♂️</div>
                     <div style={{position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.95))', padding: '30px 10px 10px 10px'}}>
-                        <b style={{color: '#00E676', fontSize: 15, display: 'block', marginBottom: 4}}>{db.name} <small style={{color:'gold'}}>(Nvl {lvl})</small></b>
-                        <div style={{display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#ddd'}}>
-                            <span>🔥 XP: <b style={{color:'lime'}}>+{db.bonusXP}%</b></span>
-                            <span>🏥 Fisio: <b style={{color:'cyan'}}>{db.healChance}%</b></span>
-                            <span>💸 <b style={{color:'var(--danger)'}}>{fmt(db.maint)}/s</b></span>
+                        <b style={{color: '#00E676', fontSize: 16, display: 'block', marginBottom: 4}}>{db.name} <small style={{color:'gold'}}>(Nvl {lvl})</small></b>
+                        <div style={{display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#ddd'}}>
+                            <span>🔥 Bônus XP: <b style={{color:'lime'}}>+{db.bonusXP}%</b></span>
+                            <span>🏥 Fisio Auto: <b style={{color:'cyan'}}>{db.healChance}%</b></span>
                         </div>
                     </div>
                 </div>
 
                 <div style={{display:'flex', gap:5, marginBottom:15, overflowX:'auto'}}>
-                    <button className={`btn ${tab==='GERAL'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('GERAL')}>ESTRUTURA</button>
+                    <button className={`btn ${tab==='GERAL'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('GERAL')}>ESTRUTURA & ELENCO</button>
                     {(isCoach || isPlayer) && <button className={`btn ${tab==='TREINO'?'btn-green':'btn-ghost'}`} onClick={()=>setTab('TREINO')}>🏋️‍♂️ TREINAR</button>}
                     {isCoach && <button className={`btn ${tab==='POSICOES'?'btn-warning':'btn-ghost'}`} onClick={()=>setTab('POSICOES')}>🔄 POSIÇÕES</button>}
                 </div>
 
+                {/* ABA 1: ESTRUTURA E QUEM ESTÁ NO CT */}
                 {tab === 'GERAL' && (
                     <div className="animate-in">
                         {isPresident && nextDb && (
@@ -2230,25 +2232,69 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                 </button>
                             </div>
                         )}
-                        <h4 style={{color:'cyan', borderBottom:'1px solid #333', paddingBottom:5, marginTop:0}}>📋 Mural de Treinos Recentes</h4>
-                        <div style={{maxHeight:'200px', overflowY:'auto', background:'rgba(0,0,0,0.3)', padding:10, borderRadius:8}}>
-                            {(!team.trainingLogs || team.trainingLogs.length === 0) ? (
-                                <p style={{fontSize:11, color:'#666', textAlign:'center'}}>Nenhum treino realizado recentemente.</p>
-                            ) : (
-                                team.trainingLogs.map((log, idx) => (
-                                    <div key={idx} style={{marginBottom:10, paddingBottom:10, borderBottom:'1px dashed #444', fontSize:11}}>
-                                        <div style={{display:'flex', justifyContent:'space-between', color:'#aaa'}}>
-                                            <b style={{color:'#fff'}}>Foco: {log.type}</b>
-                                            <span>{new Date(log.date).toLocaleDateString()}</span>
+
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                            {/* COLUNA ESQUERDA: JOGADORES PRESENTES */}
+                            <div>
+                                <h4 style={{color:'gold', borderBottom:'1px solid #333', paddingBottom:5, marginTop:0}}>👥 Elenco no CT</h4>
+                                <div style={{maxHeight:'300px', overflowY:'auto', paddingRight:5}}>
+                                    
+                                    {/* CARD DO TÉCNICO */}
+                                    {coach && (
+                                        <div className="card" style={{display:'flex', alignItems:'center', gap:10, borderLeft:'3px solid gold', padding:8, marginBottom:8}}>
+                                            {coach.face ? <img src={coach.face} style={{width:35,height:35,borderRadius:'50%',objectFit:'cover'}}/> : <div style={{width:35,height:35,background:'#333',borderRadius:'50%',display:'grid',placeItems:'center'}}>👔</div>}
+                                            <div style={{flex:1}}>
+                                                <b style={{fontSize:11, color:'gold'}}>{coach.name} <small style={{color:'#aaa'}}>(Prof.)</small></b>
+                                                <div style={{width:'100%', background:'#222', height:4, borderRadius:2, marginTop:4}}>
+                                                    <div style={{width:`${coach.energy||0}%`, background: (coach.energy||0)>50?'lime':'red', height:'100%'}}></div>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div style={{marginTop:5, color:'#00E676', whiteSpace:'pre-wrap'}}>{log.report}</div>
-                                    </div>
-                                ))
-                            )}
+                                    )}
+
+                                    {/* CARDS DOS JOGADORES */}
+                                    {[...players].sort((a,b)=>b.overall - a.overall).map(p => (
+                                        <div key={p.id} className="card" style={{display:'flex', alignItems:'center', gap:10, borderLeft:`3px solid ${getPosColor(p.position)}`, padding:8, marginBottom:8, opacity: (p.recoveryLeft||0)>0 ? 0.5 : 1}}>
+                                            {p.face ? <img src={p.face} style={{width:35,height:35,borderRadius:'50%',objectFit:'cover'}}/> : <div style={{width:35,height:35,background:'#333',borderRadius:'50%',display:'grid',placeItems:'center',fontSize:12}}>👤</div>}
+                                            <div style={{flex:1}}>
+                                                <div style={{display:'flex', justifyContent:'space-between'}}>
+                                                    <b style={{fontSize:11}}>{p.name} {(p.recoveryLeft||0)>0?'🏥':''}</b>
+                                                    <b style={{color:'var(--warning)', fontSize:11}}>{p.overall}</b>
+                                                </div>
+                                                <div style={{fontSize:9, color:'#aaa'}}>{p.position} {p.secondaryPositions ? `(+ ${p.secondaryPositions.join(',')})` : ''} | 💎 {p.fame||0}</div>
+                                                <div style={{width:'100%', background:'#222', height:4, borderRadius:2, marginTop:4}}>
+                                                    <div style={{width:`${p.energy||0}%`, background: (p.energy||0)>50?'lime':'red', height:'100%'}}></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* COLUNA DIREITA: MURAL DE TREINOS */}
+                            <div>
+                                <h4 style={{color:'cyan', borderBottom:'1px solid #333', paddingBottom:5, marginTop:0}}>📋 Mural de Resultados</h4>
+                                <div style={{maxHeight:'300px', overflowY:'auto', background:'rgba(0,0,0,0.3)', padding:10, borderRadius:8}}>
+                                    {(!team.trainingLogs || team.trainingLogs.length === 0) ? (
+                                        <p style={{fontSize:11, color:'#666', textAlign:'center'}}>Nenhum treino realizado.</p>
+                                    ) : (
+                                        team.trainingLogs.map((log, idx) => (
+                                            <div key={idx} style={{marginBottom:10, paddingBottom:10, borderBottom:'1px dashed #444', fontSize:10}}>
+                                                <div style={{display:'flex', justifyContent:'space-between', color:'#aaa'}}>
+                                                    <b style={{color:'#fff'}}>Foco: {log.type}</b>
+                                                    <span>{new Date(log.date).toLocaleDateString()}</span>
+                                                </div>
+                                                <div style={{marginTop:5, color:'#00E676', whiteSpace:'pre-wrap'}}>{log.report}</div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
 
+                {/* ABA 2: APRENDER POSIÇÕES (SÓ TÉCNICO) */}
                 {tab === 'POSICOES' && isCoach && (
                     <div className="animate-in">
                         <h4 style={{color:'var(--warning)', marginTop:0}}>🔄 Adaptação de Posições</h4>
@@ -2280,9 +2326,22 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                     </div>
                 )}
 
-                {/* A MÁGICA: ABA DE TREINO ONDE TÉCNICO E JOGADOR SE ENCONTRAM */}
+                {/* ABA 3: AÇÃO DE TREINAR (COM BARRA DE ENERGIA) */}
                 {tab === 'TREINO' && (
                     <div className="animate-in">
+                        
+                        {/* DESTAQUE DA ENERGIA DO USUÁRIO ATUAL */}
+                        <div style={{background:'rgba(0,0,0,0.4)', padding:15, borderRadius:8, marginBottom:15, border: energy > 30 ? '1px solid #444' : '1px solid red', textAlign:'center'}}>
+                            <small style={{color:'#aaa', fontWeight:'bold'}}>SUA ENERGIA ATUAL</small>
+                            <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginTop:5}}>
+                                <i className="fas fa-bolt" style={{color: energy > 30 ? 'gold' : 'red', fontSize:18}}></i>
+                                <div style={{width:'70%', background:'#222', height:14, borderRadius:7, overflow:'hidden'}}>
+                                    <div style={{width:`${energy}%`, height:'100%', background: energy > 50 ? 'lime' : energy > 20 ? 'orange' : 'red', transition:'0.3s'}}></div>
+                                </div>
+                                <b style={{color: energy > 50 ? 'lime' : energy > 20 ? 'orange' : 'red', fontSize:16}}>{energy}%</b>
+                            </div>
+                        </div>
+
                         <label style={{fontSize:11}}>Foco do Treino (O que você quer melhorar?):</label>
                         <select className="input-field" style={{margin:'5px 0 15px 0'}} value={trainingType} onChange={e=>setTrainingType(e.target.value)}>
                             <optgroup label="🏋️‍♂️ Físico e Condicionamento">
@@ -2308,7 +2367,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                         {isPlayer && (
                             <div className="card" style={{border:'1px dashed cyan'}}>
                                 <h3>Treino Individualizado</h3>
-                                <p style={{fontSize:11, color:'#aaa'}}>Você vai usar as dependências do CT sozinho.<br/><span style={{color:'red'}}>Custo: -35% Energia (Você tem {energy}%)</span></p>
+                                <p style={{fontSize:11, color:'#aaa'}}>Você vai usar as dependências do CT sozinho. A evolução é menor que treinar com o Professor.<br/><span style={{color:'red', fontWeight:'bold'}}>Custo: -35% Energia</span></p>
                                 <button className="btn btn-green" onClick={() => { onTrainSolo(user.data, trainingType); onClose(); }}>
                                     INICIAR TREINO SOLO
                                 </button>
@@ -2318,7 +2377,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                         {isCoach && (
                             <div className="card" style={{border:'1px dashed var(--primary)'}}>
                                 <h3>Treino Coletivo Orientado</h3>
-                                <p style={{fontSize:11, color:'#aaa'}}>Você conduzirá o treino. Os resultados irão para o Mural!<br/><span style={{color:'orange'}}>Custo Técnico: -20% Energia (Você tem {energy}%)</span></p>
+                                <p style={{fontSize:11, color:'#aaa'}}>Você conduzirá o treino e a evolução dos jogadores será altíssima. Os resultados irão para o Mural!<br/><span style={{color:'orange', fontWeight:'bold'}}>Custo do Técnico: -20% Energia</span></p>
                                 
                                 <button className="btn btn-green" onClick={()=>{
                                     if(energy < 20) return alert("Você está exausto!");
@@ -2331,13 +2390,13 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                 </button>
 
                                 <p style={{textAlign:'center', color:'#888', fontSize:11, margin:'10px 0'}}>👉 Selecione até <b>5 jogadores</b>:</p>
-                                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, maxHeight:'250px', overflowY:'auto'}}>
+                                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, maxHeight:'200px', overflowY:'auto'}}>
                                     {players.map(p => (
-                                        <div key={p.id} className="card" style={{ background: selectedPlayers.includes(p.id) ? 'rgba(0,255,0,0.1)' : '#111', border: selectedPlayers.includes(p.id) ? '1px solid var(--primary)' : '1px solid #333', cursor: 'pointer', padding: '10px' }} onClick={() => handleTogglePlayer(p.id)}>
-                                            <div style={{fontWeight:'bold', fontSize:11}}>{p.name}</div>
+                                        <div key={p.id} className="card" style={{ background: selectedPlayers.includes(p.id) ? 'rgba(0,255,0,0.1)' : '#111', border: selectedPlayers.includes(p.id) ? '1px solid var(--primary)' : '1px solid #333', cursor: 'pointer', padding: '10px', opacity: (p.recoveryLeft||0)>0 ? 0.4 : 1 }} onClick={() => handleTogglePlayer(p.id)}>
+                                            <div style={{fontWeight:'bold', fontSize:11}}>{p.name} {(p.recoveryLeft||0)>0?'🏥':''}</div>
                                             <div style={{fontSize:9, color:'#aaa'}}>{p.position} | OV: {p.overall}</div>
                                             <div style={{margin:'4px 0', background:'#222', height:4, borderRadius:2, overflow:'hidden', width:'100%'}}>
-                                                <div style={{ width:`${p.energy || 100}%`, height:'100%', background: (p.energy||100) > 70 ? 'lime' : (p.energy||100) > 30 ? 'orange' : 'red' }}></div>
+                                                <div style={{ width:`${p.energy || 0}%`, height:'100%', background: (p.energy||0) > 70 ? 'lime' : (p.energy||0) > 30 ? 'orange' : 'red' }}></div>
                                             </div>
                                         </div>
                                     ))}
@@ -6613,7 +6672,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.90.7</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.90.8</div>
                             </div>
                         </div>
                         
@@ -7068,7 +7127,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                     {modal && <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget && setModal(null)}>
                         <div className="modal-content">
                             {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={async(id)=>{db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} onRenew={renewContract} isOwner={user.type==='USER' && modal.data?.teamId===user.data?.id} />}
-                           {modal.type==='CT_TYCOON' && <TrainingCenterManager team={modal.data} players={players.filter(p=>p.teamId===modal.data.id)} user={user} onClose={()=>setModal(null)} onTrain={handleCoachTrain} onTrainSolo={handlePlayerSoloTrain} />}
+                            {modal.type==='CT_TYCOON' && <TrainingCenterManager team={modal.data} players={players.filter(p=>p.teamId===modal.data.id)} coach={coaches.find(c => c.teamId === modal.data.id && c.status === 'ACTIVE')} user={user} onClose={()=>setModal(null)} onTrain={handleCoachTrain} onTrainSolo={handlePlayerSoloTrain} />}
                             {modal.type==='OFFER' && <OfferForm target={modal.data} myPlayers={players.filter(p => p.teamId === user.data.id)} onSend={sendOffer} setModal={setModal} user={user} />}
                             {modal.type==='SETTINGS' && <SettingsForm team={modal.data || user.data} isAdmin={user.type==='ADMIN'} onUp={(d)=>{const tid=(modal.data?.id)||user.data.id; db.collection('teams').doc(tid).update(d); setModal(null);}} onUpgrade={()=>{/*Up*/}} onReq={(t,a,d)=>{db.collection('financeRequests').add({teamId:user.data.id, teamName:user.data.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!");}} onWithdraw={withdrawMoney} />}
                             {modal.type==='MATCH_PERFORMANCE' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} matchData={modal.data?.match} />}
@@ -7287,7 +7346,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.7 ESTADIOS   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.8 ESTADIOS   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -8510,9 +8569,11 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                 </div>
             </div>
 
-            {/* ABAS */}
+            {/* ABAS DO TÉCNICO */}
             <div style={{display:'flex', gap:5, marginBottom:15, marginTop:10, overflowX:'auto'}}>
-                <button className={`btn ${tab==='PRANCHETA'?'btn-green':'btn-ghost'}`} onClick={()=>setTab('PRANCHETA')}>PRANCHETA</button> 
+                <button className={`btn ${tab==='PRANCHETA'?'btn-green':'btn-ghost'}`} onClick={()=>setTab('PRANCHETA')}>PRANCHETA</button>
+                {/* BOTÃO DO CT (Abre o Modal diretamente) */}
+                <button className="btn btn-warning" onClick={()=>setModal({type:'CT_TYCOON', data: team})}>🏋️‍♂️ CT</button>
                 <button className={`btn ${tab==='MOCHILA'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('MOCHILA')}>MOCHILA</button>
                 <button className={`btn ${tab==='CARREIRA'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('CARREIRA')}>CARREIRA</button>
             </div>

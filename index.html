@@ -6005,17 +6005,17 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
         } else {
             // OFERTA NOVA (Primeiro contato)
             
-            // >>> CORREÇÃO V1.52.10: SE FOR PRÉ-CONTRATO, VAI DIRETO PRO JOGADOR <<<
-            if (type === 'PRE_CONTRATO') {
+           
+            // >>> CORREÇÃO: SE FOR PRÉ-CONTRATO OU RENOVAÇÃO, VAI DIRETO PRO JOGADOR <<<
+            if (type === 'PRE_CONTRATO' || type === 'RENOVACAO') {
                 recipientId = target.id; 
             } else {
-                // Se não for pré-contrato, segue a regra normal:
+                // Se não for pré-contrato/renovação, segue a regra normal:
                 // Se tem time, vai pro time. Se é Free, vai pro jogador.
                 recipientId = (target.teamId === 'FREE' || !target.teamId || target.teamId === '') 
                     ? target.id 
                     : target.teamId;
             }
-        }
 
         const pl = {
             playerId: target.id,
@@ -9519,15 +9519,19 @@ const old = target.oldOffer || {};
     const isUrgentRenewal = old?.type === 'RENOVACAO_URGENTE';
     // NOVA REGRA: Verifica se é agente livre
     const isFreeAgent = target.teamId === 'FREE' || !target.teamId; 
-    // ESCONDE A PARTE 1 SE FOR AGENTE LIVRE!
-    const shouldHidePart1 = isPlayerActing || clubsHaveAgreed || isUrgentRenewal || isFreeAgent;
+    // NOVO: Verifica se o jogador já pertence ao time do usuário logado
+    const isMyPlayer = user?.type === 'USER' && user.data.id === target.teamId;
+    
+    // ESCONDE A PARTE 1 SE FOR AGENTE LIVRE OU SE FOR O SEU PRÓPRIO JOGADOR!
+    const shouldHidePart1 = isPlayerActing || clubsHaveAgreed || isUrgentRenewal || isFreeAgent || isMyPlayer;
+
     const maxLoanAllowed = parseInt(target.contract) || 1;
 
     // --- NOVO: PEGA LIMITES SALARIAIS PARA O OVERALL DO ALVO ---
     const limits = getSalaryLimits(target.overall);
 
     // Se vier do botão "Pré-Contrato", o type inicial será PRE_CONTRATO
-    const [t, setT] = useState(old.type || 'COMPRA');
+   const [t, setT] = useState(old.type || (isMyPlayer ? 'RENOVACAO' : 'COMPRA'));
     const [v, setV] = useState(old.value || '');
     const [sal, setSal] = useState(old.meta?.newSalary || target.salary || 0);
     const [con, setCon] = useState(old.offerContract || '1');
@@ -9706,7 +9710,7 @@ const old = target.oldOffer || {};
                         }
 
                         // Se for pré-contrato, o valor é 0
-const finalVal = (isPreContract || isFreeAgent) ? 0 : v;
+const finalVal = (isPreContract || isFreeAgent || isMyPlayer) ? 0 : v;
             onSend(target, t, finalVal, swaps, (t === 'EMPRESTIMO' ? meta.loanDuration : con), {...meta, hasBuyOption, newSalary: finalSal, role, status: 'PENDING'}, old);
                     }}>
                         {isUrgentRenewal ? 'OFERECER RENOVAÇÃO' : (isPreContract ? 'ENVIAR PRÉ-CONTRATO' : 'ENVIAR RESPOSTA')}

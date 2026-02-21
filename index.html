@@ -434,7 +434,7 @@
     ]
 };
         
-        const POS = ['GOL', 'ZAG', 'LD', 'LE', 'VOL', 'MC', 'MD', 'ME', 'MEI', 'PTD', 'PTE', 'ATA'];
+        const POS = ['GOL', 'ZAG', 'LD', 'LE', 'VOL', 'MC', 'MD', 'ME', 'MEI', 'PTD', 'PTE', 'SA', 'ATA'];
         
         
         const SERIES = ['A', 'B', 'C', 'D', 'VARZEA'];
@@ -1389,26 +1389,20 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
         //FIM
 const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireCoach, onRenewCoach, setModal, isAdmin }) => {
     const [tab, setTab] = useState('ELENCO'); 
-    const [showStadiumUI, setShowStadiumUI] = useState(false); // NOVO: Estado para controlar a tela do Estádio
+    const [showStadiumUI, setShowStadiumUI] = useState(false);
     const [showCT, setShowCT] = useState(false);
-    // Calcula salários somando jogadores + técnico (se houver)
     const wageBill = players.reduce((a,p) => a + (parseFloat(p.salary)||0), 0) + (coach ? parseFloat(coach.salary) : 0);
 
-    // --- LÓGICA DE ORDENAÇÃO POR POSIÇÃO ---
     const POS_ORDER = {
-        'GOL': 1,
-        'ZAG': 2, 'LD': 3, 'LE': 4,
-        'VOL': 5, 'MC': 6, 'MEI': 7,
-        'PTD': 8, 'PTE': 9, 'ATA': 10
+        'GOL': 1, 'ZAG': 2, 'LD': 3, 'LE': 4,
+        'VOL': 5, 'MC': 6, 'MD': 7, 'ME': 8, 'MEI': 9,
+        'PTD': 10, 'PTE': 11, 'SA': 12, 'ATA': 13
     };
 
     const sortedPlayers = [...players].sort((a, b) => {
-        // 1. Ordena por Posição (Goleiro primeiro, Ataque último)
         const posA = POS_ORDER[a.position] || 99;
         const posB = POS_ORDER[b.position] || 99;
         if (posA !== posB) return posA - posB;
-        
-        // 2. Desempate por Overall (Maior primeiro)
         return (b.overall || 0) - (a.overall || 0);
     });
 
@@ -1419,22 +1413,19 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                     <h2 style={{margin:0}}>{team.name}</h2>
                     <small style={{color:'#aaa'}}>Folha: <span style={{color:'var(--danger)', fontWeight:'bold'}}>{fmt(wageBill)}/sem</span></small>
                 </div>
-                
             </div>
 
-            {/* NOVO: BOTÃO DE GESTÃO DE ARENA (Aparece apenas para o dono do time) */}
             {!isVisitor && (
                 <div style={{marginBottom: 15}}>
                     <button className="btn btn-blue" onClick={() => setShowStadiumUI(true)} style={{width: '100%', padding: '12px'}}>
                         🏟️ GESTÃO DE ARENA
                     </button>
-                <button className="btn btn-green" onClick={() => setModal({type:'CT_TYCOON', data: team})} style={{width: '100%', padding: '12px', marginTop: '10px'}}>
-    🏋️‍♂️ CENTRO DE TREINAMENTO
-</button>
+                    <button className="btn btn-green" onClick={() => setModal({type:'CT_TYCOON', data: team})} style={{width: '100%', padding: '12px', marginTop: '10px'}}>
+                        🏋️‍♂️ CENTRO DE TREINAMENTO
+                    </button>
                 </div>
             )}
 
-            {/* ABAS DE NAVEGAÇÃO */}
             <div style={{display:'flex', gap:10, marginBottom:15}}>
                 <button className={`btn ${tab==='ELENCO'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('ELENCO')}>ELENCO</button>
                 <button className={`btn ${tab==='STAFF'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('STAFF')}>COMISSÃO TÉCNICA</button>
@@ -1443,7 +1434,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             {/* --- ABA 1: ELENCO (ORDENADO) --- */}
             {tab === 'ELENCO' && (
                 <div>
-                   <div style={{marginBottom:15}}>
+                    <div style={{marginBottom:15}}>
                         <div style={{fontSize:16, fontWeight:'bold', marginBottom:10}}>Jogadores ({sortedPlayers.length})</div>
                         
                         {/* BOTÃO EXCLUSIVO DO ADMIN NA TELA DO TIME */}
@@ -1478,12 +1469,11 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                 <div><small style={{color:'#aaa'}}>🟥 {p.stats?.reds||0}</small></div>
                             </div>
 
-                            {/* ATRIBUTOS VISÍVEIS NO PAINEL */}
                             <div style={{marginTop:10, paddingTop:5, borderTop:'1px dashed #444'}}>
-                                    <AttributeGrid attrs={p.attributes} pendingXP={p.pendingXP} />
+                                <AttributeGrid attrs={p.attributes} pendingXP={p.pendingXP} />
                             </div>
 
-                           {/* --- CONTROLES DE AÇÃO (ADMIN VS DONO DO TIME) --- */}
+                            {/* --- CONTROLES DE AÇÃO (ADMIN VS DONO DO TIME) --- */}
                             {isAdmin && (
                                 <div style={{marginTop:10, display:'flex', gap:5}}>
                                     <button className="btn btn-blue" style={{width:'100%', fontSize:10, padding:'8px'}} onClick={()=>onEdit(p)}>
@@ -1502,6 +1492,10 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                     </button>
                                 </div>
                             )}
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {/* --- ABA 2: COMISSÃO TÉCNICA --- */}
             {tab === 'STAFF' && (
@@ -1563,7 +1557,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                 </div>
             )}
 
-            {/* NOVO: RENDERIZAÇÃO DO MODAL DO ESTÁDIO */}
+            {/* RENDERIZAÇÃO DO MODAL DO ESTÁDIO */}
             {showStadiumUI && (
                 <StadiumManager team={team} players={players} onClose={() => setShowStadiumUI(false)} />
             )}
@@ -1571,6 +1565,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     );
 };
 // FIM DO SHOPPING E TEAM DASHBOARD
+
 
      
        const PublicServices = ({ players, user, onDonate }) => {

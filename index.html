@@ -434,17 +434,17 @@
     ]
 };
         
-        const POS = ['GOL', 'ZAG', 'LD', 'LE', 'VOL', 'MC', 'MEI', 'PTD', 'PTE', 'ATA'];
+        const POS = ['GOL', 'ZAG', 'LD', 'LE', 'VOL', 'MC', 'MD', 'ME', 'MEI', 'PTD', 'PTE', 'ATA'];
         
         
         const SERIES = ['A', 'B', 'C', 'D', 'VARZEA'];
         const COSTS = [0, 5000000, 20000000, 50000000, 100000000];
         const fmt = (v) => "₣ " + parseFloat(v||0).toLocaleString('pt-BR');
 const getPosColor = (p) => {
-    if (p === 'GOL') return '#E65100'; // Laranja Escuro (Goleiro)
-    if (['ZAG', 'LD', 'LE'].includes(p)) return '#2979FF'; // Azul (Defesa)
-    if (['VOL', 'MC', 'MEI'].includes(p)) return '#00E676'; // Verde (Meio)
-    if (['PTD', 'PTE', 'ATA', 'SA'].includes(p)) return '#FF1744'; // Vermelho (Ataque)
+    if (p === 'GOL') return '#E65100'; 
+    if (['ZAG', 'LD', 'LE'].includes(p)) return '#2979FF'; 
+    if (['VOL', 'MC', 'MD', 'ME', 'MEI'].includes(p)) return '#00E676'; 
+    if (['PTD', 'PTE', 'ATA', 'SA'].includes(p)) return '#FF1744'; 
     return '#888';
 };
         
@@ -467,7 +467,7 @@ const getRecommendedPrice = (ovr, pos) => {
     let mult = 1.0; // Base (Laterais e Meias)
     if (pos === 'GOL') mult = 1.20;       // +20%
     else if (['ZAG'].includes(pos)) mult = 1.15; // +15%
-    else if (['VOL'].includes(pos)) mult = 1.05; // +5%
+    else if (['VOL', 'MC', 'MD', 'ME'].includes(pos)) mult = 1.05; // +5%
     else if (['PTD', 'PTE'].includes(pos)) mult = 0.95; // -5%
     else if (['ATA', 'SA'].includes(pos)) mult = 0.90;  // -10%
 
@@ -567,7 +567,42 @@ const DEFAULT_PRIZES = {
     D: { champ: 3500000, vice: 2500000, mid: 1200000, rel: 500000 },
     VARZEA: { champ: 1000000, vice: 800000, third: 600000, mid: 200000 }
 };
-        
+        // ==========================================
+// BANCO DE DADOS: CT E POSIÇÕES
+// ==========================================
+const CT_DB = {
+    1: { name: 'Campo de Terra', bonusXP: 0, healChance: 0, upgCost: 5000000, maint: 5000, prompt: 'campo de futebol de terra batida amador --ar 16:9' },
+    2: { name: 'CT Básico', bonusXP: 10, healChance: 5, upgCost: 15000000, maint: 20000, prompt: 'centro de treinamento de futebol simples, campo gramado --ar 16:9' },
+    3: { name: 'CT Profissional', bonusXP: 25, healChance: 10, upgCost: 35000000, maint: 50000, prompt: 'centro de treinamento de futebol profissional, boa estrutura --ar 16:9' },
+    4: { name: 'CT Avançado', bonusXP: 40, healChance: 20, upgCost: 80000000, maint: 100000, prompt: 'centro de treinamento moderno com academia visível ao fundo --ar 16:9' },
+    5: { name: 'Academia de Elite', bonusXP: 60, healChance: 30, upgCost: 0, maint: 200000, prompt: 'melhor centro de treinamento do mundo, piscinas de gelo, tecnologia --ar 16:9' }
+};
+
+const POS_TRAINING_MAP = {
+    'GOL': { train: 'GOLEIRO', attrs: ['gk', 'response', 'jump'] },
+    'ZAG': { train: 'DEFESA', attrs: ['defense', 'aggression', 'header'] },
+    'LD': { train: 'VELOCIDADE', attrs: ['speed', 'stamina', 'shortPass'] },
+    'LE': { train: 'VELOCIDADE', attrs: ['speed', 'stamina', 'shortPass'] },
+    'VOL': { train: 'DEFESA', attrs: ['defense', 'shortPass', 'stamina'] },
+    'MC': { train: 'PASSE', attrs: ['shortPass', 'longPass', 'teamwork'] },
+    'MD': { train: 'DRIBLE', attrs: ['dribble', 'speed', 'tech'] },
+    'ME': { train: 'DRIBLE', attrs: ['dribble', 'speed', 'tech'] },
+    'MEI': { train: 'PASSE', attrs: ['tech', 'shortPass', 'agility'] },
+    'PTD': { train: 'VELOCIDADE', attrs: ['speed', 'accel', 'dribble'] },
+    'PTE': { train: 'VELOCIDADE', attrs: ['speed', 'accel', 'dribble'] },
+    'ATA': { train: 'CHUTE', attrs: ['shot', 'shotPower', 'header'] },
+    'SA': { train: 'CHUTE', attrs: ['attack', 'shot', 'dribble'] }
+};
+
+const getPosLearningCost = (currPos, targetPos) => {
+    const sectors = { 'GOL': 0, 'ZAG': 1, 'LD': 1, 'LE': 1, 'VOL': 2, 'MC': 2, 'MD': 2, 'ME': 2, 'MEI': 2, 'PTD': 3, 'PTE': 3, 'ATA': 3, 'SA': 3 };
+    const diff = Math.abs(sectors[currPos] - sectors[targetPos]);
+    if (diff === 0) return 50;  // Mesmo setor (Aprox 5 treinos)
+    if (diff === 1) return 100; // Setor Adjacente (Aprox 10 treinos)
+    if (diff === 2) return 200; // Setor Distante (Aprox 20 treinos)
+    return 400; // Goleiro <-> Linha (Aprox 40 treinos)
+};
+// ------------------------------------------
 // ==========================================
 // BANCO DE DADOS DE ESTÁDIOS
 // ==========================================
@@ -854,7 +889,7 @@ const generateAttributes = (pos, targetOv) => {
     } else if (pos.includes('LAT') || pos.includes('LD') || pos.includes('LE')) {
         primary = ['speed', 'accel', 'stamina', 'shortPass', 'dribble'];
         secondary = ['defense', 'longPass', 'curve', 'attack'];
-    } else if (pos.includes('VOL') || pos.includes('MC')) {
+    } else if (pos.includes('VOL') || pos.includes('MC') || pos === 'MD' || pos === 'ME') {
         primary = ['shortPass', 'stamina', 'teamwork', 'defense', 'balance'];
         secondary = ['longPass', 'tech', 'shotPower', 'vision'];
     } else if (pos.includes('MEI') || pos.includes('MAT')) {
@@ -1208,7 +1243,7 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
 const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireCoach, onRenewCoach }) => {
     const [tab, setTab] = useState('ELENCO'); 
     const [showStadiumUI, setShowStadiumUI] = useState(false); // NOVO: Estado para controlar a tela do Estádio
-    
+    const [showCT, setShowCT] = useState(false);
     // Calcula salários somando jogadores + técnico (se houver)
     const wageBill = players.reduce((a,p) => a + (parseFloat(p.salary)||0), 0) + (coach ? parseFloat(coach.salary) : 0);
 
@@ -1246,6 +1281,9 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                     <button className="btn btn-blue" onClick={() => setShowStadiumUI(true)} style={{width: '100%', padding: '12px'}}>
                         🏟️ GESTÃO DE ARENA
                     </button>
+                <button className="btn btn-green" onClick={() => setModal({type:'CT_TYCOON', data: team})} style={{width: '100%', padding: '12px', marginTop: '10px'}}>
+    🏋️‍♂️ CENTRO DE TREINAMENTO
+</button>
                 </div>
             )}
 
@@ -2110,6 +2148,210 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     );
 };
         //FIM
+        const TrainingCenterManager = ({ team, players, user, onClose, onTrain, onTrainSolo }) => {
+    const lvl = team.ctLevel || 1;
+    const db = CT_DB[lvl];
+    const nextDb = CT_DB[lvl + 1];
+    const isPresident = user.type === 'USER' && user.data.id === team.id;
+    const isCoach = user.type === 'COACH' && user.data.teamId === team.id;
+    const isPlayer = user.type === 'PLAYER' && user.data.teamId === team.id;
+
+    const [tab, setTab] = useState('GERAL');
+    const [trainingType, setTrainingType] = useState('FISICO_BASE');
+    const [selectedPlayers, setSelectedPlayers] = useState([]);
+    
+    const energy = user.data?.energy !== undefined ? user.data.energy : 100;
+
+    const handleUpgrade = async () => {
+        if (!nextDb) return;
+        if ((team.balance || 0) < db.upgCost) return alert("Saldo insuficiente do clube!");
+        if (confirm(`Evoluir para ${nextDb.name} por ${fmt(db.upgCost)}?\n\nA manutenção subirá para ${fmt(nextDb.maint)}/sem.`)) {
+            await firebase.firestore().collection('teams').doc(team.id).update({ balance: firebase.firestore.FieldValue.increment(-db.upgCost), ctLevel: lvl + 1 });
+            alert("Centro de Treinamento evoluído com sucesso!");
+            onClose();
+        }
+    };
+
+    const assignLearning = async (player) => {
+        if (!isCoach) return alert("Apenas o Técnico pode designar treinos de posição.");
+        if (player.learningPosition) return alert("Este jogador já está aprendendo uma posição! Ele só pode aprender uma de cada vez.");
+        if ((player.secondaryPositions || []).length >= 3) return alert("Este jogador já atingiu o limite de 3 posições secundárias.");
+
+        const target = prompt(`Qual NOVA POSIÇÃO o jogador ${player.name} deve focar em aprender?\n(Ex: ZAG, ATA, VOL, MD, ME, PTD...)`);
+        if (!target) return;
+        const upperTarget = target.toUpperCase();
+        
+        if (!POS_TRAINING_MAP[upperTarget]) return alert("Posição inválida. Digite a sigla corretamente.");
+        if (player.position === upperTarget || (player.secondaryPositions || []).includes(upperTarget)) return alert("Ele já joga nessa posição!");
+
+        const cost = getPosLearningCost(player.position, upperTarget);
+        
+        if(confirm(`Definir ${player.name} para aprender a jogar de ${upperTarget}?\n\nEle precisará participar ativamente das sessões de treino com o foco em "${POS_TRAINING_MAP[upperTarget].train}".\nEstimativa de tempo: ${cost/10} sessões de treino.`)) {
+            await firebase.firestore().collection('players').doc(player.id).update({ learningPosition: { target: upperTarget, current: 0, required: cost } });
+            alert("Treino específico designado! Cobre o jogador nos coletivos.");
+        }
+    };
+
+    const handleTogglePlayer = (pid) => {
+        if (selectedPlayers.includes(pid)) setSelectedPlayers(selectedPlayers.filter(id => id !== pid));
+        else if (selectedPlayers.length < 5) setSelectedPlayers([...selectedPlayers, pid]);
+        else alert("Máximo de 5 jogadores!");
+    };
+
+    return (
+        <div className="modal-overlay" style={{zIndex: 99999}} onClick={onClose}>
+            <div className="modal-content" style={{maxWidth: '600px', padding: '15px'}} onClick={e => e.stopPropagation()}>
+                
+                <div style={{position:'relative', height:120, background:'#111', borderRadius:8, overflow:'hidden', marginBottom:15, border:'2px solid #00E676', boxShadow: '0 4px 8px rgba(0,0,0,0.5)'}}>
+                    <div style={{display:'flex', alignItems:'center', justifyContent:'center', height:'100%', fontSize:40, color:'#333'}}>🏋️‍♂️</div>
+                    <div style={{position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.95))', padding: '30px 10px 10px 10px'}}>
+                        <b style={{color: '#00E676', fontSize: 15, display: 'block', marginBottom: 4}}>{db.name} <small style={{color:'gold'}}>(Nvl {lvl})</small></b>
+                        <div style={{display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#ddd'}}>
+                            <span>🔥 XP: <b style={{color:'lime'}}>+{db.bonusXP}%</b></span>
+                            <span>🏥 Fisio: <b style={{color:'cyan'}}>{db.healChance}%</b></span>
+                            <span>💸 <b style={{color:'var(--danger)'}}>{fmt(db.maint)}/s</b></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{display:'flex', gap:5, marginBottom:15, overflowX:'auto'}}>
+                    <button className={`btn ${tab==='GERAL'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('GERAL')}>ESTRUTURA</button>
+                    {(isCoach || isPlayer) && <button className={`btn ${tab==='TREINO'?'btn-green':'btn-ghost'}`} onClick={()=>setTab('TREINO')}>🏋️‍♂️ TREINAR</button>}
+                    {isCoach && <button className={`btn ${tab==='POSICOES'?'btn-warning':'btn-ghost'}`} onClick={()=>setTab('POSICOES')}>🔄 POSIÇÕES</button>}
+                </div>
+
+                {tab === 'GERAL' && (
+                    <div className="animate-in">
+                        {isPresident && nextDb && (
+                            <div style={{marginBottom:15, padding:10, border:'1px dashed gold', borderRadius:8, textAlign:'center', background:'rgba(255,215,0,0.05)'}}>
+                                <b style={{color:'gold'}}>Próximo Nível: {nextDb.name} (+{nextDb.bonusXP}% XP)</b>
+                                <button className="btn btn-gold" onClick={handleUpgrade} style={{color:'#000', margin:'10px 0 0 0', fontSize:10}}>
+                                    MELHORAR ESTRUTURA ({fmt(db.upgCost)})
+                                </button>
+                            </div>
+                        )}
+                        <h4 style={{color:'cyan', borderBottom:'1px solid #333', paddingBottom:5, marginTop:0}}>📋 Mural de Treinos Recentes</h4>
+                        <div style={{maxHeight:'200px', overflowY:'auto', background:'rgba(0,0,0,0.3)', padding:10, borderRadius:8}}>
+                            {(!team.trainingLogs || team.trainingLogs.length === 0) ? (
+                                <p style={{fontSize:11, color:'#666', textAlign:'center'}}>Nenhum treino realizado recentemente.</p>
+                            ) : (
+                                team.trainingLogs.map((log, idx) => (
+                                    <div key={idx} style={{marginBottom:10, paddingBottom:10, borderBottom:'1px dashed #444', fontSize:11}}>
+                                        <div style={{display:'flex', justifyContent:'space-between', color:'#aaa'}}>
+                                            <b style={{color:'#fff'}}>Foco: {log.type}</b>
+                                            <span>{new Date(log.date).toLocaleDateString()}</span>
+                                        </div>
+                                        <div style={{marginTop:5, color:'#00E676', whiteSpace:'pre-wrap'}}>{log.report}</div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {tab === 'POSICOES' && isCoach && (
+                    <div className="animate-in">
+                        <h4 style={{color:'var(--warning)', marginTop:0}}>🔄 Adaptação de Posições</h4>
+                        <p style={{fontSize:10, color:'#aaa', marginBottom:10}}>O boost entrará no final da temporada.</p>
+                        <div style={{display:'grid', gap:8, maxHeight:'300px', overflowY:'auto'}}>
+                            {players.map(p => (
+                                <div key={p.id} className="card" style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:10, borderLeft:`3px solid ${getPosColor(p.position)}`}}>
+                                    <div style={{width:'40%'}}>
+                                        <b style={{fontSize:12}}>{p.name}</b><br/>
+                                        <span style={{fontSize:9, color:'#888'}}>{p.position} {p.secondaryPositions ? `(+ ${p.secondaryPositions.join(', ')})` : ''}</span>
+                                    </div>
+                                    <div style={{flex:1, textAlign:'center'}}>
+                                        {p.learningPosition ? (
+                                            <div style={{fontSize:9}}>
+                                                <span style={{color:'gold'}}>Aprender: <b>{p.learningPosition.target}</b></span><br/>
+                                                <span style={{color:'cyan'}}>Treinar: <b>{POS_TRAINING_MAP[p.learningPosition.target].train}</b></span>
+                                                <div style={{width:'100%', background:'#222', height:4, borderRadius:2, marginTop:2}}>
+                                                    <div style={{width:`${Math.min(100, (p.learningPosition.current/p.learningPosition.required)*100)}%`, background:'lime', height:'100%'}}></div>
+                                                </div>
+                                            </div>
+                                        ) : <span style={{fontSize:9, color:'#666'}}>Sem treino.</span>}
+                                    </div>
+                                    <button className="btn btn-ghost" style={{width:'auto', fontSize:9, padding:'5px', marginLeft:10, border:'1px solid var(--warning)', color:'var(--warning)'}} onClick={() => assignLearning(p)}>
+                                        {p.learningPosition ? 'ALTERAR' : 'NOVA'}
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* A MÁGICA: ABA DE TREINO ONDE TÉCNICO E JOGADOR SE ENCONTRAM */}
+                {tab === 'TREINO' && (
+                    <div className="animate-in">
+                        <label style={{fontSize:11}}>Foco do Treino (O que você quer melhorar?):</label>
+                        <select className="input-field" style={{margin:'5px 0 15px 0'}} value={trainingType} onChange={e=>setTrainingType(e.target.value)}>
+                            <optgroup label="🏋️‍♂️ Físico e Condicionamento">
+                                <option value="FISICO_BASE">Resistência, Equilíbrio e Força</option>
+                                <option value="VELOCIDADE">Velocidade, Aceleração e Agilidade</option>
+                                <option value="IMPULSAO">Impulsão e Condição Física</option>
+                            </optgroup>
+                            <optgroup label="⚽ Técnica com Bola">
+                                <option value="PASSE">Passe Curto, Longo e Visão</option>
+                                <option value="DRIBLE">Drible, Finta e Controle de Bola</option>
+                                <option value="CHUTE">Finalização, Força e Técnica de Chute</option>
+                            </optgroup>
+                            <optgroup label="🧠 Tático e Mental">
+                                <option value="DEFESA">Marcação, Agressividade e Resposta</option>
+                                <option value="MENTAL">Trabalho em Equipe e Mentalidade</option>
+                                <option value="BOLA_PARADA">Faltas, Efeito e Cabeceio</option>
+                            </optgroup>
+                            <optgroup label="🧤 Específico">
+                                <option value="GOLEIRO">Reflexos e Habilidades de Goleiro</option>
+                            </optgroup>
+                        </select>
+
+                        {isPlayer && (
+                            <div className="card" style={{border:'1px dashed cyan'}}>
+                                <h3>Treino Individualizado</h3>
+                                <p style={{fontSize:11, color:'#aaa'}}>Você vai usar as dependências do CT sozinho.<br/><span style={{color:'red'}}>Custo: -35% Energia (Você tem {energy}%)</span></p>
+                                <button className="btn btn-green" onClick={() => { onTrainSolo(user.data, trainingType); onClose(); }}>
+                                    INICIAR TREINO SOLO
+                                </button>
+                            </div>
+                        )}
+
+                        {isCoach && (
+                            <div className="card" style={{border:'1px dashed var(--primary)'}}>
+                                <h3>Treino Coletivo Orientado</h3>
+                                <p style={{fontSize:11, color:'#aaa'}}>Você conduzirá o treino. Os resultados irão para o Mural!<br/><span style={{color:'orange'}}>Custo Técnico: -20% Energia (Você tem {energy}%)</span></p>
+                                
+                                <button className="btn btn-green" onClick={()=>{
+                                    if(energy < 20) return alert("Você está exausto!");
+                                    if(selectedPlayers.length === 0) return alert("Selecione os jogadores que participarão da atividade (Max 5).");
+                                    onTrain(selectedPlayers, trainingType);
+                                    setSelectedPlayers([]);
+                                    onClose();
+                                }}>
+                                    APLICAR TREINAMENTO (-20⚡)
+                                </button>
+
+                                <p style={{textAlign:'center', color:'#888', fontSize:11, margin:'10px 0'}}>👉 Selecione até <b>5 jogadores</b>:</p>
+                                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, maxHeight:'250px', overflowY:'auto'}}>
+                                    {players.map(p => (
+                                        <div key={p.id} className="card" style={{ background: selectedPlayers.includes(p.id) ? 'rgba(0,255,0,0.1)' : '#111', border: selectedPlayers.includes(p.id) ? '1px solid var(--primary)' : '1px solid #333', cursor: 'pointer', padding: '10px' }} onClick={() => handleTogglePlayer(p.id)}>
+                                            <div style={{fontWeight:'bold', fontSize:11}}>{p.name}</div>
+                                            <div style={{fontSize:9, color:'#aaa'}}>{p.position} | OV: {p.overall}</div>
+                                            <div style={{margin:'4px 0', background:'#222', height:4, borderRadius:2, overflow:'hidden', width:'100%'}}>
+                                                <div style={{ width:`${p.energy || 100}%`, height:'100%', background: (p.energy||100) > 70 ? 'lime' : (p.energy||100) > 30 ? 'orange' : 'red' }}></div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+                <button className="btn btn-red" style={{marginTop:15}} onClick={onClose}>FECHAR CT</button>
+            </div>
+        </div>
+    );
+};
+        
      const StadiumManager = ({ team, players, onClose }) => {
     const lvl = team.stadiumLevel || 1;
     const db = STADIUM_DB[lvl];
@@ -3956,6 +4198,29 @@ const PrizeEditor = ({ initialData, onSave, onClose }) => {
         // 4. ENVELHECIMENTO DE CONTRATOS E EMPRÉSTIMOS
         // =========================================
         players.forEach(p => {
+            // 4.1. APLICAÇÃO DOS BOOSTS DE NOVA POSIÇÃO (TREINO DO CT)
+            if (p.pendingPosBoosts && p.attributes) {
+                let newAttrs = { ...p.attributes };
+                p.pendingPosBoosts.forEach(pos => {
+                    const map = POS_TRAINING_MAP[pos];
+                    if (map) {
+                        // Dá +3 pontos pesados nas habilidades chave daquela posição
+                        map.attrs.forEach(a => {
+                            if (newAttrs[a] < 99) newAttrs[a] = Math.min(99, newAttrs[a] + 3);
+                        });
+                    }
+                });
+                
+                // Recalcula o Overall Real
+                const vals = Object.values(newAttrs);
+                let newOvr = Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
+                
+                b.update(db.collection('players').doc(p.id), {
+                    attributes: newAttrs,
+                    overall: newOvr,
+                    pendingPosBoosts: firebase.firestore.FieldValue.delete()
+                });
+            }
             let nc = (parseInt(p.contract) || 0) - 1;
             if (nc < 0) nc = 0;
             
@@ -5258,9 +5523,6 @@ const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => 
 const handleCoachTrain = async (playerIds, type) => {
         const currentCoach = user.data;
         const coachEnergy = currentCoach.energy !== undefined ? currentCoach.energy : 100;
-
-        // --- NOVA LÓGICA: TRAVA POR ENERGIA EM VEZ DE QUANTIDADE ---
-        // Treino coletivo ou Estudo tático consomem energia
         const coachEnergyCost = playerIds.length > 0 ? 20 : 30; 
         
         if (coachEnergy < coachEnergyCost) {
@@ -5272,7 +5534,6 @@ const handleCoachTrain = async (playerIds, type) => {
         let coachXpGain = 0;
         let report = [];
 
-        // 1. Identificar Perks Ativos do Técnico
         const activePerks = currentCoach.perks || [];
         const energyPerk = activePerks.find(p => p.type === 'ENERGY_SAVE');
         const playerEnergyCost = energyPerk ? Math.round(10 * energyPerk.value) : 10; 
@@ -5283,7 +5544,11 @@ const handleCoachTrain = async (playerIds, type) => {
         const affPerk = activePerks.find(p => p.type === 'AFFINITY_BOOST');
         const affBonus = affPerk ? affPerk.value : 0;
 
-        // 2. Mapeamento de Atributos (Completo)
+        // Bônus do CT do Time
+        const currentTeam = teams.find(t => t.id === currentCoach.teamId);
+        const ctLvl = currentTeam?.ctLevel || 1;
+        const ctBonusMult = CT_DB[ctLvl].bonusXP / 100;
+
         let trainedAttrs = [];
         if(type === 'FISICO_BASE') trainedAttrs = ['stamina', 'balance', 'condition', 'strength'];
         else if(type === 'VELOCIDADE') trainedAttrs = ['speed', 'accel', 'agility', 'dribbleSpd'];
@@ -5295,28 +5560,23 @@ const handleCoachTrain = async (playerIds, type) => {
         else if(type === 'MENTAL') trainedAttrs = ['teamwork', 'mentality', 'response'];
         else if(type === 'BOLA_PARADA') trainedAttrs = ['freeKick', 'curve', 'header', 'penalties'];
         else if(type === 'GOLEIRO') trainedAttrs = ['gk', 'response', 'jump', 'longPass'];
-        else if(type === 'STUDY') trainedAttrs = []; // Estudo não afeta jogadores
+        else if(type === 'STUDY') trainedAttrs = [];
 
         playerIds.forEach(pid => {
             const p = players.find(x => x.id === pid);
             if (!p) return;
 
-            // CORREÇÃO CRÍTICA: Define energia atual aceitando o ZERO
             const currentEnergy = p.energy !== undefined ? p.energy : 100;
 
-            // TRAVA 1: Jogador lesionado não treina
             if ((p.recoveryLeft || 0) > 0) {
                 report.push(`⚠️ ${p.name} ignorado (está lesionado)`);
                 return;
             }
-
-            // TRAVA 2: Jogador Exausto (Evita bug de energia infinita)
             if (currentEnergy < playerEnergyCost) {
                 report.push(`⚠️ ${p.name} ignorado (exausto: ${currentEnergy}%)`);
                 return;
             }
 
-            // --- CHANCE DE LESÃO NO TREINO COLETIVO (1%) ---
             if (Math.random() < 0.01) {
                 const injuryName = INJURIES_DB.LEVE[Math.floor(Math.random() * INJURIES_DB.LEVE.length)];
                 b.update(db.collection('players').doc(p.id), {
@@ -5325,34 +5585,27 @@ const handleCoachTrain = async (playerIds, type) => {
                     energy: Math.max(0, currentEnergy - 15),
                     mood: '😡'
                 });
-                report.push(`❌ ${p.name} se lesionou: ${injuryName}`);
-                return; // Pula o ganho de XP deste jogador
+                report.push(`❌ ${p.name} se lesionou no treino: ${injuryName}`);
+                return; 
             }
 
-            // Gasto de Energia Seguro
             const newEnergy = currentEnergy - playerEnergyCost;
+            let baseGain = Math.floor(Math.random() * 5) + 8 + minXpBonus; 
             
-            // Cálculo de XP Base
-            let xpGain = Math.floor(Math.random() * 5) + 8 + minXpBonus; 
-            
-            // Afinidade Posicional
-            if ((currentCoach.affinities || []).includes(p.position)) {
-                xpGain += (5 + affBonus);
-            }
+            // Aplica Bônus do CT
+            let xpGain = baseGain + Math.floor(baseGain * ctBonusMult);
 
-            // Bônus de Item Equipado
+            if ((currentCoach.affinities || []).includes(p.position)) xpGain += (5 + affBonus);
+
             if (p.equippedItem) {
                 const itemBonusPercent = p.equippedItem.power || 0;
                 const bonusAmount = Math.ceil(xpGain * (itemBonusPercent / 100));
                 xpGain += bonusAmount;
                 report.push(`👟 ${p.name} usou ${p.equippedItem.name} (+${bonusAmount} XP)`);
-                
-                const itemRef = db.collection('sales').doc(p.equippedItem.id);
-                b.delete(itemRef);
+                b.delete(db.collection('sales').doc(p.equippedItem.id));
                 b.update(db.collection('players').doc(pid), { equippedItem: firebase.firestore.FieldValue.delete() });
             }
 
-            // Aplicação dos Perks
             activePerks.forEach(perk => {
                 if (perk.type === 'TRAIN_BOOST') {
                     const hasSynergy = perk.attrs.some(attr => trainedAttrs.includes(attr));
@@ -5364,39 +5617,55 @@ const handleCoachTrain = async (playerIds, type) => {
                 }
             });
 
-            // Chance de Crítico
             if (Math.random() < (0.10 + critBonus)) {
                 xpGain *= 2;
-                report.push(`🔥 ${p.name} teve uma GRANDE evolução!`);
+                report.push(`🔥 ${p.name} teve uma GRANDE evolução (+${xpGain} XP)!`);
             }
 
-            // Evolução de Atributos Específicos
             let newAttrs = { ...(p.attributes || {}) };
             trainedAttrs.forEach(attr => {
                 if((newAttrs[attr] || 50) < 99) {
-                    if(Math.random() < (xpGain / 80)) { 
-                        newAttrs[attr] = (newAttrs[attr] || 50) + 1;
-                    }
+                    if(Math.random() < (xpGain / 80)) newAttrs[attr] = (newAttrs[attr] || 50) + 1;
                 }
             });
 
-            // Salva no Banco (SEM ATUALIZAR O OVERALL)
-            b.update(db.collection('players').doc(pid), { 
+            let updates = { 
                 xp: (p.xp || 0) + xpGain, 
                 energy: newEnergy,
                 attributes: newAttrs
-            });
-            
+            };
+
+            // --- LÓGICA DE APRENDER NOVA POSIÇÃO ---
+            if (p.learningPosition) {
+                if (type === POS_TRAINING_MAP[p.learningPosition.target].train) {
+                    let posProgress = 10; // Progresso base
+                    if ((currentCoach.affinities || []).includes(p.learningPosition.target)) posProgress += 5; // Bônus do técnico
+                    posProgress += (ctLvl * 2); // Bônus do CT
+                    
+                    const newCur = p.learningPosition.current + posProgress;
+                    if (newCur >= p.learningPosition.required) {
+                        report.push(`🌟 ${p.name} APRENDEU a jogar de ${p.learningPosition.target}! (O Boost de atributos entrará na próxima temporada)`);
+                        updates.secondaryPositions = firebase.firestore.FieldValue.arrayUnion(p.learningPosition.target);
+                        updates.learningPosition = firebase.firestore.FieldValue.delete();
+                        updates.pendingPosBoosts = firebase.firestore.FieldValue.arrayUnion(p.learningPosition.target);
+                    } else {
+                        updates['learningPosition.current'] = newCur;
+                        report.push(`🔄 ${p.name} adaptando para ${p.learningPosition.target}: ${Math.min(100, Math.floor((newCur/p.learningPosition.required)*100))}%`);
+                    }
+                } else {
+                    report.push(`⚠️ ${p.name} precisa do treino de ${POS_TRAINING_MAP[p.learningPosition.target].train} para evoluir na nova posição.`);
+                }
+            }
+
+            b.update(db.collection('players').doc(pid), updates);
             coachXpGain += 20;
         });
 
-        // Caso seja ESTUDO TÁTICO (sem jogadores), ganha um XP fixo para o técnico
         if (type === 'STUDY') {
             coachXpGain = Math.floor(Math.random() * 10) + 15;
             report.push("📚 Você dedicou tempo estudando novas táticas e evoluiu como treinador.");
         }
 
-        // Evolução do Técnico
         let newCoachXp = (currentCoach.xp || 0) + coachXpGain;
         let newLevel = currentCoach.level;
         let pendingPerks = currentCoach.pendingPerks || 0;
@@ -5411,7 +5680,6 @@ const handleCoachTrain = async (playerIds, type) => {
             alert(`🎉 PARABÉNS! Nível ${newLevel} alcançado!`);
         }
 
-        // Atualização final do técnico consumindo energia da barra unificada
         b.update(db.collection('users').doc(currentCoach.id), {
             energy: coachEnergy - coachEnergyCost,
             xp: newCoachXp,
@@ -5419,6 +5687,14 @@ const handleCoachTrain = async (playerIds, type) => {
             pendingPerks,
             pendingAffinity
         });
+
+        // GRAVA NO MURAL DO CLUBE
+        if (currentTeam) {
+            let newLogs = currentTeam.trainingLogs || [];
+            newLogs.unshift({ date: Date.now(), type, report: report.join('\n') });
+            if (newLogs.length > 5) newLogs.pop(); // Mantém só os últimos 5
+            b.update(db.collection('teams').doc(currentTeam.id), { trainingLogs: newLogs });
+        }
 
         await b.commit();
         setLoading(false);
@@ -6337,7 +6613,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.90.5</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.90.6</div>
                             </div>
                         </div>
                         
@@ -6792,6 +7068,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                     {modal && <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget && setModal(null)}>
                         <div className="modal-content">
                             {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={async(id)=>{db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} onRenew={renewContract} isOwner={user.type==='USER' && modal.data?.teamId===user.data?.id} />}
+                           {modal.type==='CT_TYCOON' && <TrainingCenterManager team={modal.data} players={players.filter(p=>p.teamId===modal.data.id)} user={user} onClose={()=>setModal(null)} onTrain={handleCoachTrain} onTrainSolo={handlePlayerSoloTrain} />}
                             {modal.type==='OFFER' && <OfferForm target={modal.data} myPlayers={players.filter(p => p.teamId === user.data.id)} onSend={sendOffer} setModal={setModal} user={user} />}
                             {modal.type==='SETTINGS' && <SettingsForm team={modal.data || user.data} isAdmin={user.type==='ADMIN'} onUp={(d)=>{const tid=(modal.data?.id)||user.data.id; db.collection('teams').doc(tid).update(d); setModal(null);}} onUpgrade={()=>{/*Up*/}} onReq={(t,a,d)=>{db.collection('financeRequests').add({teamId:user.data.id, teamName:user.data.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!");}} onWithdraw={withdrawMoney} />}
                             {modal.type==='MATCH_PERFORMANCE' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} matchData={modal.data?.match} />}
@@ -7010,7 +7287,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.5 ESTADIOS   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.6 ESTADIOS   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -7705,7 +7982,7 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                 <button className={`btn ${tab==='PERFIL'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('PERFIL')}>PERFIL</button>
                 <button className={`btn ${tab==='ACOES'?'btn-red':'btn-ghost'}`} onClick={()=>setTab('ACOES')}>AÇÕES</button>
                 <button className={`btn ${tab==='CARREIRA'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('CARREIRA')}>CARREIRA</button>
-                <button className={`btn ${tab==='INV'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('INV')}>MOCHILA</button>
+                <button className={`btn ${tab==='INV'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('INV')}>MOCHILA</button> <button className={`btn ${tab==='CT'?'btn-warning':'btn-ghost'}`} onClick={()=>setModal({type:'CT_TYCOON', data: team})}>🏋️‍♂️ CT</button>
             </div>
 
             {tab==='PERFIL' && <div>
@@ -7768,39 +8045,7 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
             </div>}
 
             {tab==='ACOES' && <div>
-                <div className="card" style={{borderLeft:'4px solid cyan', marginBottom:15}}>
-                    <h3>🏋️‍♂️ Treino Individual</h3>
-                    <p style={{fontSize:11, color:'#aaa', marginBottom:10}}>
-                        Treinar sozinho é menos eficiente que com técnico.<br/>
-                        <span style={{color:'red'}}>Custo: -35% Energia</span>
-                    </p>
-                    
-                    <label style={{fontSize:11}}>Foco do Treino:</label>
-                    <select className="input-field" style={{margin:'5px 0'}} value={trainType} onChange={e=>setTrainType(e.target.value)}>
-                        <optgroup label="🏋️‍♂️ Físico e Condicionamento">
-                            <option value="FISICO_BASE">Resistência, Equilíbrio e Força</option>
-                            <option value="VELOCIDADE">Velocidade, Aceleração e Agilidade</option>
-                            <option value="IMPULSAO">Impulsão e Condição Física</option>
-                        </optgroup>
-                        <optgroup label="⚽ Técnica com Bola">
-                            <option value="PASSE">Passe Curto, Longo e Visão</option>
-                            <option value="DRIBLE">Drible, Finta e Controle de Bola</option>
-                            <option value="CHUTE">Finalização, Força e Técnica de Chute</option>
-                        </optgroup>
-                        <optgroup label="🧠 Tático e Mental">
-                            <option value="DEFESA">Marcação, Agressividade e Resposta</option>
-                            <option value="MENTAL">Trabalho em Equipe e Mentalidade</option>
-                            <option value="BOLA_PARADA">Faltas, Efeito e Cabeceio</option>
-                        </optgroup>
-                        <optgroup label="🧤 Específico">
-                            <option value="GOLEIRO">Reflexos e Habilidades de Goleiro</option>
-                        </optgroup>
-                    </select>
-
-                    <button className="btn btn-green" style={{marginTop:10}} onClick={() => onTrainSolo(player, trainType)}>
-                        TREINAR AGORA
-                    </button>
-                </div>
+    
 
                 <div className="card" style={{borderLeft:'4px solid var(--danger)'}}>
                     <h4>📢 O Gabinete do Presidente</h4>
@@ -8267,8 +8512,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
 
             {/* ABAS */}
             <div style={{display:'flex', gap:5, marginBottom:15, marginTop:10, overflowX:'auto'}}>
-                <button className={`btn ${tab==='PRANCHETA'?'btn-green':'btn-ghost'}`} onClick={()=>setTab('PRANCHETA')}>PRANCHETA</button>
-                <button className={`btn ${tab==='TREINO'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('TREINO')}>TREINAR TIME</button>
+                <button className={`btn ${tab==='PRANCHETA'?'btn-green':'btn-ghost'}`} onClick={()=>setTab('PRANCHETA')}>PRANCHETA</button> 
                 <button className={`btn ${tab==='MOCHILA'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('MOCHILA')}>MOCHILA</button>
                 <button className={`btn ${tab==='CARREIRA'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('CARREIRA')}>CARREIRA</button>
             </div>
@@ -8429,12 +8673,14 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                 </div>
             )}
 
-            {/* ABA TREINO */}
-            {tab === 'TREINO' && (
-                <div>
+           {/* ABA CARREIRA */}
+            {tab === 'CARREIRA' && (
+                <div className="animate-in">
+                    
+                    {/* AVISOS DE NOVO NÍVEL (MOVIDOS PARA CÁ) */}
                     {showPerkSelection && (
-                        <div className="card pulse-border" style={{background:'rgba(255, 215, 0, 0.1)'}}>
-                            <h3 style={{color:'gold', textAlign:'center'}}>✨ NOVO NÍVEL ALCANÇADO!</h3>
+                        <div className="card pulse-border" style={{background:'rgba(255, 215, 0, 0.1)', marginBottom: 15}}>
+                            <h3 style={{color:'gold', textAlign:'center', marginTop:0}}>✨ NOVO NÍVEL ALCANÇADO!</h3>
                             <p style={{textAlign:'center', fontSize:11}}>Escolha uma nova Habilidade Passiva:</p>
                             <div style={{display:'grid', gap:5}}>
                                 {perkOptions.map(p => (
@@ -8446,89 +8692,16 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                         </div>
                     )}
                     {showAffinitySelection && (
-                        <div className="card" style={{borderLeft:'4px solid var(--secondary)'}}>
-                            <h3>📚 Nova Especialização</h3>
+                        <div className="card" style={{borderLeft:'4px solid var(--secondary)', marginBottom: 15}}>
+                            <h3 style={{marginTop:0}}>📚 Nova Especialização</h3>
+                            <p style={{fontSize:11, color:'#aaa'}}>Escolha uma nova posição para se tornar mestre:</p>
                             <div style={{display:'flex', gap:5, flexWrap:'wrap'}}>
                                 {availableAffinities.map(a => (<button key={a} className="btn btn-ghost" onClick={() => onAddAffinity(a)}>{a}</button>))}
                             </div>
                         </div>
                     )}
 
-                    <div className="card">
-                        <h3>🏃‍♂️ Sessão de Treinamento (+XP de Treinador)</h3>
-                        <p style={{fontSize:11, color:'#aaa', marginBottom:10}}>
-                            Ao treinar o time, você também ganha experiência e evolui seu nível.<br/>
-                            <span style={{color:'orange'}}>Custo: -20% Energia</span>
-                        </p>
-                        
-                        <div style={{marginBottom:15}}>
-                            <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
-                                <span>Foco do Treino:</span>
-                            </div>
-                            <select className="input-field" style={{margin:0}} value={trainingType} onChange={e=>setTrainingType(e.target.value)}>
-                                <optgroup label="🏋️‍♂️ Físico e Condicionamento">
-                                    <option value="FISICO_BASE">Resistência, Equilíbrio e Força</option>
-                                    <option value="VELOCIDADE">Velocidade, Aceleração e Agilidade</option>
-                                    <option value="IMPULSAO">Impulsão e Condição Física</option>
-                                </optgroup>
-                                <optgroup label="⚽ Técnica com Bola">
-                                    <option value="PASSE">Passe Curto, Longo e Visão</option>
-                                    <option value="DRIBLE">Drible, Finta e Controle de Bola</option>
-                                    <option value="CHUTE">Finalização, Força e Técnica de Chute</option>
-                                </optgroup>
-                                <optgroup label="🧠 Tático e Mental">
-                                    <option value="DEFESA">Marcação, Agressividade e Resposta</option>
-                                    <option value="MENTAL">Trabalho em Equipe e Mentalidade</option>
-                                    <option value="BOLA_PARADA">Faltas, Efeito e Cabeceio</option>
-                                </optgroup>
-                                <optgroup label="🧤 Específico">
-                                    <option value="GOLEIRO">Reflexos e Habilidades de GK</option>
-                                </optgroup>
-                            </select>
-                        </div>
-                        
-                        <button className="btn btn-green" onClick={()=>{
-                            if(energy < 20) return alert("Você está exausto! Coma algo para recuperar energia antes de treinar o time.");
-                            if(selectedPlayers.length === 0) return alert("Selecione os jogadores que participarão da atividade.");
-                            onTrain(selectedPlayers, trainingType);
-                            setSelectedPlayers([]);
-                        }}>
-                            APLICAR TREINAMENTO (-20⚡)
-                        </button>
-
-                         <p style={{textAlign:'center', color:'#888', fontSize:12, margin:'10px 0'}}>
-                            👉 Selecione até <b>5 jogadores</b>:
-                        </p>
-                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                            {players.map(p => (
-                                <div key={p.id} className="card" 
-                                    style={{
-                                        background: selectedPlayers.includes(p.id) ? 'rgba(0,255,0,0.1)' : 'var(--bg-card)', 
-                                        border: selectedPlayers.includes(p.id) ? '1px solid var(--primary)' : '1px solid #333', 
-                                        cursor: 'pointer', padding: '10px'
-                                    }}
-                                    onClick={() => handleTogglePlayer(p.id)}
-                                >
-                                    <div style={{fontWeight:'bold', fontSize:12}}>{p.name}</div>
-                                    <div style={{fontSize:10}}>{p.position} | OV: {p.overall}</div>
-                                    <div style={{margin:'6px 0', background:'#222', height:4, borderRadius:2, overflow:'hidden', width:'100%'}}>
-                                        <div style={{
-                                            width:`${p.energy || 100}%`, 
-                                            height:'100%', 
-                                            background: (p.energy||100) > 70 ? 'lime' : (p.energy||100) > 30 ? 'orange' : 'red'
-                                        }}></div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ABA CARREIRA */}
-            {tab === 'CARREIRA' && (
-                <div>
-                    {/* ADIÇÃO DA FOTO DE PERFIL AQUI TAMBÉM (OPCIONAL/REDUNDÂNCIA) */}
+                    {/* FOTO DE PERFIL */}
                     <div className="card" style={{border:'1px dashed #666', marginBottom:15}}>
                         <h3 style={{marginTop:0}}>📷 Atualizar Foto de Perfil</h3>
                         <label className="btn btn-ghost" style={{display: 'block', cursor: 'pointer', textAlign: 'center'}}>
@@ -8537,6 +8710,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                         </label>
                     </div>
 
+                    {/* STATUS DO CONTRATO */}
                     {coach.teamId !== 'FREE' && (
                         <div className="card" style={{border:'1px solid #444', marginBottom:15}}>
                             <h3>📝 Meu Contrato</h3>
@@ -8549,6 +8723,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                         </div>
                     )}
 
+                    {/* PROPOSTAS DE CONTRATO (CAIXA DE ENTRADA DO TÉCNICO) */}
                     <div className="card" style={{borderLeft:'4px solid var(--primary)'}}>
                         <h3>📩 Propostas de Contrato</h3>
                         {offers.filter(o => o.recipientId === coach.id && o.status !== 'REJECTED').length === 0 && <p style={{color:'#666', fontSize:12}}>Nenhuma proposta pendente.</p>}
@@ -8619,6 +8794,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                         ))}
                     </div>
                     
+                    {/* PRETENSÃO SALARIAL */}
                     <div className="card" style={{marginTop:15}}>
                         <h3>💰 Atualizar Pretensão Salarial</h3>
                         {coach.level >= 2 ? (
@@ -8630,6 +8806,7 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
                             <p style={{color:'#666', fontSize:11}}>Desbloqueia no Nível 2.</p>
                         )}
                     </div>
+
                 </div>
             )}
         </div>
@@ -8938,8 +9115,13 @@ const Market = ({ user, me, teams, players, coaches, open, isVis, onNeg, onPayCl
                         {p.face ? (
                             <img src={p.face} style={{width: 45, height: 45, borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border:'2px solid #444'}} />
                         ) : (
-                            <span className="badge-pos" style={{background:getPosColor(p.position), width: 40, height: 40, display:'flex', alignItems:'center', justifyContent:'center', fontSize: 12}}>{p.position}</span>
-                        )}
+<div style={{display:'flex', gap:2}}>
+    <span className="badge-pos" style={{background:getPosColor(p.position), width: 40, height: 40, display:'flex', alignItems:'center', justifyContent:'center', fontSize: 12}}>{p.position}</span>
+    {p.secondaryPositions && p.secondaryPositions.map(sp => (
+        <span key={sp} className="badge-pos" style={{background:getPosColor(sp), width: 25, height: 25, display:'flex', alignItems:'center', justifyContent:'center', fontSize: 8, opacity:0.8}} title={`Aprendeu a jogar de ${sp}`}>{sp}</span>
+    ))}
+</div>
+            )}
                         
                         <div>
                             <b style={{fontSize:16}}>

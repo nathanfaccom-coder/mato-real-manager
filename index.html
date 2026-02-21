@@ -1585,8 +1585,9 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             </div>
 
             <div style={{display:'flex', gap:10, marginBottom:15}}>
-                <button className={`btn ${hTab==='HOSPITAL'?'btn-red':'btn-ghost'}`} onClick={()=>setHTab('HOSPITAL')}>🏥 HOSPITAL</button>
-                <button className={`btn ${hTab==='BANCO'?'btn-blue':'btn-ghost'}`} onClick={()=>setHTab('BANCO')}>🏦 BANCO</button>
+                <button className={`btn ${hTab==='HOSPITAL'?'btn-red':'btn-ghost'}`} onClick={()=>setHTab('HOSPITAL')} style={{flex:1, padding:10}}>🏥 HOSPITAL</button>
+                <button className={`btn ${hTab==='BANCO'?'btn-blue':'btn-ghost'}`} onClick={()=>setHTab('BANCO')} style={{flex:1, padding:10}}>🏦 BANCO</button>
+                <button className={`btn ${hTab==='BALADA'?'btn-purple':'btn-ghost'}`} onClick={()=>setHTab('BALADA')} style={{flex:1, padding:10}}>🪩 BALADA</button>
             </div>
 
             {hTab === 'HOSPITAL' && (
@@ -1615,6 +1616,78 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                             // Verifica se é leve (inclui intoxicação na lógica visual de 'Sem Cirurgia')
                             const isLight = INJURIES_DB.LEVE.includes(injuryName) || isIntoxication;
 
+                            // ==========================================
+    // LÓGICA DA BALADA (ROLETA DE EVENTOS)
+    // ==========================================
+    const handleNightclub = async () => {
+        if (user.type !== 'PLAYER' && user.type !== 'COACH') {
+            return alert("Apenas Pessoas Físicas (Jogadores e Técnicos) podem curtir a noitada!");
+        }
+
+        const entryFee = 5000;
+        if ((user.data.balance || 0) < entryFee) {
+            return alert(`O segurança barrou você na porta!\nVocê precisa de ${fmt(entryFee)} para pagar a entrada VIP.`);
+        }
+
+        if (!confirm(`🎟️ ENTRADA ÁREA VIP: ${fmt(entryFee)}\n\nAviso: A noite de Mato Real é imprevisível. Você pode fazer contatos incríveis, arrumar confusão ou acordar de ressaca sem energia. Entrar?`)) return;
+
+        const rand = Math.random();
+        let msg = "";
+        let updates = { balance: firebase.firestore.FieldValue.increment(-entryFee) };
+        let newsMsg = null;
+
+        if (rand < 0.15) {
+            // 15% - Encontro de Negócios (Jackpot)
+            updates.balance = firebase.firestore.FieldValue.increment(50000 - entryFee); 
+            msg = "🤝 CONTATOS VIP!\nVocê conheceu um magnata de Mato Real fumando charuto. Ele adorou sua visão e fez um PIX de ₣ 50.000 como patrocínio pessoal!";
+        } else if (rand < 0.35) {
+            // 20% - O Rei do Camarote
+            if (user.type === 'PLAYER') {
+                updates.fame = (user.data.fame || 0) + 500;
+                updates.mood = '🤩';
+            }
+            updates.energy = 100;
+            msg = "🍾 O REI DO CAMAROTE!\nVocê estourou champanhe pra todo mundo! Ganhou MUITA fama (+500), saiu nas colunas de fofoca e recuperou sua energia.";
+        } else if (rand < 0.65) {
+            // 30% - Noite Tranquila
+            updates.energy = 100;
+            msg = "🍹 NOITE DE BOA.\nVocê ficou no seu canto, curtiu uma música, bebeu água e descansou a mente. Sua Energia foi restaurada para 100%!";
+        } else if (rand < 0.90) {
+            // 25% - Ressaca Braba
+            updates.energy = 0;
+            if (user.type === 'PLAYER') updates.mood = '😐';
+            msg = "🤢 RESSACA MONSTRA...\nA noite foi boa até demais. Você misturou tudo o que não devia e acordou abraçado com o vaso. Sua Energia ZEROU!";
+        } else {
+            // 10% - Briga / Polêmica (Lesão Mágica)
+            if (user.type === 'PLAYER') {
+                updates.recoveryLeft = 1; // 1 jogo de gancho
+                updates.injury = "Corte no Rosto (Briga de Boate)";
+                updates.mood = '😡';
+                updates.fame = Math.max(0, (user.data.fame || 0) - 200); // Perde fama
+                updates.energy = 0;
+                msg = "👊 TRETA NA BOATE!\nVocê se envolveu numa briga com torcedores na saída. Ganhou um corte no rosto, perdeu fama e ficará 1 JOGO AFASTADO no DM!";
+                newsMsg = `🚨 **POLÊMICA NA NOITE!**\nO jogador **${user.data.name}** foi flagrado em uma confusão generalizada na boate e se machucou. A diretoria vai cobrar explicações!`;
+            } else {
+                 updates.energy = 0;
+                 msg = "📸 VAZOU NA IMPRENSA!\nFotos suas em estado lamentável vazaram na internet. A diretoria não gostou nada do seu comportamento.";
+                 newsMsg = `🚨 **CRISE NOS BASTIDORES!**\nO técnico **${user.data.name}** foi flagrado em situação constrangedora na balada e o clima pesou no vestiário!`;
+            }
+        }
+
+        try {
+            const col = user.type === 'PLAYER' ? 'players' : 'users'; 
+            await db.collection(col).doc(user.data.id).update(updates);
+            
+            // Joga no jornal pra fofoca rolar
+            if (newsMsg) {
+                await db.collection('news').add({ text: newsMsg, type: 'press', date: Date.now(), likes: [] });
+            }
+            alert(msg);
+        } catch (e) {
+            alert("Erro no evento: " + e.message);
+        }
+    };
+                            
                             return (
                                 <div key={p.id} className="card" style={{borderLeft:'5px solid #ff1744', position:'relative'}}>
                                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
@@ -1983,7 +2056,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                             <br/><br/><b style={{color:'var(--warning)'}}>⚠️ Importante:</b> O seguro não cobre lesões preexistentes (ocorridas antes da contratação).
                                         </p>
                                         
-                                        {/* Tabela de Preços Baseada na Série */}
+                                       {/* Tabela de Preços Baseada na Série */}
                                         {(() => {
                                             const s = user.data.serie || 'VARZEA';
                                             const costs = {
@@ -2038,6 +2111,52 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                     </>
                                 )}
                             </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* --- ABA: BALADA (VIDA NOTURNA) --- */}
+            {hTab === 'BALADA' && (
+                <div className="animate-in">
+                    <div style={{background:'linear-gradient(90deg, #4a148c, #000)', padding:15, borderRadius:8, color:'white', marginBottom:15, display:'flex', alignItems:'center', gap:10, border: '1px solid var(--purple)'}}>
+                        <span style={{fontSize:30}}>🪩</span>
+                        <div>
+                            <b style={{display:'block', color:'var(--purple)'}}>LOUNGE MUNICIPAL</b>
+                            <small style={{color:'#aaa'}}>Área VIP, Cassino e Muita Resenha</small>
+                        </div>
+                    </div>
+
+                    {(user.type !== 'PLAYER' && user.type !== 'COACH') ? (
+                        <div className="card" style={{textAlign:'center', padding:30, color:'#888', border:'1px dashed #666'}}>
+                            <i className="fas fa-lock" style={{fontSize:40, marginBottom:10}}></i>
+                            <p>A entrada é restrita apenas a Pessoas Físicas (Jogadores e Técnicos).</p>
+                        </div>
+                    ) : (
+                        <div className="card" style={{borderLeft: '4px solid var(--purple)', textAlign:'center', padding: '20px 10px'}}>
+                            <h3 style={{margin:0, color:'var(--purple)'}}>Entrar na Área VIP</h3>
+                            <p style={{fontSize:11, color:'#aaa', marginBottom:20}}>
+                                Quer relaxar a mente, fazer contatos milionários ou correr o risco de beber demais e virar desfalque amanhã? Gire os dados da noite!
+                            </p>
+                            
+                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:20, fontSize:10, textAlign:'left'}}>
+                                <div style={{background:'rgba(0,230,118,0.1)', padding:8, borderRadius:5, border:'1px solid lime'}}>
+                                    <span style={{color:'lime', fontWeight:'bold'}}>🟢 O que pode dar bom:</span><br/><br/>
+                                    • Recuperar 100% da Energia<br/>
+                                    • Fechar um grande Patrocínio<br/>
+                                    • Ganhar muita Fama e Moral
+                                </div>
+                                <div style={{background:'rgba(255,23,68,0.1)', padding:8, borderRadius:5, border:'1px solid red'}}>
+                                    <span style={{color:'red', fontWeight:'bold'}}>🔴 O que pode dar ruim:</span><br/><br/>
+                                    • Ressaca severa (Zera Energia)<br/>
+                                    • Briga (Lesão de 1 jogo fora)<br/>
+                                    • Vazar fotos na Imprensa
+                                </div>
+                            </div>
+
+                            <button className="btn btn-purple" style={{padding:'15px', fontSize:14, fontWeight:'900'}} onClick={handleNightclub}>
+                                🎟️ PAGAR ENTRADA VIP (₣ 5.000)
+                            </button>
                         </div>
                     )}
                 </div>
@@ -6273,7 +6392,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.90.2</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.90.3</div>
                             </div>
                         </div>
                         
@@ -6946,7 +7065,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.2 ESTADIOS   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.3 ESTADIOS   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

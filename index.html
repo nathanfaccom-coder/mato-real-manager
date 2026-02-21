@@ -1373,7 +1373,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
 // FIM DO SHOPPING E TEAM DASHBOARD
 
      
-        const PublicServices = ({ players, user, onDonate }) => {
+       const PublicServices = ({ players, user, onDonate }) => {
     const [hTab, setHTab] = useState('HOSPITAL');
     const [showLoanUI, setShowLoanUI] = useState(false);
     const [loanAmount, setLoanAmount] = useState(100000);
@@ -1561,7 +1561,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     };
 
     // ==========================================
-    // LÓGICA DA BALADA (ROLETA DE EVENTOS)
+    // MOTOR PROCEDURAL DA BALADA (1000+ EVENTOS)
     // ==========================================
     const handleNightclub = async () => {
         if (user.type !== 'PLAYER' && user.type !== 'COACH') {
@@ -1570,46 +1570,121 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
 
         const entryFee = 5000;
         if ((user.data.balance || 0) < entryFee) {
-            return alert(`O segurança barrou você na porta!\nVocê precisa de ${fmt(entryFee)} para pagar a entrada VIP.`);
+            return alert(`O segurança barrado você na porta!\nVocê precisa de ${fmt(entryFee)} para pagar a entrada VIP.`);
         }
 
-        if (!confirm(`🎟️ ENTRADA ÁREA VIP: ${fmt(entryFee)}\n\nAviso: A noite de Mato Real é imprevisível. Você pode fazer contatos incríveis, arrumar confusão ou acordar de ressaca sem energia. Entrar?`)) return;
+        if (!confirm(`🎟️ ENTRADA VIP: ${fmt(entryFee)}\n\nSua noite pode ser lendária ou terminar em escândalo. A roleta de Mato Real está girando... Entrar?`)) return;
 
-        const rand = Math.random();
+        setLoading(true);
+
+        const roll = Math.random(); // Número de 0.0 a 1.0
         let msg = "";
         let updates = { balance: firebase.firestore.FieldValue.increment(-entryFee) };
         let newsMsg = null;
 
-        if (rand < 0.15) {
-            updates.balance = firebase.firestore.FieldValue.increment(50000 - entryFee); 
-            msg = "🤝 CONTATOS VIP!\nVocê conheceu um magnata de Mato Real fumando charuto. Ele adorou sua visão e fez um PIX de ₣ 50.000 como patrocínio pessoal!";
-        } else if (rand < 0.35) {
+        // --- DICIONÁRIOS PROCEDURAIS (Para as centenas de combinações) ---
+        const celebs = ["Neymar", "Casimiro", "Craque Neto", "Tiago Leifert", "Galvão Bueno", "Ronaldo Fenômeno", "Adriano Imperador", "Ronaldinho Gaúcho", "Luva de Pedreiro"];
+        const badEntities = ["Leo Dias", "a página Choquei", "um Paparazzi", "um Torcedor Rival", "a Torcida Organizada", "o Segurança da Boate"];
+        const injuries = ["Olho Roxo", "Nariz Quebrado", "Torção no Tornozelo (Dançando)", "Corte no Supercílio", "Desgaste Extremo"];
+        const badActions = ["vomitou no sapato de", "tentou dar um drible e caiu na frente de", "foi pego no flagra discutindo com", "deu calote na mesa de"];
+        const goodActions = ["pagou um combo de bebida pra você", "fez uma dancinha viral no TikTok com você", "te chamou de 'Garotinho' ao vivo", "te apresentou um sheik árabe", "elogiou seu futebol na roda de amigos"];
+
+        // =====================================
+        // 1. EVENTO MÍTICO (0.5% de chance)
+        // =====================================
+        if (roll < 0.005) {
+            updates.balance = firebase.firestore.FieldValue.increment(10000); // Dá os 10k e não cobra a entrada
+            updates.energy = 100;
             if (user.type === 'PLAYER') {
-                updates.fame = (user.data.fame || 0) + 500;
+                updates.fame = (user.data.fame || 0) + 1500;
                 updates.mood = '🤩';
             }
-            updates.energy = 100;
-            msg = "🍾 O REI DO CAMAROTE!\nVocê estourou champanhe pra todo mundo! Ganhou MUITA fama (+500), saiu nas colunas de fofoca e recuperou sua energia.";
-        } else if (rand < 0.65) {
-            updates.energy = 100;
-            msg = "🍹 NOITE DE BOA.\nVocê ficou no seu canto, curtiu uma música, bebeu água e descansou a mente. Sua Energia foi restaurada para 100%!";
-        } else if (rand < 0.90) {
-            updates.energy = 0;
-            if (user.type === 'PLAYER') updates.mood = '😐';
-            msg = "🤢 RESSACA MONSTRA...\nA noite foi boa até demais. Você misturou tudo o que não devia e acordou abraçado com o vaso. Sua Energia ZEROU!";
-        } else {
-            if (user.type === 'PLAYER') {
-                updates.recoveryLeft = 1;
-                updates.injury = "Corte no Rosto (Briga de Boate)";
-                updates.mood = '😡';
-                updates.fame = Math.max(0, (user.data.fame || 0) - 200);
-                updates.energy = 0;
-                msg = "👊 TRETA NA BOATE!\nVocê se envolveu numa briga com torcedores na saída. Ganhou um corte no rosto, perdeu fama e ficará 1 JOGO AFASTADO no DM!";
-                newsMsg = `🚨 **POLÊMICA NA NOITE!**\nO jogador **${user.data.name}** foi flagrado em uma confusão generalizada na boate e se machucou. A diretoria vai cobrar explicações!`;
+            msg = `👑 EVENTO LENDÁRIO DESBLOQUEADO!\n\nVocê trombou com NATHAN, o criador absoluto de Mato Real! Vocês viraram uma garrafa de Mansão Maromba juntos no camarote. \n\nEfeitos:\n⚡ Energia 100%\n💸 Ele te deu ₣ 10.000 no PIX pela resenha!`;
+            newsMsg = `🚨 **VISTOS JUNTOS!**\n**${user.data.name}** foi flagrado tomando Mansão Maromba com o grande Nathan na área VIP. Que moral gigantesca!`;
+        }
+        
+        // =====================================
+        // 2. EVENTO DE DUPLA POSSIBILIDADE (4.5% de chance)
+        // =====================================
+        else if (roll < 0.05) {
+            const isLucky = Math.random() > 0.5; // 50/50 dentro do evento
+            const bruxo = "Ronaldinho Gaúcho";
+            
+            if (isLucky) {
+                updates.energy = 100;
+                updates.balance = firebase.firestore.FieldValue.increment(20000); // Ganha 20k no truco
+                if (user.type === 'PLAYER') updates.fame = (user.data.fame || 0) + 800;
+                msg = `🪄 O ROLÊ DO BRUXO!\nVocê foi convidado pro camarote do ${bruxo}. Rolou pagode, dibres e você ainda ganhou ₣ 20.000 jogando truco com ele! Que noite!`;
+                newsMsg = `🪄 **ALEATÓRIO!**\n**${user.data.name}** postou stories tocando pandeiro ao lado de ${bruxo}. A torcida foi à loucura!`;
             } else {
-                 updates.energy = 0;
-                 msg = "📸 VAZOU NA IMPRENSA!\nFotos suas em estado lamentável vazaram na internet. A diretoria não gostou nada do seu comportamento.";
-                 newsMsg = `🚨 **CRISE NOS BASTIDORES!**\nO técnico **${user.data.name}** foi flagrado em situação constrangedora na balada e o clima pesou no vestiário!`;
+                updates.energy = 0;
+                if (user.type === 'PLAYER') {
+                    updates.recoveryLeft = 1;
+                    updates.injury = "Exaustão Pós-Bruxo";
+                    updates.mood = '😡';
+                }
+                msg = `🪄 O ROLÊ DO BRUXO DEU RUIM...\nVocê tentou acompanhar o ritmo de festa do ${bruxo}. Erro fatal. Você desmaiou às 9h da manhã, zerou a energia e vai ficar 1 jogo afastado.`;
+            }
+        }
+
+        // =====================================
+        // 3. EVENTO MUITO BOM / ÉPICO (10%)
+        // =====================================
+        else if (roll < 0.15) {
+            const celeb = celebs[Math.floor(Math.random() * celebs.length)];
+            const action = goodActions[Math.floor(Math.random() * goodActions.length)];
+            const randomMoney = Math.floor(Math.random() * 15000) + 5000;
+            
+            updates.energy = 100;
+            updates.balance = firebase.firestore.FieldValue.increment(randomMoney);
+            if (user.type === 'PLAYER') updates.fame = (user.data.fame || 0) + 500;
+            
+            msg = `🌟 RESENHA FORTE!\nVocê esbarrou com ${celeb} e ele ${action}!\n\nVocê saiu com a energia no máximo e ainda fez contatos que renderam ₣ ${randomMoney.toLocaleString('pt-BR')}!`;
+        }
+
+        // =====================================
+        // 4. EVENTO NEUTRO / BOM (15%) - Só recupera energia
+        // =====================================
+        else if (roll < 0.30) {
+            updates.energy = 100;
+            msg = `🍹 NOITE TRANQUILA!\nVocê curtiu a música, ficou na água com limão e deu boas risadas com os amigos. Sua mente está relaxada e sua Energia foi restaurada para 100%!`;
+        }
+
+        // =====================================
+        // 5. EVENTO RUIM COMUM (35%) - Ressaca e Perda de Grana
+        // =====================================
+        else if (roll < 0.65) {
+            const lostMoney = Math.floor(Math.random() * 8000) + 2000;
+            updates.energy = 0;
+            updates.balance = firebase.firestore.FieldValue.increment(-lostMoney); // Perde grana extra
+            if (user.type === 'PLAYER') updates.mood = '😐';
+            
+            msg = `🤢 RESSACA BRABA...\nA noite foi intensa. Você misturou whisky com catuaba, perdeu sua carteira (prejuízo de ₣ ${lostMoney.toLocaleString('pt-BR')}) e acordou abraçado no vaso sanitário.\n\nEnergia ZERADA!`;
+        }
+
+        // =====================================
+        // 6. EVENTO CATÁSTROFE PROCEDURAL / FOFOCA (35%) - Prejuízo Severo
+        // =====================================
+        else {
+            const villain = badEntities[Math.floor(Math.random() * badEntities.length)];
+            const action = badActions[Math.floor(Math.random() * badActions.length)];
+            const isFight = Math.random() > 0.5; // Metade briga física, metade fofoca
+
+            updates.energy = 0;
+            if (user.type === 'PLAYER') updates.mood = '😡';
+
+            if (isFight && user.type === 'PLAYER') {
+                const injury = injuries[Math.floor(Math.random() * injuries.length)];
+                updates.recoveryLeft = 1; 
+                updates.injury = `${injury} (Briga Noturna)`;
+                updates.fame = Math.max(0, (user.data.fame || 0) - 300);
+                
+                msg = `👊 TRETA NA SAÍDA!\nDeu ruim! Você se desentendeu com ${villain}. Rolou empurra-empurra e você levou a pior.\n\nResultado: Lesão (${injury}), perda de Fama e 1 JOGO DE SUSPENSÃO.`;
+                newsMsg = `🚨 **CASO DE POLÍCIA!**\nO atleta **${user.data.name}** se envolveu numa briga física pesada com ${villain} nesta madrugada. O clube promete punições severas!`;
+            } else {
+                updates.fame = Math.max(0, (user.data.fame || 0) - 500); // Tombo forte na fama
+                msg = `📸 ESCÂNDALO NA INTERNET!\nVocê bebeu demais e ${action} ${villain}! Tudo foi filmado e postado nas redes sociais.\n\nSua moral despencou, sua energia zerou e a diretoria está furiosa!`;
+                newsMsg = `📉 **CANCELADO!**\nVídeos vazados mostram **${user.data.name}** em estado lamentável na boate. A repercussão é péssima nos bastidores.`;
             }
         }
 
@@ -1620,8 +1695,15 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             if (newsMsg) {
                 await db.collection('news').add({ text: newsMsg, type: 'press', date: Date.now(), likes: [] });
             }
-            alert(msg);
+            
+            // Força a atualização local rápida pra tela não parecer travada
+            setTimeout(() => {
+                alert(msg);
+                setLoading(false);
+            }, 500);
+            
         } catch (e) {
+            setLoading(false);
             alert("Erro no evento: " + e.message);
         }
     };
@@ -1636,7 +1718,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             <div style={{display:'flex', gap:10, marginBottom:15}}>
                 <button className={`btn ${hTab==='HOSPITAL'?'btn-red':'btn-ghost'}`} onClick={()=>setHTab('HOSPITAL')} style={{flex:1, padding:10}}>🏥 HOSPITAL</button>
                 <button className={`btn ${hTab==='BANCO'?'btn-blue':'btn-ghost'}`} onClick={()=>setHTab('BANCO')} style={{flex:1, padding:10}}>🏦 BANCO</button>
-                <button className={`btn ${hTab==='BALADA'?'btn-purple':'btn-ghost'}`} onClick={()=>setHTab('BALADA')} style={{flex:1, padding:10}}>🪩 BALADA</button>
+                <button className={`btn ${hTab==='BALADA'?'btn-purple':'btn-ghost'}`} onClick={()=>setHTab('BALADA')} style={{flex:1, padding:10}}>🍸 BALADA</button>
             </div>
 
             {hTab === 'HOSPITAL' && (
@@ -1975,7 +2057,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
             {hTab === 'BALADA' && (
                 <div className="animate-in">
                     <div style={{background:'linear-gradient(90deg, #4a148c, #000)', padding:15, borderRadius:8, color:'white', marginBottom:15, display:'flex', alignItems:'center', gap:10, border: '1px solid var(--purple)'}}>
-                        <span style={{fontSize:30}}>🪩</span>
+                        <span style={{fontSize:30}}>🍸</span>
                         <div>
                             <b style={{display:'block', color:'var(--purple)'}}>LOUNGE MUNICIPAL</b>
                             <small style={{color:'#aaa'}}>Área VIP, Cassino e Muita Resenha</small>
@@ -2010,7 +2092,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                             </div>
 
                             <button className="btn btn-purple" style={{padding:'15px', fontSize:14, fontWeight:'900'}} onClick={handleNightclub}>
-                                🎟️ PAGAR ENTRADA VIP (₣ 5.000)
+                                🎵 PAGAR ENTRADA VIP (₣ 5.000)
                             </button>
                         </div>
                     )}
@@ -6247,7 +6329,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.90.3</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.90.4</div>
                             </div>
                         </div>
                         
@@ -6920,7 +7002,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.3 ESTADIOS   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.4 ESTADIOS   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

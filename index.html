@@ -597,10 +597,10 @@ const POS_TRAINING_MAP = {
 const getPosLearningCost = (currPos, targetPos) => {
     const sectors = { 'GOL': 0, 'ZAG': 1, 'LD': 1, 'LE': 1, 'VOL': 2, 'MC': 2, 'MD': 2, 'ME': 2, 'MEI': 2, 'PTD': 3, 'PTE': 3, 'ATA': 3, 'SA': 3 };
     const diff = Math.abs(sectors[currPos] - sectors[targetPos]);
-    if (diff === 0) return 50;  // Mesmo setor (Aprox 5 treinos)
-    if (diff === 1) return 100; // Setor Adjacente (Aprox 10 treinos)
-    if (diff === 2) return 200; // Setor Distante (Aprox 20 treinos)
-    return 400; // Goleiro <-> Linha (Aprox 40 treinos)
+    if (diff === 0) return 1500;  // Mesmo setor (Aprox 15 treinos)
+    if (diff === 1) return 3000; // Setor Adjacente (Aprox 30 treinos)
+    if (diff === 2) return 6000; // Setor Distante (Aprox 60 treinos)
+    return 12000; // Goleiro <-> Linha (Aprox 120 treinos - Quase impossível)
 };
 // ------------------------------------------
 // ==========================================
@@ -2160,7 +2160,10 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
     const [trainingType, setTrainingType] = useState('FISICO_BASE');
     const [selectedPlayers, setSelectedPlayers] = useState([]);
     
-    // Busca a energia atualizada do usuário logado
+    // Estados para o novo menu bonito de posições
+    const [learningPlayer, setLearningPlayer] = useState(null);
+    const [targetPos, setTargetPos] = useState('');
+    
     const energy = user.data?.energy !== undefined ? user.data.energy : 100;
 
     const handleUpgrade = async () => {
@@ -2173,24 +2176,26 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         }
     };
 
-    const assignLearning = async (player) => {
+    const openLearningMenu = (player) => {
         if (!isCoach) return alert("Apenas o Técnico pode designar treinos de posição.");
         if (player.learningPosition) return alert("Este jogador já está aprendendo uma posição! Ele só pode aprender uma de cada vez.");
         if ((player.secondaryPositions || []).length >= 3) return alert("Este jogador já atingiu o limite de 3 posições secundárias.");
-
-        const target = prompt(`Qual NOVA POSIÇÃO o jogador ${player.name} deve focar em aprender?\n(Ex: ZAG, ATA, VOL, MD, ME, PTD...)`);
-        if (!target) return;
-        const upperTarget = target.toUpperCase();
         
-        if (!POS_TRAINING_MAP[upperTarget]) return alert("Posição inválida. Digite a sigla corretamente.");
-        if (player.position === upperTarget || (player.secondaryPositions || []).includes(upperTarget)) return alert("Ele já joga nessa posição!");
+        setLearningPlayer(player);
+        setTargetPos('');
+    };
 
-        const cost = getPosLearningCost(player.position, upperTarget);
+    const confirmLearning = async () => {
+        if (!learningPlayer || !targetPos) return;
+        const cost = getPosLearningCost(learningPlayer.position, targetPos);
         
-        if(confirm(`Definir ${player.name} para aprender a jogar de ${upperTarget}?\n\nEle precisará participar ativamente das sessões de treino com o foco em "${POS_TRAINING_MAP[upperTarget].train}".\nEstimativa de tempo: ${cost/10} sessões de treino.`)) {
-            await firebase.firestore().collection('players').doc(player.id).update({ learningPosition: { target: upperTarget, current: 0, required: cost } });
-            alert("Treino específico designado! Cobre o jogador nos coletivos.");
-        }
+        await firebase.firestore().collection('players').doc(learningPlayer.id).update({ 
+            learningPosition: { target: targetPos, current: 0, required: cost } 
+        });
+        
+        alert(`Treino designado! Agora cubra ${learningPlayer.name} nos coletivos de "${POS_TRAINING_MAP[targetPos].train}".`);
+        setLearningPlayer(null);
+        setTargetPos('');
     };
 
     const handleTogglePlayer = (pid) => {
@@ -2203,7 +2208,6 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         <div className="modal-overlay" style={{zIndex: 99999}} onClick={onClose}>
             <div className="modal-content" style={{maxWidth: '600px', padding: '15px', background:'#121212'}} onClick={e => e.stopPropagation()}>
                 
-                {/* CABEÇALHO DO CT */}
                 <div style={{position:'relative', height:120, background:'#1a1a1a', borderRadius:8, overflow:'hidden', marginBottom:15, border:'2px solid #00E676', boxShadow: '0 4px 15px rgba(0,230,118,0.2)'}}>
                     <div style={{display:'flex', alignItems:'center', justifyContent:'center', height:'100%', fontSize:50, color:'#222'}}>🏋️‍♂️</div>
                     <div style={{position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.95))', padding: '30px 10px 10px 10px'}}>
@@ -2216,12 +2220,11 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                 </div>
 
                 <div style={{display:'flex', gap:5, marginBottom:15, overflowX:'auto'}}>
-                    <button className={`btn ${tab==='GERAL'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('GERAL')}>ESTRUTURA & ELENCO</button>
-                    {(isCoach || isPlayer) && <button className={`btn ${tab==='TREINO'?'btn-green':'btn-ghost'}`} onClick={()=>setTab('TREINO')}>🏋️‍♂️ TREINAR</button>}
+                    <button className={`btn ${tab==='GERAL'?'btn-blue':'btn-ghost'}`} onClick={()=>{setTab('GERAL'); setLearningPlayer(null);}}>ESTRUTURA & ELENCO</button>
+                    {(isCoach || isPlayer) && <button className={`btn ${tab==='TREINO'?'btn-green':'btn-ghost'}`} onClick={()=>{setTab('TREINO'); setLearningPlayer(null);}}>🏋️‍♂️ TREINAR</button>}
                     {isCoach && <button className={`btn ${tab==='POSICOES'?'btn-warning':'btn-ghost'}`} onClick={()=>setTab('POSICOES')}>🔄 POSIÇÕES</button>}
                 </div>
 
-                {/* ABA 1: ESTRUTURA E QUEM ESTÁ NO CT */}
                 {tab === 'GERAL' && (
                     <div className="animate-in">
                         {isPresident && nextDb && (
@@ -2234,12 +2237,9 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                         )}
 
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                            {/* COLUNA ESQUERDA: JOGADORES PRESENTES */}
                             <div>
                                 <h4 style={{color:'gold', borderBottom:'1px solid #333', paddingBottom:5, marginTop:0}}>👥 Elenco no CT</h4>
                                 <div style={{maxHeight:'300px', overflowY:'auto', paddingRight:5}}>
-                                    
-                                    {/* CARD DO TÉCNICO */}
                                     {coach && (
                                         <div className="card" style={{display:'flex', alignItems:'center', gap:10, borderLeft:'3px solid gold', padding:8, marginBottom:8}}>
                                             {coach.face ? <img src={coach.face} style={{width:35,height:35,borderRadius:'50%',objectFit:'cover'}}/> : <div style={{width:35,height:35,background:'#333',borderRadius:'50%',display:'grid',placeItems:'center'}}>👔</div>}
@@ -2251,8 +2251,6 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                             </div>
                                         </div>
                                     )}
-
-                                    {/* CARDS DOS JOGADORES */}
                                     {[...players].sort((a,b)=>b.overall - a.overall).map(p => (
                                         <div key={p.id} className="card" style={{display:'flex', alignItems:'center', gap:10, borderLeft:`3px solid ${getPosColor(p.position)}`, padding:8, marginBottom:8, opacity: (p.recoveryLeft||0)>0 ? 0.5 : 1}}>
                                             {p.face ? <img src={p.face} style={{width:35,height:35,borderRadius:'50%',objectFit:'cover'}}/> : <div style={{width:35,height:35,background:'#333',borderRadius:'50%',display:'grid',placeItems:'center',fontSize:12}}>👤</div>}
@@ -2270,8 +2268,6 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                     ))}
                                 </div>
                             </div>
-
-                            {/* COLUNA DIREITA: MURAL DE TREINOS */}
                             <div>
                                 <h4 style={{color:'cyan', borderBottom:'1px solid #333', paddingBottom:5, marginTop:0}}>📋 Mural de Resultados</h4>
                                 <div style={{maxHeight:'300px', overflowY:'auto', background:'rgba(0,0,0,0.3)', padding:10, borderRadius:8}}>
@@ -2294,43 +2290,80 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                     </div>
                 )}
 
-                {/* ABA 2: APRENDER POSIÇÕES (SÓ TÉCNICO) */}
                 {tab === 'POSICOES' && isCoach && (
                     <div className="animate-in">
-                        <h4 style={{color:'var(--warning)', marginTop:0}}>🔄 Adaptação de Posições</h4>
-                        <p style={{fontSize:10, color:'#aaa', marginBottom:10}}>O boost entrará no final da temporada.</p>
-                        <div style={{display:'grid', gap:8, maxHeight:'300px', overflowY:'auto'}}>
-                            {players.map(p => (
-                                <div key={p.id} className="card" style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:10, borderLeft:`3px solid ${getPosColor(p.position)}`}}>
-                                    <div style={{width:'40%'}}>
-                                        <b style={{fontSize:12}}>{p.name}</b><br/>
-                                        <span style={{fontSize:9, color:'#888'}}>{p.position} {p.secondaryPositions ? `(+ ${p.secondaryPositions.join(', ')})` : ''}</span>
+                        {learningPlayer ? (
+                            <div className="card animate-in" style={{border: '1px solid var(--warning)', position: 'relative'}}>
+                                <button className="btn btn-ghost" style={{position:'absolute', top:5, right:5, padding:5, fontSize:14}} onClick={()=>setLearningPlayer(null)}>❌</button>
+                                <h4 style={{marginTop:0, color:'var(--warning)'}}>Ensinar Nova Posição</h4>
+                                
+                                <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:15, background:'rgba(0,0,0,0.3)', padding:10, borderRadius:8}}>
+                                    {learningPlayer.face ? <img src={learningPlayer.face} style={{width:40,height:40,borderRadius:'50%',objectFit:'cover'}}/> : <div style={{width:40,height:40,background:'#333',borderRadius:'50%',display:'grid',placeItems:'center'}}>👤</div>}
+                                    <div>
+                                        <b>{learningPlayer.name}</b><br/>
+                                        <small style={{color:'#aaa'}}>Posição Atual: <b style={{color:getPosColor(learningPlayer.position)}}>{learningPlayer.position}</b></small>
                                     </div>
-                                    <div style={{flex:1, textAlign:'center'}}>
-                                        {p.learningPosition ? (
-                                            <div style={{fontSize:9}}>
-                                                <span style={{color:'gold'}}>Aprender: <b>{p.learningPosition.target}</b></span><br/>
-                                                <span style={{color:'cyan'}}>Treinar: <b>{POS_TRAINING_MAP[p.learningPosition.target].train}</b></span>
-                                                <div style={{width:'100%', background:'#222', height:4, borderRadius:2, marginTop:2}}>
-                                                    <div style={{width:`${Math.min(100, (p.learningPosition.current/p.learningPosition.required)*100)}%`, background:'lime', height:'100%'}}></div>
-                                                </div>
-                                            </div>
-                                        ) : <span style={{fontSize:9, color:'#666'}}>Sem treino.</span>}
-                                    </div>
-                                    <button className="btn btn-ghost" style={{width:'auto', fontSize:9, padding:'5px', marginLeft:10, border:'1px solid var(--warning)', color:'var(--warning)'}} onClick={() => assignLearning(p)}>
-                                        {p.learningPosition ? 'ALTERAR' : 'NOVA'}
-                                    </button>
                                 </div>
-                            ))}
-                        </div>
+
+                                <p style={{fontSize:11, color:'#aaa', marginBottom:10}}>1. Selecione a posição alvo:</p>
+                                <div style={{display:'flex', gap:5, flexWrap:'wrap', marginBottom:15}}>
+                                    {Object.keys(POS_TRAINING_MAP).map(pos => {
+                                        if (pos === learningPlayer.position || (learningPlayer.secondaryPositions || []).includes(pos)) return null;
+                                        return (
+                                            <button key={pos} className={`btn ${targetPos === pos ? 'btn-warning' : 'btn-ghost'}`} style={{padding:'8px 12px', width:'auto', fontSize:11, border: `1px solid ${getPosColor(pos)}`, background: targetPos === pos ? getPosColor(pos) : 'transparent', color: targetPos === pos ? '#000' : getPosColor(pos), fontWeight:'bold'}} onClick={()=>setTargetPos(pos)}>
+                                                {pos}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+
+                                {targetPos && (
+                                    <div className="animate-in" style={{background:'rgba(0,0,0,0.5)', padding:15, borderRadius:8, fontSize:12, borderLeft:'4px solid cyan'}}>
+                                        <p style={{margin:'0 0 10px 0'}}>Para aprender a jogar de <b>{targetPos}</b>, o jogador precisará participar de sessões táticas onde o Foco do Treino seja:</p>
+                                        <div style={{fontSize:14, color:'cyan', fontWeight:'bold', marginBottom:10}}>🎯 {POS_TRAINING_MAP[targetPos].train}</div>
+                                        <div style={{fontSize:11, color:'#aaa'}}>Estimativa de dedicação: <b style={{color:'gold'}}>{Math.ceil(getPosLearningCost(learningPlayer.position, targetPos) / 10)} treinos coletivos</b></div>
+                                        
+                                        <button className="btn btn-green" style={{marginTop:15, width:'100%'}} onClick={confirmLearning}>
+                                            ✅ CONFIRMAR TREINAMENTO ESPECÍFICO
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <>
+                                <h4 style={{color:'var(--warning)', marginTop:0}}>🔄 Adaptação de Posições</h4>
+                                <p style={{fontSize:10, color:'#aaa', marginBottom:10}}>O boost de experiência entrará no final da temporada.</p>
+                                <div style={{display:'grid', gap:8, maxHeight:'350px', overflowY:'auto'}}>
+                                    {players.map(p => (
+                                        <div key={p.id} className="card" style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:10, borderLeft:`3px solid ${getPosColor(p.position)}`}}>
+                                            <div style={{width:'40%'}}>
+                                                <b style={{fontSize:12}}>{p.name}</b><br/>
+                                                <span style={{fontSize:9, color:'#888'}}>{p.position} {p.secondaryPositions ? `(+ ${p.secondaryPositions.join(', ')})` : ''}</span>
+                                            </div>
+                                            <div style={{flex:1, textAlign:'center'}}>
+                                                {p.learningPosition ? (
+                                                    <div style={{fontSize:9}}>
+                                                        <span style={{color:'gold'}}>Aprender: <b>{p.learningPosition.target}</b></span><br/>
+                                                        <span style={{color:'cyan'}}>Treinar: <b>{POS_TRAINING_MAP[p.learningPosition.target].train}</b></span>
+                                                        <div style={{width:'100%', background:'#222', height:4, borderRadius:2, marginTop:2}}>
+                                                            <div style={{width:`${Math.min(100, (p.learningPosition.current/p.learningPosition.required)*100)}%`, background:'lime', height:'100%'}}></div>
+                                                        </div>
+                                                    </div>
+                                                ) : <span style={{fontSize:9, color:'#666'}}>Sem treino.</span>}
+                                            </div>
+                                            <button className="btn btn-ghost" style={{width:'auto', fontSize:9, padding:'6px 10px', marginLeft:10, border:'1px solid var(--warning)', color:'var(--warning)'}} onClick={() => openLearningMenu(p)}>
+                                                {p.learningPosition ? 'ALTERAR' : 'NOVA'}
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
 
-                {/* ABA 3: AÇÃO DE TREINAR (COM BARRA DE ENERGIA) */}
                 {tab === 'TREINO' && (
                     <div className="animate-in">
-                        
-                        {/* DESTAQUE DA ENERGIA DO USUÁRIO ATUAL */}
                         <div style={{background:'rgba(0,0,0,0.4)', padding:15, borderRadius:8, marginBottom:15, border: energy > 30 ? '1px solid #444' : '1px solid red', textAlign:'center'}}>
                             <small style={{color:'#aaa', fontWeight:'bold'}}>SUA ENERGIA ATUAL</small>
                             <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginTop:5}}>
@@ -2406,359 +2439,6 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                     </div>
                 )}
                 <button className="btn btn-red" style={{marginTop:15}} onClick={onClose}>FECHAR CT</button>
-            </div>
-        </div>
-    );
-};
-        
-     const StadiumManager = ({ team, players, onClose }) => {
-    const lvl = team.stadiumLevel || 1;
-    const db = STADIUM_DB[lvl];
-    const nextDb = STADIUM_DB[lvl + 1];
-
-    const [tab, setTab] = useState('ARENA');
-    const [socioPrice, setSocioPrice] = useState(team.socioPrice || 40);
-         const [ticPrice, setTicPrice] = useState(team.ticketPrice || db.minTic);
-    
-    // Estados da Loja
-    const storeBal = team.storeBalance || 0;
-    const [editP, setEditP] = useState(null); 
-    const [buyStock, setBuyStock] = useState(10);
-
-    const handleSaveTicket = async () => {
-        await firebase.firestore().collection('teams').doc(team.id).update({ ticketPrice: ticPrice });
-        alert("Preço do ingresso atualizado para o próximo jogo em casa!");
-    };
-
-    const handleUpgrade = async () => {
-        if (!nextDb) return;
-        if ((team.balance || 0) < db.upgCost) return alert("Saldo insuficiente do clube!");
-        if (confirm(`Evoluir para ${nextDb.name} por ${fmt(db.upgCost)}?\n\nA manutenção semanal passará a ser de ${fmt(nextDb.maint)}.`)) {
-            await firebase.firestore().collection('teams').doc(team.id).update({
-                balance: firebase.firestore.FieldValue.increment(-db.upgCost),
-                stadiumLevel: lvl + 1,
-                ticketPrice: nextDb.minTic
-            });
-            alert("Estádio evoluído com sucesso!");
-            onClose();
-        }
-    };
-
-    const handleFinanceStadium = async () => {
-        if (!nextDb) return;
-        if (team.stadiumLoan && team.stadiumLoan.installments > 0) return alert("🚫 Você já possui um financiamento de estádio em andamento. Quite-o antes de fazer outra obra.");
-        
-        const upgCost = db.upgCost;
-        const totalOwed = upgCost * 1.10; 
-        const weekly = totalOwed / 10; 
-
-        if (confirm(`🏦 FINANCIAMENTO CAIXA\n\nO banco pagará a construtora diretamente e seu estádio evoluirá AGORA!\n\nValor da Obra: ${fmt(upgCost)}\nCondições: 10x de ${fmt(weekly)}\nTotal com juros (10%): ${fmt(totalOwed)}\n\nAssinar contrato e iniciar obras?`)) {
-            await firebase.firestore().collection('teams').doc(team.id).update({
-                stadiumLevel: lvl + 1,
-                ticketPrice: nextDb.minTic,
-                stadiumLoan: { amountBorrowed: upgCost, totalOwed: totalOwed, weeklyPayment: weekly, installments: 10 }
-            });
-            alert("✅ Contrato assinado! A construtora já terminou as obras e seu novo estádio está pronto.");
-            onClose(); 
-        }
-    };
-
-    const handleWithdrawStore = async () => {
-        if (storeBal <= 0) return alert("A loja não tem lucros para sacar.");
-        if (confirm(`Transferir todo o lucro da loja (${fmt(storeBal)}) para o cofre do Clube?`)) {
-            await firebase.firestore().collection('teams').doc(team.id).update({
-                balance: firebase.firestore.FieldValue.increment(storeBal),
-                storeBalance: 0
-            });
-            alert("Lucro sacado para o clube!");
-        }
-    };
-
-    const handleStadiumPicUpload = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        
-        reader.onload = (event) => {
-            const img = new Image();
-            img.src = event.target.result;
-            
-            img.onload = async () => {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                const MAX_WIDTH = 800; 
-                let width = img.width;
-                let height = img.height;
-
-                if (width > MAX_WIDTH) {
-                    height *= MAX_WIDTH / width;
-                    width = MAX_WIDTH;
-                }
-
-                canvas.width = width;
-                canvas.height = height;
-                ctx.drawImage(img, 0, 0, width, height);
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-
-                if (confirm("Salvar esta foto como a imagem oficial da sua Arena?")) {
-                    await firebase.firestore().collection('teams').doc(team.id).update({ stadiumPic: dataUrl });
-                    alert("Foto da Arena atualizada com sucesso!");
-                }
-            };
-        };
-    };
-
-    return (
-        <div className="modal-overlay" style={{zIndex: 99999}} onClick={onClose}>
-            <div className="modal-content" style={{maxWidth: '500px'}} onClick={e => e.stopPropagation()}>
-                <div style={{display:'flex', gap:5, marginBottom:15}}>
-                    <button className={`btn ${tab==='ARENA'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('ARENA')} style={{flex:1}}>🏟️ ARENA</button>
-                    <button className={`btn ${tab==='LOJA'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('LOJA')} style={{flex:1}}>🛍️ LOJA OFICIAL</button>
-                   <button className={`btn ${tab==='SOCIO'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('SOCIO')} style={{flex:1}}>🎟️ SÓCIO</button>
-                </div>
-
-                {tab === 'ARENA' && (
-                    <div className="animate-in">
-                        <div style={{position:'relative', height:150, background:'#111', borderRadius:8, overflow:'hidden', marginBottom:15, border:'2px solid cyan', boxShadow: '0 4px 8px rgba(0,0,0,0.5)'}}>
-                            {team.stadiumPic ? (
-                                <img src={team.stadiumPic} alt="Estádio" style={{width:'100%', height:'100%', objectFit:'cover', opacity:0.6}} />
-                            ) : (
-                                <div style={{display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'#555'}}><i className="fas fa-image fa-3x"></i></div>
-                            )}
-                            <div style={{position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.95))', padding: '30px 10px 10px 10px'}}>
-                                <b style={{color: 'cyan', fontSize: 15, display: 'block', marginBottom: 4, textShadow: '1px 1px 2px black'}}>{db.name} <small style={{color:'gold'}}>(Nvl {lvl})</small></b>
-                                <div style={{display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#ddd', textShadow: '1px 1px 2px black'}}>
-                                    <span>👥 Cap: <b style={{color:'#fff'}}>{db.cap.toLocaleString('pt-BR')}</b></span>
-                                    <span>🎫 Ingresso: <b style={{color:'#00E676'}}>{fmt(ticPrice)}</b></span>
-                                    <span>💸 Mnt: <b style={{color:'var(--danger)'}}>{fmt(db.maint)}/s</b></span>
-                                </div>
-                            </div>
-                            <label className="btn btn-ghost" style={{position:'absolute', top:5, right:5, padding:5, width:'auto', background:'rgba(0,0,0,0.5)', color:'white', fontSize:10, cursor:'pointer', margin:0, zIndex: 10}}>
-                                <i className="fas fa-camera"></i> Trocar Foto
-                                <input type="file" style={{display:'none'}} accept="image/*" onChange={handleStadiumPicUpload} />
-                            </label>
-                        </div>
-
-                        <div style={{background:'rgba(213, 0, 249, 0.1)', border:'1px dashed #D500F9', padding:10, borderRadius:8, marginBottom:15}}>
-                            <b style={{color:'#D500F9', fontSize:11}}><i className="fas fa-robot"></i> Gerador de Imagem IA:</b>
-                            <p style={{fontSize:10, color:'#aaa', margin:'5px 0'}}>Copie o texto abaixo e cole no seu gerador de IA favorito para criar a foto ideal do seu estádio atual:</p>
-                            <code style={{display:'block', background:'#000', padding:8, borderRadius:4, fontSize:9, color:'#00E676', userSelect:'all'}}>{db.prompt}</code>
-                        </div>
-
-                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:15}}>
-                            <div style={{background:'#111', padding:10, borderRadius:8, textAlign:'center'}}>
-                                <span style={{color:'#888', fontSize:10}}>Capacidade Máxima</span><br/><b style={{color:'#fff', fontSize:14}}>{db.cap.toLocaleString('pt-BR')}</b>
-                            </div>
-                            <div style={{background:'#111', padding:10, borderRadius:8, textAlign:'center'}}>
-                                <span style={{color:'#888', fontSize:10}}>Custo de Manutenção</span><br/><b style={{color:'var(--danger)', fontSize:14}}>{fmt(db.maint)}/sem</b>
-                            </div>
-                        </div>
-
-                        <div className="card" style={{borderLeft:'4px solid cyan'}}>
-                            <h4 style={{marginTop:0, color:'cyan'}}>🎫 Valor do Ingresso</h4>
-                            <p style={{fontSize:10, color:'#aaa', marginBottom:10}}>Ajuste o preço do ingresso. Preços muito altos espantam a torcida.</p>
-                            <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
-                                <label style={{color:'cyan', fontSize:12, fontWeight:'bold'}}>Preço da Entrada</label>
-                                <b style={{color:'#fff'}}>{fmt(ticPrice)}</b>
-                            </div>
-                            <input type="range" min={db.minTic} max={db.maxTic} step="5" value={ticPrice} onChange={e=>setTicPrice(Number(e.target.value))} style={{width:'100%', accentColor:'cyan', marginBottom:10}} />
-                            <div style={{background:'rgba(0,0,0,0.5)', padding:8, borderRadius:5, fontSize:11, display:'flex', justifyContent:'space-between', marginBottom:10}}>
-                                <span>Renda Máxima (Casa Cheia):</span> <b style={{color:'#00E676'}}>{fmt(ticPrice * db.cap)}</b>
-                            </div>
-                            <button className="btn btn-blue" onClick={handleSaveTicket} disabled={ticPrice === team.ticketPrice}>SALVAR PREÇO</button>
-                        </div>
-
-                        {nextDb && (
-                            <div style={{marginTop:15, padding:15, border:'1px dashed gold', borderRadius:8, textAlign:'center', background:'rgba(255,215,0,0.05)'}}>
-                                <b style={{color:'gold'}}>Próximo Nível: {nextDb.name}</b>
-                                <p style={{fontSize:10, color:'#aaa', marginBottom:10}}>Capacidade sobe para {nextDb.cap.toLocaleString('pt-BR')}. Manutenção subirá para {fmt(nextDb.maint)}/sem.</p>
-                                
-                                <div style={{display:'flex', gap:10}}>
-                                    <button className="btn btn-gold" onClick={handleUpgrade} style={{color:'#000', margin:0, flex:1, fontSize:10}}>
-                                        PAGAR À VISTA<br/>({fmt(db.upgCost)})
-                                    </button>
-                                    <button className="btn btn-ghost" onClick={handleFinanceStadium} style={{margin:0, flex:1, fontSize:10, borderColor:'cyan', color:'cyan'}}>
-                                        FINANCIAR OBRA<br/>(10x de {fmt((db.upgCost * 1.10) / 10)})
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {tab === 'LOJA' && (
-                    <div className="animate-in">
-                        <div style={{background:'linear-gradient(45deg, #1b5e20, #000)', padding:15, borderRadius:8, marginBottom:15, border:'1px solid #00E676', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                            <div>
-                                <small style={{color:'#888'}}>Caixa da Loja (Lucro)</small><br/>
-                                <b style={{fontSize:20, color:'#00E676'}}>{fmt(storeBal)}</b>
-                            </div>
-                            <div style={{textAlign:'right'}}>
-                                <small style={{color:'#888'}}>Nível da Loja</small><br/>
-                                <b style={{fontSize:16, color:'gold'}}>⭐ Nvl {lvl}</b>
-                            </div>
-                        </div>
-
-                        <div style={{display:'flex', gap:10, marginBottom:15}}>
-                            <button className="btn btn-green" style={{flex:2}} onClick={handleWithdrawStore} disabled={storeBal <= 0}>💸 SACAR LUCROS</button>
-                            <button className="btn btn-purple" style={{flex:1}} onClick={() => {
-                                if ((team.storeProducts || []).length >= 6) return alert("Sua vitrine está cheia! Máximo de 6 produtos.");
-                                setEditP({ id: Date.now().toString(), name: '', price: 50, stock: 0, img: null });
-                            }}>+ CRIAR ITEM</button>
-                        </div>
-
-                        {editP && (
-                            <div className="card" style={{border:'2px solid var(--purple)', marginBottom:15}}>
-                                <h4 style={{marginTop:0, color:'var(--purple)'}}>{editP.stock === undefined || editP.stock === 0 ? 'Novo Produto' : 'Repor Estoque'}</h4>
-                                
-                                <div style={{display:'flex', gap:10, marginBottom:10}}>
-                                    <div style={{width:80, height:80, background:'#222', borderRadius:8, border:'1px dashed #666', overflow:'hidden', position:'relative'}}>
-                                        {editP.img ? <img src={editP.img} style={{width:'100%', height:'100%', objectFit:'cover'}} /> : <div style={{display:'grid', placeItems:'center', height:'100%', fontSize:24}}>📷</div>}
-                                        <input type="file" style={{position:'absolute', inset:0, opacity:0, cursor:'pointer'}} accept="image/*" onChange={(e) => {
-                                            const file = e.target.files[0];
-                                            if (!file) return;
-                                            const reader = new FileReader();
-                                            reader.readAsDataURL(file);
-                                            reader.onload = (ev) => {
-                                                const img = new Image();
-                                                img.src = ev.target.result;
-                                                img.onload = () => {
-                                                    const canvas = document.createElement('canvas');
-                                                    const MAX_W = 300; 
-                                                    let w = img.width, h = img.height;
-                                                    if (w > MAX_W) { h *= MAX_W / w; w = MAX_W; }
-                                                    canvas.width = w; canvas.height = h;
-                                                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                                                    setEditP({...editP, img: canvas.toDataURL('image/jpeg', 0.8)});
-                                                };
-                                            };
-                                        }} />
-                                    </div>
-                                    <div style={{flex:1}}>
-                                        <input className="input-field" placeholder="Nome (Ex: Copo Térmico)" value={editP.name} onChange={e=>setEditP({...editP, name:e.target.value})} disabled={editP.stock > 0} style={{marginBottom:5}} />
-                                        <input className="input-field" type="number" placeholder="Preço de Venda (₣)" value={editP.price} onChange={e=>setEditP({...editP, price:e.target.value})} disabled={editP.stock > 0} style={{marginBottom:0}} />
-                                        <small style={{color:'#aaa', fontSize:9}}>Custo de fabricação: 30% do valor.</small>
-                                    </div>
-                                </div>
-
-                                <div style={{background:'rgba(0,0,0,0.3)', padding:10, borderRadius:8}}>
-                                    <div style={{display:'flex', justifyContent:'space-between', fontSize:11}}>
-                                        <span>Produzir: <b>{buyStock} un.</b></span>
-                                        <span>Custo: <b style={{color:'var(--danger)'}}>{fmt(buyStock * (editP.price * 0.3))}</b></span>
-                                    </div>
-                                    <input type="range" min="10" max="500" step="10" value={buyStock} onChange={e=>setBuyStock(Number(e.target.value))} style={{width:'100%', accentColor:'var(--purple)', margin:'10px 0'}} />
-                                    
-                                    <div style={{display:'flex', gap:5}}>
-                                        <button className="btn btn-green" onClick={async () => {
-                                            if(!editP.name || !editP.price) return alert("Preencha nome e preço!");
-                                            const cost = Math.floor(buyStock * (editP.price * 0.3));
-                                            if ((team.balance || 0) < cost) return alert("O clube não tem saldo para fabricar este lote!");
-                                            
-                                            if(confirm(`Pagar ${fmt(cost)} para fabricar ${buyStock}x ${editP.name}?`)) {
-                                                let currentProducts = team.storeProducts || [];
-                                                const existingIdx = currentProducts.findIndex(p => p.id === editP.id);
-                                                if (existingIdx >= 0) {
-                                                    currentProducts[existingIdx].stock += buyStock;
-                                                } else {
-                                                    currentProducts.push({ ...editP, stock: buyStock, price: Number(editP.price) });
-                                                }
-
-                                                await firebase.firestore().collection('teams').doc(team.id).update({
-                                                    balance: firebase.firestore.FieldValue.increment(-cost),
-                                                    storeProducts: currentProducts
-                                                });
-                                                alert("Produção enviada para o estoque!");
-                                                setEditP(null); setBuyStock(10);
-                                            }
-                                        }}>FABRICAR</button>
-                                        <button className="btn btn-ghost" onClick={()=>{setEditP(null); setBuyStock(10);}}>CANCELAR</button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                            {(team.storeProducts || []).map(p => (
-                                <div key={p.id} className="card" style={{padding:10, textAlign:'center', position:'relative'}}>
-                                    <i className="fas fa-trash" style={{position:'absolute', top:5, right:5, color:'#ff1744', cursor:'pointer', fontSize:12}} onClick={async()=>{
-                                        if(confirm(`Excluir ${p.name}? O estoque atual será perdido sem reembolso.`)) {
-                                            const newProds = team.storeProducts.filter(x => x.id !== p.id);
-                                            await firebase.firestore().collection('teams').doc(team.id).update({ storeProducts: newProds });
-                                        }
-                                    }}></i>
-                                    
-                                    <div style={{width:50, height:50, margin:'0 auto', borderRadius:5, overflow:'hidden', background:'#222', marginBottom:5}}>
-                                        {p.img ? <img src={p.img} style={{width:'100%', height:'100%', objectFit:'cover'}}/> : <span style={{fontSize:20, lineHeight:'50px'}}>📦</span>}
-                                    </div>
-                                    <b style={{fontSize:11, display:'block', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{p.name}</b>
-                                    <div style={{color:'var(--primary)', fontWeight:'bold', fontSize:13}}>{fmt(p.price)}</div>
-                                    
-                                    <div style={{fontSize:9, color: p.stock > 0 ? 'lime' : 'red', margin:'5px 0'}}>Estoque: {p.stock} un.</div>
-                                    
-                                    <button className="btn btn-ghost" style={{fontSize:9, padding:5, margin:0, borderColor:'var(--purple)', color:'white'}} onClick={() => { setEditP(p); setBuyStock(10); }}>
-                                        REPOR ESTOQUE
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                        {(team.storeProducts || []).length === 0 && !editP && <p style={{textAlign:'center', color:'#666', fontSize:11}}>Sua vitrine está vazia. Crie produtos para vender em dias de jogo!</p>}
-                    </div>
-                )}
-                {/* --- NOVA ABA: PROGRAMA SÓCIO TORCEDOR --- */}
-                {tab === 'SOCIO' && (
-                    <div className="animate-in">
-                        <div style={{background:'linear-gradient(45deg, #FFD700, #FF8F00)', padding:15, borderRadius:8, marginBottom:15, border:'1px solid #fff', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                            <div>
-                                <small style={{color:'#000', fontWeight:'bold'}}>Sócios Ativos (Em tempo real)</small><br/>
-                                <b style={{fontSize:24, color:'#000'}}>
-                                    {/* A MÁGICA DO TEMPO REAL AQUI */}
-                                    {calculateSocios(
-                                        {...team, socioPrice: socioPrice}, // Simula a mudança antes de salvar
-                                        players.filter(p => p.teamId === team.id)
-                                    ).toLocaleString('pt-BR')} 👤
-                                </b>
-                            </div>
-                        </div>
-
-                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:15}}>
-                            <div className="card" style={{padding:10, textAlign:'center'}}>
-                                <span style={{fontSize:10, color:'#aaa'}}>Renda Semanal Projetada</span><br/>
-                                <b style={{color:'lime', fontSize:14}}>
-                                    {fmt(calculateSocios({...team, socioPrice: socioPrice}, players.filter(p => p.teamId === team.id)) * socioPrice)}
-                                </b>
-                            </div>
-                            <div className="card" style={{padding:10, textAlign:'center'}}>
-                                <span style={{fontSize:10, color:'#aaa'}}>Fase do Time (Últ. 5)</span><br/>
-                                <b style={{color:'#fff', fontSize:14, letterSpacing:2}}>
-                                    {(team.recentForm || []).length > 0 
-                                        ? team.recentForm.map(r => r==='VITORIA'?'🟢':r==='EMPATE'?'⚪':'🔴').join('') 
-                                        : '➖'}
-                                </b>
-                            </div>
-                        </div>
-
-                        <div className="card" style={{borderLeft:'4px solid gold'}}>
-                            <h4 style={{marginTop:0, color:'gold'}}>💳 Mensalidade do Sócio</h4>
-                            <p style={{fontSize:10, color:'#aaa', marginBottom:10}}>
-                                Defina o valor da assinatura. Se cobrar muito caro, a massa torcedora cancelará o plano!
-                            </p>
-                            
-                            <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
-                                <label style={{color:'gold', fontSize:12, fontWeight:'bold'}}>Preço Cobrado</label>
-                                <b style={{color:'#fff'}}>{fmt(socioPrice)}</b>
-                            </div>
-                            <input type="range" min="10" max="150" step="5" value={socioPrice} onChange={e=>setSocioPrice(Number(e.target.value))} style={{width:'100%', accentColor:'gold', marginBottom:15}} />
-                            
-                            <button className="btn btn-green" onClick={async () => {
-                                await firebase.firestore().collection('teams').doc(team.id).update({ socioPrice: socioPrice });
-                                alert("Valor da mensalidade atualizado! Os sócios atuais já reagiram à mudança.");
-                            }} disabled={socioPrice === team.socioPrice}>SALVAR NOVA MENSALIDADE</button>
-                        </div>
-                    </div>
-                )}
-                <button className="btn btn-red" style={{marginTop:15}} onClick={onClose}>FECHAR</button>
             </div>
         </div>
     );

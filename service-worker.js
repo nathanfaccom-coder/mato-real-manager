@@ -1,4 +1,4 @@
-const CACHE_NAME = 'matoreal-FORCE-ONLINE-v16'; // Mudei para v5 para garantir
+const CACHE_NAME = 'matoreal-FORCE-ONLINE-v19'; // Mudei para v5 para garantir
 
 // 1. INSTALAÇÃO: Pula a espera e assume o controle AGORA
 self.addEventListener('install', (event) => {

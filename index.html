@@ -1240,7 +1240,7 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
     );
 };
         //FIM
-const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireCoach, onRenewCoach }) => {
+const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireCoach, onRenewCoach, setModal }) => {
     const [tab, setTab] = useState('ELENCO'); 
     const [showStadiumUI, setShowStadiumUI] = useState(false); // NOVO: Estado para controlar a tela do Estádio
     const [showCT, setShowCT] = useState(false);
@@ -6613,7 +6613,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.90.6</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.90.7</div>
                             </div>
                         </div>
                         
@@ -6705,7 +6705,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                                     coach={coaches.find(c => c.teamId === user.data.id && c.status === 'ACTIVE')} 
                                     onFireCoach={handleFireCoach}
                                     onRenewCoach={handleRenewCoachContract} 
-                                    isVisitor={false} 
+                                    isVisitor={false} setModal={setModal} 
                                     onEdit={(p)=>setModal({type:'PLAYER', data:p})} 
                                     onAdd={()=>setModal({type:'PLAYER', data: { teamId: user.data.id } })} 
                                 />
@@ -6830,7 +6830,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                                     coach={coaches.find(c => c.teamId === adminTeam.id && c.status === 'ACTIVE')} 
                                     onFireCoach={handleFireCoach}
                                     onRenewCoach={handleRenewCoachContract} 
-                                    isVisitor={false} 
+                                    isVisitor={false} setModal={setModal} 
                                     onEdit={(p)=>setModal({type:'PLAYER', data:p})} 
                                     onAdd={()=>setModal({type:'PLAYER', data: { teamId: adminTeam.id } })} 
                                 />
@@ -6963,7 +6963,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                                     onAction={handlePlayerActions} 
                                     onUpdatePassword={async(newP)=>{ await db.collection('players').doc(user.data.id).update({password: newP}); alert("Senha alterada!"); }} 
                                     onTrainSolo={handlePlayerSoloTrain} 
-                                    onUseItem={handleUseItem}
+                                    onUseItem={handleUseItem} setModal={setModal}
                                 />
                                 <div style={{marginTop: 20, textAlign:'center', color:'#666', fontSize:12}}>
                                     <i>Acesse a aba <b>JOGOS</b> para ver a tabela e partidas.</i>
@@ -6994,7 +6994,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                                     onUpdateSalary={handleUpdateCoachSalary} 
                                     onSelfAction={handleCoachSelfActions} 
                                     onSaveTactics={saveTactics}
-                                    onUseItem={handleCoachUseItem}
+                                    onUseItem={handleCoachUseItem} setModal={setModal}
                                 />
                                 <div style={{marginTop: 20, textAlign:'center', color:'#666', fontSize:12}}>
                                     <i>Acesse a aba <b>JOGOS</b> para ver a tabela e partidas.</i>
@@ -7287,7 +7287,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.6 ESTADIOS   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.7 ESTADIOS   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -7799,7 +7799,7 @@ const VisitorDashboard = ({ players, teams }) => {
 // FIM DO COMPONENTE COMPANY DASHBOARD
 // --- JOGADOR, MERCADO E OUTROS COMPONENTES QUE FALTARAM ---
 
-const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTrainSolo, onUseItem }) => {
+const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTrainSolo, onUseItem, setModal }) => {
     const [newPass, setNewPass] = useState('');
     const [tab, setTab] = useState('PERFIL');
     const [trainType, setTrainType] = useState('FISICO_BASE'); 
@@ -8346,7 +8346,7 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
 };
 //FIM
         // --- COMPONENTE DO PAINEL DO TÉCNICO ---
-const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolvePerk, onAddAffinity, onAcceptOffer, onRejectOffer, onCounterOffer, onUpdateSalary, onSelfAction, onUseItem, onSaveTactics }) => {
+const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolvePerk, onAddAffinity, onAcceptOffer, onRejectOffer, onCounterOffer, onUpdateSalary, onSelfAction, onUseItem, onSaveTactics, setModal }) => {
     const [tab, setTab] = useState('PRANCHETA'); 
     const [selectedPlayers, setSelectedPlayers] = useState([]);
     const [selectingPos, setSelectingPos] = useState(null); // Guarda qual posição está sendo preenchida

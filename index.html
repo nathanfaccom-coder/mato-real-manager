@@ -1387,7 +1387,7 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
     );
 };
         //FIM
-const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireCoach, onRenewCoach, setModal }) => {
+const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireCoach, onRenewCoach, setModal, isAdmin }) => {
     const [tab, setTab] = useState('ELENCO'); 
     const [showStadiumUI, setShowStadiumUI] = useState(false); // NOVO: Estado para controlar a tela do Estádio
     const [showCT, setShowCT] = useState(false);
@@ -1481,7 +1481,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                                     <AttributeGrid attrs={p.attributes} pendingXP={p.pendingXP} />
                             </div>
 
-                            {!isVisitor && (
+                           {isAdmin && (
                                 <div style={{marginTop:10, display:'flex', justifyContent:'flex-end'}}>
                                     <button className="btn btn-ghost" style={{width:'auto', fontSize:12}} onClick={()=>onEdit(p)}>
                                         <i className="fas fa-edit"></i> EDITAR
@@ -7052,6 +7052,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                                 <button className="btn" style={{background:'#333', marginBottom:10}} onClick={()=>{setAdminTeam(null); setScreen('HOME');}}>⬅ VOLTAR</button>
                                 <h3 style={{color:'var(--purple)'}}>Editando: {adminTeam.name}</h3>
                                 <TeamDashboard 
+                                    isAdmin={true} 
                                     team={adminTeam} 
                                     players={players.filter(p=>p.teamId===adminTeam.id)} 
                                     coach={coaches.find(c => c.teamId === adminTeam.id && c.status === 'ACTIVE')} 
@@ -7515,7 +7516,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.8 ESTADIOS   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.8 BALADINHAS   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

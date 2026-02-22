@@ -7631,14 +7631,16 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                                 )}
 
                                 {matchesTab === 'COPAS' && (
-                                    <TournamentHub 
-                                        tournaments={tourns} matches={matches} players={players} user={user} teams={teams}
-                                        onInspectTeam={(t) => setModal({ type: 'VIEW_LINEUP', data: t })}
-                                        onCreateMatch={(tournId) => setModal({ type: 'MATCH_MANAGER', data: { serie: tournId, round: 1, homeId:'', awayId:'', scoreHome:0, scoreAway:0, status:'PENDING' }})}
-                                        onEditMatch={(m) => setModal({ type: 'MATCH_MANAGER', data: m })}
-                                        onDeleteMatch={(id) => handleDeleteMatch(id)}
-                                        onReportMatch={(m) => setModal({type:'MATCH_PERFORMANCE', data: { match: m, player: null } })}
-                                    />
+                                    <div className="animate-in">
+                                        <TournamentHub 
+                                            tournaments={tourns} matches={matches} players={players} user={user} teams={teams}
+                                            onInspectTeam={(t) => setModal({ type: 'VIEW_LINEUP', data: t })}
+                                            onCreateMatch={(tournId) => setModal({ type: 'MATCH_MANAGER', data: { serie: tournId, round: 1, homeId:'', awayId:'', scoreHome:0, scoreAway:0, status:'PENDING' }})}
+                                            onEditMatch={(m) => setModal({ type: 'MATCH_MANAGER', data: m })}
+                                            onDeleteMatch={(id) => handleDeleteMatch(id)}
+                                            onReportMatch={(m) => setModal({type:'MATCH_PERFORMANCE', data: { match: m, player: null } })}
+                                        />
+                                    </div>
                                 )}
                             </div>
                         )}

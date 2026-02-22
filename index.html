@@ -1832,10 +1832,13 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
                     <div className="card" style={{borderTop:'3px solid var(--purple)', textAlign:'center', gridColumn:'span 2', background:'rgba(213,0,249,0.05)'}}>
                         <div style={{fontSize:10, color:'#aaa', marginBottom:5}}>⭐ CRAQUE DO CAMPEONATO</div>
                         {bestPlayer ? <div><b style={{fontSize:16, color:'#fff'}}>{bestPlayer.name}</b><br/><span style={{color:'var(--purple)', fontWeight:'bold', fontSize:18}}>{(bestPlayer.tournaments[selTourn.id].ratingSum / bestPlayer.tournaments[selTourn.id].ratingCount).toFixed(1)}</span></div> : <small style={{color:'#666'}}>Sem avaliações.</small>}
+           
                     </div>
-                </div>
-            )}
-
+                </div>
+            )}
+        </div>
+    );
+};
 
     
         const MatchManagerForm = ({ initialData, teams, tournaments, onSave, onDelete }) => {

@@ -1736,7 +1736,7 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
                 b.set(matchRef2, {
                     serie: selTourn.id, round: roundName + ' (Volta)', status: 'PENDING', played: false, processed: false,
                     homeId: awayId, homeName: awayT?.name, homeLogo: awayT?.logo || null,
-                    awayId: homeId, awayName: homeT?.name, awayLogo: homeT?.logo || null,
+                    awayId: homeId, awayName: homeT?.name, awayLogo: awayT?.logo || null,
                     scoreHome: 0, scoreAway: 0
                 });
             }
@@ -1891,20 +1891,14 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
     const tMatches = matches
         .filter(m => m.serie === selTourn.id)
         .sort((a, b) => {
-            // 1º: Jogos antigos (processados) vão pro final
             if (a.processed && !b.processed) return 1;
             if (!a.processed && b.processed) return -1;
-            
-            // 2º: Jogos finalizados descem um pouco
             if (a.status === 'FINISHED' && b.status !== 'FINISHED') return 1;
             if (a.status !== 'FINISHED' && b.status === 'FINISHED') return -1;
-            
-            // 3º: Ida antes da Volta
             const isVoltaA = (a.round || '').includes('(Volta)');
             const isVoltaB = (b.round || '').includes('(Volta)');
             if (isVoltaA && !isVoltaB) return 1;
             if (!isVoltaA && isVoltaB) return -1;
-            
             return (a.homeName || '').localeCompare(b.homeName || '');
         });
 
@@ -1935,6 +1929,49 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
                         </div>
                     )}
 
+                    {tMatches.length === 0 ? <p style={{textAlign:'center', color:'#666'}}>Nenhum jogo chaveado ainda.</p> : (
+                        <div style={{display:'grid', gap:10}}>
+                            {tMatches.map(m => (
+                                <div key={m.id} className="card" style={{borderLeft: m.status==='FINISHED' ? '4px solid #444' : '4px solid cyan', opacity: m.processed ? 0.5 : 1, position:'relative'}}>
+                                    
+                                    {user.type === 'ADMIN' && (
+                                        <div style={{position:'absolute', top:5, right:5, display:'flex', gap:5}}>
+                                            <button className="btn btn-ghost" style={{padding:'2px 5px', fontSize:10}} onClick={()=>onEditMatch(m)}>✏️</button>
+                                            <button className="btn btn-red" style={{padding:'2px 5px', fontSize:10}} onClick={()=>onDeleteMatch(m.id)}>🗑️</button>
+                                        </div>
+                                    )}
+
+                                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop: user.type === 'ADMIN' ? 15 : 0}}>
+                                        <div style={{textAlign:'center', width:'40%', cursor:'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center'}} onClick={() => { const t = teams.find(x => x.id === m.homeId); if(t) onInspectTeam(t); }}>
+                                            {m.homeLogo ? <img src={m.homeLogo} style={{width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', marginBottom: 5, border: '1px solid #444'}} /> : <div style={{width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'grid', placeItems: 'center', marginBottom: 5, fontSize: 12}}>🛡️</div>}
+                                            <b style={{fontSize:13, color:'var(--primary)'}}>{m.homeName}</b>
+                                            <div style={{fontSize:18, fontWeight:'bold'}}>
+                                                {m.status==='FINISHED' ? <>{m.scoreHome} {m.hasPenalties && <span style={{fontSize:12, color:'gold', marginLeft:4}}>({m.penaltiesHome})</span>}</> : '-'}
+                                            </div>
+                                        </div>
+                                        <div style={{fontSize:10, color:'#aaa', textAlign:'center'}}>
+                                            X<br/>
+                                            <small style={{color:'gold'}}>{m.round ? `Fase: ${m.round}` : 'Mata-Mata'}</small>
+                                        </div>
+                                        <div style={{textAlign:'center', width:'40%', cursor:'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center'}} onClick={() => { const t = teams.find(x => x.id === m.awayId); if(t) onInspectTeam(t); }}>
+                                            {m.awayLogo ? <img src={m.awayLogo} style={{width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', marginBottom: 5, border: '1px solid #444'}} /> : <div style={{width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'grid', placeItems: 'center', marginBottom: 5, fontSize: 12}}>🛡️</div>}
+                                            <b style={{fontSize:13, color:'var(--primary)'}}>{m.awayName}</b>
+                                            <div style={{fontSize:18, fontWeight:'bold'}}>
+                                                {m.status==='FINISHED' ? <>{m.hasPenalties && <span style={{fontSize:12, color:'gold', marginRight:4}}>({m.penaltiesAway})</span>} {m.scoreAway}</> : '-'}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {isAdminOrPress && m.status !== 'FINISHED' && (
+                                        <button className="btn btn-green" style={{marginTop:10}} onClick={() => onReportMatch(m)}>📝 LANÇAR SÚMULA DA COPA</button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {tab === 'STATS' && (
                 <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
                     <div className="card" style={{borderTop:'3px solid gold', textAlign:'center'}}>
@@ -1964,7 +2001,6 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
                     <div className="card" style={{borderTop:'3px solid var(--purple)', textAlign:'center', gridColumn:'span 2', background:'rgba(213,0,249,0.05)'}}>
                         <div style={{fontSize:10, color:'#aaa', marginBottom:5}}>⭐ CRAQUE DO CAMPEONATO</div>
                         {bestPlayer ? <div><b style={{fontSize:16, color:'#fff'}}>{bestPlayer.name}</b><br/><span style={{color:'var(--purple)', fontWeight:'bold', fontSize:18}}>{(bestPlayer.tournaments[selTourn.id].ratingSum / bestPlayer.tournaments[selTourn.id].ratingCount).toFixed(1)}</span></div> : <small style={{color:'#666'}}>Sem avaliações.</small>}
-            
                     </div>
                 </div>
             )}

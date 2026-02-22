@@ -1588,6 +1588,7 @@ const LeagueTable = ({ teams, serie, onInspectTeam }) => {
         //FIM
         
 // --- ATUALIZADO: MatchCenter com 14 Rodadas ---
+// --- ATUALIZADO: MatchCenter com 14 Rodadas ---
 const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDeleteMatch, onCreateMatch }) => {
     const [serie, setSerie] = useState('A');
     const [round, setRound] = useState(1);
@@ -1633,9 +1634,6 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
                     )}
 
                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5, marginTop: isAdmin ? 15 : 0}}>
-                        <div style={{textAlign:'center', width:'40%'}}>
-                            <b style={{fontSize:13}}>{m.homeName}</b>
-                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5, marginTop: isAdmin ? 15 : 0}}>
                         <div style={{textAlign:'center', width:'40%', display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
                             {m.homeLogo ? <img src={m.homeLogo} style={{width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', marginBottom: 5, border: '1px solid #444'}} /> : <div style={{width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'grid', placeItems: 'center', marginBottom: 5, fontSize: 12}}>🛡️</div>}
                             <b style={{fontSize:13}}>{m.homeName}</b>
@@ -1659,10 +1657,9 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
         </div>
     );
 };
-        //FIM
 
 
-    // ==========================================
+// ==========================================
 // FASE 3: HUB PÚBLICO DAS COPAS E TORNEIOS
 // ==========================================
 const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTeam, onReportMatch, onCreateMatch, onEditMatch, onDeleteMatch }) => {
@@ -1783,22 +1780,22 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
                                         </div>
                                     )}
 
-                                   <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop: user.type === 'ADMIN' ? 15 : 0}}>
-                                                <div style={{textAlign:'center', width:'40%', cursor:'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center'}} onClick={() => { const t = teams.find(x => x.id === m.homeId); if(t) onInspectTeam(t); }}>
-                                                    {m.homeLogo ? <img src={m.homeLogo} style={{width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', marginBottom: 5, border: '1px solid #444'}} /> : <div style={{width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'grid', placeItems: 'center', marginBottom: 5, fontSize: 12}}>🛡️</div>}
-                                                    <b style={{fontSize:13, color:'var(--primary)'}}>{m.homeName}</b>
-                                                    <div style={{fontSize:18, fontWeight:'bold'}}>{m.status==='FINISHED' ? m.scoreHome : '-'}</div>
-                                                </div>
-                                                <div style={{fontSize:10, color:'#aaa', textAlign:'center'}}>
-                                                    X<br/>
-                                                    <small style={{color:'gold'}}>{m.round ? `Fase: ${m.round}` : 'Mata-Mata'}</small>
-                                                </div>
-                                                <div style={{textAlign:'center', width:'40%', cursor:'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center'}} onClick={() => { const t = teams.find(x => x.id === m.awayId); if(t) onInspectTeam(t); }}>
-                                                    {m.awayLogo ? <img src={m.awayLogo} style={{width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', marginBottom: 5, border: '1px solid #444'}} /> : <div style={{width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'grid', placeItems: 'center', marginBottom: 5, fontSize: 12}}>🛡️</div>}
-                                                    <b style={{fontSize:13, color:'var(--primary)'}}>{m.awayName}</b>
-                                                    <div style={{fontSize:18, fontWeight:'bold'}}>{m.status==='FINISHED' ? m.scoreAway : '-'}</div>
-                                                </div>
-                                            </div>
+                                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop: user.type === 'ADMIN' ? 15 : 0}}>
+                                        <div style={{textAlign:'center', width:'40%', cursor:'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center'}} onClick={() => { const t = teams.find(x => x.id === m.homeId); if(t) onInspectTeam(t); }}>
+                                            {m.homeLogo ? <img src={m.homeLogo} style={{width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', marginBottom: 5, border: '1px solid #444'}} /> : <div style={{width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'grid', placeItems: 'center', marginBottom: 5, fontSize: 12}}>🛡️</div>}
+                                            <b style={{fontSize:13, color:'var(--primary)'}}>{m.homeName}</b>
+                                            <div style={{fontSize:18, fontWeight:'bold'}}>{m.status==='FINISHED' ? m.scoreHome : '-'}</div>
+                                        </div>
+                                        <div style={{fontSize:10, color:'#aaa', textAlign:'center'}}>
+                                            X<br/>
+                                            <small style={{color:'gold'}}>{m.round ? `Fase: ${m.round}` : 'Mata-Mata'}</small>
+                                        </div>
+                                        <div style={{textAlign:'center', width:'40%', cursor:'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center'}} onClick={() => { const t = teams.find(x => x.id === m.awayId); if(t) onInspectTeam(t); }}>
+                                            {m.awayLogo ? <img src={m.awayLogo} style={{width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', marginBottom: 5, border: '1px solid #444'}} /> : <div style={{width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'grid', placeItems: 'center', marginBottom: 5, fontSize: 12}}>🛡️</div>}
+                                            <b style={{fontSize:13, color:'var(--primary)'}}>{m.awayName}</b>
+                                            <div style={{fontSize:18, fontWeight:'bold'}}>{m.status==='FINISHED' ? m.scoreAway : '-'}</div>
+                                        </div>
+                                    </div>
 
                                     {isAdminOrPress && m.status !== 'FINISHED' && (
                                         <button className="btn btn-green" style={{marginTop:10}} onClick={() => onReportMatch(m)}>📝 LANÇAR SÚMULA DA COPA</button>
@@ -1839,10 +1836,25 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
                     <div className="card" style={{borderTop:'3px solid var(--purple)', textAlign:'center', gridColumn:'span 2', background:'rgba(213,0,249,0.05)'}}>
                         <div style={{fontSize:10, color:'#aaa', marginBottom:5}}>⭐ CRAQUE DO CAMPEONATO</div>
                         {bestPlayer ? <div><b style={{fontSize:16, color:'#fff'}}>{bestPlayer.name}</b><br/><span style={{color:'var(--purple)', fontWeight:'bold', fontSize:18}}>{(bestPlayer.tournaments[selTourn.id].ratingSum / bestPlayer.tournaments[selTourn.id].ratingCount).toFixed(1)}</span></div> : <small style={{color:'#666'}}>Sem avaliações.</small>}
-           
+            
                     </div>
-                </div>
-            )}
+                </div>
+            )}
+            
+            {tab === 'TIMES' && (
+                <div style={{display:'grid', gap:10}}>
+                    {selTourn.teams.map(tid => {
+                        const t = teams.find(x => x.id === tid);
+                        if(!t) return null;
+                        return (
+                            <div key={tid} className="card" style={{display:'flex', alignItems:'center', gap:10}} onClick={() => onInspectTeam(t)}>
+                                {t.logo ? <img src={t.logo} style={{width:40, height:40, borderRadius:'50%', objectFit:'cover'}} /> : <div style={{width:40, height:40, background:'#333', borderRadius:'50%', display:'grid', placeItems:'center'}}>🛡️</div>}
+                                <b>{t.name}</b>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 };

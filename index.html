@@ -1696,35 +1696,45 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
         );
     }
 
-    // --- SORTEIO AUTOMÁTICO DE JOGOS ---
+    // --- SORTEIO INICIAL DE JOGOS (Fase 1) ---
     const handleGenerateFixtures = async () => {
-        if(!confirm(`Deseja sortear confrontos automaticamente para a ${selTourn.name}?`)) return;
+        if(!confirm(`Deseja sortear a Primeira Fase da ${selTourn.name}?`)) return;
+        
         const db = firebase.firestore();
         const b = db.batch();
+
+        const existing = matches.filter(m => m.serie === selTourn.id);
+        if (existing.length > 0) {
+            if(!confirm("Já existem jogos! Sortear novamente APAGARÁ todo o histórico desta Copa. Continuar?")) return;
+            existing.forEach(m => b.delete(db.collection('matches').doc(m.id)));
+        }
+
         const shuffled = [...selTourn.teams].sort(() => 0.5 - Math.random());
-        
         let roundName = shuffled.length <= 2 ? 'Final' : (shuffled.length <= 4 ? 'Semifinal' : (shuffled.length <= 8 ? 'Quartas de Final' : 'Fase Inicial'));
         
         for(let i=0; i<shuffled.length; i+=2) {
             const homeId = shuffled[i];
             const awayId = shuffled[i+1];
-            if(!homeId || !awayId) continue; // Pula se faltar time par
+            if(!homeId || !awayId) continue; 
             
             const homeT = teams.find(t=>t.id===homeId);
             const awayT = teams.find(t=>t.id===awayId);
             
             const matchRef = db.collection('matches').doc();
             b.set(matchRef, {
-                serie: selTourn.id, round: roundName, status: 'PENDING', played: false,
+                serie: selTourn.id, round: roundName, status: 'PENDING', played: false, processed: false,
                 homeId: homeId, homeName: homeT?.name, homeLogo: homeT?.logo || null,
                 awayId: awayId, awayName: awayT?.name, awayLogo: awayT?.logo || null,
                 scoreHome: 0, scoreAway: 0
             });
             
-            if (selTourn.matchType === 'IDA_VOLTA') {
+            const isFinal = shuffled.length <= 2;
+            const isUnico = (isFinal && selTourn.finalType === 'UNICO') || (!isFinal && selTourn.matchType === 'IDA');
+
+            if (!isUnico) {
                 const matchRef2 = db.collection('matches').doc();
                 b.set(matchRef2, {
-                    serie: selTourn.id, round: roundName + ' (Volta)', status: 'PENDING', played: false,
+                    serie: selTourn.id, round: roundName + ' (Volta)', status: 'PENDING', played: false, processed: false,
                     homeId: awayId, homeName: awayT?.name, homeLogo: awayT?.logo || null,
                     awayId: homeId, awayName: homeT?.name, awayLogo: homeT?.logo || null,
                     scoreHome: 0, scoreAway: 0
@@ -1732,7 +1742,136 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
             }
         }
         await b.commit();
-        alert("🎲 Sorteio realizado! Os confrontos foram agendados.");
+        alert("Sorteio realizado com sucesso!");
+    };
+
+    // --- AVANÇAR FASE E PAGAR PREMIAÇÃO (MANTENDO O HISTÓRICO) ---
+    const handleAdvanceRound = async () => {
+        // Pega só os jogos ativos que ainda não foram processados para a próxima fase
+        const activeGames = matches.filter(m => m.serie === selTourn.id && !m.processed);
+        if(activeGames.length === 0) return alert("Nenhum jogo aguardando transição de fase.");
+        
+        const unfinished = activeGames.filter(m => m.status !== 'FINISHED');
+        if(unfinished.length > 0) return alert(`⚠️ Faltam ${unfinished.length} jogo(s) para terminar esta fase! Finalize todos (lançando a súmula).`);
+
+        let matchups = {};
+        
+        activeGames.forEach(m => {
+            const pairId = [m.homeId, m.awayId].sort().join('_');
+            if(!matchups[pairId]) {
+                matchups[pairId] = { team1: m.homeId, team1Goals: 0, team1Pens: 0, team2: m.awayId, team2Goals: 0, team2Pens: 0 };
+            }
+            if(matchups[pairId].team1 === m.homeId) {
+                matchups[pairId].team1Goals += (m.scoreHome || 0);
+                matchups[pairId].team2Goals += (m.scoreAway || 0);
+                if(m.hasPenalties) { matchups[pairId].team1Pens += (m.penaltiesHome || 0); matchups[pairId].team2Pens += (m.penaltiesAway || 0); }
+            } else {
+                matchups[pairId].team2Goals += (m.scoreHome || 0);
+                matchups[pairId].team1Goals += (m.scoreAway || 0);
+                if(m.hasPenalties) { matchups[pairId].team2Pens += (m.penaltiesHome || 0); matchups[pairId].team1Pens += (m.penaltiesAway || 0); }
+            }
+        });
+
+        const winners = [];
+        const losers = [];
+        
+        for (const key in matchups) {
+            const match = matchups[key];
+            if(match.team1Goals > match.team2Goals) { winners.push(match.team1); losers.push(match.team2); }
+            else if(match.team2Goals > match.team1Goals) { winners.push(match.team2); losers.push(match.team1); }
+            else {
+                // Desempate por Pênaltis
+                if(match.team1Pens > match.team2Pens) { winners.push(match.team1); losers.push(match.team2); }
+                else if(match.team2Pens > match.team1Pens) { winners.push(match.team2); losers.push(match.team1); }
+                else {
+                    const t1 = teams.find(t => t.id === match.team1)?.name;
+                    const t2 = teams.find(t => t.id === match.team2)?.name;
+                    return alert(`🚨 EMPATE DETECTADO!\nO confronto ${t1} x ${t2} empatou no placar agregado.\nEdite a partida (✏️), marque 'Decidido nos Pênaltis' e preencha para continuar.`);
+                }
+            }
+        }
+
+        const db = firebase.firestore();
+        const b = db.batch();
+
+        // 1. Congela os jogos antigos (eles CONTINUAM na tela, mas não afetam o próximo sorteio)
+        activeGames.forEach(m => {
+            b.update(db.collection('matches').doc(m.id), { processed: true });
+        });
+
+        // 2. SISTEMA DE PREMIAÇÃO DOS ELIMINADOS
+        const basePrize = parseFloat(selTourn.prize) || 0;
+        const isFinal = winners.length === 1; 
+        const isSemi = winners.length === 2; 
+        const isQuarters = winners.length === 4; 
+        
+        let loserPercentage = 0.05; // Base 5%
+        if (isFinal) loserPercentage = 0.40; // Vice = 40%
+        else if (isSemi) loserPercentage = 0.20; // Perdedor da Semi = 20%
+        else if (isQuarters) loserPercentage = 0.10; // Perdedor das Quartas = 10%
+
+        const loserPrize = basePrize * loserPercentage;
+
+        losers.forEach(loserId => {
+            if(loserId) {
+                b.update(db.collection('teams').doc(loserId), {
+                    balance: firebase.firestore.FieldValue.increment(loserPrize)
+                });
+            }
+        });
+
+        // 3. PAGAMENTO DO CAMPEÃO (SE FOR A FINAL)
+        if (isFinal && winners[0]) {
+            b.update(db.collection('teams').doc(winners[0]), {
+                balance: firebase.firestore.FieldValue.increment(basePrize)
+            });
+            await b.commit();
+            
+            const champTeam = teams.find(t => t.id === winners[0]);
+            db.collection('news').add({
+                text: `🏆 **CAMPEÃO!**\nO **${champTeam?.name}** conquistou a ${selTourn.name} e faturou ${fmt(basePrize)}!\nO Vice-campeão levou ${fmt(loserPrize)} de consolação.`,
+                type: 'finance', date: Date.now(), likes: []
+            });
+            return alert(`🏆 FIM DE COPA!\n${champTeam?.name} é o CAMPEÃO!\n\nPrêmio depositado: ${fmt(basePrize)} (Campeão) e ${fmt(loserPrize)} (Vice).`);
+        }
+
+        if(!confirm(`Confirmar encerramento desta fase?\n\n💰 ${losers.length} clubes eliminados receberão ${fmt(loserPrize)} agora.\n⚽ ${winners.length} clubes avançarão para a próxima fase.`)) return;
+
+        // 4. GERA A NOVA FASE
+        const shuffled = [...winners].sort(() => 0.5 - Math.random());
+        let roundName = shuffled.length <= 2 ? 'Final' : (shuffled.length <= 4 ? 'Semifinal' : (shuffled.length <= 8 ? 'Quartas de Final' : 'Nova Fase'));
+        
+        for(let i=0; i<shuffled.length; i+=2) {
+            const homeId = shuffled[i];
+            const awayId = shuffled[i+1];
+            if(!homeId || !awayId) continue; 
+            
+            const homeT = teams.find(t=>t.id===homeId);
+            const awayT = teams.find(t=>t.id===awayId);
+            
+            const matchRef = db.collection('matches').doc();
+            b.set(matchRef, {
+                serie: selTourn.id, round: roundName, status: 'PENDING', played: false, processed: false,
+                homeId: homeId, homeName: homeT?.name, homeLogo: homeT?.logo || null,
+                awayId: awayId, awayName: awayT?.name, awayLogo: awayT?.logo || null,
+                scoreHome: 0, scoreAway: 0
+            });
+            
+            const isUnico = (shuffled.length <= 2 && selTourn.finalType === 'UNICO') || (shuffled.length > 2 && selTourn.matchType === 'IDA');
+
+            if (!isUnico) {
+                const matchRef2 = db.collection('matches').doc();
+                b.set(matchRef2, {
+                    serie: selTourn.id, round: roundName + ' (Volta)', status: 'PENDING', played: false, processed: false,
+                    homeId: awayId, homeName: awayT?.name, homeLogo: awayT?.logo || null,
+                    awayId: homeId, awayName: homeT?.name, awayLogo: homeT?.logo || null,
+                    scoreHome: 0, scoreAway: 0
+                });
+            }
+        }
+
+        await b.commit();
+        alert(`✅ Fase concluída!\nPremiações pagas aos eliminados: ${fmt(loserPrize)}.\nPróxima fase (${roundName}) gerada com sucesso!`);
     };
 
     const tPlayers = players.filter(p => p.tournaments && p.tournaments[selTourn.id]);
@@ -1748,16 +1887,24 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
         return avgB - avgA;
     })[0];
 
-    // Filtro organizador das COPAS (Ida antes da Volta, Finalizados no fim)
+    // Filtro organizador das COPAS (Ativos no topo, Processados embaixo)
     const tMatches = matches
         .filter(m => m.serie === selTourn.id)
         .sort((a, b) => {
+            // 1º: Jogos antigos (processados) vão pro final
+            if (a.processed && !b.processed) return 1;
+            if (!a.processed && b.processed) return -1;
+            
+            // 2º: Jogos finalizados descem um pouco
             if (a.status === 'FINISHED' && b.status !== 'FINISHED') return 1;
             if (a.status !== 'FINISHED' && b.status === 'FINISHED') return -1;
+            
+            // 3º: Ida antes da Volta
             const isVoltaA = (a.round || '').includes('(Volta)');
             const isVoltaB = (b.round || '').includes('(Volta)');
             if (isVoltaA && !isVoltaB) return 1;
             if (!isVoltaA && isVoltaB) return -1;
+            
             return (a.homeName || '').localeCompare(b.homeName || '');
         });
 
@@ -1783,52 +1930,10 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
                     {isAdminOrPress && (
                         <div style={{display:'flex', gap:10, marginBottom:15}}>
                             <button className="btn btn-blue" onClick={() => onCreateMatch(selTourn.id)}>+ JOGO MANUAL</button>
-                            <button className="btn btn-gold" onClick={handleGenerateFixtures}>🎲 SORTEAR CHAVE</button>
+                            <button className="btn btn-gold" onClick={handleGenerateFixtures}>🎲 SORTEIO INICIAL</button>
+                            <button className="btn btn-purple" onClick={handleAdvanceRound}>⏭️ AVANÇAR FASE / PREMIAR</button>
                         </div>
                     )}
-
-                    {tMatches.length === 0 ? <p style={{textAlign:'center', color:'#666'}}>Nenhum jogo chaveado ainda.</p> : (
-                        <div style={{display:'grid', gap:10}}>
-                            {tMatches.map(m => (
-                                <div key={m.id} className="card" style={{borderLeft: m.status==='FINISHED' ? '4px solid #444' : '4px solid cyan', position:'relative'}}>
-                                    
-                                    {user.type === 'ADMIN' && (
-                                        <div style={{position:'absolute', top:5, right:5, display:'flex', gap:5}}>
-                                            <button className="btn btn-ghost" style={{padding:'2px 5px', fontSize:10}} onClick={()=>onEditMatch(m)}>✏️</button>
-                                            <button className="btn btn-red" style={{padding:'2px 5px', fontSize:10}} onClick={()=>onDeleteMatch(m.id)}>🗑️</button>
-                                        </div>
-                                    )}
-
-                                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop: user.type === 'ADMIN' ? 15 : 0}}>
-                                        <div style={{textAlign:'center', width:'40%', cursor:'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center'}} onClick={() => { const t = teams.find(x => x.id === m.homeId); if(t) onInspectTeam(t); }}>
-                                            {m.homeLogo ? <img src={m.homeLogo} style={{width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', marginBottom: 5, border: '1px solid #444'}} /> : <div style={{width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'grid', placeItems: 'center', marginBottom: 5, fontSize: 12}}>🛡️</div>}
-                                            <b style={{fontSize:13, color:'var(--primary)'}}>{m.homeName}</b>
-                                            <div style={{fontSize:18, fontWeight:'bold'}}>
-                                                {m.status==='FINISHED' ? <>{m.scoreHome} {m.hasPenalties && <span style={{fontSize:12, color:'gold', marginLeft:4}}>({m.penaltiesHome})</span>}</> : '-'}
-                                            </div>
-                                        </div>
-                                        <div style={{fontSize:10, color:'#aaa', textAlign:'center'}}>
-                                            X<br/>
-                                            <small style={{color:'gold'}}>{m.round ? `Fase: ${m.round}` : 'Mata-Mata'}</small>
-                                        </div>
-                                        <div style={{textAlign:'center', width:'40%', cursor:'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center'}} onClick={() => { const t = teams.find(x => x.id === m.awayId); if(t) onInspectTeam(t); }}>
-                                            {m.awayLogo ? <img src={m.awayLogo} style={{width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', marginBottom: 5, border: '1px solid #444'}} /> : <div style={{width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'grid', placeItems: 'center', marginBottom: 5, fontSize: 12}}>🛡️</div>}
-                                            <b style={{fontSize:13, color:'var(--primary)'}}>{m.awayName}</b>
-                                            <div style={{fontSize:18, fontWeight:'bold'}}>
-                                                {m.status==='FINISHED' ? <>{m.hasPenalties && <span style={{fontSize:12, color:'gold', marginRight:4}}>({m.penaltiesAway})</span>} {m.scoreAway}</> : '-'}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {isAdminOrPress && m.status !== 'FINISHED' && (
-                                        <button className="btn btn-green" style={{marginTop:10}} onClick={() => onReportMatch(m)}>📝 LANÇAR SÚMULA DA COPA</button>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
 
             {tab === 'STATS' && (
                 <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
@@ -7664,7 +7769,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.91.6</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.91.7</div>
                             </div>
                         </div>
                         
@@ -8293,7 +8398,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.6 CAMPEONATOS   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.7 CAMPEONATOS   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

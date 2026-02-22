@@ -5583,9 +5583,18 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                 {(companies||[]).some(c=>c.status==='PENDING') && <h4>Empresas Pendentes</h4>}
                 {(companies||[]).filter(c=>c.status==='PENDING').map(c => (
                     <div key={c.id} className="card" style={{borderLeft:'4px solid var(--purple)'}}>
-                        <b>🏢 {c.name} (PENDENTE)</b><br/>
-                        <small>Dono: {c.owner}</small>
-                        <div style={{display:'flex', gap:5, marginTop:5}}>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+                            <div>
+                                <b style={{fontSize:14}}>🏢 {c.name}</b> <span style={{fontSize:10, color:'var(--warning)'}}>(PENDENTE)</span><br/>
+                                <small style={{color:'#aaa'}}>Dono: {c.owner}</small>
+                            </div>
+                            <div style={{textAlign:'right'}}>
+                                <span style={{fontSize:10, background:'var(--purple)', color:'#fff', padding:'4px 8px', borderRadius:5, fontWeight:'bold'}}>
+                                    {(COMPANY_TYPES[c.companyType] || {}).label || c.companyType || 'Comércio Local'}
+                                </span>
+                            </div>
+                        </div>
+                        <div style={{display:'flex', gap:5, marginTop:10}}>
                             <button className="btn btn-green" onClick={()=>onApproveComp(c.id)}>APROVAR</button>
                             <button className="btn btn-red" onClick={()=>onDeleteComp(c.id)}>RECUSAR</button>
                         </div>

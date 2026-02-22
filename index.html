@@ -7645,6 +7645,76 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             </div>
                         )}
 
+                        {screen === 'MARKET' && (
+                            <Market 
+                                user={user}
+                                me={user.data?.id} 
+                                teams={teams} 
+                                players={players} 
+                                coaches={coaches} 
+                                open={conf.marketOpen} 
+                                isVis={user.type === 'VISITOR' || user.type === 'COACH'} 
+                                onIndicate={handleCoachIndication}
+                                onNeg={(p) => setModal({ type: 'OFFER', data: p })} 
+                                onPayClause={async (p) => {
+                                    const buy = teams.find(t => t.id === user.data.id);
+                                    const sel = teams.find(t => t.id === p.teamId);
+                                    if (buy.balance < p.clause) return alert("Saldo insuficiente!");
+                                    if (!confirm(`Pagar multa de ${fmt(p.clause)} por ${p.name}?`)) return;
+                                    const b = db.batch();
+                                    b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - p.clause });
+                                    b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + p.clause });
+                                    b.update(db.collection('players').doc(p.id), { teamId: buy.id, status: 'NAO_A_VENDA', contract: 3, history: firebase.firestore.FieldValue.arrayUnion({ date: Date.now(), from: sel.name, to: buy.name, type: 'MULTA', value: p.clause }) });
+                                    await b.commit();
+                                    postNews(`🚨 **MULTA PAGA!**\nO **${buy.name}** pagou a multa de **${p.name}**!`, 'transfer');
+                                    alert("Contratado via multa!");
+                                }}
+                                onPre={async (p) => {
+                                    const buy = teams.find(t => t.id === user.data.id);
+                                    if (!confirm(`Assinar pré-contrato com ${p.name}?`)) return;
+                                    await db.collection('players').doc(p.id).update({ preContract: { teamId: buy.id, teamName: buy.name }, mood: '🤩' });
+                                    postNews(`📝 **PRÉ-CONTRATO**\n**${p.name}** reforçará o **${buy.name}** na próxima temporada!`, 'transfer');
+                                    alert("Pré-contrato assinado!");
+                                }}
+                                onHireCoach={(c) => setModal({ type: 'HIRE_COACH', data: c })}
+                            />
+                        )}
+
+                        {screen === 'SHOPPING' && 
+                            <ShoppingScreen 
+                                products={products} 
+                                companies={companies} 
+                                user={user} 
+                                onBuy={buyProduct} 
+                                onDeleteProd={async(id)=>{if(confirm("Admin: Excluir produto?")) await db.collection('products').doc(id).delete();}} 
+                            />
+                        }
+
+                        {screen === 'SPONSORSHIPS' && user.type === 'USER' && (
+                            <div>
+                                <h3>Buscar Patrocínio</h3>
+                                <p style={{fontSize:11, color:'#aaa'}}>Envie propostas semanais para as empresas.</p>
+                                {companies.filter(c=>c.status==='ACTIVE').map(c => (
+                                    <div key={c.id} className="card">
+                                        <b>{c.name}</b> <small>({(COMPANY_TYPES[c.companyType] || {}).label})</small>
+                                        <div style={{display:'flex', gap:5, marginTop:5}}>
+                                            <button className="btn btn-purple" onClick={()=>{const v=prompt("Valor Semanal pedido (₣):"); if(v) requestSponsorship(c.id, v);}}>PEDIR PATROCÍNIO</button>
+                                        </div>
+                                    </div>
+                                ))}
+                                <hr style={{borderColor:'#333'}}/>
+                                <h4>Meus Contratos</h4>
+                                {sps.filter(s=>s.teamId===user.data.id).length === 0 && <p style={{color:'#666'}}>Sem contratos.</p>}
+                                {sps.filter(s=>s.teamId===user.data.id).map(s => (
+                                    <div key={s.id} className="card" style={{borderLeft:`4px solid ${s.status==='ACTIVE'?'var(--primary)':'#666'}`}}>
+                                        <b>{s.companyName}</b><br/>
+                                        Valor: {fmt(s.value)}/sem <small>({s.status === 'PENDING' ? 'Aguardando' : 'Ativo'})</small>
+                                        {s.status==='ACTIVE' && <button className="btn btn-red" style={{width:'auto', marginTop:5}} onClick={()=>{if(confirm("Encerrar contrato de patrocínio?")) db.collection('sponsorships').doc(s.id).delete();}}>ENCERRAR</button>}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                                
                         {screen === 'RANKING' && <Ranking teams={teams} players={players} sales={sales} />}
                         
                         {screen === 'NEWS' && <div><h3>Notícias</h3>{news.map(n=><div key={n.id} className={`news-card news-${n.type}`}>{n.text}<br/><small style={{color:'#666'}}>{new Date(n.date).toLocaleString()}</small></div>)}</div>}

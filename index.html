@@ -10985,14 +10985,6 @@ const Ranking = ({ teams, players, sales }) => {
         if (payload.length === 0) return alert("Preencha a NOTA de pelo menos um jogador para salvar.");
         
         if (confirm(`Confirmar súmula para ${payload.length} jogadores?`)) {
-            // Descobre quem é o mandante da partida e envia para cobrar bilheteria
-            const homeTeamObj = matchData ? teams.find(t => t.id === matchData.homeId) : null;
-            
-            // Só cobra bilheteria se a súmula for do time mandante!
-            if (homeTeamObj && selTeamId === homeTeamObj.id) {
-                onSaveStats(payload, null, undefined, homeTeamObj);
-            } else {
-               if (confirm(`Confirmar súmula para ${payload.length} jogadores?`)) {
             const homeTeamObj = matchData ? teams.find(t => t.id === matchData.homeId) : null;
             if (homeTeamObj && selTeamId === homeTeamObj.id) {
                 onSaveStats(payload, null, undefined, homeTeamObj, matchData);

@@ -1594,9 +1594,17 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
     const [round, setRound] = useState(1);
 
     // Filtra jogos
+    // Filtro organizador das LIGAS (Finalizados no fim, Ordem Alfabética)
     const games = matches
         .filter(m => (m.serie || 'A') === serie && parseInt(m.round) === parseInt(round))
-        .sort((a,b) => (a.status === 'FINISHED' ? 1 : -1));
+        .sort((a,b) => {
+            // 1º: Jogos finalizados descem para o final da lista
+            if (a.status === 'FINISHED' && b.status !== 'FINISHED') return 1;
+            if (a.status !== 'FINISHED' && b.status === 'FINISHED') return -1;
+            
+            // 2º: Mantém uma ordem alfabética fixa para as partidas não ficarem pulando de lugar
+            return (a.homeName || '').localeCompare(b.homeName || '');
+        });
 
     return (
         <div>
@@ -1740,7 +1748,23 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
         return avgB - avgA;
     })[0];
 
-    const tMatches = matches.filter(m => m.serie === selTourn.id);
+    // Filtro organizador das COPAS (Ida antes da Volta, Finalizados no fim)
+    const tMatches = matches
+        .filter(m => m.serie === selTourn.id)
+        .sort((a, b) => {
+            // 1º: Jogos finalizados descem para o final da lista
+            if (a.status === 'FINISHED' && b.status !== 'FINISHED') return 1;
+            if (a.status !== 'FINISHED' && b.status === 'FINISHED') return -1;
+
+            // 2º: Jogos normais (Ida) vêm ANTES dos jogos de (Volta)
+            const isVoltaA = (a.round || '').includes('(Volta)');
+            const isVoltaB = (b.round || '').includes('(Volta)');
+            if (isVoltaA && !isVoltaB) return 1;
+            if (!isVoltaA && isVoltaB) return -1;
+
+            // 3º: Ordem alfabética pelo nome do mandante para agrupar bonitinho
+            return (a.homeName || '').localeCompare(b.homeName || '');
+        });
 
     return (
         <div className="animate-in">
@@ -7617,7 +7641,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.91.4</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.91.5</div>
                             </div>
                         </div>
                         
@@ -8246,7 +8270,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.4 CAMPEONATOS   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.5 CAMPEONATOS   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

@@ -1587,22 +1587,18 @@ const LeagueTable = ({ teams, serie, onInspectTeam }) => {
 };
         //FIM
         
-// --- ATUALIZADO: MatchCenter com 14 Rodadas ---
+
 // --- ATUALIZADO: MatchCenter com 14 Rodadas ---
 const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDeleteMatch, onCreateMatch }) => {
     const [serie, setSerie] = useState('A');
     const [round, setRound] = useState(1);
 
-    // Filtra jogos
     // Filtro organizador das LIGAS (Finalizados no fim, Ordem Alfabética)
     const games = matches
         .filter(m => (m.serie || 'A') === serie && parseInt(m.round) === parseInt(round))
         .sort((a,b) => {
-            // 1º: Jogos finalizados descem para o final da lista
             if (a.status === 'FINISHED' && b.status !== 'FINISHED') return 1;
             if (a.status !== 'FINISHED' && b.status === 'FINISHED') return -1;
-            
-            // 2º: Mantém uma ordem alfabética fixa para as partidas não ficarem pulando de lugar
             return (a.homeName || '').localeCompare(b.homeName || '');
         });
 
@@ -1619,7 +1615,6 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
 
             <div style={{display:'flex', gap:10, marginBottom:10}}>
                 <select className="input-field" value={serie} onChange={e=>setSerie(e.target.value)}>
-                    {/* AGORA USA A LISTA GLOBAL PARA INCLUIR A VÁRZEA */}
                     {SERIES.map(s => (
                         <option key={s} value={s}>{s === 'VARZEA' ? '🚜 Terrão (Várzea)' : `Série ${s}`}</option>
                     ))}
@@ -1645,13 +1640,17 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
                         <div style={{textAlign:'center', width:'40%', display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
                             {m.homeLogo ? <img src={m.homeLogo} style={{width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', marginBottom: 5, border: '1px solid #444'}} /> : <div style={{width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'grid', placeItems: 'center', marginBottom: 5, fontSize: 12}}>🛡️</div>}
                             <b style={{fontSize:13}}>{m.homeName}</b>
-                            <div style={{fontSize:18, fontWeight:'bold'}}>{m.status==='FINISHED' ? m.scoreHome : '-'}</div>
+                            <div style={{fontSize:18, fontWeight:'bold'}}>
+                                {m.status==='FINISHED' ? <>{m.scoreHome} {m.hasPenalties && <span style={{fontSize:12, color:'gold', marginLeft:4}}>({m.penaltiesHome})</span>}</> : '-'}
+                            </div>
                         </div>
                         <div style={{fontSize:12, color:'#aaa'}}>X</div>
                         <div style={{textAlign:'center', width:'40%', display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
                             {m.awayLogo ? <img src={m.awayLogo} style={{width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', marginBottom: 5, border: '1px solid #444'}} /> : <div style={{width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'grid', placeItems: 'center', marginBottom: 5, fontSize: 12}}>🛡️</div>}
                             <b style={{fontSize:13}}>{m.awayName}</b>
-                            <div style={{fontSize:18, fontWeight:'bold'}}>{m.status==='FINISHED' ? m.scoreAway : '-'}</div>
+                            <div style={{fontSize:18, fontWeight:'bold'}}>
+                                {m.status==='FINISHED' ? <>{m.hasPenalties && <span style={{fontSize:12, color:'gold', marginRight:4}}>({m.penaltiesAway})</span>} {m.scoreAway}</> : '-'}
+                            </div>
                         </div>
                     </div>
                     
@@ -1665,6 +1664,7 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
         </div>
     );
 };
+//FIM
 
 
 // ==========================================
@@ -1752,17 +1752,12 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
     const tMatches = matches
         .filter(m => m.serie === selTourn.id)
         .sort((a, b) => {
-            // 1º: Jogos finalizados descem para o final da lista
             if (a.status === 'FINISHED' && b.status !== 'FINISHED') return 1;
             if (a.status !== 'FINISHED' && b.status === 'FINISHED') return -1;
-
-            // 2º: Jogos normais (Ida) vêm ANTES dos jogos de (Volta)
             const isVoltaA = (a.round || '').includes('(Volta)');
             const isVoltaB = (b.round || '').includes('(Volta)');
             if (isVoltaA && !isVoltaB) return 1;
             if (!isVoltaA && isVoltaB) return -1;
-
-            // 3º: Ordem alfabética pelo nome do mandante para agrupar bonitinho
             return (a.homeName || '').localeCompare(b.homeName || '');
         });
 
@@ -1808,7 +1803,9 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
                                         <div style={{textAlign:'center', width:'40%', cursor:'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center'}} onClick={() => { const t = teams.find(x => x.id === m.homeId); if(t) onInspectTeam(t); }}>
                                             {m.homeLogo ? <img src={m.homeLogo} style={{width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', marginBottom: 5, border: '1px solid #444'}} /> : <div style={{width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'grid', placeItems: 'center', marginBottom: 5, fontSize: 12}}>🛡️</div>}
                                             <b style={{fontSize:13, color:'var(--primary)'}}>{m.homeName}</b>
-                                            <div style={{fontSize:18, fontWeight:'bold'}}>{m.status==='FINISHED' ? m.scoreHome : '-'}</div>
+                                            <div style={{fontSize:18, fontWeight:'bold'}}>
+                                                {m.status==='FINISHED' ? <>{m.scoreHome} {m.hasPenalties && <span style={{fontSize:12, color:'gold', marginLeft:4}}>({m.penaltiesHome})</span>}</> : '-'}
+                                            </div>
                                         </div>
                                         <div style={{fontSize:10, color:'#aaa', textAlign:'center'}}>
                                             X<br/>
@@ -1817,7 +1814,9 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
                                         <div style={{textAlign:'center', width:'40%', cursor:'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center'}} onClick={() => { const t = teams.find(x => x.id === m.awayId); if(t) onInspectTeam(t); }}>
                                             {m.awayLogo ? <img src={m.awayLogo} style={{width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', marginBottom: 5, border: '1px solid #444'}} /> : <div style={{width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'grid', placeItems: 'center', marginBottom: 5, fontSize: 12}}>🛡️</div>}
                                             <b style={{fontSize:13, color:'var(--primary)'}}>{m.awayName}</b>
-                                            <div style={{fontSize:18, fontWeight:'bold'}}>{m.status==='FINISHED' ? m.scoreAway : '-'}</div>
+                                            <div style={{fontSize:18, fontWeight:'bold'}}>
+                                                {m.status==='FINISHED' ? <>{m.hasPenalties && <span style={{fontSize:12, color:'gold', marginRight:4}}>({m.penaltiesAway})</span>} {m.scoreAway}</> : '-'}
+                                            </div>
                                         </div>
                                     </div>
 
@@ -1885,9 +1884,15 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
 
     
         const MatchManagerForm = ({ initialData, teams, tournaments, onSave, onDelete }) => {
-    const [f, setF] = useState(initialData || {
+    const [f, setF] = useState(initialData ? {
+        ...initialData,
+        hasPenalties: initialData.hasPenalties || false,
+        penaltiesHome: initialData.penaltiesHome || 0,
+        penaltiesAway: initialData.penaltiesAway || 0
+    } : {
         homeId: '', awayId: '', serie: 'A', round: 1, 
-        scoreHome: 0, scoreAway: 0, status: 'PENDING'
+        scoreHome: 0, scoreAway: 0, status: 'PENDING',
+        hasPenalties: false, penaltiesHome: 0, penaltiesAway: 0
     });
 
     const handleSubmit = () => {
@@ -1903,15 +1908,17 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
             homeLogo: homeTeam.logo || null,
             awayName: awayTeam.name,
             awayLogo: awayTeam.logo || null,
-            round: isNaN(parseInt(f.round)) ? f.round : parseInt(f.round), // Suporta nomes como "Final"
-            scoreHome: parseInt(f.scoreHome),
-            scoreAway: parseInt(f.scoreAway)
+            round: isNaN(parseInt(f.round)) ? f.round : parseInt(f.round),
+            scoreHome: parseInt(f.scoreHome) || 0,
+            scoreAway: parseInt(f.scoreAway) || 0,
+            hasPenalties: f.hasPenalties || false,
+            penaltiesHome: f.hasPenalties ? (parseInt(f.penaltiesHome) || 0) : 0,
+            penaltiesAway: f.hasPenalties ? (parseInt(f.penaltiesAway) || 0) : 0
         };
 
         onSave(payload);
     };
 
-    // LÓGICA DE FILTRO: Se for uma Copa, mostra só os times da Copa. Senão, mostra os da Série.
     const isCustomTourn = tournaments && tournaments.some(t => t.id === f.serie);
     const availableTeams = isCustomTourn 
         ? teams.filter(t => tournaments.find(x => x.id === f.serie)?.teams.includes(t.id))
@@ -1926,7 +1933,7 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
                     <div style={{flex:1}}>
                         <label>Série / Liga / Copa</label>
                         <select className="input-field" value={f.serie} onChange={e=>{
-                            setF({...f, serie:e.target.value, homeId: '', awayId: ''}); // Limpa os times ao trocar de torneio
+                            setF({...f, serie:e.target.value, homeId: '', awayId: ''});
                         }}>
                             <optgroup label="Ligas Oficiais">
                                 {SERIES.map(s => <option key={s} value={s}>{s === 'VARZEA' ? 'Várzea (Terrão)' : `Série ${s}`}</option>)}
@@ -1966,10 +1973,25 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
                 </select>
 
                 {f.status === 'FINISHED' && (
-                    <div style={{display:'flex', gap:10, alignItems:'center', justifyContent:'center', background:'#222', padding:10, borderRadius:8}}>
-                        <input className="input-field" type="number" style={{width:50, textAlign:'center', marginBottom:0}} value={f.scoreHome} onChange={e=>setF({...f, scoreHome:e.target.value})} />
-                        <b>X</b>
-                        <input className="input-field" type="number" style={{width:50, textAlign:'center', marginBottom:0}} value={f.scoreAway} onChange={e=>setF({...f, scoreAway:e.target.value})} />
+                    <div style={{background:'#222', padding:10, borderRadius:8}}>
+                        <div style={{display:'flex', gap:10, alignItems:'center', justifyContent:'center', marginBottom: 10}}>
+                            <input className="input-field" type="number" style={{width:50, textAlign:'center', marginBottom:0}} value={f.scoreHome} onChange={e=>setF({...f, scoreHome:e.target.value})} />
+                            <b>X</b>
+                            <input className="input-field" type="number" style={{width:50, textAlign:'center', marginBottom:0}} value={f.scoreAway} onChange={e=>setF({...f, scoreAway:e.target.value})} />
+                        </div>
+                        
+                        <label style={{display:'flex', alignItems:'center', gap:5, cursor:'pointer', justifyContent:'center', color:'gold', fontSize:12}}>
+                            <input type="checkbox" checked={f.hasPenalties} onChange={e=>setF({...f, hasPenalties: e.target.checked})} />
+                            Decidido nos Pênaltis?
+                        </label>
+
+                        {f.hasPenalties && (
+                            <div style={{display:'flex', gap:10, alignItems:'center', justifyContent:'center', marginTop: 10}}>
+                                <input className="input-field" type="number" style={{width:40, textAlign:'center', marginBottom:0, borderColor:'gold'}} value={f.penaltiesHome} onChange={e=>setF({...f, penaltiesHome:e.target.value})} />
+                                <b style={{color:'gold'}}>(PÊNALTIS)</b>
+                                <input className="input-field" type="number" style={{width:40, textAlign:'center', marginBottom:0, borderColor:'gold'}} value={f.penaltiesAway} onChange={e=>setF({...f, penaltiesAway:e.target.value})} />
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -1982,7 +2004,8 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
         </div>
     );
 };
-        //FIM
+//FIM
+       
 const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireCoach, onRenewCoach, setModal, isAdmin }) => {
     const [tab, setTab] = useState('ELENCO'); 
     const [showStadiumUI, setShowStadiumUI] = useState(false);
@@ -7641,7 +7664,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.91.5</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.91.6</div>
                             </div>
                         </div>
                         
@@ -8270,7 +8293,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.5 CAMPEONATOS   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.6 CAMPEONATOS   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

@@ -569,13 +569,18 @@ const DEFAULT_PRIZES = {
 };
 
                                 // ==========================================
-// FASE 2: MOTOR DE CAMPEONATOS PERSONALIZADOS
+// FASE 2: MOTOR DE CAMPEONATOS PERSONALIZADOS (ATUALIZADO)
 // ==========================================
 const TournamentManagerModal = ({ tournaments, teams, awards, onClose }) => {
     const [tab, setTab] = useState('LIST');
-    const [f, setF] = useState({ name: '', format: 'MATA-MATA', matchType: 'IDA_VOLTA', trophyId: '', selectedTeams: [] });
+    
+    // ESTADO ATUALIZADO COM PREMIAÇÃO E REGRAS DA FINAL
+    const [f, setF] = useState({ 
+        name: '', format: 'MATA-MATA', matchType: 'IDA_VOLTA', 
+        trophyId: '', selectedTeams: [], 
+        prize: '', finalType: 'UNICO', neutralFinal: true 
+    });
 
-    // Pega apenas prêmios que foram criados para CLUBES
     const teamAwards = awards.filter(a => a.type === 'TEAM');
     const activeTeams = teams.filter(t => t.status === 'ACTIVE');
 
@@ -591,13 +596,17 @@ const TournamentManagerModal = ({ tournaments, teams, awards, onClose }) => {
 
     const handleSave = async () => {
         if(!f.name) return alert("Falta o nome do Campeonato!");
-        if(!f.trophyId) return alert("Vá na aba de Gala, crie uma Taça para Clubes e selecione ela aqui!");
-        if(f.selectedTeams.length < 2) return alert("Mínimo de 2 times para fazer um campeonato!");
+        if(!f.trophyId) return alert("Selecione a Taça Oficial!");
+        if(f.selectedTeams.length < 2) return alert("Mínimo de 2 times!");
+        if(!f.prize || f.prize <= 0) return alert("Defina o prêmio base do Campeão!");
 
         await firebase.firestore().collection('tournaments').add({
             name: f.name,
-            format: f.format, // MATA-MATA, PONTOS_CORRIDOS, GRUPOS_MATA
-            matchType: f.matchType, // IDA, IDA_VOLTA
+            format: f.format, 
+            matchType: f.matchType, 
+            finalType: f.finalType, // Regra da Final
+            neutralFinal: f.neutralFinal, // Campo Neutro
+            prize: parseFloat(f.prize), // Premiação Base (100%)
             trophyId: f.trophyId,
             trophyImg: teamAwards.find(a=>a.id===f.trophyId)?.img || null,
             teams: f.selectedTeams,
@@ -605,9 +614,9 @@ const TournamentManagerModal = ({ tournaments, teams, awards, onClose }) => {
             createdAt: Date.now()
         });
         
-        alert("🎉 Campeonato Oficializado com Sucesso!");
+        alert("🎉 Campeonato Oficializado!\nO sistema fará a distribuição automática dos prêmios nas eliminações (Fase 3).");
         setTab('LIST');
-        setF({ name: '', format: 'MATA-MATA', matchType: 'IDA_VOLTA', trophyId: '', selectedTeams: [] });
+        setF({ name: '', format: 'MATA-MATA', matchType: 'IDA_VOLTA', trophyId: '', selectedTeams: [], prize: '', finalType: 'UNICO', neutralFinal: true });
     };
 
     return (
@@ -638,7 +647,7 @@ const TournamentManagerModal = ({ tournaments, teams, awards, onClose }) => {
                                 </select>
                             </div>
                             <div>
-                                <label>Formato de Jogos</label>
+                                <label>Jogos (Fases Normais)</label>
                                 <select className="input-field" value={f.matchType} onChange={e=>setF({...f, matchType:e.target.value})}>
                                     <option value="IDA_VOLTA">🔁 Ida e Volta</option>
                                     <option value="IDA">⏭️ Só Ida (Jogo Único)</option>
@@ -646,8 +655,36 @@ const TournamentManagerModal = ({ tournaments, teams, awards, onClose }) => {
                             </div>
                         </div>
 
-                        <label>Taça Oficial (As taças são criadas na Central de Gala)</label>
-                        <select className="input-field" value={f.trophyId} onChange={e=>setF({...f, trophyId:e.target.value})} style={{border:'1px solid gold'}}>
+                        {/* NOVOS CAMPOS: REGRAS DA FINAL */}
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:5}}>
+                            <div>
+                                <label style={{color:'gold'}}>Formato da Grande Final</label>
+                                <select className="input-field" value={f.finalType} onChange={e=>setF({...f, finalType:e.target.value})} style={{borderColor:'gold'}}>
+                                    <option value="UNICO">🏟️ Jogo Único</option>
+                                    <option value="IDA_VOLTA">🔁 Ida e Volta</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{color:'gold'}}>Local da Final</label>
+                                <select className="input-field" value={f.neutralFinal} onChange={e=>setF({...f, neutralFinal:e.target.value === 'true'})} disabled={f.finalType === 'IDA_VOLTA'} style={{borderColor:'gold', opacity: f.finalType === 'IDA_VOLTA' ? 0.5 : 1}}>
+                                    <option value="true">🏳️ Campo Neutro</option>
+                                    <option value="false">🏠 Sorteio de Mandante</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* NOVO CAMPO: PREMIAÇÃO FINANCEIRA */}
+                        <div style={{background:'rgba(0, 230, 118, 0.1)', padding:10, borderRadius:8, marginTop:10, marginBottom:10, border:'1px solid var(--primary)'}}>
+                            <label style={{color:'var(--primary)', fontWeight:'bold'}}>💰 Prêmio Base do Campeão (₣)</label>
+                            <input className="input-field" type="number" placeholder="Ex: 5000000" value={f.prize} onChange={e=>setF({...f, prize:e.target.value})} style={{marginBottom:5}} />
+                            <div style={{fontSize:10, color:'#aaa', lineHeight:'1.4'}}>
+                                <b>Pagamento Automático nas Eliminações:</b><br/>
+                                🥇 Campeão: 100% | 🥈 Vice: 40% | 🥉 3º e 4º: 30% | 📉 E assim por diante para todos os participantes!
+                            </div>
+                        </div>
+
+                        <label>Taça Oficial (Criada na Central de Gala)</label>
+                        <select className="input-field" value={f.trophyId} onChange={e=>setF({...f, trophyId:e.target.value})}>
                             <option value="">-- Selecione o Troféu --</option>
                             {teamAwards.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                         </select>
@@ -655,7 +692,6 @@ const TournamentManagerModal = ({ tournaments, teams, awards, onClose }) => {
                         <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8, marginTop:10}}>
                             <label style={{color:'cyan'}}>Times Participantes ({f.selectedTeams.length})</label>
                             
-                            {/* Botões Rápidos por Liga */}
                             <div style={{display:'flex', gap:5, overflowX:'auto', marginBottom:10, paddingBottom:5}}>
                                 <button className="btn btn-ghost" style={{fontSize:9, padding:'5px'}} onClick={()=>addSerie('A')}>+ SÉRIE A</button>
                                 <button className="btn btn-ghost" style={{fontSize:9, padding:'5px'}} onClick={()=>addSerie('B')}>+ SÉRIE B</button>
@@ -665,7 +701,6 @@ const TournamentManagerModal = ({ tournaments, teams, awards, onClose }) => {
                                 <button className="btn btn-red" style={{fontSize:9, padding:'5px'}} onClick={()=>setF({...f, selectedTeams:[]})}>LIMPAR</button>
                             </div>
                             
-                            {/* Lista Manual Individual */}
                             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:5, maxHeight:'180px', overflowY:'auto'}}>
                                 {activeTeams.map(t => (
                                     <label key={t.id} style={{display:'flex', alignItems:'center', gap:5, background:'#111', padding:5, borderRadius:4, cursor:'pointer', border: f.selectedTeams.includes(t.id) ? '1px solid cyan' : '1px solid #333'}}>
@@ -692,8 +727,12 @@ const TournamentManagerModal = ({ tournaments, teams, awards, onClose }) => {
                                             {t.trophyImg ? <img src={t.trophyImg} style={{width:50, height:50, objectFit:'contain', filter:'drop-shadow(0 0 5px rgba(0,255,255,0.4))'}} /> : <div style={{fontSize:30}}>🏆</div>}
                                             <div>
                                                 <b style={{fontSize:15}}>{t.name}</b>
-                                                <div style={{fontSize:10, color:'#aaa'}}>{t.format.replace('_', ' ')} • {t.matchType === 'IDA' ? 'Jogo Único' : 'Ida e Volta'}</div>
-                                                <div style={{fontSize:11, color:'gold', marginTop:2}}><b>{(t.teams||[]).length} Clubes Participantes</b></div>
+                                                <div style={{fontSize:10, color:'#aaa'}}>
+                                                    Fases: {t.matchType === 'IDA' ? 'Jogo Único' : 'Ida e Volta'}<br/>
+                                                    Final: <span style={{color:'gold'}}>{t.finalType === 'UNICO' ? 'Jogo Único' : 'Ida e Volta'} {t.finalType === 'UNICO' && t.neutralFinal ? '(Neutro)' : ''}</span><br/>
+                                                    Prêmio Maior: <span style={{color:'lime'}}>{fmt(t.prize)}</span>
+                                                </div>
+                                                <div style={{fontSize:11, color:'cyan', marginTop:2}}><b>{(t.teams||[]).length} Clubes Participantes</b></div>
                                             </div>
                                         </div>
                                         <button className="btn btn-red" style={{width:'auto', padding:'10px'}} onClick={async () => {
@@ -7289,7 +7328,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.91.0</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.91.1</div>
                             </div>
                         </div>
                         
@@ -7970,7 +8009,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.0 CALENDARIO   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.1 CALENDARIO   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

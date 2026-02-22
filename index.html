@@ -3162,6 +3162,65 @@ const PrizeEditor = ({ initialData, onSave, onClose }) => {
     );
 };
         //FIM
+
+// ==========================================
+// CALENDÁRIO OFICIAL DE MATO REAL
+// ==========================================
+const GameCalendar = ({ calendar }) => {
+    if (!calendar || !calendar.date) return null;
+
+    // Formata a data (Ex: 2026-03-15 vira 15/03/2026)
+    const [ano, mes, dia] = calendar.date.split('-');
+    const dateBr = `${dia}/${mes}/${ano}`;
+
+    // Pega o nome do mês para ficar bonito
+    const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+    const monthName = monthNames[parseInt(mes) - 1];
+
+    // Filtra os eventos para mostrar apenas os de hoje em diante (e ordena por data)
+    const upcomingEvents = (calendar.events || [])
+        .filter(e => e.date >= calendar.date)
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    return (
+        <div className="card" style={{background:'linear-gradient(45deg, #1a1a1a, #001a00)', border:'1px solid var(--primary)', marginBottom: 20, display:'flex', gap:15, alignItems:'stretch'}}>
+            {/* Bloco do Dia Atual */}
+            <div style={{background:'#000', padding:'10px', borderRadius:8, textAlign:'center', minWidth:'80px', border:'1px solid #333', display:'flex', flexDirection:'column', justifyContent:'center'}}>
+                <div style={{fontSize:10, color:'var(--primary)', textTransform:'uppercase', fontWeight:'bold'}}>{monthName}</div>
+                <div style={{fontSize:30, fontWeight:'900', color:'#fff', lineHeight:1}}>{dia}</div>
+                <div style={{fontSize:10, color:'#888'}}>{ano}</div>
+            </div>
+            
+            {/* Bloco de Eventos */}
+            <div style={{flex:1, display:'flex', flexDirection:'column', justifyContent:'center'}}>
+                <div style={{fontSize:11, color:'#aaa', marginBottom:5, fontWeight:'bold'}}>
+                    <i className="fas fa-calendar-alt"></i> PRÓXIMOS EVENTOS:
+                </div>
+                {upcomingEvents.length === 0 ? (
+                    <div style={{fontSize:12, color:'#666', fontStyle:'italic'}}>Nenhum evento agendado.</div>
+                ) : (
+                    <div style={{display:'flex', flexDirection:'column', gap:4, maxHeight:'60px', overflowY:'auto'}}>
+                        {upcomingEvents.slice(0, 3).map((ev, i) => {
+                            const isToday = ev.date === calendar.date;
+                            return (
+                                <div key={i} style={{fontSize:11, display:'flex', gap:5, alignItems:'center', color: isToday ? 'gold' : '#ddd'}}>
+                                    <b style={{color: isToday ? 'gold' : 'var(--primary)'}}>
+                                        {isToday ? 'HOJE' : `${ev.date.split('-')[2]}/${ev.date.split('-')[1]}`}
+                                    </b> 
+                                    <span>- {ev.text}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+
+
+    
        function App() {
             const [user, setUser] = useState(null); 
             const [teams, setTeams] = useState([]);
@@ -3170,7 +3229,8 @@ const PrizeEditor = ({ initialData, onSave, onClose }) => {
             const [news, setNews] = useState([]);
             const [reqs, setReqs] = useState([]);
             const [conf, setConf] = useState({ marketOpen: true });
-            const [papers, setPapers] = useState([]);
+           const [calendar, setCalendar] = useState({ date: new Date().toISOString().split('T')[0], events: [] }); 
+           const [papers, setPapers] = useState([]);
             const [journalists, setJournalists] = useState([]);
             const [companies, setCompanies] = useState([]);
             const [products, setProducts] = useState([]);
@@ -3217,6 +3277,10 @@ const PrizeEditor = ({ initialData, onSave, onClose }) => {
                     db.collection('teams').onSnapshot(s => setTeams(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('players').onSnapshot(s => setPlayers(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('config').doc('system').onSnapshot(s => setConf(s.exists ? s.data() : {marketOpen:true})),
+                    db.collection('config').doc('calendar').onSnapshot(s => {
+    if (s.exists) setCalendar(s.data());
+    else db.collection('config').doc('calendar').set({ date: new Date().toISOString().split('T')[0], events: [] });
+}),
                     db.collection('financeRequests').onSnapshot(s => setReqs(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('newspapers').onSnapshot(s => setPapers(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('journalists').onSnapshot(s => setJournalists(s.docs.map(d => ({id:d.id, ...d.data()})))),
@@ -5130,7 +5194,8 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                 <button style={tabStyle(tab==='PRESS')} onClick={()=>setTab('PRESS')}>Imprensa</button>
                 <button style={tabStyle(tab==='COMP')} onClick={()=>setTab('COMP')}>Empresas</button>
                 <button style={tabStyle(tab==='COACH')} onClick={()=>setTab('COACH')}>Técnicos</button>
-            </div>
+                <button style={tabStyle(tab==='CALENDAR')} onClick={()=>setTab('CALENDAR')}>📅 Calendário</button>       
+    </div>
             {/* ABA DE TÉCNICOS */}
             {tab === 'COACH' && (
                 <div>
@@ -5526,7 +5591,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                         </div>
                     </div>
                 ))}
-
+                
                 <h4>Empresas Ativas</h4>
                 {(companies||[]).filter(c=>c.status!=='PENDING').map(c => (
                     <div key={c.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
@@ -5548,7 +5613,66 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                     </div>
                 ))}
             </div>}
+{/* --- ABA CALENDÁRIO (ADMIN) --- */}
+            {tab==='CALENDAR' && (
+                <div className="animate-in">
+                    <div className="card" style={{borderLeft:'4px solid var(--primary)'}}>
+                        <h3 style={{color:'var(--primary)', marginTop:0}}>Máquina do Tempo</h3>
+                        <p style={{fontSize:11, color:'#aaa'}}>Altere a data atual do jogo. O calendário real fará o cálculo automático de dias e meses.</p>
+                        
+                        <div style={{display:'flex', gap:10, alignItems:'center', background:'rgba(0,0,0,0.3)', padding:15, borderRadius:8}}>
+                            <div style={{flex:1}}>
+                                <label style={{fontSize:10, color:'#888'}}>Data Atual do Servidor</label>
+                                <input className="input-field" type="date" value={config.calendar?.date || ''} onChange={async (e) => {
+                                    if(confirm("Deseja forçar a mudança de data?")) {
+                                        await db.collection('config').doc('calendar').set({ date: e.target.value }, {merge: true});
+                                    }
+                                }} style={{marginBottom:0, fontSize:16, fontWeight:'bold', color:'white'}} />
+                            </div>
+                            <button className="btn btn-green" style={{width:'auto', height:'50px', padding:'0 20px'}} onClick={async () => {
+                                const current = new Date((config.calendar?.date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
+                                current.setDate(current.getDate() + 1);
+                                const newDate = current.toISOString().split('T')[0];
+                                await db.collection('config').doc('calendar').set({ date: newDate }, {merge: true});
+                            }}>
+                                ⏩ AVANÇAR +1 DIA
+                            </button>
+                        </div>
+                    </div>
 
+                    <div className="card" style={{marginTop:15, borderLeft:'4px solid gold'}}>
+                        <h4 style={{marginTop:0, color:'gold'}}>Agendar Eventos</h4>
+                        <div style={{display:'flex', gap:5, marginBottom:10}}>
+                            <input className="input-field" type="date" id="evDate" style={{flex:1, marginBottom:0}} />
+                            <input className="input-field" type="text" id="evText" placeholder="Ex: Abertura da Janela" style={{flex:2, marginBottom:0}} />
+                            <button className="btn btn-gold" style={{width:'auto'}} onClick={async () => {
+                                const d = document.getElementById('evDate').value;
+                                const t = document.getElementById('evText').value;
+                                if(!d || !t) return alert("Preencha data e texto!");
+                                const evs = [...(config.calendar?.events || []), { id: Date.now(), date: d, text: t }];
+                                await db.collection('config').doc('calendar').set({ events: evs }, {merge: true});
+                                document.getElementById('evText').value = '';
+                                alert("Evento agendado!");
+                            }}>+</button>
+                        </div>
+
+                        <div style={{background:'#111', padding:10, borderRadius:5, maxHeight:'200px', overflowY:'auto'}}>
+                            {(config.calendar?.events || []).sort((a,b)=>new Date(a.date)-new Date(b.date)).map(ev => (
+                                <div key={ev.id} style={{display:'flex', justifyContent:'space-between', fontSize:11, borderBottom:'1px dashed #333', padding:'5px 0'}}>
+                                    <span><b style={{color:'cyan'}}>{ev.date.split('-').reverse().join('/')}</b> - {ev.text}</span>
+                                    <i className="fas fa-trash" style={{color:'red', cursor:'pointer'}} onClick={async () => {
+                                        if(confirm("Apagar evento?")) {
+                                            const evs = config.calendar.events.filter(x => x.id !== ev.id);
+                                            await db.collection('config').doc('calendar').set({ events: evs }, {merge: true});
+                                        }
+                                    }}></i>
+                                </div>
+                            ))}
+                            {(config.calendar?.events || []).length === 0 && <small style={{color:'#666'}}>Nenhum evento.</small>}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -6843,7 +6967,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.90.8</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.90.9</div>
                             </div>
                         </div>
                         
@@ -6885,10 +7009,12 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                     </div>
 
                     <div className="container">
+                        {/* WIDGET UNIVERSAL DO CALENDÁRIO */}
+{screen !== 'LOGIN' && <GameCalendar calendar={calendar} />}
                        {screen === 'HOME' && user.type === 'ADMIN' && 
                             <AdminPanel 
                                 setModal={setModal}
-                                teams={teams} papers={papers} journalists={journalists} companies={companies} reqs={reqs} config={conf} coaches={coaches} 
+                                teams={teams} papers={papers} journalists={journalists} companies={companies} reqs={reqs} config={{ ...conf, calendar }} coaches={coaches} 
                                 sps={sps} players={players}
                                 onAct={adminAction} 
                                 onGenFixtures={generateFixtures}
@@ -7520,7 +7646,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.8 BALADINHAS   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.90.9 CALENDARIO   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

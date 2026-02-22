@@ -567,6 +567,151 @@ const DEFAULT_PRIZES = {
     D: { champ: 3500000, vice: 2500000, mid: 1200000, rel: 500000 },
     VARZEA: { champ: 1000000, vice: 800000, third: 600000, mid: 200000 }
 };
+
+                                // ==========================================
+// FASE 2: MOTOR DE CAMPEONATOS PERSONALIZADOS
+// ==========================================
+const TournamentManagerModal = ({ tournaments, teams, awards, onClose }) => {
+    const [tab, setTab] = useState('LIST');
+    const [f, setF] = useState({ name: '', format: 'MATA-MATA', matchType: 'IDA_VOLTA', trophyId: '', selectedTeams: [] });
+
+    // Pega apenas prêmios que foram criados para CLUBES
+    const teamAwards = awards.filter(a => a.type === 'TEAM');
+    const activeTeams = teams.filter(t => t.status === 'ACTIVE');
+
+    const toggleTeam = (id) => {
+        if(f.selectedTeams.includes(id)) setF({...f, selectedTeams: f.selectedTeams.filter(x=>x!==id)});
+        else setF({...f, selectedTeams: [...f.selectedTeams, id]});
+    };
+
+    const addSerie = (serie) => {
+        const sIds = activeTeams.filter(t=>t.serie===serie).map(t=>t.id);
+        setF({...f, selectedTeams: [...new Set([...f.selectedTeams, ...sIds])]});
+    };
+
+    const handleSave = async () => {
+        if(!f.name) return alert("Falta o nome do Campeonato!");
+        if(!f.trophyId) return alert("Vá na aba de Gala, crie uma Taça para Clubes e selecione ela aqui!");
+        if(f.selectedTeams.length < 2) return alert("Mínimo de 2 times para fazer um campeonato!");
+
+        await firebase.firestore().collection('tournaments').add({
+            name: f.name,
+            format: f.format, // MATA-MATA, PONTOS_CORRIDOS, GRUPOS_MATA
+            matchType: f.matchType, // IDA, IDA_VOLTA
+            trophyId: f.trophyId,
+            trophyImg: teamAwards.find(a=>a.id===f.trophyId)?.img || null,
+            teams: f.selectedTeams,
+            status: 'ACTIVE',
+            createdAt: Date.now()
+        });
+        
+        alert("🎉 Campeonato Oficializado com Sucesso!");
+        setTab('LIST');
+        setF({ name: '', format: 'MATA-MATA', matchType: 'IDA_VOLTA', trophyId: '', selectedTeams: [] });
+    };
+
+    return (
+        <div className="modal-overlay" style={{zIndex: 99999}}>
+            <div className="modal-content" style={{maxWidth: '600px', border:'2px solid cyan'}} onClick={e => e.stopPropagation()}>
+                <div style={{display:'flex', justifyContent:'space-between', marginBottom:15}}>
+                    <h3 style={{color:'cyan', margin:0}}>🏆 Criador de Campeonatos</h3>
+                    <button className="btn btn-red" style={{width:'auto', padding:'2px 8px'}} onClick={onClose}>X</button>
+                </div>
+
+                <div style={{display:'flex', gap:5, marginBottom:15}}>
+                    <button className={`btn ${tab==='LIST'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('LIST')}>TORNEIOS ATIVOS</button>
+                    <button className={`btn ${tab==='CREATE'?'btn-green':'btn-ghost'}`} onClick={()=>setTab('CREATE')}>+ FUNDAR NOVA COPA</button>
+                </div>
+
+                {tab === 'CREATE' && (
+                    <div className="animate-in" style={{maxHeight:'65vh', overflowY:'auto', paddingRight:5}}>
+                        <label>Nome da Competição</label>
+                        <input className="input-field" placeholder="Ex: Copa do Brasil, Champions League..." value={f.name} onChange={e=>setF({...f, name:e.target.value})} />
+                        
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                            <div>
+                                <label>Estilo do Torneio</label>
+                                <select className="input-field" value={f.format} onChange={e=>setF({...f, format:e.target.value})}>
+                                    <option value="MATA-MATA">⚔️ Mata-Mata</option>
+                                    <option value="PONTOS_CORRIDOS">📊 Pontos Corridos</option>
+                                    <option value="GRUPOS_MATA">🔀 Grupos + Mata-Mata</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label>Formato de Jogos</label>
+                                <select className="input-field" value={f.matchType} onChange={e=>setF({...f, matchType:e.target.value})}>
+                                    <option value="IDA_VOLTA">🔁 Ida e Volta</option>
+                                    <option value="IDA">⏭️ Só Ida (Jogo Único)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <label>Taça Oficial (As taças são criadas na Central de Gala)</label>
+                        <select className="input-field" value={f.trophyId} onChange={e=>setF({...f, trophyId:e.target.value})} style={{border:'1px solid gold'}}>
+                            <option value="">-- Selecione o Troféu --</option>
+                            {teamAwards.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        </select>
+
+                        <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8, marginTop:10}}>
+                            <label style={{color:'cyan'}}>Times Participantes ({f.selectedTeams.length})</label>
+                            
+                            {/* Botões Rápidos por Liga */}
+                            <div style={{display:'flex', gap:5, overflowX:'auto', marginBottom:10, paddingBottom:5}}>
+                                <button className="btn btn-ghost" style={{fontSize:9, padding:'5px'}} onClick={()=>addSerie('A')}>+ SÉRIE A</button>
+                                <button className="btn btn-ghost" style={{fontSize:9, padding:'5px'}} onClick={()=>addSerie('B')}>+ SÉRIE B</button>
+                                <button className="btn btn-ghost" style={{fontSize:9, padding:'5px'}} onClick={()=>addSerie('C')}>+ SÉRIE C</button>
+                                <button className="btn btn-ghost" style={{fontSize:9, padding:'5px'}} onClick={()=>addSerie('D')}>+ SÉRIE D</button>
+                                <button className="btn btn-ghost" style={{fontSize:9, padding:'5px', color:'gold', borderColor:'gold'}} onClick={()=>addSerie('VARZEA')}>+ VÁRZEA</button>
+                                <button className="btn btn-red" style={{fontSize:9, padding:'5px'}} onClick={()=>setF({...f, selectedTeams:[]})}>LIMPAR</button>
+                            </div>
+                            
+                            {/* Lista Manual Individual */}
+                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:5, maxHeight:'180px', overflowY:'auto'}}>
+                                {activeTeams.map(t => (
+                                    <label key={t.id} style={{display:'flex', alignItems:'center', gap:5, background:'#111', padding:5, borderRadius:4, cursor:'pointer', border: f.selectedTeams.includes(t.id) ? '1px solid cyan' : '1px solid #333'}}>
+                                        <input type="checkbox" checked={f.selectedTeams.includes(t.id)} onChange={()=>toggleTeam(t.id)} />
+                                        <span style={{fontSize:11}}>{t.name} <small style={{color:'#888'}}>({t.serie})</small></span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        <button className="btn btn-green" style={{marginTop:15, padding:15, fontSize:14}} onClick={handleSave}>
+                            🚀 INAUGURAR CAMPEONATO
+                        </button>
+                    </div>
+                )}
+
+                {tab === 'LIST' && (
+                    <div className="animate-in" style={{maxHeight:'60vh', overflowY:'auto', paddingRight:5}}>
+                        {tournaments.length === 0 ? <p style={{textAlign:'center', color:'#666'}}>Nenhuma copa ou liga extra foi criada ainda.</p> : (
+                            <div style={{display:'grid', gap:10}}>
+                                {tournaments.map(t => (
+                                    <div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderLeft:'4px solid cyan'}}>
+                                        <div style={{display:'flex', gap:10, alignItems:'center'}}>
+                                            {t.trophyImg ? <img src={t.trophyImg} style={{width:50, height:50, objectFit:'contain', filter:'drop-shadow(0 0 5px rgba(0,255,255,0.4))'}} /> : <div style={{fontSize:30}}>🏆</div>}
+                                            <div>
+                                                <b style={{fontSize:15}}>{t.name}</b>
+                                                <div style={{fontSize:10, color:'#aaa'}}>{t.format.replace('_', ' ')} • {t.matchType === 'IDA' ? 'Jogo Único' : 'Ida e Volta'}</div>
+                                                <div style={{fontSize:11, color:'gold', marginTop:2}}><b>{(t.teams||[]).length} Clubes Participantes</b></div>
+                                            </div>
+                                        </div>
+                                        <button className="btn btn-red" style={{width:'auto', padding:'10px'}} onClick={async () => {
+                                            if(confirm(`Excluir a ${t.name} permanentemente do sistema?`)) await firebase.firestore().collection('tournaments').doc(t.id).delete();
+                                        }}>🗑️</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+
+        
         // ==========================================
 // SISTEMA DE GALA E PREMIAÇÕES (ADMIN)
 // ==========================================
@@ -3392,6 +3537,7 @@ const GameCalendar = ({ calendar }) => {
             const [products, setProducts] = useState([]);
             const [sps, setSps] = useState([]);
            const [awards, setAwards] = useState([]); 
+           const [tourns, setTourns] = useState([]);
            const [coaches, setCoaches] = useState([]); 
             const [matches, setMatches] = useState([]);
             const [posts, setPosts] = useState([]);
@@ -3446,7 +3592,10 @@ const GameCalendar = ({ calendar }) => {
                     db.collection('products').onSnapshot(s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('sponsorships').onSnapshot(s => setSps(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('awards').onSnapshot(s => setAwards(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                    // --- CORREÇÃO AQUI: REMOVIDO O LIMIT(50) PARA OS ITENS NÃO SUMIREM ---
+                    db.collection('tournaments').onSnapshot(s => setTourns(s.docs.map(d => ({id:d.id, ...d.data()})))),
+                                                      
+    
+    // --- CORREÇÃO AQUI: REMOVIDO O LIMIT(50) PARA OS ITENS NÃO SUMIREM ---
                     db.collection('sales').orderBy('date', 'desc').onSnapshot(s => {
                         const cleanData = s.docs.map(d => ({id:d.id, ...d.data()}));
                         setSales(cleanData);
@@ -5533,6 +5682,9 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                     <button className="btn btn-blue" style={{marginTop:10}} onClick={onGenFixtures}>🗓️ GERAR TABELA DE JOGOS</button>
                     <button className="btn btn-gold" style={{marginTop:10}} onClick={() => onAct('EDIT_PRIZES')}>⚙️ CONFIGURAR PREMIAÇÕES DA TEMPORADA</button>
                     <button className="btn btn-purple" style={{marginTop:10}} onClick={onTurnSeasonAdvanced}>🏆 VIRAR TEMPORADA (AVANÇADO)</button>
+                    <button className="btn" style={{background:'#004D40', color:'cyan', border:'1px solid cyan', marginTop:15, padding:15, fontSize:13}} onClick={() => setModal({type: 'TOURN_MANAGER'})}>
+    🗺️ CRIAR COPAS E CAMPEONATOS
+</button>
                     <button className="btn" style={{background:'#333', border:'1px solid #666', marginTop:10}} onClick={onGenAttrs}>
                         🎲 GERAR ATRIBUTOS (ALL)
                     </button>
@@ -7605,7 +7757,8 @@ onAdd={()=>setModal({type:'ADMIN_PLAYER', data: { teamId: adminTeam.id } })}
                             {modal.type==='POST_NEWS' && <div><h3>Nova Notícia</h3><input className="input-field" placeholder="Manchete / Texto" id="news-body" /><button className="btn btn-blue" onClick={()=>{postNews(`📰 **${user.data.name}:**\n${document.getElementById('news-body').value}`, 'press'); setModal(null);}}>PUBLICAR</button></div>}
                             {modal.type==='EDIT_PRIZES' && <PrizeEditor initialData={modal.data} onSave={async (newPrizes) => { await db.collection('config').doc('system').update({ prizes: newPrizes }); alert("Premiações Atualizadas! Elas serão pagas na próxima Virada de Temporada."); setModal(null); }} onClose={() => setModal(null)} />}
                             {modal.type==='AWARDS_MANAGER' && <AwardsManager awards={awards} teams={teams} players={players} coaches={coaches} onClose={()=>setModal(null)} />}
-    {modal.type==='STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
+                            {modal.type==='TOURN_MANAGER' && <TournamentManagerModal tournaments={tourns} teams={teams} awards={awards} onClose={()=>setModal(null)} />}
+{modal.type==='STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
                             
                             {modal.type === 'MATCH_MANAGER' && (
                                 <MatchManagerForm 

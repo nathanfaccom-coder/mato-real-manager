@@ -568,18 +568,19 @@ const DEFAULT_PRIZES = {
     VARZEA: { champ: 1000000, vice: 800000, third: 600000, mid: 200000 }
 };
 
-                                // ==========================================
-// FASE 2: MOTOR DE CAMPEONATOS PERSONALIZADOS (ATUALIZADO)
+                             // ==========================================
+// FASE 2: MOTOR DE CAMPEONATOS PERSONALIZADOS (ATUALIZADO V2)
 // ==========================================
 const TournamentManagerModal = ({ tournaments, teams, awards, onClose }) => {
     const [tab, setTab] = useState('LIST');
     
-    // ESTADO ATUALIZADO COM PREMIAÇÃO E REGRAS DA FINAL
     const [f, setF] = useState({ 
         name: '', format: 'MATA-MATA', matchType: 'IDA_VOLTA', 
         trophyId: '', selectedTeams: [], 
         prize: '', finalType: 'UNICO', neutralFinal: true 
     });
+
+    const [guest, setGuest] = useState({ name: '', logo: null }); // Novo: Time Convidado
 
     const teamAwards = awards.filter(a => a.type === 'TEAM');
     const activeTeams = teams.filter(t => t.status === 'ACTIVE');
@@ -594,6 +595,35 @@ const TournamentManagerModal = ({ tournaments, teams, awards, onClose }) => {
         setF({...f, selectedTeams: [...new Set([...f.selectedTeams, ...sIds])]});
     };
 
+    const handleGuestUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (ev) => {
+            const img = new Image();
+            img.src = ev.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX = 150; let w=img.width, h=img.height;
+                if(w>h){if(w>MAX){h*=MAX/w; w=MAX;}}else{if(h>MAX){w*=MAX/h; h=MAX;}}
+                canvas.width=w; canvas.height=h;
+                canvas.getContext('2d').drawImage(img,0,0,w,h);
+                setGuest({...guest, logo: canvas.toDataURL('image/webp', 0.8)});
+            }
+        }
+    };
+
+    const createGuestTeam = async () => {
+        if(!guest.name) return alert("Digite o nome do Time Convidado!");
+        const docRef = await firebase.firestore().collection('teams').add({
+            name: guest.name, logo: guest.logo, serie: 'GUEST', status: 'ACTIVE', balance: 0, stadiumLevel: 1
+        });
+        setF({...f, selectedTeams: [...f.selectedTeams, docRef.id]});
+        setGuest({name: '', logo: null});
+        alert("Time de Fora criado e adicionado à lista do Campeonato!");
+    };
+
     const handleSave = async () => {
         if(!f.name) return alert("Falta o nome do Campeonato!");
         if(!f.trophyId) return alert("Selecione a Taça Oficial!");
@@ -604,9 +634,9 @@ const TournamentManagerModal = ({ tournaments, teams, awards, onClose }) => {
             name: f.name,
             format: f.format, 
             matchType: f.matchType, 
-            finalType: f.finalType, // Regra da Final
-            neutralFinal: f.neutralFinal, // Campo Neutro
-            prize: parseFloat(f.prize), // Premiação Base (100%)
+            finalType: f.finalType, 
+            neutralFinal: f.neutralFinal, 
+            prize: parseFloat(f.prize), 
             trophyId: f.trophyId,
             trophyImg: teamAwards.find(a=>a.id===f.trophyId)?.img || null,
             teams: f.selectedTeams,
@@ -655,7 +685,6 @@ const TournamentManagerModal = ({ tournaments, teams, awards, onClose }) => {
                             </div>
                         </div>
 
-                        {/* NOVOS CAMPOS: REGRAS DA FINAL */}
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:5}}>
                             <div>
                                 <label style={{color:'gold'}}>Formato da Grande Final</label>
@@ -673,14 +702,9 @@ const TournamentManagerModal = ({ tournaments, teams, awards, onClose }) => {
                             </div>
                         </div>
 
-                        {/* NOVO CAMPO: PREMIAÇÃO FINANCEIRA */}
                         <div style={{background:'rgba(0, 230, 118, 0.1)', padding:10, borderRadius:8, marginTop:10, marginBottom:10, border:'1px solid var(--primary)'}}>
                             <label style={{color:'var(--primary)', fontWeight:'bold'}}>💰 Prêmio Base do Campeão (₣)</label>
                             <input className="input-field" type="number" placeholder="Ex: 5000000" value={f.prize} onChange={e=>setF({...f, prize:e.target.value})} style={{marginBottom:5}} />
-                            <div style={{fontSize:10, color:'#aaa', lineHeight:'1.4'}}>
-                                <b>Pagamento Automático nas Eliminações:</b><br/>
-                                🥇 Campeão: 100% | 🥈 Vice: 40% | 🥉 3º e 4º: 30% | 📉 E assim por diante para todos os participantes!
-                            </div>
                         </div>
 
                         <label>Taça Oficial (Criada na Central de Gala)</label>
@@ -688,6 +712,19 @@ const TournamentManagerModal = ({ tournaments, teams, awards, onClose }) => {
                             <option value="">-- Selecione o Troféu --</option>
                             {teamAwards.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                         </select>
+
+                        {/* FÁBRICA DE TIMES CONVIDADOS */}
+                        <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8, marginTop:10, border:'1px dashed #666'}}>
+                            <label style={{color:'gold', fontSize:11}}>🌍 Adicionar Time de Fora / Convidado</label>
+                            <div style={{display:'flex', gap:10, alignItems:'center', marginTop:5}}>
+                                <label className="btn btn-ghost" style={{width:'50px', height:'50px', padding:0, display:'grid', placeItems:'center', borderRadius:'8px', cursor:'pointer', margin:0}}>
+                                    {guest.logo ? <img src={guest.logo} style={{width:'100%', height:'100%', objectFit:'cover', borderRadius:'8px'}} /> : <span style={{fontSize:20}}>📷</span>}
+                                    <input type="file" style={{display:'none'}} accept="image/*" onChange={handleGuestUpload} />
+                                </label>
+                                <input className="input-field" placeholder="Nome do Convidado" value={guest.name} onChange={e=>setGuest({...guest, name:e.target.value})} style={{marginBottom:0, flex:1}} />
+                                <button className="btn btn-gold" style={{width:'auto', marginBottom:0, padding:'0 15px'}} onClick={createGuestTeam}>+</button>
+                            </div>
+                        </div>
 
                         <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8, marginTop:10}}>
                             <label style={{color:'cyan'}}>Times Participantes ({f.selectedTeams.length})</label>
@@ -698,6 +735,7 @@ const TournamentManagerModal = ({ tournaments, teams, awards, onClose }) => {
                                 <button className="btn btn-ghost" style={{fontSize:9, padding:'5px'}} onClick={()=>addSerie('C')}>+ SÉRIE C</button>
                                 <button className="btn btn-ghost" style={{fontSize:9, padding:'5px'}} onClick={()=>addSerie('D')}>+ SÉRIE D</button>
                                 <button className="btn btn-ghost" style={{fontSize:9, padding:'5px', color:'gold', borderColor:'gold'}} onClick={()=>addSerie('VARZEA')}>+ VÁRZEA</button>
+                                <button className="btn btn-ghost" style={{fontSize:9, padding:'5px', color:'cyan', borderColor:'cyan'}} onClick={()=>addSerie('GUEST')}>+ CONVIDADOS</button>
                                 <button className="btn btn-red" style={{fontSize:9, padding:'5px'}} onClick={()=>setF({...f, selectedTeams:[]})}>LIMPAR</button>
                             </div>
                             
@@ -1646,22 +1684,56 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
         );
     }
 
-    // --- CÁLCULO DAS ESTATÍSTICAS EXCLUSIVAS DESTA COPA ---
+    // --- SORTEIO AUTOMÁTICO DE JOGOS ---
+    const handleGenerateFixtures = async () => {
+        if(!confirm(`Deseja sortear confrontos automaticamente para a ${selTourn.name}?`)) return;
+        const db = firebase.firestore();
+        const b = db.batch();
+        const shuffled = [...selTourn.teams].sort(() => 0.5 - Math.random());
+        
+        let roundName = shuffled.length <= 2 ? 'Final' : (shuffled.length <= 4 ? 'Semifinal' : (shuffled.length <= 8 ? 'Quartas de Final' : 'Fase Inicial'));
+        
+        for(let i=0; i<shuffled.length; i+=2) {
+            const homeId = shuffled[i];
+            const awayId = shuffled[i+1];
+            if(!homeId || !awayId) continue; // Pula se faltar time par
+            
+            const homeT = teams.find(t=>t.id===homeId);
+            const awayT = teams.find(t=>t.id===awayId);
+            
+            const matchRef = db.collection('matches').doc();
+            b.set(matchRef, {
+                serie: selTourn.id, round: roundName, status: 'PENDING', played: false,
+                homeId: homeId, homeName: homeT?.name, homeLogo: homeT?.logo || null,
+                awayId: awayId, awayName: awayT?.name, awayLogo: awayT?.logo || null,
+                scoreHome: 0, scoreAway: 0
+            });
+            
+            if (selTourn.matchType === 'IDA_VOLTA') {
+                const matchRef2 = db.collection('matches').doc();
+                b.set(matchRef2, {
+                    serie: selTourn.id, round: roundName + ' (Volta)', status: 'PENDING', played: false,
+                    homeId: awayId, homeName: awayT?.name, homeLogo: awayT?.logo || null,
+                    awayId: homeId, awayName: homeT?.name, awayLogo: homeT?.logo || null,
+                    scoreHome: 0, scoreAway: 0
+                });
+            }
+        }
+        await b.commit();
+        alert("🎲 Sorteio realizado! Os confrontos foram agendados.");
+    };
+
     const tPlayers = players.filter(p => p.tournaments && p.tournaments[selTourn.id]);
-    
     const topScorer = [...tPlayers].sort((a,b) => (b.tournaments[selTourn.id].goals || 0) - (a.tournaments[selTourn.id].goals || 0))[0];
     const topAssist = [...tPlayers].sort((a,b) => (b.tournaments[selTourn.id].assists || 0) - (a.tournaments[selTourn.id].assists || 0))[0];
     const topTackles = [...tPlayers].sort((a,b) => (b.tournaments[selTourn.id].tackles || 0) - (a.tournaments[selTourn.id].tackles || 0))[0];
     const topSaves = [...tPlayers].sort((a,b) => (b.tournaments[selTourn.id].saves || 0) - (a.tournaments[selTourn.id].saves || 0))[0];
-    const bestPlayer = [...tPlayers]
-        .filter(p => p.tournaments[selTourn.id].ratingCount > 0)
-        .sort((a,b) => {
-            const avgA = a.tournaments[selTourn.id].ratingSum / a.tournaments[selTourn.id].ratingCount;
-            const avgB = b.tournaments[selTourn.id].ratingSum / b.tournaments[selTourn.id].ratingCount;
-            return avgB - avgA;
-        })[0];
+    const bestPlayer = [...tPlayers].filter(p => p.tournaments[selTourn.id].ratingCount > 0).sort((a,b) => {
+        const avgA = a.tournaments[selTourn.id].ratingSum / a.tournaments[selTourn.id].ratingCount;
+        const avgB = b.tournaments[selTourn.id].ratingSum / b.tournaments[selTourn.id].ratingCount;
+        return avgB - avgA;
+    })[0];
 
-    // Jogos da Copa (O ID da copa fica salvo como a "Série" do jogo)
     const tMatches = matches.filter(m => m.serie === selTourn.id);
 
     return (
@@ -1675,15 +1747,19 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
                 {selTourn.neutralFinal && selTourn.finalType === 'UNICO' && <div style={{fontSize:10, color:'#aaa', marginTop:5}}>🏟️ Final em Jogo Único (Campo Neutro)</div>}
             </div>
 
-            <div style={{display:'flex', gap:10, marginBottom:15}}>
+            <div style={{display:'flex', gap:5, marginBottom:15, overflowX:'auto', paddingBottom:5}}>
                 <button className={`btn ${tab==='JOGOS'?'btn-cyan':'btn-ghost'}`} style={{borderColor:'cyan', color:tab==='JOGOS'?'#000':'cyan', background:tab==='JOGOS'?'cyan':'transparent'}} onClick={()=>setTab('JOGOS')}>JOGOS</button>
-                <button className={`btn ${tab==='STATS'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('STATS')}>ESTATÍSTICAS DA COPA</button>
+                <button className={`btn ${tab==='STATS'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('STATS')}>ESTATÍSTICAS</button>
+                <button className={`btn ${tab==='TIMES'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('TIMES')}>TIMES ({selTourn.teams.length})</button>
             </div>
 
             {tab === 'JOGOS' && (
                 <div>
                     {isAdminOrPress && (
-                        <button className="btn btn-blue" style={{marginBottom:15}} onClick={() => onCreateMatch(selTourn.id)}>+ AGENDAR JOGO NESTA COPA</button>
+                        <div style={{display:'flex', gap:10, marginBottom:15}}>
+                            <button className="btn btn-blue" onClick={() => onCreateMatch(selTourn.id)}>+ JOGO MANUAL</button>
+                            <button className="btn btn-gold" onClick={handleGenerateFixtures}>🎲 SORTEAR CHAVE</button>
+                        </div>
                     )}
 
                     {tMatches.length === 0 ? <p style={{textAlign:'center', color:'#666'}}>Nenhum jogo chaveado ainda.</p> : (
@@ -1705,7 +1781,7 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
                                         </div>
                                         <div style={{fontSize:10, color:'#aaa', textAlign:'center'}}>
                                             X<br/>
-                                            <small style={{color:'gold'}}>{m.round ? `Fase ${m.round}` : 'Mata-Mata'}</small>
+                                            <small style={{color:'gold'}}>{m.round ? `Fase: ${m.round}` : 'Mata-Mata'}</small>
                                         </div>
                                         <div style={{textAlign:'center', width:'40%', cursor:'pointer'}} onClick={() => { const t = teams.find(x => x.id === m.awayId); if(t) onInspectTeam(t); }}>
                                             <b style={{fontSize:13, color:'var(--primary)'}}>{m.awayName}</b>
@@ -1734,16 +1810,27 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
                         {topAssist && topAssist.tournaments[selTourn.id].assists > 0 ? <div><b style={{fontSize:14, color:'#fff'}}>{topAssist.name}</b><br/><span style={{color:'var(--secondary)', fontWeight:'bold'}}>{topAssist.tournaments[selTourn.id].assists} Assis.</span></div> : <small style={{color:'#666'}}>Nenhuma.</small>}
                     </div>
                     <div className="card" style={{borderTop:'3px solid var(--purple)', textAlign:'center', gridColumn:'span 2', background:'rgba(213,0,249,0.05)'}}>
-                        <div style={{fontSize:10, color:'#aaa', marginBottom:5}}>⭐ CRAQUE DO CAMPEONATO (MÉDIA)</div>
+                        <div style={{fontSize:10, color:'#aaa', marginBottom:5}}>⭐ CRAQUE DO CAMPEONATO</div>
                         {bestPlayer ? <div><b style={{fontSize:16, color:'#fff'}}>{bestPlayer.name}</b><br/><span style={{color:'var(--purple)', fontWeight:'bold', fontSize:18}}>{(bestPlayer.tournaments[selTourn.id].ratingSum / bestPlayer.tournaments[selTourn.id].ratingCount).toFixed(1)}</span></div> : <small style={{color:'#666'}}>Sem avaliações.</small>}
                     </div>
-                    <div className="card" style={{borderTop:'3px solid #ff5555', textAlign:'center'}}>
-                        <div style={{fontSize:10, color:'#aaa', marginBottom:5}}>🛡️ XERIFE</div>
-                        {topTackles && topTackles.tournaments[selTourn.id].tackles > 0 ? <div><b style={{fontSize:14, color:'#fff'}}>{topTackles.name}</b><br/><span style={{color:'#ff5555', fontWeight:'bold'}}>{topTackles.tournaments[selTourn.id].tackles} Desarmes</span></div> : <small style={{color:'#666'}}>Nenhum.</small>}
-                    </div>
-                    <div className="card" style={{borderTop:'3px solid cyan', textAlign:'center'}}>
-                        <div style={{fontSize:10, color:'#aaa', marginBottom:5}}>🧤 MURALHA</div>
-                        {topSaves && topSaves.tournaments[selTourn.id].saves > 0 ? <div><b style={{fontSize:14, color:'#fff'}}>{topSaves.name}</b><br/><span style={{color:'cyan', fontWeight:'bold'}}>{topSaves.tournaments[selTourn.id].saves} Defesas</span></div> : <small style={{color:'#666'}}>Nenhuma.</small>}
+                </div>
+            )}
+
+            {/* NOVA ABA: CLUBES PARTICIPANTES */}
+            {tab === 'TIMES' && (
+                <div>
+                    <h4 style={{marginTop:0, color:'cyan'}}>Clubes Inscritos ({selTourn.teams.length})</h4>
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                        {selTourn.teams.map((tid, i) => {
+                            const t = teams.find(x => x.id === tid);
+                            return (
+                                <div key={tid} className="card" style={{display:'flex', alignItems:'center', gap:10, padding:'10px', cursor:'pointer'}} onClick={() => t && onInspectTeam(t)}>
+                                    <b style={{color:'#666', fontSize:10}}>{i+1}</b>
+                                    {t?.logo ? <img src={t.logo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}} /> : <div style={{width:30,height:30,background:'#333',borderRadius:'50%',display:'grid',placeItems:'center',fontSize:10}}>🛡️</div>}
+                                    <div style={{fontSize:11, fontWeight:'bold', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{t?.name || 'Desconhecido'}</div>
+                                </div>
+                            )
+                        })}
                     </div>
                 </div>
             )}
@@ -1772,13 +1859,19 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
             homeLogo: homeTeam.logo || null,
             awayName: awayTeam.name,
             awayLogo: awayTeam.logo || null,
-            round: parseInt(f.round),
+            round: isNaN(parseInt(f.round)) ? f.round : parseInt(f.round), // Suporta nomes como "Final"
             scoreHome: parseInt(f.scoreHome),
             scoreAway: parseInt(f.scoreAway)
         };
 
         onSave(payload);
     };
+
+    // LÓGICA DE FILTRO: Se for uma Copa, mostra só os times da Copa. Senão, mostra os da Série.
+    const isCustomTourn = tournaments && tournaments.some(t => t.id === f.serie);
+    const availableTeams = isCustomTourn 
+        ? teams.filter(t => tournaments.find(x => x.id === f.serie)?.teams.includes(t.id))
+        : teams.filter(t => t.serie === f.serie && t.status !== 'PENDING');
 
     return (
         <div className="modal-bg">
@@ -1787,11 +1880,13 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
                 
                 <div style={{display:'flex', gap:10}}>
                     <div style={{flex:1}}>
-                        <label>Série / Liga</label>
-                        {/* AQUI ESTAVA O PROBLEMA: AGORA USA A LISTA GLOBAL */}
-                        <select className="input-field" value={f.serie} onChange={e=>setF({...f, serie:e.target.value})}>
+                        <label>Série / Liga / Copa</label>
+                        <select className="input-field" value={f.serie} onChange={e=>{
+                            setF({...f, serie:e.target.value, homeId: '', awayId: ''}); // Limpa os times ao trocar de torneio
+                        }}>
                             <optgroup label="Ligas Oficiais">
                                 {SERIES.map(s => <option key={s} value={s}>{s === 'VARZEA' ? 'Várzea (Terrão)' : `Série ${s}`}</option>)}
+                                <option value="GUEST">Times Convidados</option>
                             </optgroup>
                             {tournaments && tournaments.length > 0 && (
                                 <optgroup label="Copas e Campeonatos">
@@ -1801,22 +1896,21 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
                         </select>
                     </div>
                     <div style={{flex:1}}>
-                        <label>Rodada</label>
-                        <input className="input-field" type="number" value={f.round} onChange={e=>setF({...f, round:e.target.value})} />
+                        <label>Rodada/Fase</label>
+                        <input className="input-field" type="text" placeholder="Ex: 1, Quartas, Final" value={f.round} onChange={e=>setF({...f, round:e.target.value})} />
                     </div>
                 </div>
 
                 <label>Mandante (Casa)</label>
                 <select className="input-field" value={f.homeId} onChange={e=>setF({...f, homeId:e.target.value})}>
                     <option value="">-- Selecione --</option>
-                    {/* Filtra times da série selecionada */}
-                    {teams.filter(t => t.serie === f.serie && t.status !== 'PENDING').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
 
                 <label>Visitante (Fora)</label>
                 <select className="input-field" value={f.awayId} onChange={e=>setF({...f, awayId:e.target.value})}>
                     <option value="">-- Selecione --</option>
-                    {teams.filter(t => t.serie === f.serie && t.status !== 'PENDING').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
 
                 <hr style={{borderColor:'#333', margin:'15px 0'}}/>

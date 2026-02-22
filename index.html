@@ -7320,25 +7320,69 @@ const renewContract = async (p) => {
             });
         }
 
-        // FASE DO TIME (Recent Form)
+       // FASE DO TIME E AUTOMAÇÃO DE TABELA / PLACAR
         const teamResults = {};
+        let totalGoalsInThisSumula = 0; // Vai somar os gols lançados agora
+
         batchData.forEach(item => {
             if (item.player && item.player.teamId && item.player.teamId !== 'FREE') {
                 teamResults[item.player.teamId] = item.match.result; 
+                totalGoalsInThisSumula += (item.match.goals || 0); // Soma os gols
             }
         });
         
+        const submittedTeamId = Object.keys(teamResults)[0]; // Pega o ID do time que está sendo salvo
+
         Object.keys(teamResults).forEach(tid => {
             if (teamResults[tid] !== 'NENHUM') {
                 const tObj = teams.find(t => t.id === tid);
                 if (tObj) {
+                    let updatesToTeam = {};
+
+                    // 1. Atualiza as bolinhas verdes e vermelhas (Fase)
                     let form = tObj.recentForm || [];
                     form.unshift(teamResults[tid]); 
                     if (form.length > 5) form.pop(); 
-                    b.update(db.collection('teams').doc(tid), { recentForm: form });
+                    updatesToTeam.recentForm = form;
+
+                    // 2. Atualiza a Tabela de Classificação (Só se for Liga Oficial)
+                    const isLeague = ['A', 'B', 'C', 'D', 'VARZEA'].includes(tObj.serie);
+                    if (isLeague) {
+                        let currentStats = tObj.stats || { pts:0, wins:0, draws:0, losses:0, gf:0, ga:0, cards:0 };
+                        let newStats = { ...currentStats };
+
+                        newStats.gf += totalGoalsInThisSumula; // Adiciona os gols feitos
+
+                        if (teamResults[tid] === 'VITORIA') {
+                            newStats.pts += 3;
+                            newStats.wins += 1;
+                        } else if (teamResults[tid] === 'EMPATE') {
+                            newStats.pts += 1;
+                            newStats.draws += 1;
+                        } else if (teamResults[tid] === 'DERROTA') {
+                            newStats.losses += 1;
+                        }
+
+                        updatesToTeam.stats = newStats;
+                    }
+
+                    b.update(db.collection('teams').doc(tid), updatesToTeam);
                 }
             }
         });
+
+        // 3. Atualiza o Placar na Central de Jogos Automaticamente
+        if (matchDataObj && matchDataObj.id && submittedTeamId) {
+            let matchUpdates = {};
+            if (submittedTeamId === matchDataObj.homeId) {
+                matchUpdates.scoreHome = totalGoalsInThisSumula;
+            } else if (submittedTeamId === matchDataObj.awayId) {
+                matchUpdates.scoreAway = totalGoalsInThisSumula;
+            }
+            matchUpdates.status = 'FINISHED'; // Marca o jogo como finalizado
+            
+            b.update(db.collection('matches').doc(matchDataObj.id), matchUpdates);
+        }
         
         await b.commit();
         setLoading(false);

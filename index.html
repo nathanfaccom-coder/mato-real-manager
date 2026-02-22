@@ -7632,8 +7632,8 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
 
                                 {matchesTab === 'COPAS' && (
                                     <TournamentHub 
-                                        tournaments={tourns} matches={matches} players={players} user={user} teams={teams}                                        
-                                        onInspectTeam={(t) => setModal({ type: 'VIEW_LINEUP', data: t })} 
+                                        tournaments={tourns} matches={matches} players={players} user={user} teams={teams}
+                                        onInspectTeam={(t) => setModal({ type: 'VIEW_LINEUP', data: t })}
                                         onCreateMatch={(tournId) => setModal({ type: 'MATCH_MANAGER', data: { serie: tournId, round: 1, homeId:'', awayId:'', scoreHome:0, scoreAway:0, status:'PENDING' }})}
                                         onEditMatch={(m) => setModal({ type: 'MATCH_MANAGER', data: m })}
                                         onDeleteMatch={(id) => handleDeleteMatch(id)}
@@ -7642,9 +7642,8 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                                 )}
                             </div>
                         )}
-                        
-                       
-{screen === 'RANKING' && <Ranking teams={teams} players={players} sales={sales} />}
+
+                        {screen === 'RANKING' && <Ranking teams={teams} players={players} sales={sales} />}
                         
                         {screen === 'NEWS' && <div><h3>Notícias</h3>{news.map(n=><div key={n.id} className={`news-card news-${n.type}`}>{n.text}<br/><small style={{color:'#666'}}>{new Date(n.date).toLocaleString()}</small></div>)}</div>}
 

@@ -5651,13 +5651,13 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                     ))}
                 </div>
             )}
-            {/* ABA FINANÇAS (MANTIDA) */}
-             <div>
+            {/* ABA FINANÇAS E GALA */}
             {tab==='FINANCE' && (
+                <div>
                     <button className="btn btn-gold" style={{marginBottom: 20, padding: 15, fontSize: 14}} onClick={() => setModal({type: 'AWARDS_MANAGER'})}>
                         🏆 CENTRAL DE PREMIAÇÕES DE GALA (TROFÉUS E MEDALHAS)
                     </button>
-               
+                    
                     <h4>Solicitações Financeiras</h4>
                     {(reqs||[]).filter(r=>r.status==='PENDING').length === 0 && <p style={{color:'#666'}}>Nenhum pedido pendente.</p>}
                     

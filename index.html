@@ -7803,17 +7803,17 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                     {modal && <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget && setModal(null)}>
                         <div className="modal-content">
                             {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={async(id)=>{db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} onRenew={renewContract} isOwner={user.type==='USER' && modal.data?.teamId===user.data?.id} />}
-                        {modal.type === 'ADMIN_PLAYER' && <AdminPlayerModal player={modal.data} teams={teams} onClose={() => setModal(null)} />}    
-                        {modal.type==='CT_TYCOON' && <TrainingCenterManager team={modal.data} players={players.filter(p=>p.teamId===modal.data.id)} coach={coaches.find(c => c.teamId === modal.data.id && c.status === 'ACTIVE')} user={user} onClose={()=>setModal(null)} onTrain={handleCoachTrain} onTrainSolo={handlePlayerSoloTrain} />}
+                            {modal.type==='ADMIN_PLAYER' && <AdminPlayerModal player={modal.data} teams={teams} onClose={()=>setModal(null)} />}
+                            {modal.type==='CT_TYCOON' && <TrainingCenterManager team={modal.data} players={players.filter(p=>p.teamId===modal.data.id)} coach={coaches.find(c => c.teamId === modal.data.id && c.status === 'ACTIVE')} user={user} onClose={()=>setModal(null)} onTrain={handleCoachTrain} onTrainSolo={handlePlayerSoloTrain} />}
                             {modal.type==='OFFER' && <OfferForm target={modal.data} myPlayers={players.filter(p => p.teamId === user.data.id)} onSend={sendOffer} setModal={setModal} user={user} />}
                             {modal.type==='SETTINGS' && <SettingsForm team={modal.data || user.data} isAdmin={user.type==='ADMIN'} onUp={(d)=>{const tid=(modal.data?.id)||user.data.id; db.collection('teams').doc(tid).update(d); setModal(null);}} onUpgrade={()=>{/*Up*/}} onReq={(t,a,d)=>{db.collection('financeRequests').add({teamId:user.data.id, teamName:user.data.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!");}} onWithdraw={withdrawMoney} />}
                             {modal.type==='MATCH_PERFORMANCE' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} matchData={modal.data?.match} />}
                             {modal.type==='TEAM_TABLE' && <TeamStandingsEditor teams={teams} onUpdateTeamStats={updateTeamStats} />}
                             {modal.type==='POST_NEWS' && <div><h3>Nova Notícia</h3><input className="input-field" placeholder="Manchete / Texto" id="news-body" /><button className="btn btn-blue" onClick={()=>{postNews(`📰 **${user.data.name}:**\n${document.getElementById('news-body').value}`, 'press'); setModal(null);}}>PUBLICAR</button></div>}
-                            {modal.type==='EDIT_PRIZES' && <PrizeEditor initialData={modal.data} onSave={async (newPrizes) => { await db.collection('config').doc('system').update({ prizes: newPrizes }); alert("Premiações Atualizadas! Elas serão pagas na próxima Virada de Temporada."); setModal(null); }} onClose={() => setModal(null)} />}
+                            {modal.type==='EDIT_PRIZES' && <PrizeEditor initialData={modal.data} onSave={async (newPrizes) => { await db.collection('config').doc('system').update({ prizes: newPrizes }); alert("Premiações Atualizadas!"); setModal(null); }} onClose={() => setModal(null)} />}
                             {modal.type==='AWARDS_MANAGER' && <AwardsManager awards={awards} teams={teams} players={players} coaches={coaches} onClose={()=>setModal(null)} />}
                             {modal.type==='TOURN_MANAGER' && <TournamentManagerModal tournaments={tourns} teams={teams} awards={awards} onClose={()=>setModal(null)} />}
-{modal.type==='STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
+                            {modal.type==='STATS_SEARCH' && <StatsEditor players={players} teams={teams} onSave={updateStats} />}
                             
                             {modal.type === 'MATCH_MANAGER' && (
                                 <MatchManagerForm 
@@ -7824,106 +7824,99 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             
                             {modal.type==='MATCH_REPORT' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} />}
 
+                            {modal?.type === 'VIEW_LINEUP' && (
+                                <div className="modal-overlay" onClick={() => setModal(null)}>
+                                    <div className="modal-content" style={{maxWidth: '450px', background: '#1a1a1a', border: '1px solid var(--primary)'}} onClick={e => e.stopPropagation()}>
+                                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15}}>
+                                            <h3 style={{margin: 0, color: 'var(--primary)'}}>{modal.data.name}</h3>
+                                            <button className="btn btn-red" style={{width: 'auto', padding: '5px 10px'}} onClick={() => setModal(null)}>X</button>
+                                        </div>
 
-                       {modal?.type === 'VIEW_LINEUP' && (
-                            <div className="modal-overlay" onClick={() => setModal(null)}>
-                                <div className="modal-content" style={{maxWidth: '450px', background: '#1a1a1a', border: '1px solid var(--primary)'}} onClick={e => e.stopPropagation()}>
-                                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15}}>
-                                        <h3 style={{margin: 0, color: 'var(--primary)'}}>{modal.data.name}</h3>
-                                        <button className="btn btn-red" style={{width: 'auto', padding: '5px 10px'}} onClick={() => setModal(null)}>X</button>
-                                    </div>
+                                        {(() => {
+                                            const lvl = modal.data.stadiumLevel || 1;
+                                            const sDb = STADIUM_DB[lvl] || STADIUM_DB[1];
+                                            const ticPrice = modal.data.ticketPrice || sDb.minTic;
 
-                                    {/* --- NOVO: INFORMAÇÕES DO ESTÁDIO --- */}
-                                    {(() => {
-                                        const lvl = modal.data.stadiumLevel || 1;
-                                        const sDb = STADIUM_DB[lvl] || STADIUM_DB[1];
-                                        const ticPrice = modal.data.ticketPrice || sDb.minTic;
-
-                                        return (
-                                            <div style={{position: 'relative', height: 130, borderRadius: 8, overflow: 'hidden', marginBottom: 15, border: '1px solid cyan', background: '#111', boxShadow: '0 4px 8px rgba(0,0,0,0.5)'}}>
-                                                {/* FOTO GRANDE NO FUNDO */}
-                                                {modal.data.stadiumPic ? (
-                                                    <img src={modal.data.stadiumPic} style={{width:'100%', height:'100%', objectFit:'cover', opacity: 0.6}} />
-                                                ) : (
-                                                    <div style={{display:'grid', placeItems:'center', height:'100%', fontSize:50, color:'#333'}}>🏟️</div>
-                                                )}
-                                                
-                                                {/* INFORMAÇÕES FLUTUANDO EM CIMA DA FOTO */}
-                                                <div style={{position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.95))', padding: '30px 10px 10px 10px'}}>
-                                                    <b style={{color: 'cyan', fontSize: 15, display: 'block', marginBottom: 4, textShadow: '1px 1px 2px black'}}>{sDb.name} <small style={{color:'gold'}}>(Nvl {lvl})</small></b>
-                                                    <div style={{display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#ddd', textShadow: '1px 1px 2px black'}}>
-                                                        <span>👥 <b style={{color:'#fff'}}>{sDb.cap.toLocaleString('pt-BR')}</b></span>
-                                                        <span>🎫 <b style={{color:'#00E676'}}>{fmt(ticPrice)}</b></span>
-                                                        <span>💸 <b style={{color:'var(--danger)'}}>{fmt(sDb.maint)}/sem</b></span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })()}
-
-                                    {/* BUSCA O TÉCNICO PELO ID DO TIME */}
-                                    {(() => {
-                                        const comandante = (coaches || []).find(c => c.teamId === modal.data.id);
-                                        return (
-                                            <div style={{display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,215,0,0.1)', padding: 10, borderRadius: 10, marginBottom: 15, border: '1px solid gold'}}>
-                                                {comandante?.face ? 
-                                                    <img src={comandante.face} style={{width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '1px solid gold'}} /> 
-                                                    : <div style={{fontSize: 24, width: 40, textAlign: 'center'}}>👔</div>
-                                                }
-                                                <div>
-                                                    <small style={{display: 'block', color: 'gold', fontSize: '9px', fontWeight: 'bold'}}>COMANDANTE:</small>
-                                                    <b style={{color: '#fff'}}>{comandante ? comandante.name : "Sem técnico no cargo"}</b>
-                                                </div>
-                                            </div>
-                                        );
-                                    })()}
-
-                                    {/* CAMPO VISUAL */}
-                                    <div className="football-field" style={{height: '380px', pointerEvents: 'none', position: 'relative'}}>
-                                        {modal.data.tactics ? (
-                                            FORMATIONS[modal.data.tactics.formation].map((posLabel, idx) => {
-                                                const coords = FORMATION_COORDINATES[modal.data.tactics.formation][idx];
-                                                const pId = modal.data.tactics.lineup[idx];
-                                                const player = players.find(p => p.id === pId);
-
-                                                return (
-                                                    <div key={idx} style={{ 
-                                                        position: 'absolute', top: coords.t, left: coords.l, 
-                                                        transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' 
-                                                    }}>
-                                                        <div className="player-photo-circle" style={{
-                                                            width: '32px', height: '32px', 
-                                                            border: player ? '2px solid gold' : '1px dashed #666',
-                                                            background: player ? '#001a33' : 'rgba(0,0,0,0.4)',
-                                                            boxShadow: '0 4px 6px rgba(0,0,0,0.6)'
-                                                        }}>
-                                                            {player?.face ? <img src={player.face} style={{width:'100%', height:'100%', objectFit:'cover'}} /> : <span style={{fontSize: '8px'}}>{posLabel}</span>}
-                                                        </div>
-                                                        {/* --- NOVO: NOME DO JOGADOR MAIS VISÍVEL --- */}
-                                                        <div className="player-name-label" style={{
-                                                            fontSize: '9px', padding: '2px 6px', background: player ? '#fff' : 'rgba(0,0,0,0.8)',
-                                                            color: player ? '#000' : '#fff', fontWeight: '900', marginTop: '3px',
-                                                            borderRadius: '4px', border: player ? '1px solid #333' : 'none',
-                                                            boxShadow: '0 2px 5px rgba(0,0,0,0.8)', letterSpacing: '0.5px'
-                                                        }}>
-                                                            {player ? player.name.split(' ')[0].toUpperCase() : "VAZIO"}
+                                            return (
+                                                <div style={{position: 'relative', height: 130, borderRadius: 8, overflow: 'hidden', marginBottom: 15, border: '1px solid cyan', background: '#111', boxShadow: '0 4px 8px rgba(0,0,0,0.5)'}}>
+                                                    {modal.data.stadiumPic ? (
+                                                        <img src={modal.data.stadiumPic} style={{width:'100%', height:'100%', objectFit:'cover', opacity: 0.6}} />
+                                                    ) : (
+                                                        <div style={{display:'grid', placeItems:'center', height:'100%', fontSize:50, color:'#333'}}>🏟️</div>
+                                                    )}
+                                                    
+                                                    <div style={{position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.95))', padding: '30px 10px 10px 10px'}}>
+                                                        <b style={{color: 'cyan', fontSize: 15, display: 'block', marginBottom: 4, textShadow: '1px 1px 2px black'}}>{sDb.name} <small style={{color:'gold'}}>(Nvl {lvl})</small></b>
+                                                        <div style={{display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#ddd', textShadow: '1px 1px 2px black'}}>
+                                                            <span>👥 <b style={{color:'#fff'}}>{sDb.cap.toLocaleString('pt-BR')}</b></span>
+                                                            <span>🎫 <b style={{color:'#00E676'}}>{fmt(ticPrice)}</b></span>
+                                                            <span>💸 <b style={{color:'var(--danger)'}}>{fmt(sDb.maint)}/sem</b></span>
                                                         </div>
                                                     </div>
-                                                );
-                                            })
-                                        ) : (
-                                            <div style={{display:'grid', placeItems:'center', height:'100%', color:'#fff', fontSize:'13px', textAlign: 'center', padding: 20}}>
-                                                <br/>O técnico ainda não enviou a súmula tática.
-                                            </div>
-                                        )}
+                                                </div>
+                                            );
+                                        })()}
+
+                                        {(() => {
+                                            const comandante = (coaches || []).find(c => c.teamId === modal.data.id);
+                                            return (
+                                                <div style={{display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,215,0,0.1)', padding: 10, borderRadius: 10, marginBottom: 15, border: '1px solid gold'}}>
+                                                    {comandante?.face ? 
+                                                        <img src={comandante.face} style={{width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '1px solid gold'}} /> 
+                                                        : <div style={{fontSize: 24, width: 40, textAlign: 'center'}}>👔</div>
+                                                    }
+                                                    <div>
+                                                        <small style={{display: 'block', color: 'gold', fontSize: '9px', fontWeight: 'bold'}}>COMANDANTE:</small>
+                                                        <b style={{color: '#fff'}}>{comandante ? comandante.name : "Sem técnico no cargo"}</b>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+
+                                        <div className="football-field" style={{height: '380px', pointerEvents: 'none', position: 'relative'}}>
+                                            {modal.data.tactics ? (
+                                                FORMATIONS[modal.data.tactics.formation].map((posLabel, idx) => {
+                                                    const coords = FORMATION_COORDINATES[modal.data.tactics.formation][idx];
+                                                    const pId = modal.data.tactics.lineup[idx];
+                                                    const player = players.find(p => p.id === pId);
+
+                                                    return (
+                                                        <div key={idx} style={{ 
+                                                            position: 'absolute', top: coords.t, left: coords.l, 
+                                                            transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' 
+                                                        }}>
+                                                            <div className="player-photo-circle" style={{
+                                                                width: '32px', height: '32px', 
+                                                                border: player ? '2px solid gold' : '1px dashed #666',
+                                                                background: player ? '#001a33' : 'rgba(0,0,0,0.4)',
+                                                                boxShadow: '0 4px 6px rgba(0,0,0,0.6)'
+                                                            }}>
+                                                                {player?.face ? <img src={player.face} style={{width:'100%', height:'100%', objectFit:'cover'}} /> : <span style={{fontSize: '8px'}}>{posLabel}</span>}
+                                                            </div>
+                                                            <div className="player-name-label" style={{
+                                                                fontSize: '9px', padding: '2px 6px', background: player ? '#fff' : 'rgba(0,0,0,0.8)',
+                                                                color: player ? '#000' : '#fff', fontWeight: '900', marginTop: '3px',
+                                                                borderRadius: '4px', border: player ? '1px solid #333' : 'none',
+                                                                boxShadow: '0 2px 5px rgba(0,0,0,0.8)', letterSpacing: '0.5px'
+                                                            }}>
+                                                                {player ? player.name.split(' ')[0].toUpperCase() : "VAZIO"}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })
+                                            ) : (
+                                                <div style={{display:'grid', placeItems:'center', height:'100%', color:'#fff', fontSize:'13px', textAlign: 'center', padding: 20}}>
+                                                    <br/>O técnico ainda não enviou a súmula tática.
+                                                </div>
+                                            )}
+                                        </div>
+                                        <p style={{fontSize: '10px', color: '#888', textAlign: 'center', marginTop: 10}}>
+                                            Esquema: {modal.data.tactics?.formation || "Não definido"}
+                                        </p>
                                     </div>
-                                    <p style={{fontSize: '10px', color: '#888', textAlign: 'center', marginTop: 10}}>
-                                        Esquema: {modal.data.tactics?.formation || "Não definido"}
-                                    </p>
                                 </div>
-                            </div>
-                        )}
-    
+                            )}
+
                             {modal.type === 'HIRE_COACH' && (
                                 <div className="modal-content">
                                     <h3>Negociar com {modal.data.name}</h3>
@@ -7954,10 +7947,10 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             )}
                         </div>
                     </div>}
+                </div>
             </div>
-        </div>
-    );
-};
+        );
+    };
 // --- COMPONENTS ---
 const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor, onCreateCoach, onCreatePlayer }) => {
         const [tab, setTab] = useState('LOGIN'); 

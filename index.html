@@ -2352,14 +2352,20 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
 
 
      
-       const PublicServices = ({ players, user, onDonate }) => {
+      const PublicServices = ({ players, coaches, user, onDonate }) => {
     const [hTab, setHTab] = useState('HOSPITAL');
     const [showLoanUI, setShowLoanUI] = useState(false);
     const [loanAmount, setLoanAmount] = useState(100000);
     const [loanInst, setLoanInst] = useState(5);
     const [showInvestUI, setShowInvestUI] = useState(false);
     const [investAmount, setInvestAmount] = useState(100000);
+    
+    // --- ESTADOS DO PIX ---
+    const [pixRecipient, setPixRecipient] = useState('');
+    const [pixAmount, setPixAmount] = useState('');
+
     const injured = (players || []).filter(p => (p.recoveryLeft || 0) > 0);
+    const db = firebase.firestore();
 
     const SURGERY_OPTIONS = {
         MODERADA: [
@@ -2401,7 +2407,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
 
             let teamCoverage = 0;
             if (p.teamId && p.teamId !== 'FREE') {
-                const teamDoc = await firebase.firestore().collection('teams').doc(p.teamId).get();
+                const teamDoc = await db.collection('teams').doc(p.teamId).get();
                 if (teamDoc.exists && teamDoc.data().healthPlan) {
                     teamCoverage = teamDoc.data().healthPlan.coverage || 0;
                 }
@@ -2539,24 +2545,79 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         }
     };
 
-    // ==========================================
-    // MOTOR PROCEDURAL DA BALADA (1000+ EVENTOS)
-    // ==========================================
-   // ==========================================
-    // MOTOR PROCEDURAL DA BALADA (1000+ EVENTOS)
-    // ==========================================
+    // --- NOVA FUNÇÃO: ENVIAR PIX (P2P) ---
+    const handleSendPix = async () => {
+        const amount = parseFloat(pixAmount);
+        if (isNaN(amount) || amount <= 0) return alert("Valor inválido.");
+        if (amount > 20000) return alert("O limite máximo por PIX é de ₣ 20.000 (Lei Antilavagem).");
+        if (!pixRecipient) return alert("Selecione um destinatário.");
+
+        // TRAVAS ANTI-TRAPAÇA
+        if (user.type === 'PLAYER') {
+            if ((user.data.overall || 0) <= 50) return alert("🚫 BLOQUEADO: Apenas jogadores com Overall acima de 50 (Nível Pró) podem enviar PIX.");
+            if (user.data.teamId === 'FREE' || !user.data.teamId) return alert("🚫 BLOQUEADO: Agentes Livres (Contas Fantasmas) não podem fazer transferências bancárias.");
+        } else if (user.type === 'COACH') {
+            if ((user.data.level || 1) < 2) return alert("🚫 BLOQUEADO: Apenas Técnicos Nível 2+ podem enviar PIX.");
+        }
+
+        const totalCost = amount * 1.10; // Taxa de 10%
+        if ((user.data.balance || 0) < totalCost) return alert(`Saldo insuficiente!\nCom a taxa bancária de 10%, você precisa ter na conta: ${fmt(totalCost)}`);
+
+        const [recType, recId] = pixRecipient.split('_');
+        const collection = recType === 'PLAYER' ? 'players' : 'users';
+
+        if (!confirm(`Confirma o PIX de ${fmt(amount)}?\n\n💸 Valor da Transferência: ${fmt(amount)}\n🏦 Taxa do Banco (10%): ${fmt(amount * 0.10)}\n=====================\nTotal Debitado: ${fmt(totalCost)}`)) return;
+
+        try {
+            const b = db.batch();
+
+            // 1. Tira do remetente
+            const myCol = user.type === 'PLAYER' ? 'players' : 'users';
+            b.update(db.collection(myCol).doc(user.data.id), {
+                balance: firebase.firestore.FieldValue.increment(-totalCost)
+            });
+
+            // 2. Entrega ao destinatário
+            b.update(db.collection(collection).doc(recId), {
+                balance: firebase.firestore.FieldValue.increment(amount)
+            });
+
+            // 3. Salva no Log da Receita Federal (Admin)
+            let recName = "Desconhecido";
+            if(recType === 'PLAYER') recName = players.find(p => p.id === recId)?.name || recName;
+            if(recType === 'COACH') recName = coaches.find(c => c.id === recId)?.name || recName;
+
+            const logRef = db.collection('pixLogs').doc();
+            b.set(logRef, {
+                senderId: user.data.id,
+                senderName: user.data.name,
+                senderType: user.type,
+                recipientId: recId,
+                recipientName: recName,
+                recipientType: recType,
+                amount: amount,
+                tax: amount * 0.10,
+                date: Date.now()
+            });
+
+            await b.commit();
+            alert(`✅ PIX ENVIADO COM SUCESSO!\n${fmt(amount)} foram transferidos para a conta de ${recName}.`);
+            setPixAmount('');
+            setPixRecipient('');
+        } catch (e) {
+            alert("Erro ao processar o PIX: " + e.message);
+        }
+    };
+
     const handleNightclub = async () => {
         if (user.type !== 'PLAYER' && user.type !== 'COACH') {
             return alert("Apenas Pessoas Físicas (Jogadores e Técnicos) podem curtir a noitada!");
         }
 
-        // --- NOVA TRAVA: JOGADOR LESIONADO TENTANDO ENTRAR ---
         if (user.type === 'PLAYER' && (user.data.recoveryLeft || 0) > 0) {
             const confirmBribe = confirm("⚠️ ATENÇÃO: Você está no Departamento Médico!\n\nSe a imprensa ou a diretoria te pegarem na balada de atestado, a punição será severa. Deseja forçar a entrada disfarçado?");
-            
             if (!confirmBribe) return;
 
-            // 80% de chance de ser pego no flagra!
             if (Math.random() < 0.80) {
                 const fine = 10000;
                 const penaltyUpdates = {
@@ -2573,7 +2634,6 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                     b.update(db.collection('players').doc(user.data.id), penaltyUpdates);
                     b.set(db.collection('news').doc(), { text: scandalMsg, type: 'press', date: Date.now(), likes: [] });
                     await b.commit();
-                    
                     return alert(`📸 FLAGRADO!\n\nO paparazzo tirou foto sua mancando na porta da boate! Você virou piada e a diretoria não perdoou.\n\nEfeitos:\n💸 Multa de ${fmt(fine)}\n📉 Fama: -1000\n🏥 Lesão Agravada (+1 jogo fora)!`);
                 } catch (e) {
                     return alert("Erro: " + e.message);
@@ -2589,8 +2649,6 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         }
 
         if (!confirm(`🎟️ ENTRADA VIP: ${fmt(entryFee)}\n\nSua noite pode ser lendária ou terminar em escândalo. A roleta de Mato Real está girando... Entrar?`)) return;
-
-        // O erro estava aqui: Removido o setLoading() que causava o crash.
 
         const roll = Math.random(); 
         let msg = "";
@@ -2682,14 +2740,10 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         try {
             const col = user.type === 'PLAYER' ? 'players' : 'users'; 
             await db.collection(col).doc(user.data.id).update(updates);
-            
             if (newsMsg) {
                 await db.collection('news').add({ text: newsMsg, type: 'press', date: Date.now(), likes: [] });
             }
-            
-            // O alerta agora aparece imediatamente
             alert(msg);
-            
         } catch (e) {
             alert("Erro no evento: " + e.message);
         }
@@ -2795,252 +2849,289 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                         <span style={{fontSize:24}}>🏦</span>
                         <div>
                             <b style={{display:'block'}}>BANCO DE MATO REAL</b>
-                            <small>Crédito e Investimentos Financeiros</small>
+                            <small>Crédito, Investimentos e PIX</small>
                         </div>
                     </div>
 
-                   {user.type !== 'USER' && user.type !== 'PLAYER' ? (
+                   {!['USER', 'PLAYER', 'COACH'].includes(user.type) ? (
                         <div className="card" style={{textAlign:'center', padding:30, color:'#888'}}>
                             <i className="fas fa-lock" style={{fontSize:40, marginBottom:10}}></i>
-                            <p>Esta área é exclusiva para Clubes e Jogadores.</p>
-                        </div>
-                    ) : user.type === 'PLAYER' ? (
-                        <div className="animate-in">
-                            <div className="card" style={{borderLeft: '4px solid #00E676', marginBottom: 15}}>
-                                <h4 style={{marginTop: 0, color: '#00E676'}}>🛡️ Meu Seguro Saúde Particular</h4>
-                                
-                                {user.data.healthPlan ? (
-                                    <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid #333'}}>
-                                        <b style={{color: '#00E676'}}>Cobertura Ativa</b>
-                                        <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 10, borderBottom:'1px dashed #444', paddingBottom:5}}>
-                                            <span>Plano: <b>{user.data.healthPlan.name}</b></span>
-                                            <span>Cobre: <b style={{color:'lime'}}>{user.data.healthPlan.coverage}% de Cirurgias</b></span>
-                                        </div>
-                                        <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 5}}>
-                                            <span>Mensalidade:</span>
-                                            <b style={{color:'var(--danger)'}}>{fmt(user.data.healthPlan.cost)}/sem</b>
-                                        </div>
-                                        <button className="btn btn-red" style={{marginTop: 15}} onClick={async () => {
-                                            if(confirm("Cancelar seu Seguro Particular?")) {
-                                                await db.collection('players').doc(user.data.id).update({
-                                                    healthPlan: firebase.firestore.FieldValue.delete()
-                                                });
-                                                alert("Plano cancelado.");
-                                            }
-                                        }}>
-                                            ❌ CANCELAR PLANO
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>
-                                            O presidente do clube não paga seu seguro? Contrate um particular! Ele cobre suas cirurgias e o valor é descontado automaticamente do seu salário toda semana.
-                                        </p>
-                                        
-                                        <div style={{display:'grid', gap:10}}>
-                                            <div style={{background:'#111', padding:10, borderRadius:5, border:'1px solid silver', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                                <div><b style={{color:'silver', fontSize:13}}>Prata</b><br/><small style={{color:'#00E676'}}>Cobre 30%</small></div>
-                                                <div style={{textAlign:'right'}}><b style={{color:'var(--danger)', display:'block'}}>{fmt(1500)}/s</b><button className="btn btn-ghost" style={{padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5}} onClick={async () => { if(confirm(`Contratar o Plano Prata por ${fmt(1500)}/semana?`)) { await db.collection('players').doc(user.data.id).update({ healthPlan: { name: 'Prata', coverage: 30, cost: 1500 } }); } }}>ASSINAR</button></div>
-                                            </div>
-
-                                            <div style={{background:'#111', padding:10, borderRadius:5, border:'1px solid gold', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                                <div><b style={{color:'gold', fontSize:13}}>Ouro</b><br/><small style={{color:'#00E676'}}>Cobre 50%</small></div>
-                                                <div style={{textAlign:'right'}}><b style={{color:'var(--danger)', display:'block'}}>{fmt(4000)}/s</b><button className="btn btn-ghost" style={{padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5, borderColor:'gold', color:'gold'}} onClick={async () => { if(confirm(`Contratar o Plano Ouro por ${fmt(4000)}/semana?`)) { await db.collection('players').doc(user.data.id).update({ healthPlan: { name: 'Ouro', coverage: 50, cost: 4000 } }); } }}>ASSINAR</button></div>
-                                            </div>
-
-                                            <div style={{background:'linear-gradient(45deg, #111, #1a237e)', padding:10, borderRadius:5, border:'1px solid cyan', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                                <div><b style={{color:'cyan', fontSize:13}}>Diamante</b><br/><small style={{color:'#00E676'}}>Cobre 70%</small></div>
-                                                <div style={{textAlign:'right'}}><b style={{color:'var(--danger)', display:'block'}}>{fmt(10000)}/s</b><button className="btn btn-blue" style={{padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5}} onClick={async () => { if(confirm(`Contratar o Plano Diamante por ${fmt(10000)}/semana?`)) { await db.collection('players').doc(user.data.id).update({ healthPlan: { name: 'Diamante', coverage: 70, cost: 10000 } }); } }}>ASSINAR</button></div>
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
+                            <p>Esta área é exclusiva para Clubes, Jogadores e Técnicos.</p>
                         </div>
                     ) : (
                         <div className="animate-in">
-                            <div className="card" style={{borderLeft: '4px solid var(--secondary)', marginBottom: 15}}>
-                                <h4 style={{marginTop: 0, color: 'var(--secondary)'}}>💸 Linhas de Crédito</h4>
-                                
-                                {user.data.stadiumLoan && user.data.stadiumLoan.installments > 0 && (
-                                    <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid cyan', marginBottom: 10}}>
-                                        <b style={{color: 'cyan'}}>🏟️ Financiamento da Arena</b>
-                                        <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 10, borderBottom:'1px dashed #444', paddingBottom:5}}>
-                                            <span>Faltam: <b>{user.data.stadiumLoan.installments} parcelas</b></span>
-                                            <span>Pagamento: <b style={{color:'var(--danger)'}}>{fmt(user.data.stadiumLoan.weeklyPayment)}/sem</b></span>
+                            
+                            {/* --- MÓDULO PIX (APENAS PARA PESSOA FÍSICA: JOGADORES E TÉCNICOS) --- */}
+                            {(user.type === 'PLAYER' || user.type === 'COACH') && (
+                                <div className="card" style={{borderLeft: '4px solid #00bcd4', marginBottom: 15}}>
+                                    <h4 style={{marginTop: 0, color: '#00bcd4'}}>💸 Enviar PIX (Transferência)</h4>
+                                    <p style={{fontSize: 11, color: '#aaa', marginBottom: 15}}>Transfira dinheiro diretamente para o bolso de outros atletas ou técnicos (Taxa bancária: 10%). Limite: ₣ 20.000.</p>
+                                    
+                                    <label>Quem vai receber o PIX?</label>
+                                    <select className="input-field" value={pixRecipient} onChange={e=>setPixRecipient(e.target.value)}>
+                                        <option value="">-- Selecione o contato --</option>
+                                        <optgroup label="🏃 Jogadores">
+                                            {players.filter(p => p.id !== user.data.id && p.name).map(p => (
+                                                <option key={p.id} value={`PLAYER_${p.id}`}>{p.name} (Jogador)</option>
+                                            ))}
+                                        </optgroup>
+                                        <optgroup label="👔 Técnicos">
+                                            {(coaches || []).filter(c => c.id !== user.data.id && c.name).map(c => (
+                                                <option key={c.id} value={`COACH_${c.id}`}>{c.name} (Treinador)</option>
+                                            ))}
+                                        </optgroup>
+                                    </select>
+
+                                    <label>Valor da Transferência (₣)</label>
+                                    <input className="input-field" type="number" placeholder="Ex: 5000" value={pixAmount} onChange={e=>setPixAmount(e.target.value)} />
+                                    
+                                    <button className="btn btn-blue" style={{background:'#00bcd4', color:'#000'}} onClick={handleSendPix}>
+                                        <i className="fas fa-paper-plane"></i> CONFIRMAR PIX
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* --- MÓDULO DE SEGURO (SÓ JOGADOR) --- */}
+                            {user.type === 'PLAYER' && (
+                                <div className="card" style={{borderLeft: '4px solid #00E676', marginBottom: 15}}>
+                                    <h4 style={{marginTop: 0, color: '#00E676'}}>🛡️ Meu Seguro Saúde Particular</h4>
+                                    
+                                    {user.data.healthPlan ? (
+                                        <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid #333'}}>
+                                            <b style={{color: '#00E676'}}>Cobertura Ativa</b>
+                                            <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 10, borderBottom:'1px dashed #444', paddingBottom:5}}>
+                                                <span>Plano: <b>{user.data.healthPlan.name}</b></span>
+                                                <span>Cobre: <b style={{color:'lime'}}>{user.data.healthPlan.coverage}% de Cirurgias</b></span>
+                                            </div>
+                                            <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 5}}>
+                                                <span>Mensalidade:</span>
+                                                <b style={{color:'var(--danger)'}}>{fmt(user.data.healthPlan.cost)}/sem</b>
+                                            </div>
+                                            <button className="btn btn-red" style={{marginTop: 15}} onClick={async () => {
+                                                if(confirm("Cancelar seu Seguro Particular?")) {
+                                                    await db.collection('players').doc(user.data.id).update({
+                                                        healthPlan: firebase.firestore.FieldValue.delete()
+                                                    });
+                                                    alert("Plano cancelado.");
+                                                }
+                                            }}>
+                                                ❌ CANCELAR PLANO
+                                            </button>
                                         </div>
-                                    </div>
-                                )}
-                                
-                                {user.data.bankLoan && user.data.bankLoan.installments > 0 ? (
-                                    <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid #333'}}>
-                                        <b style={{color: 'var(--danger)'}}>Empréstimo Ativo</b>
-                                        <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 10, borderBottom:'1px dashed #444', paddingBottom:5}}>
-                                            <span>Faltam: <b>{user.data.bankLoan.installments} parcelas</b></span>
-                                            <span>Pagamento: <b style={{color:'var(--danger)'}}>{fmt(user.data.bankLoan.weeklyPayment)}/sem</b></span>
-                                        </div>
-                                    </div>
-                                ) : (
-                                   <>
-                                        {!showLoanUI ? (
-                                            <>
-                                                <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>Precisa de caixa rápido? Pegue um empréstimo.</p>
-                                                <button className="btn btn-blue" onClick={openLoanUI}>💰 SIMULAR EMPRÉSTIMO</button>
-                                            </>
-                                        ) : (
-                                            <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid var(--secondary)'}}>
-                                                <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
-                                                    <label style={{color:'var(--secondary)', fontSize:12, fontWeight:'bold'}}>Valor do Empréstimo</label>
-                                                    <b style={{color:'#fff'}}>{fmt(loanAmount)}</b>
+                                    ) : (
+                                        <>
+                                            <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>
+                                                O presidente do clube não paga seu seguro? Contrate um particular! Ele cobre suas cirurgias e o valor é descontado automaticamente do seu salário toda semana.
+                                            </p>
+                                            
+                                            <div style={{display:'grid', gap:10}}>
+                                                <div style={{background:'#111', padding:10, borderRadius:5, border:'1px solid silver', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                                    <div><b style={{color:'silver', fontSize:13}}>Prata</b><br/><small style={{color:'#00E676'}}>Cobre 30%</small></div>
+                                                    <div style={{textAlign:'right'}}><b style={{color:'var(--danger)', display:'block'}}>{fmt(1500)}/s</b><button className="btn btn-ghost" style={{padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5}} onClick={async () => { if(confirm(`Contratar o Plano Prata por ${fmt(1500)}/semana?`)) { await db.collection('players').doc(user.data.id).update({ healthPlan: { name: 'Prata', coverage: 30, cost: 1500 } }); } }}>ASSINAR</button></div>
                                                 </div>
-                                                <input type="range" min="10000" max={LOAN_LIMITS[user.data.serie || 'VARZEA'] || 500000} step="10000" value={loanAmount} onChange={e => setLoanAmount(Number(e.target.value))} style={{width:'100%', accentColor:'var(--secondary)', marginBottom: 15}} />
 
-                                                <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
-                                                    <label style={{color:'var(--secondary)', fontSize:12, fontWeight:'bold'}}>Parcelas (Semanas)</label>
-                                                    <b style={{color:'#fff'}}>{loanInst}x</b>
+                                                <div style={{background:'#111', padding:10, borderRadius:5, border:'1px solid gold', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                                    <div><b style={{color:'gold', fontSize:13}}>Ouro</b><br/><small style={{color:'#00E676'}}>Cobre 50%</small></div>
+                                                    <div style={{textAlign:'right'}}><b style={{color:'var(--danger)', display:'block'}}>{fmt(4000)}/s</b><button className="btn btn-ghost" style={{padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5, borderColor:'gold', color:'gold'}} onClick={async () => { if(confirm(`Contratar o Plano Ouro por ${fmt(4000)}/semana?`)) { await db.collection('players').doc(user.data.id).update({ healthPlan: { name: 'Ouro', coverage: 50, cost: 4000 } }); } }}>ASSINAR</button></div>
                                                 </div>
-                                                <input type="range" min="1" max="10" step="1" value={loanInst} onChange={e => setLoanInst(Number(e.target.value))} style={{width:'100%', accentColor:'var(--secondary)', marginBottom: 15}} />
 
-                                                {(() => {
-                                                    const interestRate = 0.10 + ((loanInst - 1) * 0.05);
-                                                    const totalToPay = loanAmount * (1 + interestRate);
-                                                    const weekly = totalToPay / loanInst;
-                                                    return (
-                                                        <div style={{background:'#111', padding:10, borderRadius:5, fontSize:11, borderLeft:'3px solid var(--secondary)', marginBottom:15}}>
-                                                            <div style={{display:'flex', justifyContent:'space-between'}}><span>Taxa de Juros:</span> <b style={{color:'gold'}}>{(interestRate * 100).toFixed(0)}%</b></div>
-                                                            <div style={{display:'flex', justifyContent:'space-between', margin:'5px 0'}}><span>Pagamento Semanal:</span> <b style={{color:'var(--danger)'}}>{fmt(weekly)}</b></div>
-                                                        </div>
-                                                    );
-                                                })()}
+                                                <div style={{background:'linear-gradient(45deg, #111, #1a237e)', padding:10, borderRadius:5, border:'1px solid cyan', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                                    <div><b style={{color:'cyan', fontSize:13}}>Diamante</b><br/><small style={{color:'#00E676'}}>Cobre 70%</small></div>
+                                                    <div style={{textAlign:'right'}}><b style={{color:'var(--danger)', display:'block'}}>{fmt(10000)}/s</b><button className="btn btn-blue" style={{padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5}} onClick={async () => { if(confirm(`Contratar o Plano Diamante por ${fmt(10000)}/semana?`)) { await db.collection('players').doc(user.data.id).update({ healthPlan: { name: 'Diamante', coverage: 70, cost: 10000 } }); } }}>ASSINAR</button></div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            )}
 
-                                                <div style={{display:'flex', gap:10}}>
-                                                    <button className="btn btn-green" onClick={handleConfirmLoan}>ASSINAR CONTRATO</button>
-                                                    <button className="btn btn-red" onClick={() => setShowLoanUI(false)}>CANCELAR</button>
+                            {/* --- MÓDULOS DOS CLUBES (USER) --- */}
+                            {user.type === 'USER' && (
+                                <>
+                                    <div className="card" style={{borderLeft: '4px solid var(--secondary)', marginBottom: 15}}>
+                                        <h4 style={{marginTop: 0, color: 'var(--secondary)'}}>💸 Linhas de Crédito</h4>
+                                        
+                                        {user.data.stadiumLoan && user.data.stadiumLoan.installments > 0 && (
+                                            <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid cyan', marginBottom: 10}}>
+                                                <b style={{color: 'cyan'}}>🏟️ Financiamento da Arena</b>
+                                                <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 10, borderBottom:'1px dashed #444', paddingBottom:5}}>
+                                                    <span>Faltam: <b>{user.data.stadiumLoan.installments} parcelas</b></span>
+                                                    <span>Pagamento: <b style={{color:'var(--danger)'}}>{fmt(user.data.stadiumLoan.weeklyPayment)}/sem</b></span>
                                                 </div>
                                             </div>
                                         )}
-                                    </>
-                                )}
-                            </div>
-
-                            <div className="card" style={{borderLeft: '4px solid #00E676'}}>
-                                <h4 style={{marginTop: 0, color: '#00E676'}}>📈 Fundo de Renda Fixa</h4>
-                                
-                                {user.data.bankInvestment && user.data.bankInvestment.amount > 0 ? (
-                                    <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid #333'}}>
-                                        <b style={{color: '#00E676'}}>Investimento Ativo</b>
-                                        <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 10}}>
-                                            <span>Valor Aplicado: <b>{fmt(user.data.bankInvestment.amount)}</b></span>
-                                            <span style={{color: (user.data.bankInvestment.weeksLocked || 0) > 0 ? 'var(--warning)' : 'lime'}}>
-                                                {(user.data.bankInvestment.weeksLocked || 0) > 0 ? `Bloqueado (${user.data.bankInvestment.weeksLocked} sem)` : 'Livre para Saque'}
-                                            </span>
-                                        </div>
-                                        <button className="btn btn-red" style={{marginTop: 15}} onClick={handleWithdraw}>🏦 RESGATAR DINHEIRO</button>
-                                    </div>
-                                ) : (
-                                    <>
-                                        {!showInvestUI ? (
-                                            <>
-                                                <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>Aplique seu dinheiro no banco rendendo <b style={{color:'#00E676'}}>2% de juros</b> na virada de semana.</p>
-                                                <button className="btn btn-green" style={{color:'#000'}} onClick={openInvestUI}>📊 SIMULAR INVESTIMENTO</button>
-                                            </>
-                                        ) : (
-                                            <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid #00E676'}}>
-                                                <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
-                                                    <label style={{color:'#00E676', fontSize:12, fontWeight:'bold'}}>Valor a Aplicar</label>
-                                                    <b style={{color:'#fff'}}>{fmt(investAmount)}</b>
+                                        
+                                        {user.data.bankLoan && user.data.bankLoan.installments > 0 ? (
+                                            <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid #333'}}>
+                                                <b style={{color: 'var(--danger)'}}>Empréstimo Ativo</b>
+                                                <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 10, borderBottom:'1px dashed #444', paddingBottom:5}}>
+                                                    <span>Faltam: <b>{user.data.bankLoan.installments} parcelas</b></span>
+                                                    <span>Pagamento: <b style={{color:'var(--danger)'}}>{fmt(user.data.bankLoan.weeklyPayment)}/sem</b></span>
                                                 </div>
-                                                
-                                                <input type="range" min="10000" max={Math.min(user.data.balance || 0, 50000000 - (user.data.bankInvestment?.amount || 0))} step="10000" value={investAmount} onChange={e => setInvestAmount(Number(e.target.value))} style={{width:'100%', accentColor:'#00E676', marginBottom: 15}} />
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {!showLoanUI ? (
+                                                    <>
+                                                        <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>Precisa de caixa rápido? Pegue um empréstimo.</p>
+                                                        <button className="btn btn-blue" onClick={openLoanUI}>💰 SIMULAR EMPRÉSTIMO</button>
+                                                    </>
+                                                ) : (
+                                                    <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid var(--secondary)'}}>
+                                                        <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
+                                                            <label style={{color:'var(--secondary)', fontSize:12, fontWeight:'bold'}}>Valor do Empréstimo</label>
+                                                            <b style={{color:'#fff'}}>{fmt(loanAmount)}</b>
+                                                        </div>
+                                                        <input type="range" min="10000" max={LOAN_LIMITS[user.data.serie || 'VARZEA'] || 500000} step="10000" value={loanAmount} onChange={e => setLoanAmount(Number(e.target.value))} style={{width:'100%', accentColor:'var(--secondary)', marginBottom: 15}} />
 
+                                                        <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
+                                                            <label style={{color:'var(--secondary)', fontSize:12, fontWeight:'bold'}}>Parcelas (Semanas)</label>
+                                                            <b style={{color:'#fff'}}>{loanInst}x</b>
+                                                        </div>
+                                                        <input type="range" min="1" max="10" step="1" value={loanInst} onChange={e => setLoanInst(Number(e.target.value))} style={{width:'100%', accentColor:'var(--secondary)', marginBottom: 15}} />
+
+                                                        {(() => {
+                                                            const interestRate = 0.10 + ((loanInst - 1) * 0.05);
+                                                            const totalToPay = loanAmount * (1 + interestRate);
+                                                            const weekly = totalToPay / loanInst;
+                                                            return (
+                                                                <div style={{background:'#111', padding:10, borderRadius:5, fontSize:11, borderLeft:'3px solid var(--secondary)', marginBottom:15}}>
+                                                                    <div style={{display:'flex', justifyContent:'space-between'}}><span>Taxa de Juros:</span> <b style={{color:'gold'}}>{(interestRate * 100).toFixed(0)}%</b></div>
+                                                                    <div style={{display:'flex', justifyContent:'space-between', margin:'5px 0'}}><span>Pagamento Semanal:</span> <b style={{color:'var(--danger)'}}>{fmt(weekly)}</b></div>
+                                                                </div>
+                                                            );
+                                                        })()}
+
+                                                        <div style={{display:'flex', gap:10}}>
+                                                            <button className="btn btn-green" onClick={handleConfirmLoan}>ASSINAR CONTRATO</button>
+                                                            <button className="btn btn-red" onClick={() => setShowLoanUI(false)}>CANCELAR</button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+
+                                    <div className="card" style={{borderLeft: '4px solid #00E676'}}>
+                                        <h4 style={{marginTop: 0, color: '#00E676'}}>📈 Fundo de Renda Fixa</h4>
+                                        
+                                        {user.data.bankInvestment && user.data.bankInvestment.amount > 0 ? (
+                                            <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid #333'}}>
+                                                <b style={{color: '#00E676'}}>Investimento Ativo</b>
+                                                <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 10}}>
+                                                    <span>Valor Aplicado: <b>{fmt(user.data.bankInvestment.amount)}</b></span>
+                                                    <span style={{color: (user.data.bankInvestment.weeksLocked || 0) > 0 ? 'var(--warning)' : 'lime'}}>
+                                                        {(user.data.bankInvestment.weeksLocked || 0) > 0 ? `Bloqueado (${user.data.bankInvestment.weeksLocked} sem)` : 'Livre para Saque'}
+                                                    </span>
+                                                </div>
+                                                <button className="btn btn-red" style={{marginTop: 15}} onClick={handleWithdraw}>🏦 RESGATAR DINHEIRO</button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {!showInvestUI ? (
+                                                    <>
+                                                        <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>Aplique seu dinheiro no banco rendendo <b style={{color:'#00E676'}}>2% de juros</b> na virada de semana.</p>
+                                                        <button className="btn btn-green" style={{color:'#000'}} onClick={openInvestUI}>📊 SIMULAR INVESTIMENTO</button>
+                                                    </>
+                                                ) : (
+                                                    <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid #00E676'}}>
+                                                        <div style={{display:'flex', justifyContent:'space-between', marginBottom:5}}>
+                                                            <label style={{color:'#00E676', fontSize:12, fontWeight:'bold'}}>Valor a Aplicar</label>
+                                                            <b style={{color:'#fff'}}>{fmt(investAmount)}</b>
+                                                        </div>
+                                                        
+                                                        <input type="range" min="10000" max={Math.min(user.data.balance || 0, 50000000 - (user.data.bankInvestment?.amount || 0))} step="10000" value={investAmount} onChange={e => setInvestAmount(Number(e.target.value))} style={{width:'100%', accentColor:'#00E676', marginBottom: 15}} />
+
+                                                        {(() => {
+                                                            const rendimento = investAmount * 0.02;
+                                                            return (
+                                                                <div style={{background:'#111', padding:10, borderRadius:5, fontSize:11, borderLeft:'3px solid #00E676', marginBottom:15}}>
+                                                                    <div style={{display:'flex', justifyContent:'space-between'}}><span>Rendimento Semanal (2%):</span> <b style={{color:'lime'}}>+ {fmt(rendimento)}</b></div>
+                                                                </div>
+                                                            );
+                                                        })()}
+
+                                                        <div style={{display:'flex', gap:10}}>
+                                                            <button className="btn btn-green" style={{color:'#000'}} onClick={handleConfirmInvest}>CONFIRMAR APLICAÇÃO</button>
+                                                            <button className="btn btn-red" onClick={() => setShowInvestUI(false)}>CANCELAR</button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+
+                                    <div className="card" style={{borderLeft: '4px solid #D500F9', marginTop: 15}}>
+                                        <h4 style={{marginTop: 0, color: '#D500F9'}}>🏥 Plano de Saúde do Elenco</h4>
+                                        
+                                        {user.data.healthPlan ? (
+                                            <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid #333'}}>
+                                                <b style={{color: '#D500F9'}}>Cobertura Ativa</b>
+                                                <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 10, borderBottom:'1px dashed #444', paddingBottom:5}}>
+                                                    <span>Plano: <b>{user.data.healthPlan.name}</b></span>
+                                                    <span>Cobre: <b style={{color:'lime'}}>{user.data.healthPlan.coverage}% de Cirurgias</b></span>
+                                                </div>
+                                                <button className="btn btn-red" style={{marginTop: 15}} onClick={async () => {
+                                                    if(confirm("Cancelar o Plano de Saúde?")) {
+                                                        await db.collection('teams').doc(user.data.id).update({ healthPlan: firebase.firestore.FieldValue.delete() });
+                                                        alert("Plano cancelado.");
+                                                    }
+                                                }}>❌ CANCELAR PLANO</button>
+                                            </div>
+                                        ) : (
+                                            <>
                                                 {(() => {
-                                                    const rendimento = investAmount * 0.02;
+                                                    const s = user.data.serie || 'VARZEA';
+                                                    const costs = {
+                                                        'VARZEA': { basic: 5000, master: 15000 },
+                                                        'D': { basic: 15000, master: 40000 },
+                                                        'C': { basic: 30000, master: 80000 },
+                                                        'B': { basic: 60000, master: 150000 },
+                                                        'A': { basic: 150000, master: 350000 }
+                                                    };
+                                                    const myCost = costs[s] || costs['VARZEA'];
+
                                                     return (
-                                                        <div style={{background:'#111', padding:10, borderRadius:5, fontSize:11, borderLeft:'3px solid #00E676', marginBottom:15}}>
-                                                            <div style={{display:'flex', justifyContent:'space-between'}}><span>Rendimento Semanal (2%):</span> <b style={{color:'lime'}}>+ {fmt(rendimento)}</b></div>
+                                                        <div style={{display:'grid', gap:10}}>
+                                                            <div style={{background:'#111', padding:10, borderRadius:5, border:'1px solid #333', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                                                <div><b style={{color:'silver', fontSize:13}}>Plano Básico</b><br/><small style={{color:'#00E676'}}>Cobre 30%</small></div>
+                                                                <div style={{textAlign:'right'}}>
+                                                                    <b style={{color:'var(--danger)', display:'block'}}>{fmt(myCost.basic)}/s</b>
+                                                                    <button className="btn btn-ghost" style={{padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5, border:'1px solid silver'}} onClick={async () => {
+                                                                        if(confirm(`Contratar o Plano Básico por ${fmt(myCost.basic)}/semana?`)) {
+                                                                            await db.collection('teams').doc(user.data.id).update({ healthPlan: { name: 'Básico', coverage: 30, cost: myCost.basic } });
+                                                                            alert("Plano Básico ativado!");
+                                                                        }
+                                                                    }}>ASSINAR</button>
+                                                                </div>
+                                                            </div>
+
+                                                            <div style={{background:'#111', padding:10, borderRadius:5, border:'1px solid gold', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                                                <div><b style={{color:'gold', fontSize:13}}>Plano Master</b><br/><small style={{color:'#00E676'}}>Cobre 70%</small></div>
+                                                                <div style={{textAlign:'right'}}>
+                                                                    <b style={{color:'var(--danger)', display:'block'}}>{fmt(myCost.master)}/s</b>
+                                                                    <button className="btn btn-gold" style={{color:'#000', padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5}} onClick={async () => {
+                                                                        if(confirm(`Contratar o Plano Master por ${fmt(myCost.master)}/semana?`)) {
+                                                                            await db.collection('teams').doc(user.data.id).update({ healthPlan: { name: 'Master', coverage: 70, cost: myCost.master } });
+                                                                            alert("Plano Master ativado!");
+                                                                        }
+                                                                    }}>ASSINAR</button>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     );
                                                 })()}
-
-                                                <div style={{display:'flex', gap:10}}>
-                                                    <button className="btn btn-green" style={{color:'#000'}} onClick={handleConfirmInvest}>CONFIRMAR APLICAÇÃO</button>
-                                                    <button className="btn btn-red" onClick={() => setShowInvestUI(false)}>CANCELAR</button>
-                                                </div>
-                                            </div>
+                                            </>
                                         )}
-                                    </>
-                                )}
-                            </div>
-
-                            <div className="card" style={{borderLeft: '4px solid #D500F9', marginTop: 15}}>
-                                <h4 style={{marginTop: 0, color: '#D500F9'}}>🏥 Plano de Saúde do Elenco</h4>
-                                
-                                {user.data.healthPlan ? (
-                                    <div style={{background: 'rgba(0,0,0,0.3)', padding: 15, borderRadius: 8, border: '1px solid #333'}}>
-                                        <b style={{color: '#D500F9'}}>Cobertura Ativa</b>
-                                        <div style={{display:'flex', justifyContent:'space-between', fontSize: 12, marginTop: 10, borderBottom:'1px dashed #444', paddingBottom:5}}>
-                                            <span>Plano: <b>{user.data.healthPlan.name}</b></span>
-                                            <span>Cobre: <b style={{color:'lime'}}>{user.data.healthPlan.coverage}% de Cirurgias</b></span>
-                                        </div>
-                                        <button className="btn btn-red" style={{marginTop: 15}} onClick={async () => {
-                                            if(confirm("Cancelar o Plano de Saúde?")) {
-                                                await db.collection('teams').doc(user.data.id).update({ healthPlan: firebase.firestore.FieldValue.delete() });
-                                                alert("Plano cancelado.");
-                                            }
-                                        }}>❌ CANCELAR PLANO</button>
                                     </div>
-                                ) : (
-                                    <>
-                                        {(() => {
-                                            const s = user.data.serie || 'VARZEA';
-                                            const costs = {
-                                                'VARZEA': { basic: 5000, master: 15000 },
-                                                'D': { basic: 15000, master: 40000 },
-                                                'C': { basic: 30000, master: 80000 },
-                                                'B': { basic: 60000, master: 150000 },
-                                                'A': { basic: 150000, master: 350000 }
-                                            };
-                                            const myCost = costs[s] || costs['VARZEA'];
+                                </>
+                            )}
 
-                                            return (
-                                                <div style={{display:'grid', gap:10}}>
-                                                    <div style={{background:'#111', padding:10, borderRadius:5, border:'1px solid #333', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                                        <div><b style={{color:'silver', fontSize:13}}>Plano Básico</b><br/><small style={{color:'#00E676'}}>Cobre 30%</small></div>
-                                                        <div style={{textAlign:'right'}}>
-                                                            <b style={{color:'var(--danger)', display:'block'}}>{fmt(myCost.basic)}/s</b>
-                                                            <button className="btn btn-ghost" style={{padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5, border:'1px solid silver'}} onClick={async () => {
-                                                                if(confirm(`Contratar o Plano Básico por ${fmt(myCost.basic)}/semana?`)) {
-                                                                    await db.collection('teams').doc(user.data.id).update({ healthPlan: { name: 'Básico', coverage: 30, cost: myCost.basic } });
-                                                                    alert("Plano Básico ativado!");
-                                                                }
-                                                            }}>ASSINAR</button>
-                                                        </div>
-                                                    </div>
-
-                                                    <div style={{background:'#111', padding:10, borderRadius:5, border:'1px solid gold', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                                        <div><b style={{color:'gold', fontSize:13}}>Plano Master</b><br/><small style={{color:'#00E676'}}>Cobre 70%</small></div>
-                                                        <div style={{textAlign:'right'}}>
-                                                            <b style={{color:'var(--danger)', display:'block'}}>{fmt(myCost.master)}/s</b>
-                                                            <button className="btn btn-gold" style={{color:'#000', padding:'5px', fontSize:9, width:'auto', margin:0, marginTop:5}} onClick={async () => {
-                                                                if(confirm(`Contratar o Plano Master por ${fmt(myCost.master)}/semana?`)) {
-                                                                    await db.collection('teams').doc(user.data.id).update({ healthPlan: { name: 'Master', coverage: 70, cost: myCost.master } });
-                                                                    alert("Plano Master ativado!");
-                                                                }
-                                                            }}>ASSINAR</button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })()}
-                                    </>
-                                )}
-                            </div>
                         </div>
                     )}
                 </div>
             )}
 
-            {/* --- ABA: BALADA (VIDA NOTURNA) --- */}
             {hTab === 'BALADA' && (
                 <div className="animate-in">
                     <div style={{background:'linear-gradient(90deg, #4a148c, #000)', padding:15, borderRadius:8, color:'white', marginBottom:15, display:'flex', alignItems:'center', gap:10, border: '1px solid var(--purple)'}}>
@@ -3088,7 +3179,8 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
         </div>
     );
 };
-        //FIM
+//FIM
+      
         const TrainingCenterManager = ({ team, players, coach, user, onClose, onTrain, onTrainSolo }) => {
     const lvl = team.ctLevel || 1;
     const db = CT_DB[lvl];
@@ -5802,8 +5894,9 @@ const resetDatabase = async () => {
 };
 //FIM
 const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvanced, papers, journalists, companies, coaches, reqs, sps, config, onAct, onPost, onApprove, onReject, onEditT, onApproveTeam, onUpdateBal, onDeleteTeam, onApprovePaper, onDeletePaper, onDeleteJourno, onRejectPaper, onConfig, onReset, onApproveComp, onDeleteComp, onUpdateCompBal, onGenAttrs }) => {
-        const [tab, setTab] = useState('DASH');
-    const [selTeamPlayers, setSelTeamPlayers] = useState(null); // Estado para abrir a lista de senhas dos jogadores
+    const [tab, setTab] = useState('DASH');
+    const [selTeamPlayers, setSelTeamPlayers] = useState(null); 
+    const [pixLogs, setPixLogs] = useState(null); // Estado para a Receita Federal
 
     const tabStyle = (active) => ({
         background: active ? 'var(--primary)' : '#333',
@@ -5817,38 +5910,32 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
 
     const fedSpons = (sps || []).filter(s => s.companyId === 'FEDERACAO');
 
-    // --- FUNÇÃO MESTRE DAS SENHAS 🔑 (ADICIONADA) ---
     const managePassword = async (collection, docId, currentPass, name) => {
         const newPass = prompt(`🔐 GESTÃO DE SENHAS\nUsuário: ${name}\n\nSenha Atual: ${currentPass || 'Vazia'}\n\nDigite a NOVA SENHA para alterar:`, currentPass);
         if (newPass !== null && newPass !== currentPass) {
             try {
-                await db.collection(collection).doc(docId).update({ password: newPass });
+                await firebase.firestore().collection(collection).doc(docId).update({ password: newPass });
                 alert(`✅ Senha de ${name} alterada com sucesso!`);
             } catch (e) { alert("Erro: " + e.message); }
         }
     };
-        // --- FUNÇÃO 1: CORRIGIR PREÇOS DO SHOP (ANTI-CHEAT) ---
+
     const fixShopPrices = async () => {
         if(!confirm("⚠️ MANUTENÇÃO DO SHOP:\n\n1. Resetar ESTOQUE de tudo para 10 unidades.\n2. Corrigir PREÇOS abaixo do custo (Anti-Cheat).\n\nDeseja aplicar essa atualização geral agora?")) return;
         
         try {
-            setLoading(true);
+            const db = firebase.firestore();
             const snap = await db.collection('products').get();
             const b = db.batch();
             let count = 0;
             
             snap.docs.forEach(doc => {
                 const p = doc.data();
-                // Calcula o custo mínimo baseado na nova tabela
                 const minCost = getProdCost(p.cat, p.power); 
-                
-                // Se o preço atual for menor que o custo, ele sobe para o mínimo.
-                // Se for maior, mantemos o preço (lucro da empresa).
                 const correctedPrice = Math.max(parseFloat(p.price) || 0, minCost);
-
                 b.update(doc.ref, { 
                     price: correctedPrice,
-                    stock: 10 // <--- NOVO: Abastece o estoque para 10 unidades
+                    stock: 10 
                 });
                 count++;
             });
@@ -5858,15 +5945,13 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
         } catch(e) {
             alert("Erro na correção: " + e.message);
         }
-        setLoading(false);
     };
-    //FIM
-        // --- NOVA FUNÇÃO: REAJUSTE SALARIAL EM MASSA (TETO/PISO) ---
+
     const fixAllSalaries = async () => {
         if (!confirm("⚠️ ATENÇÃO ADM:\n\nIsso vai verificar TODOS os jogadores do banco de dados.\n\n🔻 Quem ganha ACIMA do teto -> Salário desce para o máximo permitido.\n🔺 Quem ganha ABAIXO do piso -> Salário sobe para o mínimo permitido.\n\nDeseja aplicar essa correção geral agora?")) return;
 
-        setLoading(true);
         try {
+            const db = firebase.firestore();
             const snap = await db.collection('players').get();
             const b = db.batch();
             let count = 0;
@@ -5875,23 +5960,13 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                 const p = doc.data();
                 const ovr = parseInt(p.overall) || 0;
                 const currentSal = parseFloat(p.salary) || 0;
-                
-                // Pega os limites baseados no Overall do jogador
                 const limits = getSalaryLimits(ovr); 
 
                 let newSal = currentSal;
                 let changed = false;
 
-                // 1. Se ganha pouco, sobe pro mínimo
-                if (currentSal < limits.minSal) {
-                    newSal = limits.minSal;
-                    changed = true;
-                } 
-                // 2. Se ganha muito, desce pro máximo
-                else if (currentSal > limits.maxSal) {
-                    newSal = limits.maxSal;
-                    changed = true;
-                }
+                if (currentSal < limits.minSal) { newSal = limits.minSal; changed = true; } 
+                else if (currentSal > limits.maxSal) { newSal = limits.maxSal; changed = true; }
 
                 if (changed) {
                     b.update(doc.ref, { salary: newSal });
@@ -5908,11 +5983,8 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
         } catch (e) {
             alert("Erro ao corrigir: " + e.message);
         }
-        setLoading(false);
     };
-        //FIM
-    
-        // --- FUNÇÃO 2: ABONO COLETIVO (EVENTOS) ---
+
     const giveMassGrant = async () => {
         const target = prompt("🎁 ABONO COLETIVO - QUEM VAI RECEBER?\n\n1: Jogadores (Todos)\n2: Jogadores (Apenas Contratados)\n3: Times\n4: Empresas\n5: Técnicos");
         if(!target) return;
@@ -5942,7 +6014,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
         if(!confirm(`CONFIRMA?\nDar ${fmt(amount)} para ${typeName.toUpperCase()}?\nMotivo: ${reason}`)) return;
 
         try {
-            setLoading(true);
+            const db = firebase.firestore();
             const b = db.batch();
             let q = db.collection(collectionName);
             
@@ -5971,7 +6043,6 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
         } catch(e) {
             alert("Erro: " + e.message);
         }
-        setLoading(false);
     };
 
     return (
@@ -5984,7 +6055,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                 <button style={tabStyle(tab==='PRESS')} onClick={()=>setTab('PRESS')}>Imprensa</button>
                 <button style={tabStyle(tab==='COMP')} onClick={()=>setTab('COMP')}>Empresas</button>
                 <button style={tabStyle(tab==='COACH')} onClick={()=>setTab('COACH')}>Técnicos</button>
-                <button style={tabStyle(tab==='CALENDAR')} onClick={()=>setTab('CALENDAR')}>📅 Calendário</button>       
+                <button style={tabStyle(tab==='CALENDAR')} onClick={()=>setTab('CALENDAR')}>📅 Calendário</button>        
     </div>
             {/* ABA DE TÉCNICOS */}
             {tab === 'COACH' && (
@@ -5999,10 +6070,10 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                             </div>
                             <div style={{marginTop:10, display:'flex', gap:5}}>
                                 <button className="btn btn-red" onClick={async()=>{
-                                    if(confirm("Rejeitar solicitação?")) await db.collection('users').doc(c.id).delete();
+                                    if(confirm("Rejeitar solicitação?")) await firebase.firestore().collection('users').doc(c.id).delete();
                                 }}>REJEITAR / EXCLUIR</button>
                                 <button className="btn btn-green" onClick={async()=>{
-                                    await db.collection('users').doc(c.id).update({status: 'ACTIVE'});
+                                    await firebase.firestore().collection('users').doc(c.id).update({status: 'ACTIVE'});
                                 }}>APROVAR</button>
                             </div>
                         </div>
@@ -6036,7 +6107,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                                         const idealPerksCount = Math.floor(newLevel / 5);
                                         const newPending = Math.max(0, idealPerksCount - currentPerksCount);
 
-                                        await db.collection('users').doc(c.id).update({
+                                        await firebase.firestore().collection('users').doc(c.id).update({
                                             level: newLevel,
                                             pendingPerks: newPending 
                                         });
@@ -6046,11 +6117,11 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
 
                                 <button className="btn btn-green" style={{fontSize:10, width:'auto', padding:'5px 8px'}} onClick={async()=>{
                                     const n = prompt("Novo Saldo:", c.balance);
-                                    if(n) await db.collection('users').doc(c.id).update({balance: parseFloat(n)});
+                                    if(n) await firebase.firestore().collection('users').doc(c.id).update({balance: parseFloat(n)});
                                 }}>$</button>
 
                                 <button className="btn btn-red" style={{fontSize:10, width:'auto', padding:'5px 8px'}} onClick={async()=>{
-                                    if(prompt("Digite DELETE para banir este técnico:") === "DELETE") await db.collection('users').doc(c.id).delete();
+                                    if(prompt("Digite DELETE para banir este técnico:") === "DELETE") await firebase.firestore().collection('users').doc(c.id).delete();
                                 }}>X</button>
                             </div>
                         </div>
@@ -6081,7 +6152,6 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
 </button>
                     </div>
                     
-                    {/* BOTÃO DE LIMPEZA DE MOCHILAS */}
                     <button 
                         className="btn" 
                         style={{background: '#442200', color: '#ffaa00', border: '1px solid #ffaa00', marginTop: 10}} 
@@ -6090,6 +6160,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                                 const senha = prompt("Confirme a senha master:");
                                 if(senha === '2503') {
                                     try {
+                                        const db = firebase.firestore();
                                         const b = db.batch();
                                         const salesSnap = await db.collection('sales').get();
                                         salesSnap.docs.forEach(doc => b.delete(doc.ref));
@@ -6113,13 +6184,13 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                         <i className="fas fa-broom"></i> LIMPAR TODAS AS MOCHILAS (FIX BUG)
                     </button>
 
-                    {/* BOTÃO DE AVANÇO DE RECUPERAÇÃO */}
                     <button 
                         className="btn" 
                         style={{background: '#b71c1c', color: 'white', marginTop: 10}} 
                         onClick={async () => {
                             if(confirm("Deseja reduzir 1 jogo de recuperação de TODOS os jogadores lesionados? Use isso APÓS a realização de uma partida.")) {
                                 try {
+                                    const db = firebase.firestore();
                                     const b = db.batch();
                                     const snap = await db.collection('players').get();
                                     
@@ -6132,13 +6203,11 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                                             const nextVal = currentRecovery - 1;
                                             
                                             if (nextVal <= 0) {
-                                                // Jogador recebeu alta
                                                 b.update(doc.ref, { 
                                                     recoveryLeft: 0, 
                                                     injury: firebase.firestore.FieldValue.delete() 
                                                 });
                                             } else {
-                                                // Apenas diminui um jogo
                                                 b.update(doc.ref, { recoveryLeft: nextVal });
                                             }
                                             count++;
@@ -6185,7 +6254,6 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
             {/* --- ABA TIMES E JOGADORES --- */}
             {tab==='TEAMS' && !selTeamPlayers && (
                 <div>
-                    {/* --- BOTÃO GLOBAL DE CRIAR JOGADOR NPC --- */}
                     <div style={{marginBottom: 20, textAlign: 'center'}}>
                         <button className="btn btn-green" onClick={() => setModal({type: 'ADMIN_PLAYER', data: null})}>
                             ✨ CRIAR NOVO JOGADOR (MANUAL)
@@ -6293,6 +6361,40 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                     <button className="btn btn-gold" style={{marginBottom: 20, padding: 15, fontSize: 14}} onClick={() => setModal({type: 'AWARDS_MANAGER'})}>
                         🏆 CENTRAL DE PREMIAÇÕES DE GALA (TROFÉUS E MEDALHAS)
                     </button>
+
+                    {/* --- INÍCIO DO CÓDIGO DA RECEITA FEDERAL (PIX) --- */}
+                    <div className="card" style={{border: '1px solid #00bcd4', marginBottom: 20}}>
+                        <h4 style={{marginTop: 0, color: '#00bcd4'}}>👁️ Olho de Deus (Receita Federal)</h4>
+                        <p style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>Monitore todas as transferências PIX realizadas por Jogadores e Técnicos para evitar lavagem de dinheiro.</p>
+                        
+                        <button className="btn btn-blue" style={{background:'#00bcd4', color:'#000'}} onClick={async () => {
+                            const snap = await firebase.firestore().collection('pixLogs').orderBy('date', 'desc').limit(50).get();
+                            setPixLogs(snap.docs.map(d => d.data()));
+                        }}>GERAR EXTRATO DE TRANSAÇÕES</button>
+
+                        {pixLogs && (
+                            <div style={{marginTop: 15, maxHeight: '300px', overflowY: 'auto', background: '#000', padding: 10, borderRadius: 5}}>
+                                <div style={{display:'flex', justifyContent:'space-between', marginBottom: 10}}>
+                                    <h5 style={{color:'cyan', margin:0}}>Últimos 50 PIX</h5>
+                                    <button className="btn btn-red" style={{width:'auto', padding:'2px 8px', margin:0, fontSize:10}} onClick={()=>setPixLogs(null)}>FECHAR</button>
+                                </div>
+                                {pixLogs.length === 0 && <p style={{color:'#666', fontSize:11}}>Nenhum PIX registrado ainda no servidor.</p>}
+                                
+                                {pixLogs.map((l, i) => (
+                                    <div key={i} style={{fontSize: 11, borderBottom: '1px dashed #333', padding: '8px 0'}}>
+                                        <div style={{color:'#888', fontSize:9}}>{new Date(l.date).toLocaleString()}</div>
+                                        <div style={{marginTop: 2}}>
+                                            <b style={{color:'var(--danger)'}}>{l.senderName}</b> 
+                                            <i className="fas fa-arrow-right" style={{margin:'0 5px', color:'#555'}}></i> 
+                                            <b style={{color:'lime'}}>{l.recipientName}</b> 
+                                            <span style={{float:'right', color:'gold', fontWeight:'bold'}}>{fmt(l.amount)}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    {/* --- FIM DO CÓDIGO DA RECEITA FEDERAL --- */}
                     
                     <h4>Solicitações Financeiras</h4>
                     {(reqs||[]).filter(r=>r.status==='PENDING').length === 0 && <p style={{color:'#666'}}>Nenhum pedido pendente.</p>}
@@ -6431,7 +6533,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                                 <label style={{fontSize:10, color:'#888'}}>Data Atual do Servidor</label>
                                 <input className="input-field" type="date" value={config.calendar?.date || ''} onChange={async (e) => {
                                     if(confirm("Deseja forçar a mudança de data?")) {
-                                        await db.collection('config').doc('calendar').set({ date: e.target.value }, {merge: true});
+                                        await firebase.firestore().collection('config').doc('calendar').set({ date: e.target.value }, {merge: true});
                                     }
                                 }} style={{marginBottom:0, fontSize:16, fontWeight:'bold', color:'white'}} />
                             </div>
@@ -6439,7 +6541,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                                 const current = new Date((config.calendar?.date || new Date().toISOString().split('T')[0]) + 'T12:00:00');
                                 current.setDate(current.getDate() + 1);
                                 const newDate = current.toISOString().split('T')[0];
-                                await db.collection('config').doc('calendar').set({ date: newDate }, {merge: true});
+                                await firebase.firestore().collection('config').doc('calendar').set({ date: newDate }, {merge: true});
                             }}>
                                 ⏩ AVANÇAR +1 DIA
                             </button>
@@ -6456,7 +6558,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                                 const t = document.getElementById('evText').value;
                                 if(!d || !t) return alert("Preencha data e texto!");
                                 const evs = [...(config.calendar?.events || []), { id: Date.now(), date: d, text: t }];
-                                await db.collection('config').doc('calendar').set({ events: evs }, {merge: true});
+                                await firebase.firestore().collection('config').doc('calendar').set({ events: evs }, {merge: true});
                                 document.getElementById('evText').value = '';
                                 alert("Evento agendado!");
                             }}>+</button>
@@ -6469,7 +6571,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                                     <i className="fas fa-trash" style={{color:'red', cursor:'pointer'}} onClick={async () => {
                                         if(confirm("Apagar evento?")) {
                                             const evs = config.calendar.events.filter(x => x.id !== ev.id);
-                                            await db.collection('config').doc('calendar').set({ events: evs }, {merge: true});
+                                            await firebase.firestore().collection('config').doc('calendar').set({ events: evs }, {merge: true});
                                         }
                                     }}></i>
                                 </div>
@@ -6482,8 +6584,8 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
         </div>
     );
 };
-
-            //fim 
+//FIM
+            
     
 const SettingsForm = ({ team, isAdmin, onUp, onUpgrade, onReq, onWithdraw }) => {
     const [form, setF] = useState({name: team.name, logo: team.logo, balance: team.balance, serie: team.serie});
@@ -8095,14 +8197,15 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
         onCoachCounter={handleCounterCoachOffer} 
     />
 )}        
-                        {/* NOVA TELA DE SERVIÇOS PÚBLICOS (HOSPITAL) */}
-{screen === 'PUBLIC_SERVICES' && (
-    <PublicServices 
-        players={players} 
-        user={user} 
-        onDonate={handleHospitalDonation} 
-    />
-)}
+                        {/* NOVA TELA DE SERVIÇOS PÚBLICOS (HOSPITAL E BANCO) */}
+                        {screen === 'PUBLIC_SERVICES' && (
+                            <PublicServices 
+                                players={players} 
+                                coaches={coaches}
+                                user={user} 
+                                onDonate={handleHospitalDonation} 
+                            />
+                        )}
                         {(screen === 'COMPANY_DASH' || screen === 'COMPANY_HOME') && user.type === 'COMPANY' && 
                             <CompanyDashboard company={user.data} products={products.filter(p => p.companyId === user.data.id)} sps={sps.filter(s => s.companyId === user.data.id)} sales={sales || []} teams={teams} onSaveProd={saveProduct} onDeleteProd={async(id)=>{if(confirm("Excluir produto?")) await db.collection('products').doc(id).delete();}} onProcessSpons={processSponsorship} />
                         }
@@ -8434,7 +8537,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.7 CAMPEONATOS   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.8 PIX  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

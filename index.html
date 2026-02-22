@@ -1615,10 +1615,147 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
     );
 };
         //FIM
-        const MatchManagerForm = ({ initialData, teams, onSave, onDelete }) => {
-    // Estado inicial
+
+
+    // ==========================================
+// FASE 3: HUB PÚBLICO DAS COPAS E TORNEIOS
+// ==========================================
+const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTeam, onReportMatch, onCreateMatch, onEditMatch, onDeleteMatch }) => {, onReportMatch, onCreateMatch, onEditMatch, onDeleteMatch }) => {
+    const [selTourn, setSelTourn] = useState(null);
+    const [tab, setTab] = useState('JOGOS');
+
+    const isAdminOrPress = user.type === 'ADMIN' || user.type.includes('PRESS');
+
+    if (!selTourn) {
+        return (
+            <div>
+                <h3 style={{color:'cyan', textAlign:'center', marginTop:0}}>🏆 Copas e Campeonatos</h3>
+                <p style={{textAlign:'center', color:'#aaa', fontSize:12, marginBottom:20}}>Acompanhe o chaveamento e as estatísticas exclusivas de cada torneio.</p>
+                {tournaments.length === 0 && <p style={{textAlign:'center', color:'#666'}}>Nenhuma competição ativa no momento.</p>}
+                
+                <div style={{display:'grid', gap:15}}>
+                    {tournaments.map(t => (
+                        <div key={t.id} className="highlight-card" style={{cursor:'pointer', border:'1px solid cyan', padding:20, background:'linear-gradient(135deg, #001a33 0%, #000 100%)'}} onClick={() => setSelTourn(t)}>
+                            {t.trophyImg ? <img src={t.trophyImg} style={{width:80, height:80, objectFit:'contain', marginBottom:10, filter:'drop-shadow(0 0 10px rgba(0,255,255,0.3))'}} /> : <div style={{fontSize:50}}>🏆</div>}
+                            <h3 style={{margin:0, color:'cyan'}}>{t.name}</h3>
+                            <small style={{color:'#aaa'}}>{t.format.replace('_', ' ')} • Prêmio: <b style={{color:'lime'}}>{fmt(t.prize)}</b></small>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
+    // --- CÁLCULO DAS ESTATÍSTICAS EXCLUSIVAS DESTA COPA ---
+    const tPlayers = players.filter(p => p.tournaments && p.tournaments[selTourn.id]);
+    
+    const topScorer = [...tPlayers].sort((a,b) => (b.tournaments[selTourn.id].goals || 0) - (a.tournaments[selTourn.id].goals || 0))[0];
+    const topAssist = [...tPlayers].sort((a,b) => (b.tournaments[selTourn.id].assists || 0) - (a.tournaments[selTourn.id].assists || 0))[0];
+    const topTackles = [...tPlayers].sort((a,b) => (b.tournaments[selTourn.id].tackles || 0) - (a.tournaments[selTourn.id].tackles || 0))[0];
+    const topSaves = [...tPlayers].sort((a,b) => (b.tournaments[selTourn.id].saves || 0) - (a.tournaments[selTourn.id].saves || 0))[0];
+    const bestPlayer = [...tPlayers]
+        .filter(p => p.tournaments[selTourn.id].ratingCount > 0)
+        .sort((a,b) => {
+            const avgA = a.tournaments[selTourn.id].ratingSum / a.tournaments[selTourn.id].ratingCount;
+            const avgB = b.tournaments[selTourn.id].ratingSum / b.tournaments[selTourn.id].ratingCount;
+            return avgB - avgA;
+        })[0];
+
+    // Jogos da Copa (O ID da copa fica salvo como a "Série" do jogo)
+    const tMatches = matches.filter(m => m.serie === selTourn.id);
+
+    return (
+        <div className="animate-in">
+            <button className="btn btn-ghost" style={{marginBottom:15, width:'auto'}} onClick={() => {setSelTourn(null); setTab('JOGOS');}}>⬅ VOLTAR</button>
+            
+            <div style={{textAlign:'center', marginBottom:20}}>
+                {selTourn.trophyImg ? <img src={selTourn.trophyImg} style={{width:100, height:100, objectFit:'contain', filter:'drop-shadow(0 0 15px rgba(0,255,255,0.6))'}} /> : <div style={{fontSize:60}}>🏆</div>}
+                <h2 style={{margin:'10px 0 5px 0', color:'cyan'}}>{selTourn.name}</h2>
+                <div style={{fontSize:12, color:'gold'}}>Premiação do Campeão: <b style={{color:'lime'}}>{fmt(selTourn.prize)}</b></div>
+                {selTourn.neutralFinal && selTourn.finalType === 'UNICO' && <div style={{fontSize:10, color:'#aaa', marginTop:5}}>🏟️ Final em Jogo Único (Campo Neutro)</div>}
+            </div>
+
+            <div style={{display:'flex', gap:10, marginBottom:15}}>
+                <button className={`btn ${tab==='JOGOS'?'btn-cyan':'btn-ghost'}`} style={{borderColor:'cyan', color:tab==='JOGOS'?'#000':'cyan', background:tab==='JOGOS'?'cyan':'transparent'}} onClick={()=>setTab('JOGOS')}>JOGOS</button>
+                <button className={`btn ${tab==='STATS'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('STATS')}>ESTATÍSTICAS DA COPA</button>
+            </div>
+
+            {tab === 'JOGOS' && (
+                <div>
+                    {isAdminOrPress && (
+                        <button className="btn btn-blue" style={{marginBottom:15}} onClick={() => onCreateMatch(selTourn.id)}>+ AGENDAR JOGO NESTA COPA</button>
+                    )}
+
+                    {tMatches.length === 0 ? <p style={{textAlign:'center', color:'#666'}}>Nenhum jogo chaveado ainda.</p> : (
+                        <div style={{display:'grid', gap:10}}>
+                            {tMatches.map(m => (
+                                <div key={m.id} className="card" style={{borderLeft: m.status==='FINISHED' ? '4px solid #444' : '4px solid cyan', position:'relative'}}>
+                                    
+                                    {user.type === 'ADMIN' && (
+                                        <div style={{position:'absolute', top:5, right:5, display:'flex', gap:5}}>
+                                            <button className="btn btn-ghost" style={{padding:'2px 5px', fontSize:10}} onClick={()=>onEditMatch(m)}>✏️</button>
+                                            <button className="btn btn-red" style={{padding:'2px 5px', fontSize:10}} onClick={()=>onDeleteMatch(m.id)}>🗑️</button>
+                                        </div>
+                                    )}
+
+                                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop: user.type === 'ADMIN' ? 15 : 0}}>
+                                        <div style={{textAlign:'center', width:'40%', cursor:'pointer'}} onClick={() => { const t = teams.find(x => x.id === m.homeId); if(t) onInspectTeam(t); }}>
+                                            <b style={{fontSize:13, color:'var(--primary)'}}>{m.homeName}</b>
+                                            <div style={{fontSize:18, fontWeight:'bold'}}>{m.status==='FINISHED' ? m.scoreHome : '-'}</div>
+                                        </div>
+                                        <div style={{fontSize:10, color:'#aaa', textAlign:'center'}}>
+                                            X<br/>
+                                            <small style={{color:'gold'}}>{m.round ? `Fase ${m.round}` : 'Mata-Mata'}</small>
+                                        </div>
+                                        <div style={{textAlign:'center', width:'40%', cursor:'pointer'}} onClick={() => { const t = teams.find(x => x.id === m.awayId); if(t) onInspectTeam(t); }}>
+                                            <b style={{fontSize:13, color:'var(--primary)'}}>{m.awayName}</b>
+                                            <div style={{fontSize:18, fontWeight:'bold'}}>{m.status==='FINISHED' ? m.scoreAway : '-'}</div>
+                                        </div>
+                                    </div>
+
+                                    {isAdminOrPress && m.status !== 'FINISHED' && (
+                                        <button className="btn btn-green" style={{marginTop:10}} onClick={() => onReportMatch(m)}>📝 LANÇAR SÚMULA DA COPA</button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {tab === 'STATS' && (
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                    <div className="card" style={{borderTop:'3px solid gold', textAlign:'center'}}>
+                        <div style={{fontSize:10, color:'#aaa', marginBottom:5}}>⚽ ARTILHEIRO</div>
+                        {topScorer && topScorer.tournaments[selTourn.id].goals > 0 ? <div><b style={{fontSize:14, color:'#fff'}}>{topScorer.name}</b><br/><span style={{color:'gold', fontWeight:'bold'}}>{topScorer.tournaments[selTourn.id].goals} Gols</span></div> : <small style={{color:'#666'}}>Nenhum gol.</small>}
+                    </div>
+                    <div className="card" style={{borderTop:'3px solid var(--secondary)', textAlign:'center'}}>
+                        <div style={{fontSize:10, color:'#aaa', marginBottom:5}}>👟 GARÇOM</div>
+                        {topAssist && topAssist.tournaments[selTourn.id].assists > 0 ? <div><b style={{fontSize:14, color:'#fff'}}>{topAssist.name}</b><br/><span style={{color:'var(--secondary)', fontWeight:'bold'}}>{topAssist.tournaments[selTourn.id].assists} Assis.</span></div> : <small style={{color:'#666'}}>Nenhuma.</small>}
+                    </div>
+                    <div className="card" style={{borderTop:'3px solid var(--purple)', textAlign:'center', gridColumn:'span 2', background:'rgba(213,0,249,0.05)'}}>
+                        <div style={{fontSize:10, color:'#aaa', marginBottom:5}}>⭐ CRAQUE DO CAMPEONATO (MÉDIA)</div>
+                        {bestPlayer ? <div><b style={{fontSize:16, color:'#fff'}}>{bestPlayer.name}</b><br/><span style={{color:'var(--purple)', fontWeight:'bold', fontSize:18}}>{(bestPlayer.tournaments[selTourn.id].ratingSum / bestPlayer.tournaments[selTourn.id].ratingCount).toFixed(1)}</span></div> : <small style={{color:'#666'}}>Sem avaliações.</small>}
+                    </div>
+                    <div className="card" style={{borderTop:'3px solid #ff5555', textAlign:'center'}}>
+                        <div style={{fontSize:10, color:'#aaa', marginBottom:5}}>🛡️ XERIFE</div>
+                        {topTackles && topTackles.tournaments[selTourn.id].tackles > 0 ? <div><b style={{fontSize:14, color:'#fff'}}>{topTackles.name}</b><br/><span style={{color:'#ff5555', fontWeight:'bold'}}>{topTackles.tournaments[selTourn.id].tackles} Desarmes</span></div> : <small style={{color:'#666'}}>Nenhum.</small>}
+                    </div>
+                    <div className="card" style={{borderTop:'3px solid cyan', textAlign:'center'}}>
+                        <div style={{fontSize:10, color:'#aaa', marginBottom:5}}>🧤 MURALHA</div>
+                        {topSaves && topSaves.tournaments[selTourn.id].saves > 0 ? <div><b style={{fontSize:14, color:'#fff'}}>{topSaves.name}</b><br/><span style={{color:'cyan', fontWeight:'bold'}}>{topSaves.tournaments[selTourn.id].saves} Defesas</span></div> : <small style={{color:'#666'}}>Nenhuma.</small>}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+
+    
+        const MatchManagerForm = ({ initialData, teams, tournaments, onSave, onDelete }) => {
     const [f, setF] = useState(initialData || {
-        homeId: '', awayId: '', serie: 'VARZEA', round: 1, 
+        homeId: '', awayId: '', serie: 'A', round: 1, 
         scoreHome: 0, scoreAway: 0, status: 'PENDING'
     });
 
@@ -1653,9 +1790,14 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
                         <label>Série / Liga</label>
                         {/* AQUI ESTAVA O PROBLEMA: AGORA USA A LISTA GLOBAL */}
                         <select className="input-field" value={f.serie} onChange={e=>setF({...f, serie:e.target.value})}>
-                            {SERIES.map(s => (
-                                <option key={s} value={s}>{s === 'VARZEA' ? 'Várzea (Terrão)' : `Série ${s}`}</option>
-                            ))}
+                            <optgroup label="Ligas Oficiais">
+                                {SERIES.map(s => <option key={s} value={s}>{s === 'VARZEA' ? 'Várzea (Terrão)' : `Série ${s}`}</option>)}
+                            </optgroup>
+                            {tournaments && tournaments.length > 0 && (
+                                <optgroup label="Copas e Campeonatos">
+                                    {tournaments.filter(t=>t.status==='ACTIVE').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                </optgroup>
+                            )}
                         </select>
                     </div>
                     <div style={{flex:1}}>
@@ -3581,7 +3723,8 @@ const GameCalendar = ({ calendar }) => {
             const [matches, setMatches] = useState([]);
             const [posts, setPosts] = useState([]);
             const [screen, setScreen] = useState('HOME');
-            const [modal, setModal] = useState(null);
+           const [matchesTab, setMatchesTab] = useState('LIGAS'); 
+           const [modal, setModal] = useState(null);
             const [loading, setLoading] = useState(true);
             const [newNews, setNewNews] = useState(false);
             const [adminTeam, setAdminTeam] = useState(null); 
@@ -6951,174 +7094,162 @@ const renewContract = async (p) => {
             };
 
             // 2. Função para lançar Súmula (ATUALIZADA: CÁLCULO DA MÉDIA + BILHETERIA E LOJA)
-            // --- FUNÇÃO INTELIGENTE DE SÚMULA (INDIVIDUAL OU EM MASSA) ---
-            // ⚠️ NOVO PARÂMETRO 'homeTeam' ADICIONADO NO FINAL
-            const saveMatchStats = async (dataPayload, legacyMatch, legacyXp, homeTeam = null) => {
-                let batchData = [];
+           const saveMatchStats = async (dataPayload, legacyMatch, legacyXp, homeTeam = null, matchDataObj = null) => {
+        let batchData = [];
 
-                // 1. Compatibilidade com chamadas antigas (player, match, xp)
-                if (legacyMatch && legacyMatch.goals !== undefined) {
-                    batchData = [{ player: dataPayload, match: legacyMatch, xpOverride: legacyXp }];
-                } 
-                // 2. Novo formato (Array de jogadores ou Objeto único)
-                else {
-                    batchData = Array.isArray(dataPayload) ? dataPayload : [dataPayload];
-                }
-                
-                if (batchData.length === 0) return alert("Nenhum dataPayload para salvar.");
-                
-                setLoading(true);
-                const b = db.batch();
-                let count = 0;
+        if (legacyMatch && legacyMatch.goals !== undefined) {
+            batchData = [{ player: dataPayload, match: legacyMatch, xpOverride: legacyXp }];
+        } else {
+            batchData = Array.isArray(dataPayload) ? dataPayload : [dataPayload];
+        }
+        
+        if (batchData.length === 0) return alert("Nenhum dataPayload para salvar.");
+        
+        setLoading(true);
+        const b = db.batch();
+        let count = 0;
 
-                // Regras de XP para cálculo automático
-                const R = { GOAL: 150, ASSIST: 120, TACKLE: 80, SAVE: 100, WIN: 300, DRAW: 100, LOSS: -100, YELLOW: -50, RED: -200, RATING_MULT: 50 };
+        const R = { GOAL: 150, ASSIST: 120, TACKLE: 80, SAVE: 100, WIN: 300, DRAW: 100, LOSS: -100, YELLOW: -50, RED: -200, RATING_MULT: 50 };
 
-                batchData.forEach(item => {
-                    const { player, match, xpOverride } = item;
-                    if (!player || !match) return;
-                    
-                    // Cálculo de XP Interno (se não vier pré-calculado)
-                    let xp = 0;
-                    if (xpOverride !== undefined) {
-                        xp = xpOverride;
-                    } else {
-                        xp += (match.goals || 0) * R.GOAL;
-                        xp += (match.assists || 0) * R.ASSIST;
-                        xp += (match.tackles || 0) * R.TACKLE;
-                        xp += (match.saves || 0) * R.SAVE;
-                        xp += (match.yellows || 0) * R.YELLOW;
-                        xp += (match.reds || 0) * R.RED;
-                        if (match.result === 'VITORIA') xp += R.WIN;
-                        if (match.result === 'EMPATE') xp += R.DRAW;
-                        if (match.result === 'DERROTA') xp += R.LOSS;
-                        xp += (parseFloat(match.rating) || 0) * R.RATING_MULT;
-                    }
-                    const xpGained = parseInt(xp);
+        batchData.forEach(item => {
+            const { player, match, xpOverride } = item;
+            if (!player || !match) return;
+            
+            let xp = 0;
+            if (xpOverride !== undefined) {
+                xp = xpOverride;
+            } else {
+                xp += (match.goals || 0) * R.GOAL;
+                xp += (match.assists || 0) * R.ASSIST;
+                xp += (match.tackles || 0) * R.TACKLE;
+                xp += (match.saves || 0) * R.SAVE;
+                xp += (match.yellows || 0) * R.YELLOW;
+                xp += (match.reds || 0) * R.RED;
+                if (match.result === 'VITORIA') xp += R.WIN;
+                if (match.result === 'EMPATE') xp += R.DRAW;
+                if (match.result === 'DERROTA') xp += R.LOSS;
+                xp += (parseFloat(match.rating) || 0) * R.RATING_MULT;
+            }
+            const xpGained = parseInt(xp);
 
-                    // Atualiza o Jogador
-                    const pRef = db.collection('players').doc(player.id);
-                    
-                    const newStats = { 
-                        goals: (player.stats?.goals||0) + match.goals, 
-                        assists: (player.stats?.assists||0) + match.assists, 
-                        tackles: (player.stats?.tackles||0) + match.tackles, 
-                        saves: (player.stats?.saves||0) + match.saves, 
-                        yellows: (player.stats?.yellows||0) + match.yellows, 
-                        reds: (player.stats?.reds||0) + match.reds 
-                    };
-
-                    // Cálculo da Média da Imprensa
-                    const currentSum = player.pressRatingSum || 0; 
-                    const currentCount = player.pressRatingCount || 0; 
-                    const newSum = currentSum + parseFloat(match.rating);
-                    const newCount = currentCount + 1;
-                    const newAvg = newSum / newCount; 
-                    
-                    // Preparação do objeto de atualização
-                    const updateData = { 
-                        stats: newStats, 
-                        pendingXP: (player.pendingXP || 0) + xpGained,
-                        pressRatingSum: newSum,
-                        pressRatingCount: newCount,
-                        pressRatingAvg: parseFloat(newAvg.toFixed(1)),
-                        energy: Math.max(0, (player.energy || 100) - 25) // Desgaste físico do jogo
-                    };
-
-                    // --- INTEGRAÇÃO DO SISTEMA MÉDICO (LESÕES) ---
-                    if (match.injury && (match.recoveryLeft || 0) > 0) {
-                        updateData.injury = match.injury;
-                        updateData.recoveryLeft = parseInt(match.recoveryLeft);
-                        updateData.mood = '😡'; // Jogador fica irritado ao se lesionar
-                    }
-                    
-                    b.update(pRef, updateData);
-                    count++;
-                });
-                
-                // ==========================================
-                // --- INTEGRAÇÃO DO ESTÁDIO E LOJA (MATCHDAY) ---
-                // Roda fora do forEach para não multiplicar a renda pelos 11 jogadores!
-                // ==========================================
-                if (homeTeam && homeTeam.id) {
-                    const lvl = homeTeam.stadiumLevel || 1;
-                    const sDb = STADIUM_DB[lvl] || STADIUM_DB[1]; // Puxa do Banco de Estádios global
-                    const ticPrice = homeTeam.ticketPrice || sDb.minTic;
-
-                    // 1. O Peso do Preço
-                    const priceFactor = 1.0 - (((ticPrice - sDb.minTic) / ((sDb.maxTic - sDb.minTic) || 1)) * 0.6);
-
-                    // 2. Fator Surpresa (Varia de 80% a 120%)
-                    const rngFactor = (Math.floor(Math.random() * 41) + 80) / 100;
-
-                    // Calcula o público final e trava no teto do estádio
-                    let attendance = Math.floor(sDb.cap * priceFactor * rngFactor);
-                    if (attendance > sDb.cap) attendance = sDb.cap;
-
-                    const ticketRevenue = attendance * ticPrice;
-
-                    // 3. Vendas da Loja Oficial (Algoritmo Dinâmico de Produtos)
-                    // A conversão base depende do nível da Loja (Estádio). Nvl 1 = 5%, Nvl 5 = 25%
-                    const baseConversionRate = [0, 0.05, 0.10, 0.15, 0.20, 0.25][lvl] || 0.05; 
-                    
-                    let totalStoreRevenue = 0;
-                    let currentProducts = [...(homeTeam.storeProducts || [])];
-
-                    // Calcula a venda para CADA produto separadamente
-                    const updatedProducts = currentProducts.map(prod => {
-                        // Fator de Dificuldade pelo Preço: 
-                        // Itens de até ₣30 vendem 100% do potencial. Quanto mais caro, menos vende.
-                        let priceDifficulty = 1;
-                        if (prod.price > 30) {
-                            priceDifficulty = Math.max(0.05, 30 / prod.price); // Nunca cai pra 0, mínimo de 5% de chance
-                        }
-
-                        // Quantos torcedores TENTARAM comprar esse item específico
-                        const potentialBuyers = Math.floor(attendance * baseConversionRate * priceDifficulty);
-                        
-                        // Quantos realmente compraram (limitado pelo estoque)
-                        const itemsSold = Math.min(potentialBuyers, prod.stock);
-
-                        totalStoreRevenue += (itemsSold * prod.price);
-                        
-                        // Retorna o produto atualizado com o estoque deduzido
-                        return { ...prod, stock: prod.stock - itemsSold };
-                    });
-
-                    // 4. Salva o dinheiro no clube e atualiza o estoque dos produtos
-                    const teamRef = db.collection('teams').doc(homeTeam.id);
-                    b.update(teamRef, {
-                        balance: firebase.firestore.FieldValue.increment(ticketRevenue), // Dinheiro do Ingresso direto pro time
-                        storeBalance: firebase.firestore.FieldValue.increment(totalStoreRevenue), // Lucro da loja vai pro cofre da loja
-                        storeProducts: updatedProducts // Salva o novo estoque
-                    });
-                }
-                // ==========================================
-// --- ATUALIZA A SEQUÊNCIA DE JOGOS (RECENT FORM) DOS TIMES ---
-                const teamResults = {};
-                batchData.forEach(item => {
-                    if (item.player && item.player.teamId && item.player.teamId !== 'FREE') {
-                        teamResults[item.player.teamId] = item.match.result; // Salva o resultado do time
-                    }
-                });
-                
-                Object.keys(teamResults).forEach(tid => {
-                    if (teamResults[tid] !== 'NENHUM') {
-                        const tObj = teams.find(t => t.id === tid);
-                        if (tObj) {
-                            let form = tObj.recentForm || [];
-                            form.unshift(teamResults[tid]); // Adiciona o jogo atual no topo da lista
-                            if (form.length > 5) form.pop(); // Mantém apenas os últimos 5 jogos
-                            b.update(db.collection('teams').doc(tid), { recentForm: form });
-                        }
-                    }
-                });
-                
-                await b.commit();
-                setLoading(false);
-                setModal(null);
-                alert(`${count} súmula(s) lançada(s) com sucesso!${homeTeam ? '\n🏟️ Bilheteria e vendas da Loja contabilizadas!' : ''}`);
+            const pRef = db.collection('players').doc(player.id);
+            
+            // 1. DADOS GERAIS (Carreira)
+            const newStats = { 
+                goals: (player.stats?.goals||0) + (match.goals||0), 
+                assists: (player.stats?.assists||0) + (match.assists||0), 
+                tackles: (player.stats?.tackles||0) + (match.tackles||0), 
+                saves: (player.stats?.saves||0) + (match.saves||0), 
+                yellows: (player.stats?.yellows||0) + (match.yellows||0), 
+                reds: (player.stats?.reds||0) + (match.reds||0) 
             };
+
+            const currentSum = player.pressRatingSum || 0; 
+            const currentCount = player.pressRatingCount || 0; 
+            const newSum = currentSum + parseFloat(match.rating || 0);
+            const newCount = currentCount + 1;
+            const newAvg = newSum / newCount; 
+            
+            const updateData = { 
+                stats: newStats, 
+                pendingXP: (player.pendingXP || 0) + xpGained,
+                pressRatingSum: newSum,
+                pressRatingCount: newCount,
+                pressRatingAvg: parseFloat(newAvg.toFixed(1)),
+                energy: Math.max(0, (player.energy || 100) - 25) 
+            };
+
+            if (match.injury && (match.recoveryLeft || 0) > 0) {
+                updateData.injury = match.injury;
+                updateData.recoveryLeft = parseInt(match.recoveryLeft);
+                updateData.mood = '😡'; 
+            }
+
+            // 2. MATEMÁTICA DUPLA: DADOS DA COPA ISOLADOS
+            const matchSerie = matchDataObj ? matchDataObj.serie : match.serie;
+            const isCustomTourn = matchSerie && !['A', 'B', 'C', 'D', 'VARZEA'].includes(matchSerie);
+
+            if (isCustomTourn) {
+                const tournId = matchSerie;
+                const currentTournaments = player.tournaments || {};
+                const currentTournStats = currentTournaments[tournId] || { goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0, ratingSum:0, ratingCount:0 };
+                
+                updateData.tournaments = {
+                    ...currentTournaments,
+                    [tournId]: {
+                        goals: currentTournStats.goals + (match.goals || 0),
+                        assists: currentTournStats.assists + (match.assists || 0),
+                        tackles: currentTournStats.tackles + (match.tackles || 0),
+                        saves: currentTournStats.saves + (match.saves || 0),
+                        yellows: currentTournStats.yellows + (match.yellows || 0),
+                        reds: currentTournStats.reds + (match.reds || 0),
+                        ratingSum: currentTournStats.ratingSum + (parseFloat(match.rating) || 0),
+                        ratingCount: currentTournStats.ratingCount + 1
+                    }
+                };
+            }
+            
+            b.update(pRef, updateData);
+            count++;
+        });
+        
+        // BILHETERIA E LOJA DO ESTÁDIO (Se mandante)
+        if (homeTeam && homeTeam.id && matchDataObj && !matchDataObj.neutralFinal) {
+            const lvl = homeTeam.stadiumLevel || 1;
+            const sDb = STADIUM_DB[lvl] || STADIUM_DB[1];
+            const ticPrice = homeTeam.ticketPrice || sDb.minTic;
+            const priceFactor = 1.0 - (((ticPrice - sDb.minTic) / ((sDb.maxTic - sDb.minTic) || 1)) * 0.6);
+            const rngFactor = (Math.floor(Math.random() * 41) + 80) / 100;
+            let attendance = Math.floor(sDb.cap * priceFactor * rngFactor);
+            if (attendance > sDb.cap) attendance = sDb.cap;
+
+            const ticketRevenue = attendance * ticPrice;
+            const baseConversionRate = [0, 0.05, 0.10, 0.15, 0.20, 0.25][lvl] || 0.05; 
+            
+            let totalStoreRevenue = 0;
+            let currentProducts = [...(homeTeam.storeProducts || [])];
+            const updatedProducts = currentProducts.map(prod => {
+                let priceDifficulty = 1;
+                if (prod.price > 30) priceDifficulty = Math.max(0.05, 30 / prod.price); 
+                const potentialBuyers = Math.floor(attendance * baseConversionRate * priceDifficulty);
+                const itemsSold = Math.min(potentialBuyers, prod.stock);
+                totalStoreRevenue += (itemsSold * prod.price);
+                return { ...prod, stock: prod.stock - itemsSold };
+            });
+
+            const teamRef = db.collection('teams').doc(homeTeam.id);
+            b.update(teamRef, {
+                balance: firebase.firestore.FieldValue.increment(ticketRevenue), 
+                storeBalance: firebase.firestore.FieldValue.increment(totalStoreRevenue), 
+                storeProducts: updatedProducts 
+            });
+        }
+
+        // FASE DO TIME (Recent Form)
+        const teamResults = {};
+        batchData.forEach(item => {
+            if (item.player && item.player.teamId && item.player.teamId !== 'FREE') {
+                teamResults[item.player.teamId] = item.match.result; 
+            }
+        });
+        
+        Object.keys(teamResults).forEach(tid => {
+            if (teamResults[tid] !== 'NENHUM') {
+                const tObj = teams.find(t => t.id === tid);
+                if (tObj) {
+                    let form = tObj.recentForm || [];
+                    form.unshift(teamResults[tid]); 
+                    if (form.length > 5) form.pop(); 
+                    b.update(db.collection('teams').doc(tid), { recentForm: form });
+                }
+            }
+        });
+        
+        await b.commit();
+        setLoading(false);
+        setModal(null);
+        alert(`${count} súmula(s) lançada(s) com sucesso!${(homeTeam && !matchDataObj?.neutralFinal) ? '\n🏟️ Bilheteria e vendas da Loja contabilizadas!' : ''}`);
+    };
             // --- TREINO SOLO DO JOGADOR ---
  const handlePlayerSoloTrain = async (player, type) => {
         // CORREÇÃO CRÍTICA: Define energia atual aceitando o ZERO
@@ -7328,7 +7459,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.91.1</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.91.2</div>
                             </div>
                         </div>
                         
@@ -7459,170 +7590,56 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                         
                        {screen === 'MATCHES' && (
                             <div style={{paddingBottom: 60}}>
-                                <h2 style={{color:'var(--primary)', textAlign:'center'}}>Campeonato Mato Real</h2>
-                                
-                                {/* SÉRIE A (Sempre visível) */}
-                                <div style={{marginBottom: 20}}>
-                                    <LeagueTable 
-                                        teams={teams} 
-                                        serie="A" 
-                                        onInspectTeam={(t) => setModal({ type: 'VIEW_LINEUP', data: t })} 
-                                    />
+                                <div style={{display:'flex', gap:10, marginBottom:20, justifyContent:'center'}}>
+                                    <button className={`btn ${matchesTab==='LIGAS'?'btn-blue':'btn-ghost'}`} onClick={()=>setMatchesTab('LIGAS')}>LIGAS NACIONAIS</button>
+                                    <button className={`btn ${matchesTab==='COPAS'?'btn-cyan':'btn-ghost'}`} onClick={()=>setMatchesTab('COPAS')} style={{borderColor:'cyan', color:matchesTab==='COPAS'?'#000':'cyan', background:matchesTab==='COPAS'?'cyan':'transparent'}}>🏆 COPAS E TORNEIOS</button>
                                 </div>
 
-                                {/* SÉRIES B, C e D (Expansível) */}
-                                <details open>
-                                    <summary style={{padding:10, background:'#333', borderRadius:5, cursor:'pointer', fontWeight:'bold', marginBottom:10}}>
-                                        Divisões de Acesso (B, C, D)
-                                    </summary>
-                                    <div style={{display:'grid', gap:20}}>
-                                        <LeagueTable 
-                                            teams={teams} 
-                                            serie="B" 
-                                            onInspectTeam={(t) => setModal({ type: 'VIEW_LINEUP', data: t })} 
-                                        />
-                                        <LeagueTable 
-                                            teams={teams} 
-                                            serie="C" 
-                                            onInspectTeam={(t) => setModal({ type: 'VIEW_LINEUP', data: t })} 
-                                        />
-                                        <LeagueTable 
-                                            teams={teams} 
-                                            serie="D" 
-                                            onInspectTeam={(t) => setModal({ type: 'VIEW_LINEUP', data: t })} 
-                                        />
-                                    </div>
-                                </details>
-
-                                {/* --- AQUI ESTÁ A VÁRZEA (O QUE FALTAVA) --- */}
-                                <div style={{marginTop: 30, border: '2px dashed gold', borderRadius: 8, overflow: 'hidden'}}>
-                                    <div style={{background: 'gold', color: 'black', padding: '10px', textAlign: 'center', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '1px'}}>
-                                        🚜 O Terrão (Várzea)
-                                    </div>
-                                    <div style={{padding: 5, background: 'rgba(255, 215, 0, 0.05)'}}>
-                                        <LeagueTable 
-                                            teams={teams} 
-                                            serie="VARZEA" 
-                                            onInspectTeam={(t) => setModal({ type: 'VIEW_LINEUP', data: t })} 
-                                        />
-                                    </div>
-                                    <div style={{padding: 10, textAlign: 'center', fontSize: 10, color: '#aaa'}}>
-                                        * Regras de Amador: Sem teto salarial mínimo. G4 sobe para a Série D.
-                                    </div>
-                                </div>
-
-                                <hr style={{borderColor:'#333', margin:'20px 0'}}/>
-                                
-                                {/* MATCH CENTER ATUALIZADO PARA VER JOGOS DA VÁRZEA */}
-                                <MatchCenter 
-                                    matches={matches} 
-                                    teams={teams}
-                                    isAdmin={user.type === 'ADMIN'}
-                                    onCreateMatch={(serie, round) => setModal({
-                                        type: 'MATCH_MANAGER', 
-                                        data: { serie, round, homeId:'', awayId:'', scoreHome:0, scoreAway:0, status:'PENDING' }
-                                    })}
-                                    onEditMatch={(m) => setModal({ type: 'MATCH_MANAGER', data: m })}
-                                    onDeleteMatch={(id) => handleDeleteMatch(id)}
-                                    onReportMatch={(m) => {
-                                        if(user.type.includes('PRESS') || user.type === 'ADMIN') {
-                                            setModal({type:'MATCH_PERFORMANCE', data: { match: m, player: null } }); 
-                                        } else {
-                                            alert("Apenas imprensa/admin lança súmula.");
-                                        }
-                                    }} 
-                                />
-                            </div>
-                        )}
-
-
-        
-
-                        {screen === 'ADMIN_TEAM' && adminTeam && 
-                            <div>
-                                <button className="btn" style={{background:'#333', marginBottom:10}} onClick={()=>{setAdminTeam(null); setScreen('HOME');}}>⬅ VOLTAR</button>
-                                <h3 style={{color:'var(--purple)'}}>Editando: {adminTeam.name}</h3>
-                                <TeamDashboard 
-                                    isAdmin={true} 
-                                    team={adminTeam} 
-                                    players={players.filter(p=>p.teamId===adminTeam.id)} 
-                                    coach={coaches.find(c => c.teamId === adminTeam.id && c.status === 'ACTIVE')} 
-                                    onFireCoach={handleFireCoach}
-                                    onRenewCoach={handleRenewCoachContract} 
-                                    isVisitor={false} setModal={setModal} 
-                                    onEdit={(p)=>setModal({type:'ADMIN_PLAYER', data:p})} 
-onAdd={()=>setModal({type:'ADMIN_PLAYER', data: { teamId: adminTeam.id } })}
-                                />
-                            </div>
-                        }
-                        
-                      {screen === 'MARKET' && (
-                            <Market 
-                                user={user}
-                                me={user.data?.id} 
-                                teams={teams} 
-                                players={players} 
-                                coaches={coaches} 
-                                open={conf.marketOpen} 
-                                isVis={user.type === 'VISITOR' || user.type === 'COACH'} 
-                                onIndicate={handleCoachIndication}
-                                onNeg={(p) => setModal({ type: 'OFFER', data: p })} 
-                                onPayClause={async (p) => {
-                                    const buy = teams.find(t => t.id === user.data.id);
-                                    const sel = teams.find(t => t.id === p.teamId);
-                                    if (buy.balance < p.clause) return alert("Saldo insuficiente!");
-                                    if (!confirm(`Pagar multa de ${fmt(p.clause)} por ${p.name}?`)) return;
-                                    const b = db.batch();
-                                    b.update(db.collection('teams').doc(buy.id), { balance: buy.balance - p.clause });
-                                    b.update(db.collection('teams').doc(sel.id), { balance: sel.balance + p.clause });
-                                    b.update(db.collection('players').doc(p.id), { teamId: buy.id, status: 'NAO_A_VENDA', contract: 3, history: firebase.firestore.FieldValue.arrayUnion({ date: Date.now(), from: sel.name, to: buy.name, type: 'MULTA', value: p.clause }) });
-                                    await b.commit();
-                                    postNews(`🚨 **MULTA PAGA!**\nO **${buy.name}** pagou a multa de **${p.name}**!`, 'transfer');
-                                    alert("Contratado via multa!");
-                                }}
-                                onPre={async (p) => {
-                                    const buy = teams.find(t => t.id === user.data.id);
-                                    if (!confirm(`Assinar pré-contrato com ${p.name}?`)) return;
-                                    await db.collection('players').doc(p.id).update({ preContract: { teamId: buy.id, teamName: buy.name }, mood: '🤩' });
-                                    postNews(`📝 **PRÉ-CONTRATO**\n**${p.name}** reforçará o **${buy.name}** na próxima temporada!`, 'transfer');
-                                    alert("Pré-contrato assinado!");
-                                }}
-                                onHireCoach={(c) => setModal({ type: 'HIRE_COACH', data: c })}
-                            />
-                        )}
-
-        {screen === 'SHOPPING' && 
-                            <ShoppingScreen 
-                                products={products} 
-                                companies={companies} 
-                                user={user} // Passa o usuário para checar Admin
-                                userTeam={user.type==='USER' || user.type==='PLAYER' || user.type==='COACH'} 
-                                onBuy={buyProduct} 
-                                onDeleteProd={async(id)=>{if(confirm("Admin: Excluir produto?")) await db.collection('products').doc(id).delete();}} // Função de deletar
-                            />
-                        }
-                        {screen === 'SPONSORSHIPS' && user.type === 'USER' && (
-                            <div>
-                                <h3>Buscar Patrocínio</h3>
-                                <p style={{fontSize:11, color:'#aaa'}}>Envie propostas semanais para as empresas.</p>
-                                {companies.filter(c=>c.status==='ACTIVE').map(c => (
-                                    <div key={c.id} className="card">
-                                        <b>{c.name}</b> <small>({(COMPANY_TYPES[c.companyType] || {}).label})</small>
-                                        <div style={{display:'flex', gap:5, marginTop:5}}>
-                                            <button className="btn btn-purple" onClick={()=>{const v=prompt("Valor Semanal pedido (₣):"); if(v) requestSponsorship(c.id, v);}}>PEDIR PATROCÍNIO</button>
+                                {matchesTab === 'LIGAS' && (
+                                    <div className="animate-in">
+                                        <h2 style={{color:'var(--primary)', textAlign:'center', marginTop:0}}>Campeonato Mato Real</h2>
+                                        <div style={{marginBottom: 20}}>
+                                            <LeagueTable teams={teams} serie="A" onInspectTeam={(t) => setModal({ type: 'VIEW_LINEUP', data: t })} />
                                         </div>
+                                        <details open>
+                                            <summary style={{padding:10, background:'#333', borderRadius:5, cursor:'pointer', fontWeight:'bold', marginBottom:10}}>
+                                                Divisões de Acesso (B, C, D)
+                                            </summary>
+                                            <div style={{display:'grid', gap:20}}>
+                                                <LeagueTable teams={teams} serie="B" onInspectTeam={(t) => setModal({ type: 'VIEW_LINEUP', data: t })} />
+                                                <LeagueTable teams={teams} serie="C" onInspectTeam={(t) => setModal({ type: 'VIEW_LINEUP', data: t })} />
+                                                <LeagueTable teams={teams} serie="D" onInspectTeam={(t) => setModal({ type: 'VIEW_LINEUP', data: t })} />
+                                            </div>
+                                        </details>
+                                        <div style={{marginTop: 30, border: '2px dashed gold', borderRadius: 8, overflow: 'hidden'}}>
+                                            <div style={{background: 'gold', color: 'black', padding: '10px', textAlign: 'center', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '1px'}}>🚜 O Terrão (Várzea)</div>
+                                            <div style={{padding: 5, background: 'rgba(255, 215, 0, 0.05)'}}>
+                                                <LeagueTable teams={teams} serie="VARZEA" onInspectTeam={(t) => setModal({ type: 'VIEW_LINEUP', data: t })} />
+                                            </div>
+                                        </div>
+                                        <hr style={{borderColor:'#333', margin:'20px 0'}}/>
+                                        <MatchCenter matches={matches} teams={teams} isAdmin={user.type === 'ADMIN'}
+                                            onCreateMatch={(serie, round) => setModal({ type: 'MATCH_MANAGER', data: { serie, round, homeId:'', awayId:'', scoreHome:0, scoreAway:0, status:'PENDING' }})}
+                                            onEditMatch={(m) => setModal({ type: 'MATCH_MANAGER', data: m })}
+                                            onDeleteMatch={(id) => handleDeleteMatch(id)}
+                                            onReportMatch={(m) => {
+                                                if(user.type.includes('PRESS') || user.type === 'ADMIN') setModal({type:'MATCH_PERFORMANCE', data: { match: m, player: null } }); 
+                                                else alert("Apenas imprensa/admin lança súmula.");
+                                            }} 
+                                        />
                                     </div>
-                                ))}
-                                <hr style={{borderColor:'#333'}}/>
-                                <h4>Meus Contratos</h4>
-                                {sps.filter(s=>s.teamId===user.data.id).length === 0 && <p style={{color:'#666'}}>Sem contratos.</p>}
-                                {sps.filter(s=>s.teamId===user.data.id).map(s => (
-                                    <div key={s.id} className="card" style={{borderLeft:`4px solid ${s.status==='ACTIVE'?'var(--primary)':'#666'}`}}>
-                                        <b>{s.companyName}</b><br/>
-                                        Valor: {fmt(s.value)}/sem <small>({s.status === 'PENDING' ? 'Aguardando' : 'Ativo'})</small>
-                                        {s.status==='ACTIVE' && <button className="btn btn-red" style={{width:'auto', marginTop:5}} onClick={()=>{if(confirm("Encerrar contrato de patrocínio?")) db.collection('sponsorships').doc(s.id).delete();}}>ENCERRAR</button>}
-                                    </div>
-                                ))}
+                                )}
+
+                                {matchesTab === 'COPAS' && (
+                                    <TournamentHub 
+                                        tournaments={tourns} matches={matches} players={players} user={user} teams={teams}                                        
+                                        onInspectTeam={(t) => setModal({ type: 'VIEW_LINEUP', data: t })} 
+                                        onCreateMatch={(tournId) => setModal({ type: 'MATCH_MANAGER', data: { serie: tournId, round: 1, homeId:'', awayId:'', scoreHome:0, scoreAway:0, status:'PENDING' }})}
+                                        onEditMatch={(m) => setModal({ type: 'MATCH_MANAGER', data: m })}
+                                        onDeleteMatch={(id) => handleDeleteMatch(id)}
+                                        onReportMatch={(m) => setModal({type:'MATCH_PERFORMANCE', data: { match: m, player: null } })}
+                                    />
+                                )}
                             </div>
                         )}
                         
@@ -7801,10 +7818,8 @@ onAdd={()=>setModal({type:'ADMIN_PLAYER', data: { teamId: adminTeam.id } })}
                             
                             {modal.type === 'MATCH_MANAGER' && (
                                 <MatchManagerForm 
-                                    initialData={modal.data} 
-                                    teams={teams} 
-                                    onSave={handleSaveMatch} 
-                                    onDelete={handleDeleteMatch} 
+                                    initialData={modal.data} teams={teams} tournaments={tourns}
+                                    onSave={handleSaveMatch} onDelete={handleDeleteMatch} 
                                 />
                             )}
                             
@@ -8009,7 +8024,7 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.1 CALENDARIO   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.2 CALENDARIO   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -10983,7 +10998,12 @@ const Ranking = ({ teams, players, sales }) => {
             if (homeTeamObj && selTeamId === homeTeamObj.id) {
                 onSaveStats(payload, null, undefined, homeTeamObj);
             } else {
-                onSaveStats(payload); // Se for o visitante, não cobra bilheteria
+               if (confirm(`Confirmar súmula para ${payload.length} jogadores?`)) {
+            const homeTeamObj = matchData ? teams.find(t => t.id === matchData.homeId) : null;
+            if (homeTeamObj && selTeamId === homeTeamObj.id) {
+                onSaveStats(payload, null, undefined, homeTeamObj, matchData);
+            } else {
+                onSaveStats(payload, null, undefined, null, matchData); 
             }
         }
     };

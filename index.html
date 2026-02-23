@@ -8580,44 +8580,97 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
                     <button className={`btn ${subTab==='COACH'?'btn-gold':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>setSubTab('COACH')}>TÉCNICOS</button>
                 </div>
 
-                {subTab==='TEAM' && (teams||[]).filter(t=>t.status!=='PENDING').map(t=><div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>{t.logo ? <img src={t.logo} className="team-logo" style={{width:40, height:40, objectFit:'cover'}}/> : <div className="team-logo"></div>}<div><b>{t.name}</b><br/><small style={{color:'#666'}}>Série {t.serie}</small></div></div>)}
-                
-                {subTab==='PLAYER' && !selTeamForPlayer && <div>
-                    <p style={{color:'#aaa'}}>Selecione o clube onde você joga ou acesse como livre:</p>
-                    
-                    <div 
-                        className="card" 
-                        onClick={() => setSelTeamForPlayer({ id: 'FREE', name: 'Agentes Livres' })} 
-                        style={{cursor:'pointer', border: '1px solid var(--warning)', background: 'rgba(255, 196, 0, 0.1)'}}
-                    >
-                        <b style={{color: 'var(--warning)'}}>🆓 BUSCAR MEU PERFIL (AGENTE LIVRE)</b>
+                {/* --- ABA DE LOGIN DE TIMES (ORGANIZADO POR SÉRIE E ALFABÉTICA) --- */}
+                {subTab === 'TEAM' && (
+                    <div style={{textAlign: 'left'}}>
+                        {SERIES.map(s => {
+                            // Filtra os times da série e ordena por ordem alfabética
+                            const teamsInSerie = (teams||[]).filter(t => t.status !== 'PENDING' && t.serie === s).sort((a,b) => a.name.localeCompare(b.name));
+                            if (teamsInSerie.length === 0) return null; // Se não tiver time na série, não mostra o título
+                            
+                            return (
+                                <div key={`login-serie-${s}`} style={{marginBottom: 20}}>
+                                    <h4 style={{color: s === 'VARZEA' ? 'gold' : 'var(--primary)', borderBottom: '1px solid #333', paddingBottom: 5, marginTop: 0}}>
+                                        {s === 'VARZEA' ? '🚜 Terrão (Várzea)' : `Série ${s}`}
+                                    </h4>
+                                    {teamsInSerie.map(t => (
+                                        <div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>
+                                            {t.logo ? <img src={t.logo} style={{width:40, height:40, borderRadius:'50%', objectFit:'cover', border:'1px solid #444'}}/> : <div style={{width:40, height:40, borderRadius:'50%', background:'#333', display:'grid', placeItems:'center'}}>🛡️</div>}
+                                            <div><b>{t.name}</b></div>
+                                        </div>
+                                    ))}
+                                </div>
+                            );
+                        })}
                     </div>
-
-                    <hr style={{borderColor: '#333', margin: '15px 0'}} />
-
-                    {(teams||[]).filter(t=>t.status!=='PENDING').map(t=>(
-                        <div key={t.id} className="card" onClick={()=>setSelTeamForPlayer(t)} style={{cursor:'pointer'}}>
-                            <b>{t.name}</b>
+                )}
+                
+                {/* --- ABA DE LOGIN DE JOGADOR (SELEÇÃO DE TIME ORGANIZADA) --- */}
+                {subTab === 'PLAYER' && !selTeamForPlayer && (
+                    <div style={{textAlign: 'left'}}>
+                        <p style={{color:'#aaa', textAlign:'center', fontSize: 12}}>Selecione o clube onde você joga ou acesse como livre:</p>
+                        
+                        <div className="card" onClick={() => setSelTeamForPlayer({ id: 'FREE', name: 'Agentes Livres' })} style={{cursor:'pointer', border: '1px solid var(--warning)', background: 'rgba(255, 196, 0, 0.1)', textAlign:'center'}}>
+                            <b style={{color: 'var(--warning)'}}>🆓 BUSCAR MEU PERFIL (AGENTE LIVRE)</b>
                         </div>
-                    ))}
-                </div>}
 
-                {subTab==='PLAYER' && selTeamForPlayer && <div>
-                    <button className="btn" style={{marginBottom:10, background:'#333'}} onClick={()=>setSelTeamForPlayer(null)}>
-                        ⬅ VOLTAR
-                    </button>
-                    <h4 style={{color:'var(--secondary)'}}>Jogadores - {selTeamForPlayer.name}:</h4>
-                    
-                    {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).length === 0 && 
-                        <p style={{color:'#666'}}>Nenhum jogador encontrado aqui.</p>
-                    }
-                    
-                    {(players||[]).filter(p => p.teamId === selTeamForPlayer.id).map(p => (
-                        <div key={p.id} className="card" onClick={()=>setSel({...p, type:'PLAYER'})} style={{cursor:'pointer', borderLeft:'4px solid var(--secondary)'}}>
-                            👟 <b>{p.name} {p.recoveryLeft > 0 ? '❌' : ''}</b>
-                        </div>
-                    ))}
-                </div>}
+                        <hr style={{borderColor: '#333', margin: '20px 0'}} />
+
+                        {SERIES.map(s => {
+                            const teamsInSerie = (teams||[]).filter(t => t.status !== 'PENDING' && t.serie === s).sort((a,b) => a.name.localeCompare(b.name));
+                            if (teamsInSerie.length === 0) return null;
+                            
+                            return (
+                                <div key={`p-serie-${s}`} style={{marginBottom: 20}}>
+                                    <h4 style={{color: s === 'VARZEA' ? 'gold' : 'var(--secondary)', borderBottom: '1px solid #333', paddingBottom: 5, marginTop: 0}}>
+                                        {s === 'VARZEA' ? '🚜 Terrão (Várzea)' : `Série ${s}`}
+                                    </h4>
+                                    {teamsInSerie.map(t => (
+                                        <div key={t.id} className="card" onClick={()=>setSelTeamForPlayer(t)} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>
+                                            {t.logo ? <img src={t.logo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/> : <div style={{width:30, height:30, borderRadius:'50%', background:'#333', display:'grid', placeItems:'center', fontSize:12}}>🛡️</div>}
+                                            <b>{t.name}</b>
+                                        </div>
+                                    ))}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* --- ABA DE LOGIN DE JOGADOR (LISTA DO ELENCO COM FOTO E ALFABÉTICA) --- */}
+                {subTab === 'PLAYER' && selTeamForPlayer && (
+                    <div style={{textAlign: 'left'}}>
+                        <button className="btn" style={{marginBottom:15, background:'#333', width:'auto'}} onClick={()=>setSelTeamForPlayer(null)}>
+                            ⬅ VOLTAR AOS CLUBES
+                        </button>
+                        <h4 style={{color:'var(--secondary)', borderBottom: '1px solid #333', paddingBottom: 5, marginTop: 0}}>Elenco: {selTeamForPlayer.name}</h4>
+                        
+                        {(() => {
+                            // Filtra os jogadores do time selecionado e ordena por ordem alfabética
+                            const teamPlayers = (players||[]).filter(p => p.teamId === selTeamForPlayer.id).sort((a,b) => a.name.localeCompare(b.name));
+                            
+                            if (teamPlayers.length === 0) {
+                                return <p style={{color:'#666', textAlign:'center'}}>Nenhum jogador encontrado neste clube.</p>;
+                            }
+                            
+                            return teamPlayers.map(p => (
+                                <div key={p.id} className="card" onClick={()=>setSel({...p, type:'PLAYER'})} style={{cursor:'pointer', borderLeft:'4px solid var(--secondary)', display: 'flex', alignItems: 'center', gap: 12}}>
+                                    {/* FOTO DO JOGADOR NA TELA DE LOGIN */}
+                                    {p.face ? (
+                                        <img src={p.face} style={{width: 45, height: 45, borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border: '1px solid #555'}} />
+                                    ) : (
+                                        <div style={{width: 45, height: 45, borderRadius: '50%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20}}>👤</div>
+                                    )}
+                                    
+                                    <div>
+                                        <b style={{fontSize: 15}}>{p.name} {p.recoveryLeft > 0 ? '❌' : ''}</b><br/>
+                                        <span style={{fontSize:10, background: 'var(--secondary)', color: '#000', padding: '2px 6px', borderRadius: 4, fontWeight: 'bold'}}>{p.position}</span>
+                                    </div>
+                                </div>
+                            ));
+                        })()}
+                    </div>
+                )}
 
                 {subTab==='COMPANY' && (companies||[]).filter(c=>c.status!=='PENDING').map(c=><div key={c.id} className="card" onClick={()=>setSel({...c, type:'COMPANY'})} style={{cursor:'pointer', borderLeft:'4px solid var(--purple)'}}>🏢 <b>{c.name}</b><br/><small>{(c.companyType)}</small></div>)}
                 

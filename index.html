@@ -4818,7 +4818,12 @@ const GameCalendar = ({ calendar }) => {
             db.collection('config').doc('system').update({ marketOpen: data });
             postNews(data ? "📢 JANELA ABERTA" : "🔒 JANELA FECHADA", 'infra');
         }
+if (act === 'VARZEA') {
+            db.collection('config').doc('system').update({ varzeaOpen: data });
+            postNews(data ? "🔓 **INSCRIÇÕES ABERTAS!**\nA Várzea voltou a aceitar novos times!" : "🛑 **INSCRIÇÕES ENCERRADAS!**\nO limite de times na Várzea foi atingido. Apenas na próxima temporada!", 'infra');
+        }
 
+         
         // --- 2. VIRADA DE SEMANA ---
         if (act === 'WEEK') {
             if (!confirm("⚠️ VIRAR SEMANA?\n\n1. Pagar Salários (+)\n2. Cobrar Imposto Jogador (3%)\n3. Recuperar Energia (100%)\n4. Empresas, Técnicos e XP")) return;
@@ -6133,6 +6138,9 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                     <h4 style={{marginTop:0, color:'var(--danger)'}}>🎮 Controle do Jogo</h4>
                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10}}>
                         <button className={`btn ${config.marketOpen?'btn-red':'btn-green'}`} onClick={()=>onAct('MARKET', !config.marketOpen)}>{config.marketOpen?'FECHAR MERCADO':'ABRIR MERCADO'}</button>
+                       <button className={`btn ${config.varzeaOpen === false ? 'btn-green' : 'btn-red'}`} onClick={()=>onAct('VARZEA', config.varzeaOpen === false ? true : false)}>
+                            {config.varzeaOpen === false ? 'ABRIR VÁRZEA' : 'TRAVAR VÁRZEA'}
+                        </button>
                         <button className="btn btn-purple" onClick={()=>onAct('WEEK')}>VIRAR SEMANA</button>
                     </div>
 
@@ -7922,8 +7930,8 @@ const renewContract = async (p) => {
      
           // --- RENDER ---
           if(loading) return <div style={{display:'grid', placeItems:'center', height:'100vh'}}>Carregando...</div>;
-if(!user) return <LoginScreen teams={teams} players={players} papers={papers} journalists={journalists} companies={companies} coaches={coaches} onLogin={login} onCreateTeam={createTeam} onCreatePaper={createNewspaper} onCreateJourno={createJournalist} onCreateCompany={createCompany} onAdmin={loginAdmin} onVisitor={()=>{setUser({type:'VISITOR'}); setScreen('RANKING');}} onCreateCoach={createCoach} onCreatePlayer={createPlayerAccount} />;
-            return (
+if(!user) return <LoginScreen teams={teams} players={players} papers={papers} journalists={journalists} companies={companies} coaches={coaches} onLogin={login} onCreateTeam={createTeam} onCreatePaper={createNewspaper} onCreateJourno={createJournalist} onCreateCompany={createCompany} onAdmin={loginAdmin} onVisitor={()=>{setUser({type:'VISITOR'}); setScreen('RANKING');}} onCreateCoach={createCoach} onCreatePlayer={createPlayerAccount} config={conf} />;
+    return (
                 <div>
                     <div className="header">
                         <div style={{display:'flex', alignItems:'center', gap:10}}>
@@ -8496,7 +8504,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
         );
     };
 // --- COMPONENTS ---
-const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor, onCreateCoach, onCreatePlayer }) => {
+const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, onLogin, onCreateTeam, onCreatePaper, onCreateJourno, onCreateCompany, onAdmin, onVisitor, onCreateCoach, onCreatePlayer, config }) => {
         const [tab, setTab] = useState('LOGIN'); 
     const [subTab, setSubTab] = useState('TEAM'); 
     const [f, setF] = useState({n:'', b:'10000000', s:'A', p:''}); 
@@ -8770,7 +8778,20 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
 
                 <input className="input-field" type="password" placeholder="Crie uma Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} />
                 
-                <button className="btn btn-green" onClick={()=>{
+                {/* --- AVISO DE VÁRZEA FECHADA --- */}
+                {f.s === 'VARZEA' && config?.varzeaOpen === false && (
+                    <div style={{background: 'rgba(255, 23, 68, 0.1)', border: '1px solid red', padding: 15, borderRadius: 8, marginTop: 10, marginBottom: 15}}>
+                        <b style={{color: '#ff1744', display:'block', marginBottom: 5, fontSize: 14}}>🛑 INSCRIÇÕES ENCERRADAS!</b>
+                        <span style={{fontSize: 11, color: '#ffaaaa', lineHeight: 1.4, display: 'block'}}>
+                            A Federação informa que o limite de clubes filiados ao Terrão (Várzea) foi atingido. Novas vagas estarão disponíveis apenas na próxima temporada. Fique atento aos comunicados oficiais!
+                        </span>
+                    </div>
+                )}
+
+                <button 
+                    className={`btn ${f.s === 'VARZEA' && config?.varzeaOpen === false ? 'btn-ghost' : 'btn-green'}`} 
+                    disabled={f.s === 'VARZEA' && config?.varzeaOpen === false}
+                    onClick={()=>{
                     // Validações de segurança
                     if(!f.n || !f.p) return alert("⚠️ Preencha o nome do clube e crie uma senha!");
                     if(teams.find(t=>t.name && t.name.toLowerCase() === f.n.toLowerCase())) return alert("🚫 Este nome de clube já está em uso!");

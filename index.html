@@ -8586,8 +8586,8 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
                     <button className={`btn ${subTab==='PLAYER'?'btn-blue':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>{setSubTab('PLAYER'); setSelTeamForPlayer(null);}}>JOGADORES</button>
                     <button className={`btn ${subTab==='COMPANY'?'btn-purple':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>setSubTab('COMPANY')}>EMPRESAS</button>
                     {/* NOVO BOTÃO DE LOGIN DE TÉCNICO */}
-                    <button className={`btn ${subTab==='COACH'?'btn-gold':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>setSubTab('COACH')}>TÉCNICOS</button>
-                </div>
+<button className={`btn ${subTab==='COACH'?'btn-gold':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>{setSubTab('COACH'); setSelTeamForPlayer(null); setLoginSerie(null);}}>TÉCNICOS</button>
+    </div>
 
                {/* --- ABA DE LOGIN DE TIMES (MENU VERTICAL) --- */}
                 {subTab === 'TEAM' && (
@@ -8719,16 +8719,82 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
 
                 {subTab==='COMPANY' && (companies||[]).filter(c=>c.status!=='PENDING').map(c=><div key={c.id} className="card" onClick={()=>setSel({...c, type:'COMPANY'})} style={{cursor:'pointer', borderLeft:'4px solid var(--purple)'}}>🏢 <b>{c.name}</b><br/><small>{(c.companyType)}</small></div>)}
                 
-                {/* LISTA DE TÉCNICOS PARA LOGIN */}
-                {subTab==='COACH' && (
-                    <div>
-                        <h4 style={{color:'gold'}}>Acessar como Técnico</h4>
-                        {(coaches||[]).filter(c => c.status === 'ACTIVE').length === 0 && <p style={{color:'#666'}}>Nenhum técnico ativo.</p>}
-                        {(coaches||[]).filter(c => c.status === 'ACTIVE').map(c => (
-                            <div key={c.id} className="card" onClick={()=>setSel({...c, type:'COACH'})} style={{cursor:'pointer', borderLeft:'4px solid gold'}}>
-                                🎓 <b>{c.name}</b>
-                            </div>
-                        ))}
+                {/* --- ABA DE LOGIN DE TÉCNICO (MENU VERTICAL COM SÉRIES E AGENTES LIVRES) --- */}
+                {subTab === 'COACH' && !selTeamForPlayer && (
+                    <div className="animate-in" style={{textAlign: 'left'}}>
+                        <p style={{color:'#aaa', textAlign:'center', fontSize: 12, margin: '0 0 10px 0'}}>Selecione o clube que você comanda ou acesse como livre:</p>
+                        
+                        <div className="card pulse" onClick={() => setSelTeamForPlayer({ id: 'FREE', name: 'Técnicos Livres' })} style={{cursor:'pointer', border: '1px solid gold', background: 'rgba(255, 215, 0, 0.1)', textAlign:'center', padding: '15px', marginBottom: 10}}>
+                            <b style={{color: 'gold', fontSize: 14}}>🆓 SOU TÉCNICO LIVRE</b>
+                        </div>
+
+                        {/* Botões das Séries */}
+                        <div style={{display:'flex', gap:8, marginBottom:15, overflowX:'auto', paddingBottom:5}}>
+                            {SERIES.map(s => (
+                                <button 
+                                    key={`btn-c-s-${s}`} 
+                                    className={`btn ${loginSerie === s ? 'btn-gold' : 'btn-ghost'}`} 
+                                    style={{
+                                        flex: '0 0 auto', minWidth: '80px', padding: '8px', fontSize: '11px', margin: 0, 
+                                        borderColor: loginSerie === s ? 'gold' : '#666', 
+                                        color: loginSerie === s ? '#000' : '#ccc'
+                                    }}
+                                    onClick={() => setLoginSerie(s)}
+                                >
+                                    {s === 'VARZEA' ? 'VÁRZEA' : `SÉRIE ${s}`}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Lista de Times Filtrada (Para o técnico clicar no seu clube) */}
+                        {(() => {
+                            if (!loginSerie) return null;
+                            const teamsInSerie = (teams||[]).filter(t => t.status !== 'PENDING' && t.serie === loginSerie).sort((a,b) => a.name.localeCompare(b.name));
+                            
+                            if (teamsInSerie.length === 0) return <p style={{textAlign:'center', color:'#666', marginTop: 20}}>Nenhum time cadastrado nesta série.</p>;
+                            
+                            return teamsInSerie.map(t => (
+                                <div key={t.id} className="card" onClick={()=>setSelTeamForPlayer(t)} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>
+                                    {t.logo ? <img src={t.logo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/> : <div style={{width:30, height:30, borderRadius:'50%', background:'#333', display:'grid', placeItems:'center', fontSize:12}}>🛡️</div>}
+                                    <b>{t.name}</b>
+                                    <i className="fas fa-chevron-right" style={{marginLeft: 'auto', color: '#555'}}></i>
+                                </div>
+                            ));
+                        })()}
+                    </div>
+                )}
+
+                {/* --- TELA 3: FOTO DO TÉCNICO NO TIME ESCOLHIDO --- */}
+                {subTab === 'COACH' && selTeamForPlayer && (
+                    <div className="animate-in" style={{textAlign: 'left'}}>
+                        <button className="btn" style={{marginBottom:15, background:'#333', width:'auto'}} onClick={()=>setSelTeamForPlayer(null)}>
+                            ⬅ VOLTAR AOS CLUBES
+                        </button>
+                        <h4 style={{color:'gold', borderBottom: '1px solid #333', paddingBottom: 5, marginTop: 0}}>
+                            {selTeamForPlayer.id === 'FREE' ? 'Mercado de Técnicos' : `Comandante: ${selTeamForPlayer.name}`}
+                        </h4>
+                        
+                        {(() => {
+                            const teamCoaches = (coaches||[]).filter(c => c.status === 'ACTIVE' && c.teamId === selTeamForPlayer.id).sort((a,b) => a.name.localeCompare(b.name));
+                            
+                            if (teamCoaches.length === 0) return <p style={{color:'#666', textAlign:'center', marginTop: 20}}>O cargo de técnico está vago neste clube.</p>;
+                            
+                            return teamCoaches.map(c => (
+                                <div key={c.id} className="card" onClick={()=>setSel({...c, type:'COACH'})} style={{cursor:'pointer', borderLeft:'4px solid gold', display: 'flex', alignItems: 'center', gap: 12}}>
+                                    {c.face ? (
+                                        <img src={c.face} style={{width: 45, height: 45, borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border: '1px solid gold'}} />
+                                    ) : (
+                                        <div style={{width: 45, height: 45, borderRadius: '50%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, border: '1px solid gold'}}>👔</div>
+                                    )}
+                                    
+                                    <div style={{flex: 1}}>
+                                        <b style={{fontSize: 15, color: 'gold'}}>{c.name}</b><br/>
+                                        <span style={{fontSize:10, color: '#aaa'}}>Nível {c.level} | Especialista: {c.affinities ? c.affinities[0] : 'Geral'}</span>
+                                    </div>
+                                    <i className="fas fa-sign-in-alt" style={{color: 'gold'}}></i>
+                                </div>
+                            ));
+                        })()}
                     </div>
                 )}
 

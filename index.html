@@ -4359,9 +4359,9 @@ db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTA
                 const c = companies.find(x => x.id === loginId && x.password === loginPass);
                 if (c) { foundUser = c; foundType = 'COMPANY'; }
             } 
-            else if (type === 'COACH') {
+           else if (['COACH', 'DOCTOR', 'SCOUT', 'ASSISTANT'].includes(type)) {
                 const c = coaches.find(x => x.id === loginId && x.password === loginPass);
-                if (c) { foundUser = c; foundType = 'COACH'; }
+                if (c) { foundUser = c; foundType = c.type; }
             }
             // --- VERIFICAÇÃO DE IMPRENSA (MODAL) ---
             else if (type === 'PRESS' || type === 'PAPER') {
@@ -4389,10 +4389,10 @@ db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTA
                     if (p) { foundUser = p; foundType = 'PLAYER'; }
                 }
                 
-                // Tenta achar em Técnicos
+                // Tenta achar em Comissão (Técnicos, Médicos, etc)
                 if (!foundUser) {
                     let c = coaches.find(x => (x.id === loginId || x.name === loginId) && x.password === loginPass);
-                    if (c) { foundUser = c; foundType = 'COACH'; }
+                    if (c) { foundUser = c; foundType = c.type; }
                 }
 
                 // Tenta achar em Empresas
@@ -7977,7 +7977,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.92.0</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.92.1</div>
                             </div>
                         </div>
                         
@@ -8353,13 +8353,14 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                 {/* INDICADOR DE ROLAGEM ANIMADO */}
                     <div className="scroll-hint">Deslize <i className="fas fa-arrow-right"></i></div>
                  <div className="bottom-nav">
-                    {/* 1. HOME */}
-                    <div className={`nav-item ${['HOME','COMPANY_HOME','COMPANY_DASH','PLAYER_DASH','COACH_DASH','PRESS_DASH'].includes(screen)?'active':''}`} 
+                   {/* 1. HOME */}
+                    <div className={`nav-item ${['HOME','COMPANY_HOME','COMPANY_DASH','PLAYER_DASH','COACH_DASH','DOCTOR_DASH','PRESS_DASH'].includes(screen)?'active':''}`} 
                         onClick={() => { 
                             if(user.type.includes('PRESS')) setScreen('PRESS_DASH'); 
                             else if(user.type === 'COMPANY') setScreen('COMPANY_HOME'); 
                             else if(user.type === 'PLAYER') setScreen('PLAYER_DASH'); 
                             else if(user.type === 'COACH') setScreen('COACH_DASH'); 
+                            else if(user.type === 'DOCTOR') setScreen('DOCTOR_DASH');
                             else setScreen('HOME'); 
                         }}>
                         <i className="fas fa-home"></i><span>INÍCIO</span>
@@ -8631,7 +8632,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.0 MEDICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.1 MEDICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -8851,8 +8852,8 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                             const roleNames = { 'COACH': '👔 Técnico', 'DOCTOR': '🩺 Médico', 'SCOUT': '🕵️‍♂️ Olheiro', 'ASSISTANT': '📋 Auxiliar' };
 
                             return teamCoaches.map(c => (
-                                <div key={c.id} className="card" onClick={()=>setSel({...c, type:'COACH'})} style={{cursor:'pointer', borderLeft:'4px solid gold', display: 'flex', alignItems: 'center', gap: 12}}>
-                                    {c.face ? (
+<div key={c.id} className="card" onClick={()=>setSel({...c, type: c.type || 'COACH'})} style={{cursor:'pointer', borderLeft:'4px solid gold', display: 'flex', alignItems: 'center', gap: 12}}>
+    {c.face ? (
                                         <img src={c.face} style={{width: 45, height: 45, borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border: '1px solid gold'}} />
                                     ) : (
                                         <div style={{width: 45, height: 45, borderRadius: '50%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, border: '1px solid gold'}}>

@@ -4185,9 +4185,9 @@ const GameCalendar = ({ calendar }) => {
                         if (list.length && (!lastRead || list[0].date > parseInt(lastRead))) setNewNews(true); 
                         setLoading(false); 
                     }),
+db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTANT']).onSnapshot(snap => {
 
-                    db.collection('users').where('type', '==', 'COACH').onSnapshot(snap => {
-                        setCoaches(snap.docs.map(d => ({id: d.id, ...d.data()})));
+                    setCoaches(snap.docs.map(d => ({id: d.id, ...d.data()})));
                     }),
                     db.collection('matches').onSnapshot(s => setMatches(s.docs.map(d => ({id:d.id, ...d.data()})))),
 
@@ -4425,6 +4425,8 @@ const GameCalendar = ({ calendar }) => {
                     
                     // Redireciona para a tela correta
                     if (foundType === 'COACH') setScreen('COACH_DASH');
+                    else if (foundType === 'DOCTOR') setScreen('DOCTOR_DASH');
+                    else if (['SCOUT', 'ASSISTANT'].includes(foundType)) { alert("Painel em construção. Em breve!"); setScreen('HOME'); }
                     else if (foundType === 'COMPANY') setScreen('COMPANY_DASH');
                     else if (foundType === 'PLAYER') setScreen('PLAYER_DASH');
                     else if (foundType === 'PRESS' || foundType === 'PRESS_WORKER') setScreen('PRESS_DASH'); // Redireciona Imprensa
@@ -5654,8 +5656,7 @@ const handleCoachIndication = async (player, obs) => {
 // --- FUNÇÃO DE CONSUMO DO TÉCNICO (COM SISTEMA DE INTOXICAÇÃO) ---
     const handleCoachUseItem = async (item) => {
         // Verificações de segurança
-        if (!user.data || user.type !== 'COACH') return;
-        
+if (!user.data || !['COACH', 'DOCTOR', 'SCOUT', 'ASSISTANT'].includes(user.type)) return;        
         // 1. Configuração do Dia e Toxicidade
         const today = new Date().toDateString();
         const lastDate = user.data.lastToxicityDate || '';
@@ -7967,7 +7968,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.91.9</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.92.0</div>
                             </div>
                         </div>
                         
@@ -8317,6 +8318,28 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                                 </div>
                             </div>
                         }
+                        {/* --- PAINEL DO MÉDICO --- */}
+                        {(screen === 'HOME' || screen === 'DOCTOR_DASH') && user.type === 'DOCTOR' && 
+                            <div key="doctor-home-container">
+                                <DoctorDashboard 
+                                    doctor={user.data} 
+                                    team={teams.find(t => t.id === user.data.teamId)} 
+                                    players={players.filter(p => p.teamId === user.data.teamId)} 
+                                    offers={offers} 
+                                    sales={sales} 
+                                    onUseItem={handleCoachUseItem} 
+                                    onSelfAction={(act, payload) => {
+                                        if(act === 'ACCEPT_OFFER') handleFinalizeCoachContract(payload.offer);
+                                        if(act === 'REJECT_OFFER') rejectOffer(payload.offer);
+                                        handleCoachSelfActions(act, payload);
+                                    }} 
+                                    setModal={setModal} 
+                                />
+                                <div style={{marginTop: 20, textAlign:'center', color:'#666', fontSize:12}}>
+                                    <i>Acesse a aba <b>JOGOS</b> para ver a tabela e partidas.</i>
+                                </div>
+                            </div>
+                        }
                 {/* INDICADOR DE ROLAGEM ANIMADO */}
                     <div className="scroll-hint">Deslize <i className="fas fa-arrow-right"></i></div>
                  <div className="bottom-nav">
@@ -8598,7 +8621,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.91.9 PIX  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.0 PIX  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -9885,6 +9908,8 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
     );
 };
 //FIM
+
+    
         // --- COMPONENTE DO PAINEL DO TÉCNICO ---
 const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolvePerk, onAddAffinity, onAcceptOffer, onRejectOffer, onCounterOffer, onUpdateSalary, onSelfAction, onUseItem, onSaveTactics, setModal }) => {
     const [tab, setTab] = useState('PRANCHETA'); 

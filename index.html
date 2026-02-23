@@ -4114,6 +4114,7 @@ const GameCalendar = ({ calendar }) => {
            const [awards, setAwards] = useState([]); 
            const [tourns, setTourns] = useState([]);
            const [coaches, setCoaches] = useState([]); 
+                        const [hallOfFame, setHallOfFame] = useState([]);
             const [matches, setMatches] = useState([]);
             const [posts, setPosts] = useState([]);
             const [screen, setScreen] = useState('HOME');
@@ -4169,7 +4170,7 @@ const GameCalendar = ({ calendar }) => {
                     db.collection('sponsorships').onSnapshot(s => setSps(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('awards').onSnapshot(s => setAwards(s.docs.map(d => ({id:d.id, ...d.data()})))),
                     db.collection('tournaments').onSnapshot(s => setTourns(s.docs.map(d => ({id:d.id, ...d.data()})))),
-                                                      
+                     db.collection('hallOfFame').orderBy('season', 'desc').onSnapshot(s => setHallOfFame(s.docs.map(d => ({id:d.id, ...d.data()})))),                                 
     
     // --- CORREÇÃO AQUI: REMOVIDO O LIMIT(50) PARA OS ITENS NÃO SUMIREM ---
                     db.collection('sales').orderBy('date', 'desc').onSnapshot(s => {
@@ -5258,100 +5259,39 @@ if (act === 'VARZEA') {
 
         // Função auxiliar para ordenar classificação
         const sortTable = (list) => list.sort((a, b) => {
-            const pA = (a.stats?.pts||0), pB = (b.stats?.pts||0);
-            if (pA !== pB) return pB - pA; // Pontos
-            const vA = (a.stats?.wins||0), vB = (b.stats?.wins||0);
-            if (vA !== vB) return vB - vA; // Vitórias
-            const sgA = (a.stats?.gf||0)-(a.stats?.ga||0), sgB = (b.stats?.gf||0)-(b.stats?.ga||0);
-            if (sgA !== sgB) return sgB - sgA; // Saldo
-            const cA = (a.stats?.cards||0), cB = (b.stats?.cards||0);
-            return cA - cB; // Menos cartões é melhor
+           const champA = tA[0];
+        const champB = tB[0];
+        const champC = tC[0];
+        const champD = tD[0];
+        const champVarzea = tVarzea[0];
+        
+        postNews(`🏆 **FIM DA TEMPORADA ${currentSeason}!**\nAs premiações foram depositadas! Parabéns aos campeões:\n\n🥇 Série A: ${champA?.name || 'Ninguém'}\n🥈 Série B: ${champB?.name || 'Ninguém'}\n🥉 Série C: ${champC?.name || 'Ninguém'}\n🏅 Série D: ${champD?.name || 'Ninguém'}`, 'finance');
+
+        // =========================================
+        // 2.5 REGISTRO NO HALL DA FAMA (MUSEU)
+        // =========================================
+        const topScorer = [...players].sort((a,b) => (b.stats?.goals||0) - (a.stats?.goals||0))[0];
+        const topAssist = [...players].sort((a,b) => (b.stats?.assists||0) - (a.stats?.assists||0))[0];
+        const topSaves = [...players].sort((a,b) => (b.stats?.saves||0) - (a.stats?.saves||0))[0];
+        const topRating = [...players].filter(p => p.pressRatingCount > 0).sort((a,b) => (b.pressRatingAvg||0) - (a.pressRatingAvg||0))[0];
+
+        const hallRef = db.collection('hallOfFame').doc(`season_${currentSeason}`);
+        b.set(hallRef, {
+            season: currentSeason,
+            date: Date.now(),
+            champA: champA ? { name: champA.name, logo: champA.logo } : null,
+            champB: champB ? { name: champB.name, logo: champB.logo } : null,
+            champC: champC ? { name: champC.name, logo: champC.logo } : null,
+            champD: champD ? { name: champD.name, logo: champD.logo } : null,
+            champVarzea: champVarzea ? { name: champVarzea.name, logo: champVarzea.logo } : null,
+            topScorer: topScorer && topScorer.stats?.goals > 0 ? { name: topScorer.name, face: topScorer.face, val: topScorer.stats.goals } : null,
+            topAssist: topAssist && topAssist.stats?.assists > 0 ? { name: topAssist.name, face: topAssist.face, val: topAssist.stats.assists } : null,
+            topSaves: topSaves && topSaves.stats?.saves > 0 ? { name: topSaves.name, face: topSaves.face, val: topSaves.stats.saves } : null,
+            topRating: topRating ? { name: topRating.name, face: topRating.face, val: topRating.pressRatingAvg } : null,
         });
 
-        // Pega as tabelas finais filtrando times ativos
-        const tA = sortTable(teams.filter(t => t.serie === 'A' && t.status !== 'PENDING'));
-        const tB = sortTable(teams.filter(t => t.serie === 'B' && t.status !== 'PENDING'));
-        const tC = sortTable(teams.filter(t => t.serie === 'C' && t.status !== 'PENDING'));
-        const tD = sortTable(teams.filter(t => t.serie === 'D' && t.status !== 'PENDING'));
-        const tVarzea = sortTable(teams.filter(t => t.serie === 'VARZEA' && t.status !== 'PENDING'));
-
         // =========================================
-        // 1. DISTRIBUIÇÃO DAS PREMIAÇÕES DE FIM DE ANO (DINÂMICA)
-        // =========================================
-        const activePrizes = conf.prizes || DEFAULT_PRIZES;
-
-        const calculatePrize = (serie, index, totalTeams) => {
-            const pos = index + 1;
-            const isRelegated = (serie === 'A' || serie === 'B' || serie === 'C') && index >= totalTeams - 2;
-            const isRelegatedD = serie === 'D' && index >= totalTeams - 3;
-            const p = activePrizes[serie] || DEFAULT_PRIZES[serie];
-
-            if (serie === 'A') {
-                if (pos === 1) return p.champ;
-                if (pos === 2) return p.vice;
-                if (pos === 3) return p.third;
-                if (isRelegated) return p.rel; 
-                return p.mid; 
-            }
-            if (serie === 'B' || serie === 'C') {
-                if (pos === 1) return p.champ;
-                if (pos === 2) return p.vice;
-                if (isRelegated) return p.rel; 
-                return p.mid; 
-            }
-            if (serie === 'D') {
-                if (pos === 1) return p.champ;
-                if (pos === 2) return p.vice;
-                if (isRelegatedD) return p.rel; 
-                return p.mid; 
-            }
-            if (serie === 'VARZEA') {
-                if (pos === 1) return p.champ;
-                if (pos === 2) return p.vice;
-                if (pos === 3) return p.third;
-                return p.mid; 
-            }
-            return 0;
-        };
-
-        const awardPrizes = (teamList, serieName) => {
-            teamList.forEach((t, i) => {
-                const prize = calculatePrize(serieName, i, teamList.length);
-                b.update(db.collection('teams').doc(t.id), {
-                    balance: firebase.firestore.FieldValue.increment(prize)
-                });
-            });
-        };
-
-        awardPrizes(tA, 'A');
-        awardPrizes(tB, 'B');
-        awardPrizes(tC, 'C');
-        awardPrizes(tD, 'D');
-        awardPrizes(tVarzea, 'VARZEA');
-
-        const champA = tA[0]?.name || 'Ninguém';
-        const champB = tB[0]?.name || 'Ninguém';
-        const champC = tC[0]?.name || 'Ninguém';
-        const champD = tD[0]?.name || 'Ninguém';
-        
-        postNews(`🏆 **FIM DA TEMPORADA ${currentSeason}!**\nAs premiações foram depositadas! Parabéns aos campeões:\n\n🥇 Série A: ${champA}\n🥈 Série B: ${champB}\n🥉 Série C: ${champC}\n🏅 Série D: ${champD}`, 'finance');
-
-        // =========================================
-        // 2. PROMOÇÃO E REBAIXAMENTO
-        // =========================================
-        if (tA.length > 0 || tB.length > 0) {
-            tA.slice(-2).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'B' }));
-            tB.slice(0, 2).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'A' }));
-            tB.slice(-2).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'C' }));
-            tC.slice(0, 2).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'B' }));
-            tC.slice(-2).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'D' }));
-            tD.slice(0, 2).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'C' }));
-            tD.slice(-3).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'VARZEA' }));
-            tVarzea.slice(0, 3).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'D' }));
-        }
-
-        // =========================================
-        // 3. ZERA ESTATÍSTICAS DOS TIMES
+        // 3. ZERA ESTATÍSTICAS DOS TIMES E JOGADORES P/ A NOVA TEMPORADA
         // =========================================
         teams.forEach(t => {
             b.update(db.collection('teams').doc(t.id), {
@@ -5359,7 +5299,15 @@ if (act === 'VARZEA') {
             });
         });
         
+        players.forEach(p => {
+            b.update(db.collection('players').doc(p.id), {
+                stats: {goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0},
+                pressRatingSum: 0, pressRatingCount: 0, pressRatingAvg: 0
+            });
+        });
+        
         b.update(db.collection('config').doc('system'), { season: currentSeason + 1 });
+                
 
         // =========================================
         // 4. ENVELHECIMENTO DE CONTRATOS E EMPRÉSTIMOS
@@ -8194,8 +8142,8 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             </div>
                         )}
                                 
-                        {screen === 'RANKING' && <Ranking teams={teams} players={players} sales={sales} />}
-                        
+                            {screen === 'RANKING' && <Ranking teams={teams} players={players} sales={sales} hallOfFame={hallOfFame} />}
+    
                         {screen === 'NEWS' && <div><h3>Notícias</h3>{news.map(n=><div key={n.id} className={`news-card news-${n.type}`}>{n.text}<br/><small style={{color:'#666'}}>{new Date(n.date).toLocaleString()}</small></div>)}</div>}
 
                         {/* TELA DO MATOGRAM */}
@@ -11449,26 +11397,20 @@ const OffersScreen = ({ user, offers, teams, players, setModal, onAccept, onReje
 };
         //FIM
 
-const Ranking = ({ teams, players, sales }) => {
-    const [view, setView] = React.useState('TEAMS');
-    const [inspect, setInspect] = React.useState(null); // Estado para o modal de inspeção
+const Ranking = ({ teams, players, sales, hallOfFame }) => {
+    const [view, setView] = React.useState('HALL'); // Abre direto no Hall da Fama agora!
+    const [inspect, setInspect] = React.useState(null); 
 
-    // Filtra para não mostrar jogadores bugados (sem time)
     const validPlayers = players.filter(p => p && p.teamId && p.teamId !== 'FREE' && p.name);
 
     const renderTeams = () => teams
         .filter(t => t && t.status !== 'PENDING')
         .map(t => {
-            // MUDANÇA AQUI: Calcula o valor do elenco usando o PREÇO JUSTO RECOMENDADO
-            // Isso impede que times superfaturem jogadores para subir no ranking artificialmente
             const squadValue = validPlayers
                 .filter(p => p.teamId === t.id)
                 .reduce((total, p) => total + getRecommendedPrice(p.overall, p.position), 0);
             
-            // Pega o saldo em caixa
             const balance = parseFloat(t.balance) || 0;
-            
-            // Soma tudo para o Ranking Geral
             return { ...t, balance, squadValue, totalWealth: balance + squadValue };
         })
         .sort((a, b) => b.totalWealth - a.totalWealth)
@@ -11480,21 +11422,15 @@ const Ranking = ({ teams, players, sales }) => {
                 <div style={{ flex: 1 }}>
                     <div style={{marginBottom: 5, fontWeight: 'bold'}}>{String(t.name)}</div>
                     
-                    {/* EXIBIÇÃO DETALHADA DO PATRIMÔNIO (3 Colunas) */}
                     <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5}}>
-                        {/* 1. Saldo em Caixa */}
                         <div style={{background: 'rgba(0, 230, 118, 0.1)', padding: 4, borderRadius: 4, textAlign: 'center', border: '1px solid rgba(0, 230, 118, 0.2)'}}>
                             <div style={{fontSize: 8, color: '#aaa', textTransform: 'uppercase'}}>Saldo</div>
                             <div style={{fontSize: 10, fontWeight: 'bold', color: '#00E676'}}>{fmt(t.balance)}</div>
                         </div>
-
-                        {/* 2. Valor do Elenco (Real/Justo) */}
                         <div style={{background: 'rgba(41, 121, 255, 0.1)', padding: 4, borderRadius: 4, textAlign: 'center', border: '1px solid rgba(41, 121, 255, 0.2)'}}>
                             <div style={{fontSize: 8, color: '#aaa', textTransform: 'uppercase'}}>Elenco</div>
                             <div style={{fontSize: 10, fontWeight: 'bold', color: '#2979FF'}}>{fmt(t.squadValue)}</div>
                         </div>
-
-                        {/* 3. Total Geral */}
                         <div style={{background: 'rgba(255, 215, 0, 0.1)', padding: 4, borderRadius: 4, textAlign: 'center', border: '1px solid rgba(255, 215, 0, 0.2)'}}>
                             <div style={{fontSize: 8, color: '#aaa', textTransform: 'uppercase'}}>Total</div>
                             <div style={{fontSize: 10, fontWeight: 'bold', color: 'gold'}}>{fmt(t.totalWealth)}</div>
@@ -11516,14 +11452,11 @@ const Ranking = ({ teams, players, sales }) => {
         return sorted.slice(0, 20).map((p, i) => (
             <div key={p.id} className="card" onClick={() => setInspect({ type: 'PLAYER', data: p })} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
                 <b style={{ fontSize: 20, color: '#555', width: 30, textAlign: 'center' }}>{i + 1}</b>
-                
-                {/* FOTO DO JOGADOR NO RANKING */}
                 {p.face ? (
                     <img src={p.face} style={{ width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border: '1px solid #444' }} />
                 ) : (
                     <div style={{ width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>👤</div>
                 )}
-
                 <div style={{ flex: 1 }}>
                     <b>{String(p.name)} {p.recoveryLeft > 0 ? '❌' : ''}</b> <small>({String(teams.find(t => t.id === p.teamId)?.name || 'Sem Clube')})</small>
                 </div>
@@ -11536,11 +11469,12 @@ const Ranking = ({ teams, players, sales }) => {
 
     return (
         <div>
-            <h3>Ranking e Estatísticas</h3>
+            <h3>Ranking e Histórico</h3>
             <div className="rank-tabs">
+                <div className={`rank-tab ${view === 'HALL' ? 'active' : ''}`} onClick={() => setView('HALL')}>🏛️ Hall da Fama</div>
                 <div className={`rank-tab ${view === 'TEAMS' ? 'active' : ''}`} onClick={() => setView('TEAMS')}>💰 Clubes</div>
-               <div className={`rank-tab ${view === 'SOCIOS' ? 'active' : ''}`} onClick={() => setView('SOCIOS')}>🎟️ Maior Torcida</div>
-                                        <div className={`rank-tab ${view === 'FAME' ? 'active' : ''}`} onClick={() => setView('FAME')}>💎 Celebridades</div>
+                <div className={`rank-tab ${view === 'SOCIOS' ? 'active' : ''}`} onClick={() => setView('SOCIOS')}>🎟️ Maior Torcida</div>
+                <div className={`rank-tab ${view === 'FAME' ? 'active' : ''}`} onClick={() => setView('FAME')}>💎 Celebridades</div>
                 <div className={`rank-tab ${view === 'OVERALL' ? 'active' : ''}`} onClick={() => setView('OVERALL')}>⭐ Craques</div>
                 <div className={`rank-tab ${view === 'SALARY' ? 'active' : ''}`} onClick={() => setView('SALARY')}>💸 Salários</div>
                 <div className={`rank-tab ${view === 'GOALS' ? 'active' : ''}`} onClick={() => setView('GOALS')}>⚽ Gols</div>
@@ -11551,7 +11485,64 @@ const Ranking = ({ teams, players, sales }) => {
             </div>
 
             <div style={{ marginTop: 10 }}>
+                {view === 'HALL' && (
+                    <div className="animate-in">
+                        {(hallOfFame || []).length === 0 ? (
+                            <div className="card" style={{textAlign:'center', padding:40, color:'#666'}}>
+                                <i className="fas fa-museum" style={{fontSize:40, marginBottom:10}}></i>
+                                <p>O Museu está vazio. Quando a primeira Temporada virar, a história começará a ser escrita aqui!</p>
+                            </div>
+                        ) : (
+                            hallOfFame.map(season => (
+                                <div key={season.id} className="card" style={{marginBottom: 15, border: '1px solid gold'}}>
+                                    <h3 style={{marginTop: 0, color: 'gold', textAlign:'center', borderBottom:'1px dashed #444', paddingBottom:10}}>
+                                        🏆 Temporada {season.season}
+                                    </h3>
+                                    
+                                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:15}}>
+                                        <div style={{background:'rgba(0, 230, 118, 0.1)', padding:10, borderRadius:8, border:'1px solid var(--primary)', textAlign:'center'}}>
+                                            <span style={{fontSize:10, color:'#aaa'}}>Campeão da Série A</span><br/>
+                                            {season.champA?.logo ? <img src={season.champA.logo} style={{width:40, height:40, borderRadius:'50%', objectFit:'cover', margin:'5px auto', display:'block'}} /> : <div style={{fontSize:30, textAlign:'center'}}>🛡️</div>}
+                                            <b style={{display:'block', color:'#fff'}}>{season.champA?.name || '---'}</b>
+                                        </div>
+                                        <div style={{background:'rgba(255, 255, 255, 0.05)', padding:10, borderRadius:8, border:'1px solid #555', textAlign:'center'}}>
+                                            <span style={{fontSize:10, color:'#aaa'}}>Artilheiro do Ano</span><br/>
+                                            {season.topScorer?.face ? <img src={season.topScorer.face} style={{width:40, height:40, borderRadius:'50%', objectFit:'cover', margin:'5px auto', display:'block'}} /> : <div style={{fontSize:30, textAlign:'center'}}>👤</div>}
+                                            <b style={{display:'block', color:'#fff'}}>{season.topScorer?.name || '---'}</b>
+                                            <span style={{color:'gold', fontSize:12, fontWeight:'bold'}}>{season.topScorer?.val || 0} ⚽</span>
+                                        </div>
+                                    </div>
+
+                                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:5}}>
+                                        <div style={{background:'#222', padding:8, borderRadius:5, textAlign:'center'}}>
+                                            <span style={{fontSize:9, color:'#888'}}>Rei das Assistências</span><br/>
+                                            <b style={{fontSize:11, color:'var(--secondary)'}}>{season.topAssist?.name || '---'}</b><br/>
+                                            <span style={{fontSize:10}}>{season.topAssist?.val || 0} 👟</span>
+                                        </div>
+                                        <div style={{background:'#222', padding:8, borderRadius:5, textAlign:'center'}}>
+                                            <span style={{fontSize:9, color:'#888'}}>Muralha (Defesas)</span><br/>
+                                            <b style={{fontSize:11, color:'cyan'}}>{season.topSaves?.name || '---'}</b><br/>
+                                            <span style={{fontSize:10}}>{season.topSaves?.val || 0} 🧤</span>
+                                        </div>
+                                        <div style={{background:'#222', padding:8, borderRadius:5, textAlign:'center'}}>
+                                            <span style={{fontSize:9, color:'#888'}}>Craque (Média)</span><br/>
+                                            <b style={{fontSize:11, color:'var(--purple)'}}>{season.topRating?.name || '---'}</b><br/>
+                                            <span style={{fontSize:10}}>⭐ {season.topRating?.val || 0}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style={{marginTop: 10, paddingTop: 10, borderTop: '1px dashed #444', display:'flex', justifyContent:'space-around', fontSize:10}}>
+                                        <span style={{color:'#aaa'}}><b>Série B:</b> {season.champB?.name || '-'}</span>
+                                        <span style={{color:'#aaa'}}><b>Série C:</b> {season.champC?.name || '-'}</span>
+                                        <span style={{color:'#aaa'}}><b>Série D:</b> {season.champD?.name || '-'}</span>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                )}
                 {view === 'TEAMS' && renderTeams()}
+                
                 {view === 'SOCIOS' && teams.filter(t=>t.status!=='PENDING')
                     .sort((a,b) => calculateSocios(b, players.filter(p=>p.teamId===b.id)) - calculateSocios(a, players.filter(p=>p.teamId===a.id)))
                     .map((t, i) => (

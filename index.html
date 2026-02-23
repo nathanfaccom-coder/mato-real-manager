@@ -4746,8 +4746,9 @@ db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTA
 
         await db.collection('offers').add({
             type: 'COACH_OFFER',
-            coachId: coachId,       // ID Fixo do Técnico
-            recipientId: coachId,   // Quem deve responder agora (Técnico)
+            coachId: coachId,       // ID Fixo do Profissional
+            staffType: coach.type,  // NOVO: Marca se é Técnico, Médico, etc.
+            recipientId: coachId,   // Quem deve responder agora
             senderId: user.data.id, // Quem enviou (Time)
             teamId: user.data.id,
             teamName: user.data.name,
@@ -4765,7 +4766,7 @@ db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTA
     // --- 2. CONTRA-PROPOSTA (TÉCNICO -> PRESIDENTE) ---
     const handleCounterCoachOffer = async (offer, newSalary, newContract, newClause) => {
         // Regra: Só nível 2+ negocia
-        if (user.data.level < 2) return alert("Apenas técnicos Nível 2+ podem negociar valores!");
+        if (user.data.level < 2) return alert("Apenas profissionais Nível 2+ podem negociar valores!");
 
         await db.collection('offers').doc(offer.id).update({
             salary: parseFloat(newSalary),
@@ -4773,7 +4774,7 @@ db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTA
             clause: parseFloat(newClause),
             status: 'COUNTERED',        // Marca como contra-proposta
             recipientId: offer.teamId,  // Devolve a bola para o Presidente
-            senderId: user.data.id      // Marca que foi o técnico que mandou
+            senderId: user.data.id      // Marca que foi o funcionário que mandou
         });
         alert("Contra-proposta enviada ao clube!");
     };
@@ -4781,8 +4782,8 @@ db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTA
     // --- 3. FINALIZAR CONTRATO (ACEITAR) ---
     const handleFinalizeCoachContract = async (offer) => {
         const teamId = offer.teamId;
-        // Pega o ID do técnico (garante que pega certo independente de quem aceitou)
         const coachId = offer.coachId || (offer.recipientId === teamId ? offer.senderId : offer.recipientId);
+        const staffType = offer.staffType || 'COACH'; // Identifica o cargo
 
         // Verifica saldo do time
         const teamDoc = await db.collection('teams').doc(teamId).get();
@@ -4791,33 +4792,29 @@ db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTA
 
         const b = db.batch();
 
-        // 1. Se o time já tem técnico, demite o antigo (volta pra FREE)
-        const oldCoach = coaches.find(c => c.teamId === teamId && c.status === 'ACTIVE');
-        if (oldCoach) {
-            b.update(db.collection('users').doc(oldCoach.id), { teamId: 'FREE', contract: 0 });
+        // 1. Demite o antigo APENAS se ele for da MESMA PROFISSÃO! (Médico substitui Médico)
+        const oldStaff = coaches.find(c => c.teamId === teamId && c.status === 'ACTIVE' && c.type === staffType);
+        if (oldStaff) {
+            b.update(db.collection('users').doc(oldStaff.id), { teamId: 'FREE', contract: 0 });
         }
 
-        // 2. Se o técnico já tinha time, sai do antigo (sem multa automática aqui, assume-se fim de contrato ou acordo)
-        // (Opcional: Adicionar lógica se ele estiver saindo no meio do contrato de outro time)
-
-        // 3. Atualiza o Técnico com o NOVO CONTRATO
+        // 2. Atualiza o Profissional com o NOVO CONTRATO
         b.update(db.collection('users').doc(coachId), { 
             teamId: teamId,
             salary: parseFloat(offer.salary),
-            contract: parseInt(offer.contract), // Grava as temporadas
-            clause: parseFloat(offer.clause)    // Grava a multa
+            contract: parseInt(offer.contract), 
+            clause: parseFloat(offer.clause)    
         });
 
-        // 4. Paga Luvas (1º Salário) e desconta do time
+        // 3. Paga Luvas (1º Salário) e desconta do time
         b.update(db.collection('teams').doc(teamId), { balance: teamData.balance - offer.salary });
 
-        // 5. Apaga a oferta (negócio fechado)
+        // 4. Apaga a oferta (negócio fechado)
         b.delete(db.collection('offers').doc(offer.id));
 
         await b.commit();
-        alert(`Contrato assinado! ${offer.coachName || 'O técnico'} agora comanda o ${offer.teamName}.`);
+        alert(`Contrato assinado! ${offer.coachName} agora integra o Staff do ${offer.teamName}.`);
     };
-            //FIM
      const adminAction = async (act, data) => {
         
 // --- ABRIR EDITOR DE PREMIAÇÕES ---
@@ -11162,8 +11159,8 @@ const Market = ({ user, me, teams, players, coaches, open, isVis, onNeg, onPayCl
                 {isPresident && (
                     <div className="card" style={{textAlign:'center', cursor:'pointer', border:'2px solid gold', background:'rgba(255,215,0,0.1)', marginBottom:15}} onClick={()=>{setView('COACHES');}}>
                         <i className="fas fa-user-tie" style={{fontSize:20, marginBottom:5, color:'gold'}}></i><br/>
-                        <span style={{fontSize:10, fontWeight:'bold'}}>CONTRATAR TÉCNICOS</span>
-                    </div>
+<span style={{fontSize:10, fontWeight:'bold'}}>CONTRATAR COMISSÃO</span>
+                                                      </div>
                 )}
 
                 {/* --- FILTRO GLOBAL NO MENU --- */}
@@ -11211,41 +11208,44 @@ const Market = ({ user, me, teams, players, coaches, open, isVis, onNeg, onPayCl
         </div>
     );
 
-    // --- VIEW DE TÉCNICOS ---
-    if(view === 'COACHES') return (
-        <div>
-            <button className="btn btn-ghost" style={{marginBottom:15, width:'auto'}} onClick={()=>setView('MENU')}>
-                <i className="fas fa-chevron-left"></i> VOLTAR
-            </button>
-            <h3>Técnicos Livres</h3>
-            
-            {availableCoaches.length === 0 && <p style={{textAlign:'center', color:'#666'}}>Nenhum técnico disponível no momento.</p>}
+   // --- VIEW DA COMISSÃO TÉCNICA (TÉCNICOS, MÉDICOS, ETC) ---
+    if(view === 'COACHES') {
+        const roleNames = { 'COACH': 'Técnico', 'DOCTOR': 'Médico', 'SCOUT': 'Olheiro', 'ASSISTANT': 'Auxiliar' };
+        return (
+            <div>
+                <button className="btn btn-ghost" style={{marginBottom:15, width:'auto'}} onClick={()=>setView('MENU')}>
+                    <i className="fas fa-chevron-left"></i> VOLTAR
+                </button>
+                <h3>Mercado da Comissão Técnica</h3>
+                
+                {availableCoaches.length === 0 && <p style={{textAlign:'center', color:'#666'}}>Nenhum profissional disponível no momento.</p>}
 
-            <div style={{display:'grid', gridTemplateColumns:'1fr', gap:10}}>
-                {availableCoaches.map(c => (
-                    <div key={c.id} className="card" style={{borderLeft:'4px solid gold'}}>
-                        <div style={{display:'flex', justifyContent:'space-between'}}>
-                            <b>{c.name}</b>
-                            <span style={{color:'gold', fontWeight:'bold'}}>★ Nível {c.level}</span>
+                <div style={{display:'grid', gridTemplateColumns:'1fr', gap:10}}>
+                    {availableCoaches.map(c => (
+                        <div key={c.id} className="card" style={{borderLeft:'4px solid gold'}}>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems: 'center'}}>
+                                <b>{c.type === 'DOCTOR' ? '🩺 Dr. ' : '👔 '}{c.name}</b>
+                                <span style={{color:'gold', fontWeight:'bold', fontSize: 11}}>★ Nível {c.level}</span>
+                            </div>
+                            <div style={{fontSize:12, color:'#aaa', margin:'5px 0'}}>
+                                Cargo: <b style={{color:'#fff'}}>{roleNames[c.type] || 'Técnico'}</b>
+                                {c.type === 'COACH' && ` | Esp: ${c.affinities ? c.affinities[0] : 'Geral'}`}
+                            </div>
+                            <div style={{fontSize:12, fontWeight:'bold', color:'var(--primary)', marginBottom:10}}>
+                                Salário Pretendido: {fmt(c.salary)}/sem
+                            </div>
+                            
+                            {isPresident && (
+                                <button className="btn btn-green" onClick={() => onHireCoach(c)}>
+                                    CONTRATAR {roleNames[c.type] ? roleNames[c.type].toUpperCase() : 'PROFISSIONAL'}
+                                </button>
+                            )}
                         </div>
-                        <div style={{fontSize:12, color:'#aaa', margin:'5px 0'}}>
-                            Especialidade: <b style={{color:'#fff'}}>{c.affinities ? c.affinities[0] : 'Geral'}</b>
-                        </div>
-                        <div style={{fontSize:12, fontWeight:'bold', color:'var(--primary)', marginBottom:10}}>
-                            Salário Semanal: {fmt(c.salary)}
-                        </div>
-                        
-                        {/* AQUI TAMBÉM GARANTE QUE SÓ PRESIDENTES PODEM CONTRATAR */}
-                        {isPresident && (
-                            <button className="btn btn-green" onClick={() => onHireCoach(c)}>
-                                CONTRATAR TÉCNICO
-                            </button>
-                        )}
-                    </div>
-                ))}
+                    ))}
+                </div>
             </div>
-        </div>
-    );
+        );
+    }
 
     // --- VIEW DE JOGADORES (GLOBAL ou TEAM) ---
     return (
@@ -11889,12 +11889,12 @@ const OffersScreen = ({ user, offers, teams, players, setModal, onAccept, onReje
                                     </>
                                 )}
 
-                                {/* VISÃO DO TÉCNICO (Recebendo Proposta Inicial) */}
-                                {user.type === 'COACH' && o.status === 'PENDING' && (
+                                {/* VISÃO DA COMISSÃO TÉCNICA (Recebendo Proposta Inicial) */}
+                                {['COACH', 'DOCTOR', 'SCOUT', 'ASSISTANT'].includes(user.type) && o.status === 'PENDING' && (
                                     <>
                                         <button className="btn btn-green" onClick={()=>onCoachAccept(o)}>ACEITAR</button>
-                                        {user.data.level >= 2 && <button className="btn btn-blue" onClick={()=>onCoachCounter(o)}>NEGOCIAR</button>}
-                                        <button className="btn btn-red" onClick={()=>onCoachReject(o)}>RECUSAR</button>
+{(user.data.level >= 2 || user.type !== 'COACH') && <button className="btn btn-blue" onClick={()=>onCoachCounter(o)}>NEGOCIAR</button>}
+    <button className="btn btn-red" onClick={()=>onCoachReject(o)}>RECUSAR</button>
                                     </>
                                 )}
                             </div>

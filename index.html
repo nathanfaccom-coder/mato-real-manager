@@ -11718,17 +11718,17 @@ const Ranking = ({ teams, players, sales, hallOfFame }) => {
         let time = 1;
 
         if (withAmbulance) {
-            // Se sair de ambulância: Maior chance de ser Grave/Extrema
-            if (rand < 10) { cat = 'LEVE'; time = 1; }
-            else if (rand < 35) { cat = 'MODERADA'; time = Math.floor(Math.random() * 2) + 2; } // 2-3
-            else if (rand < 75) { cat = 'GRAVE'; time = Math.floor(Math.random() * 3) + 4; }    // 4-6
-            else { cat = 'EXTREMA'; time = Math.floor(Math.random() * 4) + 7; }                // 7-10
+            // Se sair de ambulância: Lesões extremamente longas (Precisa de Médico urgente)
+            if (rand < 10) { cat = 'LEVE'; time = Math.floor(Math.random() * 3) + 2; } // 2 a 4 jogos
+            else if (rand < 35) { cat = 'MODERADA'; time = Math.floor(Math.random() * 4) + 5; } // 5 a 8 jogos
+            else if (rand < 75) { cat = 'GRAVE'; time = Math.floor(Math.random() * 6) + 9; }    // 9 a 14 jogos
+            else { cat = 'EXTREMA'; time = Math.floor(Math.random() * 11) + 15; }               // 15 a 25 jogos
         } else {
-            // Se sair andando: Geralmente Leve/Moderada
-            if (rand < 50) { cat = 'LEVE'; time = 1; }
-            else if (rand < 85) { cat = 'MODERADA'; time = 2; }
-            else if (rand < 97) { cat = 'GRAVE'; time = Math.floor(Math.random() * 2) + 3; }    // 3-4
-            else { cat = 'EXTREMA'; time = 5; }
+            // Se sair andando: Ainda machuca, mas um pouco menos
+            if (rand < 50) { cat = 'LEVE'; time = Math.floor(Math.random() * 2) + 2; } // 2 a 3 jogos
+            else if (rand < 85) { cat = 'MODERADA'; time = Math.floor(Math.random() * 3) + 4; } // 4 a 6 jogos
+            else if (rand < 97) { cat = 'GRAVE'; time = Math.floor(Math.random() * 4) + 7; }    // 7 a 10 jogos
+            else { cat = 'EXTREMA'; time = Math.floor(Math.random() * 5) + 12; }                // 12 a 16 jogos
         }
 
         const injuryList = INJURIES_DB[cat];

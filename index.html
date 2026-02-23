@@ -8719,48 +8719,55 @@ const LoginScreen = ({ teams, players, papers, journalists, companies, coaches, 
 
                 {subTab==='COMPANY' && (companies||[]).filter(c=>c.status!=='PENDING').map(c=><div key={c.id} className="card" onClick={()=>setSel({...c, type:'COMPANY'})} style={{cursor:'pointer', borderLeft:'4px solid var(--purple)'}}>🏢 <b>{c.name}</b><br/><small>{(c.companyType)}</small></div>)}
                 
-                {/* --- ABA DE LOGIN DE TÉCNICO (MENU VERTICAL COM SÉRIES E AGENTES LIVRES) --- */}
+               
+                {/* --- ABA DE LOGIN DE TÉCNICO (MENU VERTICAL CORRIGIDO) --- */}
                 {subTab === 'COACH' && !selTeamForPlayer && (
-                    <div className="animate-in" style={{textAlign: 'left'}}>
-                        <p style={{color:'#aaa', textAlign:'center', fontSize: 12, margin: '0 0 10px 0'}}>Selecione o clube que você comanda ou acesse como livre:</p>
-                        
-                        <div className="card pulse" onClick={() => setSelTeamForPlayer({ id: 'FREE', name: 'Técnicos Livres' })} style={{cursor:'pointer', border: '1px solid gold', background: 'rgba(255, 215, 0, 0.1)', textAlign:'center', padding: '15px', marginBottom: 10}}>
-                            <b style={{color: 'gold', fontSize: 14}}>🆓 SOU TÉCNICO LIVRE</b>
-                        </div>
-
-                        {/* Botões das Séries */}
-                        <div style={{display:'flex', gap:8, marginBottom:15, overflowX:'auto', paddingBottom:5}}>
-                            {SERIES.map(s => (
-                                <button 
-                                    key={`btn-c-s-${s}`} 
-                                    className={`btn ${loginSerie === s ? 'btn-gold' : 'btn-ghost'}`} 
-                                    style={{
-                                        flex: '0 0 auto', minWidth: '80px', padding: '8px', fontSize: '11px', margin: 0, 
-                                        borderColor: loginSerie === s ? 'gold' : '#666', 
-                                        color: loginSerie === s ? '#000' : '#ccc'
-                                    }}
-                                    onClick={() => setLoginSerie(s)}
-                                >
-                                    {s === 'VARZEA' ? 'VÁRZEA' : `SÉRIE ${s}`}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Lista de Times Filtrada (Para o técnico clicar no seu clube) */}
-                        {(() => {
-                            if (!loginSerie) return null;
-                            const teamsInSerie = (teams||[]).filter(t => t.status !== 'PENDING' && t.serie === loginSerie).sort((a,b) => a.name.localeCompare(b.name));
-                            
-                            if (teamsInSerie.length === 0) return <p style={{textAlign:'center', color:'#666', marginTop: 20}}>Nenhum time cadastrado nesta série.</p>;
-                            
-                            return teamsInSerie.map(t => (
-                                <div key={t.id} className="card" onClick={()=>setSelTeamForPlayer(t)} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>
-                                    {t.logo ? <img src={t.logo} style={{width:30, height:30, borderRadius:'50%', objectFit:'cover'}}/> : <div style={{width:30, height:30, borderRadius:'50%', background:'#333', display:'grid', placeItems:'center', fontSize:12}}>🛡️</div>}
-                                    <b>{t.name}</b>
-                                    <i className="fas fa-chevron-right" style={{marginLeft: 'auto', color: '#555'}}></i>
+                    <div style={{textAlign: 'left'}}>
+                        {!loginSerie ? (
+                            /* TELA 1: BOTÕES DAS SÉRIES + AGENTE LIVRE (VERTICAL) */
+                            <div className="animate-in" style={{display: 'flex', flexDirection: 'column', gap: 10}}>
+                                <p style={{color:'#aaa', textAlign:'center', fontSize: 12, margin: '0 0 10px 0'}}>Selecione o clube que você comanda ou acesse como livre:</p>
+                                
+                                <div className="card pulse" onClick={() => setSelTeamForPlayer({ id: 'FREE', name: 'Técnicos Livres' })} style={{cursor:'pointer', border: '1px solid gold', background: 'rgba(255, 215, 0, 0.1)', textAlign:'center', padding: '15px', marginBottom: 10}}>
+                                    <b style={{color: 'gold', fontSize: 14}}>🆓 SOU TÉCNICO LIVRE</b>
                                 </div>
-                            ));
-                        })()}
+
+                                {SERIES.map(s => (
+                                    <button 
+                                        key={`btn-c-s-${s}`} 
+                                        className="btn btn-ghost" 
+                                        style={{padding: '15px', fontSize: '14px', border: '1px solid gold', color: 'white', background: 'rgba(255, 215, 0, 0.05)'}}
+                                        onClick={() => setLoginSerie(s)}
+                                    >
+                                        {s === 'VARZEA' ? '🚜 O Terrão (Várzea)' : `🏆 Campeonato Série ${s}`}
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            /* TELA 2: LISTA DE TIMES DA SÉRIE (PARA O TÉCNICO CLICAR) */
+                            <div className="animate-in">
+                                <button className="btn" style={{marginBottom:15, background:'#333', width:'auto'}} onClick={() => setLoginSerie(null)}>
+                                    ⬅ VOLTAR PARA DIVISÕES
+                                </button>
+                                <h4 style={{color: loginSerie === 'VARZEA' ? 'gold' : 'gold', borderBottom: '1px solid #333', paddingBottom: 5, marginTop: 0}}>
+                                    {loginSerie === 'VARZEA' ? '🚜 Terrão (Várzea)' : `Série ${loginSerie}`}
+                                </h4>
+                                
+                                {(() => {
+                                    const teamsInSerie = (teams||[]).filter(t => t.status !== 'PENDING' && t.serie === loginSerie).sort((a,b) => a.name.localeCompare(b.name));
+                                    
+                                    if (teamsInSerie.length === 0) return <p style={{textAlign:'center', color:'#666', marginTop: 20}}>Nenhum time cadastrado nesta série.</p>;
+                                    
+                                    return teamsInSerie.map(t => (
+                                        <div key={t.id} className="card" onClick={()=>setSelTeamForPlayer(t)} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>
+                                            {t.logo ? <img src={t.logo} style={{width:35, height:35, borderRadius:'50%', objectFit:'cover'}}/> : <div style={{width:35, height:35, borderRadius:'50%', background:'#333', display:'grid', placeItems:'center', fontSize:12}}>🛡️</div>}
+                                            <b style={{fontSize: 15}}>{t.name}</b>
+                                            <i className="fas fa-chevron-right" style={{marginLeft: 'auto', color: '#555'}}></i>
+                                        </div>
+                                    ));
+                                })()}
+                            </div>
+                        )}
                     </div>
                 )}
 

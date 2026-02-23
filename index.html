@@ -6500,7 +6500,30 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                     </div>
                 ))}
                 
-                <h4>Empresas Ativas</h4>
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop: 20, marginBottom: 10}}>
+                    <h4 style={{margin:0}}>Empresas Ativas</h4>
+                    <button className="btn btn-blue" style={{width:'auto', fontSize:10, padding:'5px 10px'}} onClick={async () => {
+                        if(confirm("Deseja forçar a reativação e sincronização de todas as empresas? Isso conserta bugs de empresas invisíveis no jogo.")) {
+                            try {
+                                const db = firebase.firestore();
+                                const b = db.batch();
+                                let count = 0;
+                                companies.forEach(c => {
+                                    // Só reativa as que não estão pendentes
+                                    if(c.status !== 'PENDING') {
+                                        b.update(db.collection('companies').doc(c.id), { status: 'ACTIVE' });
+                                        count++;
+                                    }
+                                });
+                                await b.commit();
+                                alert(`✅ SUCESSO! ${count} empresas foram forçadas a aparecer. Peça aos jogadores para atualizarem a página.`);
+                            } catch(e) {
+                                alert("Erro: " + e.message);
+                            }
+                        }
+                    }}>♻️ RE-SINCRONIZAR EMPRESAS</button>
+                </div>
+    
                 {(companies||[]).filter(c=>c.status!=='PENDING').map(c => (
                     <div key={c.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                         <div>
@@ -7907,7 +7930,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.91.7</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.91.8</div>
                             </div>
                         </div>
                         

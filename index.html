@@ -5254,6 +5254,7 @@ if (act === 'VARZEA') {
         if (!confirm("⚠️ ATENÇÃO: Isso encerrará a temporada atual!\n\n1. Pagará Premiações Finais\n2. Aplica Promoção/Rebaixamento\n3. Envelhece jogadores e contratos\n4. Zera estatísticas e Salva o Hall da Fama")) return;
 
         setLoading(true);
+        const db = firebase.firestore();
         const b = db.batch();
         const currentSeason = conf.season || 1;
 
@@ -5266,7 +5267,7 @@ if (act === 'VARZEA') {
             const sgA = (a.stats?.gf||0)-(a.stats?.ga||0), sgB = (b.stats?.gf||0)-(b.stats?.ga||0);
             if (sgA !== sgB) return sgB - sgA; // Saldo
             const cA = (a.stats?.cards||0), cB = (b.stats?.cards||0);
-            return cA - cB; // Menos cartões é melhor
+            return cA - cB; // Menos cartões
         });
 
         // Pega as tabelas finais filtrando times ativos
@@ -5277,7 +5278,7 @@ if (act === 'VARZEA') {
         const tVarzea = sortTable(teams.filter(t => t.serie === 'VARZEA' && t.status !== 'PENDING'));
 
         // =========================================
-        // 1. DISTRIBUIÇÃO DAS PREMIAÇÕES DE FIM DE ANO (DINÂMICA)
+        // 1. DISTRIBUIÇÃO DAS PREMIAÇÕES DE FIM DE ANO
         // =========================================
         const activePrizes = conf.prizes || DEFAULT_PRIZES;
 
@@ -5387,16 +5388,14 @@ if (act === 'VARZEA') {
         b.update(db.collection('config').doc('system'), { season: currentSeason + 1 });
 
         // =========================================
-        // 5. ENVELHECIMENTO DE CONTRATOS, EMPRÉSTIMOS E ZERAR JOGADORES
+        // 5. ENVELHECIMENTO DE CONTRATOS E ZERAR JOGADORES
         // =========================================
         players.forEach(p => {
-            // Zera as estatísticas do jogador
             let updates = {
                 stats: {goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0},
                 pressRatingSum: 0, pressRatingCount: 0, pressRatingAvg: 0
             };
 
-            // Aplica os Boosts de Treinamento
             if (p.pendingPosBoosts && p.attributes) {
                 let newAttrs = { ...p.attributes };
                 p.pendingPosBoosts.forEach(pos => {
@@ -5407,27 +5406,22 @@ if (act === 'VARZEA') {
                         });
                     }
                 });
-                
                 const vals = Object.values(newAttrs);
                 let newOvr = Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
-                
                 updates.attributes = newAttrs;
                 updates.overall = newOvr;
                 updates.pendingPosBoosts = firebase.firestore.FieldValue.delete();
             }
 
-            // Envelhecimento de Contrato
             let nc = (parseInt(p.contract) || 0) - 1;
             if (nc < 0) nc = 0;
             
             if (nc === 0) {
                  if (!p.loanMeta || !p.loanMeta.ownerId) {
-                     // Fim de contrato definitivo (Cai nos Agentes Livres)
                      updates.contract = 0;
                      updates.teamId = 'FREE';
                      updates.status = 'VENDA';
                  } else {
-                     // Fim de empréstimo: Volta pro time original
                      updates.teamId = p.loanMeta.ownerId;
                      updates.contract = parseInt(p.loanMeta.originalContract) > 0 ? parseInt(p.loanMeta.originalContract) : 1;
                      updates.status = 'NAO_A_VENDA';

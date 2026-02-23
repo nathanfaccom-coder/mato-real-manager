@@ -8408,8 +8408,8 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                         <div className="modal-content">
                             {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={async(id)=>{db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} onRenew={renewContract} isOwner={user.type==='USER' && modal.data?.teamId===user.data?.id} />}
                             {modal.type==='ADMIN_PLAYER' && <AdminPlayerModal player={modal.data} teams={teams} onClose={()=>setModal(null)} />}
-                            {modal.type==='CT_TYCOON' && <TrainingCenterManager team={modal.data} players={players.filter(p=>p.teamId===modal.data.id)} coach={coaches.find(c => c.teamId === modal.data.id && c.status === 'ACTIVE')} user={user} onClose={()=>setModal(null)} onTrain={handleCoachTrain} onTrainSolo={handlePlayerSoloTrain} />}
-                            {modal.type==='OFFER' && <OfferForm target={modal.data} myPlayers={players.filter(p => p.teamId === user.data.id)} onSend={sendOffer} setModal={setModal} user={user} />}
+{modal.type==='CT_TYCOON' && modal.data && <TrainingCenterManager team={modal.data} players={players.filter(p=>p.teamId===modal.data.id)} coach={(coaches||[]).find(c => c.teamId === modal.data.id && c.status === 'ACTIVE')} user={user} onClose={()=>setModal(null)} onTrain={handleCoachTrain} onTrainSolo={handlePlayerSoloTrain} />}
+        {modal.type==='OFFER' && <OfferForm target={modal.data} myPlayers={players.filter(p => p.teamId === user.data.id)} onSend={sendOffer} setModal={setModal} user={user} />}
                             {modal.type==='SETTINGS' && <SettingsForm team={modal.data || user.data} isAdmin={user.type==='ADMIN'} onUp={(d)=>{const tid=(modal.data?.id)||user.data.id; db.collection('teams').doc(tid).update(d); setModal(null);}} onUpgrade={()=>{/*Up*/}} onReq={(t,a,d)=>{db.collection('financeRequests').add({teamId:user.data.id, teamName:user.data.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!");}} onWithdraw={withdrawMoney} />}
                             {modal.type==='MATCH_PERFORMANCE' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} matchData={modal.data?.match} />}
                             {modal.type==='TEAM_TABLE' && <TeamStandingsEditor teams={teams} onUpdateTeamStats={updateTeamStats} />}
@@ -8621,7 +8621,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.0 PIX  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.0 MEDICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -8772,16 +8772,16 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                 {subTab==='COMPANY' && (companies||[]).filter(c=>c.status!=='PENDING').map(c=><div key={c.id} className="card" onClick={()=>setSel({...c, type:'COMPANY'})} style={{cursor:'pointer', borderLeft:'4px solid var(--purple)'}}>🏢 <b>{c.name}</b><br/><small>{(c.companyType)}</small></div>)}
                 
                
-                {/* --- ABA DE LOGIN DE TÉCNICO (MENU VERTICAL CORRIGIDO) --- */}
+                {/* --- ABA DE LOGIN DE COMISSÃO TÉCNICA (MENU VERTICAL CORRIGIDO) --- */}
                 {subTab === 'COACH' && !selTeamForPlayer && (
                     <div style={{textAlign: 'left'}}>
                         {!loginSerie ? (
-                            /* TELA 1: BOTÕES DAS SÉRIES + AGENTE LIVRE (VERTICAL) */
+                            /* TELA 1: BOTÕES DAS SÉRIES + PROFISSIONAL LIVRE (VERTICAL) */
                             <div className="animate-in" style={{display: 'flex', flexDirection: 'column', gap: 10}}>
-                                <p style={{color:'#aaa', textAlign:'center', fontSize: 12, margin: '0 0 10px 0'}}>Selecione o clube que você comanda ou acesse como livre:</p>
+                                <p style={{color:'#aaa', textAlign:'center', fontSize: 12, margin: '0 0 10px 0'}}>Selecione o clube onde trabalha ou acesse como livre:</p>
                                 
-                                <div className="card pulse" onClick={() => setSelTeamForPlayer({ id: 'FREE', name: 'Técnicos Livres' })} style={{cursor:'pointer', border: '1px solid gold', background: 'rgba(255, 215, 0, 0.1)', textAlign:'center', padding: '15px', marginBottom: 10}}>
-                                    <b style={{color: 'gold', fontSize: 14}}>🆓 SOU TÉCNICO LIVRE</b>
+                                <div className="card pulse" onClick={() => setSelTeamForPlayer({ id: 'FREE', name: 'Profissionais Livres' })} style={{cursor:'pointer', border: '1px solid gold', background: 'rgba(255, 215, 0, 0.1)', textAlign:'center', padding: '15px', marginBottom: 10}}>
+                                    <b style={{color: 'gold', fontSize: 14}}>🆓 SOU PROFISSIONAL LIVRE</b>
                                 </div>
 
                                 {SERIES.map(s => (
@@ -8796,7 +8796,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                                 ))}
                             </div>
                         ) : (
-                            /* TELA 2: LISTA DE TIMES DA SÉRIE (PARA O TÉCNICO CLICAR) */
+                            /* TELA 2: LISTA DE TIMES DA SÉRIE */
                             <div className="animate-in">
                                 <button className="btn" style={{marginBottom:15, background:'#333', width:'auto'}} onClick={() => setLoginSerie(null)}>
                                     ⬅ VOLTAR PARA DIVISÕES
@@ -8823,32 +8823,39 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                     </div>
                 )}
 
-                {/* --- TELA 3: FOTO DO TÉCNICO NO TIME ESCOLHIDO --- */}
+                {/* --- TELA 3: FOTO DA COMISSÃO NO TIME ESCOLHIDO --- */}
                 {subTab === 'COACH' && selTeamForPlayer && (
                     <div className="animate-in" style={{textAlign: 'left'}}>
                         <button className="btn" style={{marginBottom:15, background:'#333', width:'auto'}} onClick={()=>setSelTeamForPlayer(null)}>
                             ⬅ VOLTAR AOS CLUBES
                         </button>
                         <h4 style={{color:'gold', borderBottom: '1px solid #333', paddingBottom: 5, marginTop: 0}}>
-                            {selTeamForPlayer.id === 'FREE' ? 'Mercado de Técnicos' : `Comandante: ${selTeamForPlayer.name}`}
+                            {selTeamForPlayer.id === 'FREE' ? 'Mercado de Profissionais' : `Staff: ${selTeamForPlayer.name}`}
                         </h4>
                         
                         {(() => {
                             const teamCoaches = (coaches||[]).filter(c => c.status === 'ACTIVE' && c.teamId === selTeamForPlayer.id).sort((a,b) => a.name.localeCompare(b.name));
                             
-                            if (teamCoaches.length === 0) return <p style={{color:'#666', textAlign:'center', marginTop: 20}}>O cargo de técnico está vago neste clube.</p>;
+                            if (teamCoaches.length === 0) return <p style={{color:'#666', textAlign:'center', marginTop: 20}}>Nenhum profissional contratado neste clube.</p>;
                             
+                            const roleNames = { 'COACH': '👔 Técnico', 'DOCTOR': '🩺 Médico', 'SCOUT': '🕵️‍♂️ Olheiro', 'ASSISTANT': '📋 Auxiliar' };
+
                             return teamCoaches.map(c => (
                                 <div key={c.id} className="card" onClick={()=>setSel({...c, type:'COACH'})} style={{cursor:'pointer', borderLeft:'4px solid gold', display: 'flex', alignItems: 'center', gap: 12}}>
                                     {c.face ? (
                                         <img src={c.face} style={{width: 45, height: 45, borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border: '1px solid gold'}} />
                                     ) : (
-                                        <div style={{width: 45, height: 45, borderRadius: '50%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, border: '1px solid gold'}}>👔</div>
+                                        <div style={{width: 45, height: 45, borderRadius: '50%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, border: '1px solid gold'}}>
+                                            {c.type === 'DOCTOR' ? '🩺' : (c.type === 'SCOUT' ? '🕵️‍♂️' : '👔')}
+                                        </div>
                                     )}
                                     
                                     <div style={{flex: 1}}>
                                         <b style={{fontSize: 15, color: 'gold'}}>{c.name}</b><br/>
-                                        <span style={{fontSize:10, color: '#aaa'}}>Nível {c.level} | Especialista: {c.affinities ? c.affinities[0] : 'Geral'}</span>
+                                        <span style={{fontSize:10, color: '#aaa'}}>
+                                            {roleNames[c.type] || '👔 Técnico'} | Nível {c.level}
+                                            {c.type === 'COACH' && c.affinities ? ` | Esp: ${c.affinities[0]}` : ''}
+                                        </span>
                                     </div>
                                     <i className="fas fa-sign-in-alt" style={{color: 'gold'}}></i>
                                 </div>
@@ -9528,8 +9535,9 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                 <button className={`btn ${tab==='PERFIL'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('PERFIL')}>PERFIL</button>
                 <button className={`btn ${tab==='ACOES'?'btn-red':'btn-ghost'}`} onClick={()=>setTab('ACOES')}>AÇÕES</button>
                 <button className={`btn ${tab==='CARREIRA'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('CARREIRA')}>CARREIRA</button>
-                <button className={`btn ${tab==='INV'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('INV')}>MOCHILA</button> <button className={`btn ${tab==='CT'?'btn-warning':'btn-ghost'}`} onClick={()=>setModal({type:'CT_TYCOON', data: team})}>🏋️‍♂️ CT</button>
-            </div>
+                <button className={`btn ${tab==='INV'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('INV')}>MOCHILA</button> 
+<button className={`btn ${tab==='CT'?'btn-warning':'btn-ghost'}`} onClick={() => team ? setModal({type:'CT_TYCOON', data: team}) : alert("🚫 Você precisa estar contratado por um Clube para acessar o Centro de Treinamento!")}>🏋️‍♂️ CT</button>
+    </div>
 
             {tab==='PERFIL' && <div>
                 <div className="card" style={{borderLeft:'4px solid var(--primary)', background:'linear-gradient(90deg, #1b2e1b, #1E1E1E)'}}>
@@ -10079,8 +10087,8 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
             <div style={{display:'flex', gap:5, marginBottom:15, marginTop:10, overflowX:'auto'}}>
                 <button className={`btn ${tab==='PRANCHETA'?'btn-green':'btn-ghost'}`} onClick={()=>setTab('PRANCHETA')}>PRANCHETA</button>
                 {/* BOTÃO DO CT (Abre o Modal diretamente) */}
-                <button className="btn btn-warning" onClick={()=>setModal({type:'CT_TYCOON', data: team})}>🏋️‍♂️ CT</button>
-                <button className={`btn ${tab==='MOCHILA'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('MOCHILA')}>MOCHILA</button>
+<button className="btn btn-warning" onClick={() => team ? setModal({type:'CT_TYCOON', data: team}) : alert("🚫 Você precisa estar contratado por um Clube para ter acesso à prancheta e ao CT!")}>🏋️‍♂️ CT</button>
+    <button className={`btn ${tab==='MOCHILA'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('MOCHILA')}>MOCHILA</button>
                 <button className={`btn ${tab==='CARREIRA'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('CARREIRA')}>CARREIRA</button>
             </div>
 

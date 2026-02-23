@@ -5249,9 +5249,9 @@ if (act === 'VARZEA') {
         postNews("📅 **TABELA DIVULGADA!**\nA Federação liberou o calendário de jogos da temporada (incluindo Várzea).", 'infra');
         alert("Jogos gerados com sucesso!");
     };
-// --- VIRADA DE TEMPORADA 3.0 (COM PREMIAÇÕES DINÂMICAS, PROMOÇÃO E REBAIXAMENTO) ---
+// --- VIRADA DE TEMPORADA 3.0 (COM PREMIAÇÕES DINÂMICAS, PROMOÇÃO E REBAIXAMENTO E HALL DA FAMA) ---
     const handleSeasonTurnAdvanced = async () => {
-        if (!confirm("⚠️ ATENÇÃO: Isso encerrará a temporada atual!\n\n1. Pagará Premiações Finais (Baseado nas Configurações)\n2. Aplica Promoção/Rebaixamento\n3. Envelhece jogadores e contratos\n4. Zera estatísticas")) return;
+        if (!confirm("⚠️ ATENÇÃO: Isso encerrará a temporada atual!\n\n1. Pagará Premiações Finais\n2. Aplica Promoção/Rebaixamento\n3. Envelhece jogadores e contratos\n4. Zera estatísticas e Salva o Hall da Fama")) return;
 
         setLoading(true);
         const b = db.batch();
@@ -5259,7 +5259,78 @@ if (act === 'VARZEA') {
 
         // Função auxiliar para ordenar classificação
         const sortTable = (list) => list.sort((a, b) => {
-           const champA = tA[0];
+            const pA = (a.stats?.pts||0), pB = (b.stats?.pts||0);
+            if (pA !== pB) return pB - pA; // Pontos
+            const vA = (a.stats?.wins||0), vB = (b.stats?.wins||0);
+            if (vA !== vB) return vB - vA; // Vitórias
+            const sgA = (a.stats?.gf||0)-(a.stats?.ga||0), sgB = (b.stats?.gf||0)-(b.stats?.ga||0);
+            if (sgA !== sgB) return sgB - sgA; // Saldo
+            const cA = (a.stats?.cards||0), cB = (b.stats?.cards||0);
+            return cA - cB; // Menos cartões é melhor
+        });
+
+        // Pega as tabelas finais filtrando times ativos
+        const tA = sortTable(teams.filter(t => t.serie === 'A' && t.status !== 'PENDING'));
+        const tB = sortTable(teams.filter(t => t.serie === 'B' && t.status !== 'PENDING'));
+        const tC = sortTable(teams.filter(t => t.serie === 'C' && t.status !== 'PENDING'));
+        const tD = sortTable(teams.filter(t => t.serie === 'D' && t.status !== 'PENDING'));
+        const tVarzea = sortTable(teams.filter(t => t.serie === 'VARZEA' && t.status !== 'PENDING'));
+
+        // =========================================
+        // 1. DISTRIBUIÇÃO DAS PREMIAÇÕES DE FIM DE ANO (DINÂMICA)
+        // =========================================
+        const activePrizes = conf.prizes || DEFAULT_PRIZES;
+
+        const calculatePrize = (serie, index, totalTeams) => {
+            const pos = index + 1;
+            const isRelegated = (serie === 'A' || serie === 'B' || serie === 'C') && index >= totalTeams - 2;
+            const isRelegatedD = serie === 'D' && index >= totalTeams - 3;
+            const p = activePrizes[serie] || DEFAULT_PRIZES[serie];
+
+            if (serie === 'A') {
+                if (pos === 1) return p.champ;
+                if (pos === 2) return p.vice;
+                if (pos === 3) return p.third;
+                if (isRelegated) return p.rel; 
+                return p.mid; 
+            }
+            if (serie === 'B' || serie === 'C') {
+                if (pos === 1) return p.champ;
+                if (pos === 2) return p.vice;
+                if (isRelegated) return p.rel; 
+                return p.mid; 
+            }
+            if (serie === 'D') {
+                if (pos === 1) return p.champ;
+                if (pos === 2) return p.vice;
+                if (isRelegatedD) return p.rel; 
+                return p.mid; 
+            }
+            if (serie === 'VARZEA') {
+                if (pos === 1) return p.champ;
+                if (pos === 2) return p.vice;
+                if (pos === 3) return p.third;
+                return p.mid; 
+            }
+            return 0;
+        };
+
+        const awardPrizes = (teamList, serieName) => {
+            teamList.forEach((t, i) => {
+                const prize = calculatePrize(serieName, i, teamList.length);
+                b.update(db.collection('teams').doc(t.id), {
+                    balance: firebase.firestore.FieldValue.increment(prize)
+                });
+            });
+        };
+
+        awardPrizes(tA, 'A');
+        awardPrizes(tB, 'B');
+        awardPrizes(tC, 'C');
+        awardPrizes(tD, 'D');
+        awardPrizes(tVarzea, 'VARZEA');
+
+        const champA = tA[0];
         const champB = tB[0];
         const champC = tC[0];
         const champD = tD[0];
@@ -5268,7 +5339,7 @@ if (act === 'VARZEA') {
         postNews(`🏆 **FIM DA TEMPORADA ${currentSeason}!**\nAs premiações foram depositadas! Parabéns aos campeões:\n\n🥇 Série A: ${champA?.name || 'Ninguém'}\n🥈 Série B: ${champB?.name || 'Ninguém'}\n🥉 Série C: ${champC?.name || 'Ninguém'}\n🏅 Série D: ${champD?.name || 'Ninguém'}`, 'finance');
 
         // =========================================
-        // 2.5 REGISTRO NO HALL DA FAMA (MUSEU)
+        // 2. REGISTRO NO HALL DA FAMA (MUSEU)
         // =========================================
         const topScorer = [...players].sort((a,b) => (b.stats?.goals||0) - (a.stats?.goals||0))[0];
         const topAssist = [...players].sort((a,b) => (b.stats?.assists||0) - (a.stats?.assists||0))[0];
@@ -5291,7 +5362,21 @@ if (act === 'VARZEA') {
         });
 
         // =========================================
-        // 3. ZERA ESTATÍSTICAS DOS TIMES E JOGADORES P/ A NOVA TEMPORADA
+        // 3. PROMOÇÃO E REBAIXAMENTO
+        // =========================================
+        if (tA.length > 0 || tB.length > 0) {
+            tA.slice(-2).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'B' }));
+            tB.slice(0, 2).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'A' }));
+            tB.slice(-2).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'C' }));
+            tC.slice(0, 2).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'B' }));
+            tC.slice(-2).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'D' }));
+            tD.slice(0, 2).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'C' }));
+            tD.slice(-3).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'VARZEA' }));
+            tVarzea.slice(0, 3).forEach(t => b.update(db.collection('teams').doc(t.id), { serie: 'D' }));
+        }
+
+        // =========================================
+        // 4. ZERA ESTATÍSTICAS DOS TIMES P/ A NOVA TEMPORADA
         // =========================================
         teams.forEach(t => {
             b.update(db.collection('teams').doc(t.id), {
@@ -5299,66 +5384,66 @@ if (act === 'VARZEA') {
             });
         });
         
-        players.forEach(p => {
-            b.update(db.collection('players').doc(p.id), {
-                stats: {goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0},
-                pressRatingSum: 0, pressRatingCount: 0, pressRatingAvg: 0
-            });
-        });
-        
         b.update(db.collection('config').doc('system'), { season: currentSeason + 1 });
-                
 
         // =========================================
-        // 4. ENVELHECIMENTO DE CONTRATOS E EMPRÉSTIMOS
+        // 5. ENVELHECIMENTO DE CONTRATOS, EMPRÉSTIMOS E ZERAR JOGADORES
         // =========================================
         players.forEach(p => {
-            // 4.1. APLICAÇÃO DOS BOOSTS DE NOVA POSIÇÃO (TREINO DO CT)
+            // Zera as estatísticas do jogador
+            let updates = {
+                stats: {goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0},
+                pressRatingSum: 0, pressRatingCount: 0, pressRatingAvg: 0
+            };
+
+            // Aplica os Boosts de Treinamento
             if (p.pendingPosBoosts && p.attributes) {
                 let newAttrs = { ...p.attributes };
                 p.pendingPosBoosts.forEach(pos => {
                     const map = POS_TRAINING_MAP[pos];
                     if (map) {
-                        // Dá +3 pontos pesados nas habilidades chave daquela posição
                         map.attrs.forEach(a => {
                             if (newAttrs[a] < 99) newAttrs[a] = Math.min(99, newAttrs[a] + 3);
                         });
                     }
                 });
                 
-                // Recalcula o Overall Real
                 const vals = Object.values(newAttrs);
                 let newOvr = Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
                 
-                b.update(db.collection('players').doc(p.id), {
-                    attributes: newAttrs,
-                    overall: newOvr,
-                    pendingPosBoosts: firebase.firestore.FieldValue.delete()
-                });
+                updates.attributes = newAttrs;
+                updates.overall = newOvr;
+                updates.pendingPosBoosts = firebase.firestore.FieldValue.delete();
             }
+
+            // Envelhecimento de Contrato
             let nc = (parseInt(p.contract) || 0) - 1;
             if (nc < 0) nc = 0;
             
             if (nc === 0) {
                  if (!p.loanMeta || !p.loanMeta.ownerId) {
                      // Fim de contrato definitivo (Cai nos Agentes Livres)
-                     b.update(db.collection('players').doc(p.id), { contract: 0, teamId: 'FREE', status: 'VENDA' });
+                     updates.contract = 0;
+                     updates.teamId = 'FREE';
+                     updates.status = 'VENDA';
                  } else {
                      // Fim de empréstimo: Volta pro time original
-                     b.update(db.collection('players').doc(p.id), { 
-                         teamId: p.loanMeta.ownerId, 
-                         contract: parseInt(p.loanMeta.originalContract) > 0 ? parseInt(p.loanMeta.originalContract) : 1, 
-                         status: 'NAO_A_VENDA',
-                         loanMeta: firebase.firestore.FieldValue.delete()
-                     });
+                     updates.teamId = p.loanMeta.ownerId;
+                     updates.contract = parseInt(p.loanMeta.originalContract) > 0 ? parseInt(p.loanMeta.originalContract) : 1;
+                     updates.status = 'NAO_A_VENDA';
+                     updates.loanMeta = firebase.firestore.FieldValue.delete();
                      postNews(`🔙 **RETORNO**\n${p.name} voltou ao seu clube de origem após empréstimo.`, 'transfer');
                  }
             } else {
-                 b.update(db.collection('players').doc(p.id), { contract: nc });
+                 updates.contract = nc;
             }
+
+            b.update(db.collection('players').doc(p.id), updates);
         });
 
-        // ENVELHECIMENTO TÉCNICOS
+        // =========================================
+        // 6. ENVELHECIMENTO TÉCNICOS
+        // =========================================
         const coachSnap = await db.collection('users').where('type', '==', 'COACH').get();
         coachSnap.docs.forEach(doc => {
             const c = doc.data();
@@ -5374,7 +5459,7 @@ if (act === 'VARZEA') {
 
         await b.commit();
         setLoading(false);
-        alert(`Temporada ${currentSeason} encerrada com sucesso!\n\nPremiações pagas, acessos e descensos definidos!`);
+        alert(`Temporada ${currentSeason} encerrada com sucesso!\n\nPremiações pagas, acessos e descensos definidos, e Museu atualizado!`);
     };
 
     const createCompany = async (f) => {

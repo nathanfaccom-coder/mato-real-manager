@@ -2789,8 +2789,7 @@ const TeamDashboard = ({ team, players, coach, isVisitor, onEdit, onAdd, onFireC
                     ) : (
                         injured.map(p => {
                             const injuryName = typeof p.injury === 'object' ? p.injury.label : p.injury;
-                            const isIntoxication = injuryName === 'Intoxicação Alimentar';
-                            const isLight = INJURIES_DB.LEVE.includes(injuryName) || isIntoxication;
+                            const isLight = !INJURIES_DB.MODERADA.includes(injuryName) && !INJURIES_DB.GRAVE.includes(injuryName) && !INJURIES_DB.EXTREMA.includes(injuryName);
 
                             return (
                                 <div key={p.id} className="card" style={{borderLeft:'5px solid #ff1744', position:'relative'}}>
@@ -6866,7 +6865,7 @@ const handleCoachTrain = async (playerIds, type) => {
 
         const activePerks = currentCoach.perks || [];
         const energyPerk = activePerks.find(p => p.type === 'ENERGY_SAVE');
-        const playerEnergyCost = energyPerk ? Math.round(10 * energyPerk.value) : 10; 
+        const playerEnergyCost = energyPerk ? Math.round(25 * energyPerk.value) : 25;
         const critPerk = activePerks.find(p => p.type === 'CRIT_CHANCE');
         const critBonus = critPerk ? critPerk.value : 0;
         const minXpPerk = activePerks.find(p => p.type === 'MIN_XP_BOOST');
@@ -6987,8 +6986,9 @@ const handleCoachTrain = async (playerIds, type) => {
                 }
             }
 
-            b.update(db.collection('players').doc(pid), updates);
+           b.update(db.collection('players').doc(pid), updates);
             coachXpGain += 20;
+            report.push(`✔️ ${p.name} evoluiu +${xpGain} XP (Desgaste: -${playerEnergyCost}⚡)`);
         });
 
         if (type === 'STUDY') {
@@ -7018,11 +7018,11 @@ const handleCoachTrain = async (playerIds, type) => {
             pendingAffinity
         });
 
-        // GRAVA NO MURAL DO CLUBE
+        // GRAVA NO MURAL DO CLUBE (TREINO DO TÉCNICO)
         if (currentTeam) {
-            let newLogs = currentTeam.trainingLogs || [];
+            let newLogs = [...(currentTeam.trainingLogs || [])];
             newLogs.unshift({ date: Date.now(), type, report: report.join('\n') });
-            if (newLogs.length > 5) newLogs.pop(); // Mantém só os últimos 5
+            if (newLogs.length > 10) newLogs.pop(); // Agora guarda os últimos 10 treinos
             b.update(db.collection('teams').doc(currentTeam.id), { trainingLogs: newLogs });
         }
 
@@ -7974,14 +7974,14 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.92.1</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.92.2</div>
                             </div>
                         </div>
                         
                         <div style={{display:'flex', gap:15, alignItems:'center'}}>
                             {/* ÍCONE DE NOTIFICAÇÃO (SINO) */}
-                            {(user.type === 'USER' || user.type === 'PLAYER' || user.type === 'COACH') && (
-                                <div onClick={() => setScreen('OFFERS')} style={{ position: 'relative', cursor: 'pointer', padding: '5px', display: 'flex', alignItems: 'center' }}>
+{['USER', 'PLAYER', 'COACH', 'DOCTOR', 'SCOUT', 'ASSISTANT'].includes(user.type) && (
+    <div onClick={() => setScreen('OFFERS')} style={{ position: 'relative', cursor: 'pointer', padding: '5px', display: 'flex', alignItems: 'center' }}>
                                     <i className="fas fa-bell" style={{ 
                                         fontSize: '20px', 
                                         color: (offers || []).some(o => o.recipientId === user.data.id && (o.status === 'PENDING' || o.status === 'COUNTERED')) ? 'var(--warning)' : '#666', 
@@ -7994,7 +7994,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             )}
 
                             {/* SALDO EM DINHEIRO */}
-                            {(user.type === 'USER' || user.type === 'COMPANY' || user.type === 'PLAYER' || user.type === 'COACH') && (
+                         {['USER', 'COMPANY', 'PLAYER', 'COACH', 'DOCTOR', 'SCOUT', 'ASSISTANT'].includes(user.type) && (
                                 <div style={{color:'var(--primary)', fontWeight:'bold', marginLeft:10}}>
                                     {fmt(user.data.balance)}
                                 </div>
@@ -8416,7 +8416,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                         <div className="modal-content">
                             {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={async(id)=>{db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} onRenew={renewContract} isOwner={user.type==='USER' && modal.data?.teamId===user.data?.id} />}
                             {modal.type==='ADMIN_PLAYER' && <AdminPlayerModal player={modal.data} teams={teams} onClose={()=>setModal(null)} />}
-{modal.type==='CT_TYCOON' && modal.data && <TrainingCenterManager team={modal.data} players={players.filter(p=>p.teamId===modal.data.id)} coach={(coaches||[]).find(c => c.teamId === modal.data.id && c.status === 'ACTIVE')} user={user} onClose={()=>setModal(null)} onTrain={handleCoachTrain} onTrainSolo={handlePlayerSoloTrain} />}
+{modal.type==='CT_TYCOON' && modal.data && <TrainingCenterManager team={teams.find(t => t.id === modal.data.id) || modal.data} players={players.filter(p=>p.teamId===modal.data.id)} coach={(coaches||[]).find(c => c.teamId === modal.data.id && c.status === 'ACTIVE')} user={user} onClose={()=>setModal(null)} onTrain={handleCoachTrain} onTrainSolo={handlePlayerSoloTrain} />}
         {modal.type==='OFFER' && <OfferForm target={modal.data} myPlayers={players.filter(p => p.teamId === user.data.id)} onSend={sendOffer} setModal={setModal} user={user} />}
                             {modal.type==='SETTINGS' && <SettingsForm team={modal.data || user.data} isAdmin={user.type==='ADMIN'} onUp={(d)=>{const tid=(modal.data?.id)||user.data.id; db.collection('teams').doc(tid).update(d); setModal(null);}} onUpgrade={()=>{/*Up*/}} onReq={(t,a,d)=>{db.collection('financeRequests').add({teamId:user.data.id, teamName:user.data.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!");}} onWithdraw={withdrawMoney} />}
                             {modal.type==='MATCH_PERFORMANCE' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} matchData={modal.data?.match} />}
@@ -8629,7 +8629,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.1 MEDICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.2 MEDICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -9981,7 +9981,8 @@ const DoctorDashboard = ({ doctor, team, players, offers, sales, onUseItem, onSe
         const cost = hasFastDiag ? 5 : 10;
         if (energy < cost) return alert(`Energia insuficiente. (Custo: ${cost}⚡)`);
         
-        const isLeve = INJURIES_DB.LEVE.includes(p.injury) || p.injury === 'Intoxicação Alimentar';
+        const injuryName = typeof p.injury === 'object' ? p.injury.label : p.injury;
+                                        const isLeve = !INJURIES_DB.MODERADA.includes(injuryName) && !INJURIES_DB.GRAVE.includes(injuryName) && !INJURIES_DB.EXTREMA.includes(injuryName);
         const baseChance = 0.20 + (doctor.level * 0.02); // 20% base + 2% por nível
         const success = Math.random() < baseChance;
 
@@ -10176,6 +10177,7 @@ const DoctorDashboard = ({ doctor, team, players, offers, sales, onUseItem, onSe
                 <button className={`btn ${tab==='ESTUDO'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('ESTUDO')}>ESTUDAR</button>
                 <button className={`btn ${tab==='MOCHILA'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('MOCHILA')}>MOCHILA</button>
                 <button className={`btn ${tab==='CONTRATO'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('CONTRATO')}>CONTRATO</button>
+                <button className="btn btn-warning" onClick={() => team ? setModal({type:'CT_TYCOON', data: team}) : alert("🚫 Você precisa estar contratado por um Clube para acessar o CT!")}>🏋️‍♂️ CT</button>
             </div>
 
             {showPerkSelection && (
@@ -10211,7 +10213,8 @@ const DoctorDashboard = ({ doctor, team, players, offers, sales, onUseItem, onSe
                             ) : (
                                 <div style={{display:'grid', gap:10}}>
                                     {injuredPlayers.map(p => {
-                                        const isLeve = INJURIES_DB.LEVE.includes(p.injury) || p.injury === 'Intoxicação Alimentar';
+                                        const injuryName = typeof p.injury === 'object' ? p.injury.label : p.injury;
+        const isLeve = !INJURIES_DB.MODERADA.includes(injuryName) && !INJURIES_DB.GRAVE.includes(injuryName) && !INJURIES_DB.EXTREMA.includes(injuryName);
                                         return (
                                             <div key={p.id} className="card" style={{borderLeft:'4px solid red'}}>
                                                 <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>

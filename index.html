@@ -7989,7 +7989,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.92.2</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.92.3</div>
                             </div>
                         </div>
                         
@@ -8644,7 +8644,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
     return (
         <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
             <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.2 MEDICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.3 MEDICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -10191,7 +10191,7 @@ const DoctorDashboard = ({ doctor, team, players, offers, sales, onUseItem, onSe
                 <button className={`btn ${tab==='DM'?'btn-green':'btn-ghost'}`} onClick={()=>setTab('DM')}>MACA (DM)</button>
                 <button className={`btn ${tab==='ESTUDO'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('ESTUDO')}>ESTUDAR</button>
                 <button className={`btn ${tab==='MOCHILA'?'btn-gold':'btn-ghost'}`} onClick={()=>setTab('MOCHILA')}>MOCHILA</button>
-                <button className={`btn ${tab==='CONTRATO'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('CONTRATO')}>CONTRATO</button>
+                <button className={`btn ${tab==='CARREIRA'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('CARREIRA')}>CARREIRA</button>
                 <button className="btn btn-warning" onClick={() => team ? setModal({type:'CT_TYCOON', data: team}) : alert("🚫 Você precisa estar contratado por um Clube para acessar o CT!")}>🏋️‍♂️ CT</button>
             </div>
 

@@ -2389,7 +2389,9 @@ const TeamDashboard = ({ team, players, staff, isVisitor, onEdit, onAdd, onFireC
         const totalCost = amount * 1.10; // Taxa de 10%
         if ((user.data.balance || 0) < totalCost) return alert(`Saldo insuficiente!\nCom a taxa bancária de 10%, você precisa ter na conta: ${fmt(totalCost)}`);
 
-        const [recType, recId] = pixRecipient.split('_');
+        const splitIndex = pixRecipient.indexOf('_');
+        const recType = pixRecipient.substring(0, splitIndex);
+        const recId = pixRecipient.substring(splitIndex + 1);
         const collection = recType === 'PLAYER' ? 'players' : 'users';
 
         if (!confirm(`Confirma o PIX de ${fmt(amount)}?\n\n💸 Valor da Transferência: ${fmt(amount)}\n🏦 Taxa do Banco (10%): ${fmt(amount * 0.10)}\n=====================\nTotal Debitado: ${fmt(totalCost)}`)) return;
@@ -7831,7 +7833,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.92.4</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.92.5</div>
                             </div>
                         </div>
                         
@@ -8486,7 +8488,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
     return (
         <div className="login-wrapper">
             <h1 className="login-title">Gerenciador de Times<br/><span className="login-title-span">de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.4 MEDICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.5 MEDICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

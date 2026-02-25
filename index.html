@@ -2188,6 +2188,7 @@ const TeamDashboard = ({ team, players, staff, isVisitor, onEdit, onAdd, onFireC
     // --- ESTADOS DO PIX ---
     const [pixRecipient, setPixRecipient] = useState('');
     const [pixAmount, setPixAmount] = useState('');
+    const [pixSearch, setPixSearch] = useState('');
 
     const injured = (players || []).filter(p => (p.recoveryLeft || 0) > 0);
     const db = firebase.firestore();
@@ -2689,29 +2690,69 @@ const TeamDashboard = ({ team, players, staff, isVisitor, onEdit, onAdd, onFireC
                             {(user.type === 'PLAYER' || user.type === 'COACH') && (
                                 <div className="card" style={{borderLeft: '4px solid #00bcd4', marginBottom: 15}}>
                                     <h4 style={{marginTop: 0, color: '#00bcd4'}}>💸 Enviar PIX (Transferência)</h4>
-                                    <p style={{fontSize: 11, color: '#aaa', marginBottom: 15}}>Transfira dinheiro diretamente para o bolso de outros atletas ou técnicos (Taxa bancária: 10%). Limite: ₣ 20.000.</p>
                                     
-                                    <label>Quem vai receber o PIX?</label>
-                                    <select className="input-field" value={pixRecipient} onChange={e=>setPixRecipient(e.target.value)}>
-                                        <option value="">-- Selecione o contato --</option>
-                                        <optgroup label="🏃 Jogadores">
-                                            {players.filter(p => p.id !== user.data.id && p.name).map(p => (
-                                                <option key={p.id} value={`PLAYER_${p.id}`}>{p.name} (Jogador)</option>
-                                            ))}
-                                        </optgroup>
-                                        <optgroup label="👔 Técnicos">
-                                            {(coaches || []).filter(c => c.id !== user.data.id && c.name).map(c => (
-                                                <option key={c.id} value={`COACH_${c.id}`}>{c.name} (Treinador)</option>
-                                            ))}
-                                        </optgroup>
-                                    </select>
+                                    {/* VERIFICAÇÃO VISUAL DAS TRAVAS ANTI-TRAPAÇA */}
+                                    {(user.type === 'PLAYER' && (user.data.overall || 0) <= 50) ? (
+                                        <div style={{background:'rgba(255,0,0,0.1)', padding:15, borderRadius:8, border:'1px solid red', color:'#ff5555', fontSize:12, textAlign:'center'}}>
+                                            <i className="fas fa-ban" style={{fontSize: 24, marginBottom: 5}}></i><br/>
+                                            <b>CONTA BANCÁRIA RESTRITA</b><br/>
+                                            Apenas jogadores com <b>Overall acima de 50 (Nível Pró)</b> podem enviar transferências para evitar contas fakes. Treine para evoluir!
+                                        </div>
+                                    ) : (user.type === 'PLAYER' && (!user.data.teamId || user.data.teamId === 'FREE')) ? (
+                                        <div style={{background:'rgba(255,0,0,0.1)', padding:15, borderRadius:8, border:'1px solid red', color:'#ff5555', fontSize:12, textAlign:'center'}}>
+                                            <i className="fas fa-ban" style={{fontSize: 24, marginBottom: 5}}></i><br/>
+                                            <b>CONTA BANCÁRIA INATIVA</b><br/>
+                                            Agentes Livres não possuem o PIX liberado. <b>Assine com um clube</b> para ativar suas transações financeiras!
+                                        </div>
+                                    ) : (user.type === 'COACH' && (user.data.level || 1) < 2) ? (
+                                        <div style={{background:'rgba(255,0,0,0.1)', padding:15, borderRadius:8, border:'1px solid red', color:'#ff5555', fontSize:12, textAlign:'center'}}>
+                                            <i className="fas fa-ban" style={{fontSize: 24, marginBottom: 5}}></i><br/>
+                                            <b>CONTA BANCÁRIA RESTRITA</b><br/>
+                                            Apenas Técnicos <b>Nível 2 ou superior</b> podem realizar transferências.
+                                        </div>
+                                    ) : (
+                                        /* SE PASSOU NAS REGRAS, MOSTRA O FORMULÁRIO DO PIX NORMAL COM A BUSCA */
+                                        <>
+                                            <p style={{fontSize: 11, color: '#aaa', marginBottom: 15}}>Transfira dinheiro diretamente para o bolso de outros atletas ou técnicos (Taxa bancária: 10%). Limite: ₣ 20.000.</p>
+                                            
+                                            <label>Quem vai receber o PIX?</label>
+                                            
+                                            {/* BARRA DE PESQUISA DO PIX */}
+                                            <input 
+                                                className="input-field" 
+                                                type="text" 
+                                                placeholder="🔍 Buscar pelo nome..." 
+                                                value={pixSearch} 
+                                                onChange={e => setPixSearch(e.target.value)} 
+                                                style={{marginBottom: '5px', borderColor: '#00bcd4'}} 
+                                            />
 
-                                    <label>Valor da Transferência (₣)</label>
-                                    <input className="input-field" type="number" placeholder="Ex: 5000" value={pixAmount} onChange={e=>setPixAmount(e.target.value)} />
-                                    
-                                    <button className="btn btn-blue" style={{background:'#00bcd4', color:'#000'}} onClick={handleSendPix}>
-                                        <i className="fas fa-paper-plane"></i> CONFIRMAR PIX
-                                    </button>
+                                            <select className="input-field" value={pixRecipient} onChange={e=>setPixRecipient(e.target.value)}>
+                                                <option value="">-- Selecione o contato --</option>
+                                                <optgroup label="🏃 Jogadores">
+                                                    {players
+                                                        .filter(p => p.id !== user.data.id && p.name && p.name.toLowerCase().includes(pixSearch.toLowerCase()))
+                                                        .map(p => (
+                                                        <option key={p.id} value={`PLAYER_${p.id}`}>{p.name} (Jogador)</option>
+                                                    ))}
+                                                </optgroup>
+                                                <optgroup label="👔 Técnicos">
+                                                    {(coaches || [])
+                                                        .filter(c => c.id !== user.data.id && c.name && c.name.toLowerCase().includes(pixSearch.toLowerCase()))
+                                                        .map(c => (
+                                                        <option key={c.id} value={`COACH_${c.id}`}>{c.name} (Treinador)</option>
+                                                    ))}
+                                                </optgroup>
+                                            </select>
+
+                                            <label>Valor da Transferência (₣)</label>
+                                            <input className="input-field" type="number" placeholder="Ex: 5000" value={pixAmount} onChange={e=>setPixAmount(e.target.value)} />
+                                            
+                                            <button className="btn btn-blue" style={{background:'#00bcd4', color:'#000'}} onClick={handleSendPix}>
+                                                <i className="fas fa-paper-plane"></i> CONFIRMAR PIX
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             )}
 
@@ -7790,7 +7831,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.92.3</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.92.4</div>
                             </div>
                         </div>
                         
@@ -8445,7 +8486,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
     return (
         <div className="login-wrapper">
             <h1 className="login-title">Gerenciador de Times<br/><span className="login-title-span">de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.3 MEDICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.4 MEDICOS  </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

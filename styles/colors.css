@@ -1,0 +1,12 @@
+:root {
+    --bg-dark: #121212;
+    --bg-card: #1E1E1E;
+    --bg-input: #2C2C2C;
+    --primary: #00E676;
+    --secondary: #2979FF;
+    --danger: #FF1744;
+    --warning: #FFC400;
+    --purple: #D500F9;
+    --text-main: #FFFFFF;
+    --border: #333333;
+}

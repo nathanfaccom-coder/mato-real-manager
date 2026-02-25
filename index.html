@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Gerenciador de Times de Mato Real</title>
 
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="pwa/manifest.json">
 <meta name="theme-color" content="#00E676">
-<link rel="apple-touch-icon" href="icon.png">
+<link rel="apple-touch-icon" href="assets/icon.png">
     
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -18,216 +18,11 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap" rel="stylesheet">
 
-    <style>
-        :root {
-            --bg-dark: #121212; --bg-card: #1E1E1E; --bg-input: #2C2C2C;
-            --primary: #00E676; --secondary: #2979FF; --danger: #FF1744; --warning: #FFC400; --purple: #D500F9;
-            --text-main: #FFFFFF; --border: #333333;
-        }
-        body { background: var(--bg-dark); color: var(--text-main); font-family: 'Roboto', sans-serif; margin: 0; padding-bottom: 80px; -webkit-font-smoothing: antialiased; }
-        .container { max-width: 800px; margin: 0 auto; padding: 15px; }
-        .card { background: var(--bg-card); padding: 15px; border-radius: 12px; margin-bottom: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.4); position: relative; }
-        .btn { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: 800; cursor: pointer; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; transition: 0.2s; margin-bottom: 5px; color: white; }
-        .btn:active { transform: scale(0.98); }
-        .btn-green { background: var(--primary); color: #000; }
-        .btn-blue { background: var(--secondary); }
-        .btn-red { background: var(--danger); }
-        .btn-gold { background: var(--warning); color: #000; }
-        .btn-purple { background: var(--purple); }
-        .btn-ghost { background: transparent; border: 1px solid #666; color: #ccc; }
-        .input-field { width: 100%; padding: 12px; background: var(--bg-input); border: 1px solid var(--border); color: white; border-radius: 8px; margin-bottom: 10px; box-sizing: border-box; font-family: inherit; font-size: 14px; }
-        .input-field:focus { outline: 2px solid var(--primary); border-color: transparent; }
-        .header { background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(10px); padding: 15px; position: sticky; top: 0; z-index: 50; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-        .badge-pos { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 900; margin-right: 8px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
-        .player-ov { background: #003300; color: #00E676; border: 1px solid #00E676; padding: 2px 6px; border-radius: 4px; font-weight: 900; font-size: 14px; }
-        .news-card { background: #262626; padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid #666; font-size: 13px; line-height: 1.4; white-space: pre-wrap; }
-        .news-transfer { border-color: var(--secondary); background: linear-gradient(90deg, #1a1a2e, #16213e); }
-        .news-money { border-color: var(--primary); }
-        .news-money-minus { border-color: var(--danger); }
-        .news-admin { border-color: var(--warning); background: #2a2000; }
-        .news-press { border-color: #00bcd4; background: #003333; }
-        .bottom-nav { 
-            position: fixed; 
-            bottom: 0; 
-            left: 0; 
-            right: 0; 
-            background: #1a1a1a; 
-            border-top: 1px solid var(--border); 
-            display: flex; 
-            padding-bottom: env(safe-area-inset-bottom); 
-            z-index: 100;
-            overflow-x: auto; /* Permite rolar para o lado */
-            white-space: nowrap; /* Impede quebra de linha */
-            -webkit-overflow-scrolling: touch; /* Scroll suave no iOS */
-            scrollbar-width: none; /* Esconde barra no Firefox */
-        }
-        .bottom-nav::-webkit-scrollbar { display: none; } /* Esconde barra no Chrome/Android */
-        
-        .nav-item { 
-            flex: 0 0 auto; 
-            min-width: 85px; /* Aumentado para facilitar o clique no iPhone */
-            padding: 15px 5px; /* Mais espaço para o dedo */
-            text-align: center; 
-            color: #666; 
-            font-size: 11px; /* Fonte mais legível */
-            cursor: pointer; 
-            -webkit-tap-highlight-color: transparent; /* Remove pisca azul feio no mobile */
-        }
-        .nav-item.active { color: var(--primary); }
-        .nav-item i { font-size: 24px; margin-bottom: 6px; display: block; } /* Ícone maior */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 99999; display: grid; place-items: center; padding: 15px; backdrop-filter: blur(5px); }
-        .modal-content { background: var(--bg-card); width: 100%; max-width: 450px; padding: 20px; border-radius: 12px; border: 1px solid var(--border); max-height: 90vh; overflow-y: auto; }
-        .login-tabs { display: flex; border-bottom: 1px solid #333; margin-bottom: 20px; }
-        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; color: #666; font-weight: bold; }
-        .tab.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
-        .pulse { animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
-        .scroll-hint {
-            position: fixed;
-            bottom: 80px; /* Fica flutuando bem em cima do menu */
-            right: 15px;
-            background: rgba(0, 230, 118, 0.9);
-            color: #000;
-            border-radius: 20px;
-            padding: 5px 12px;
-            font-size: 10px;
-            font-weight: 900;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            z-index: 99;
-            pointer-events: none; /* Para o dedo passar direto por ela e clicar no que tem atrás */
-            animation: slideHint 1.5s infinite ease-in-out;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
-        }
-        @keyframes slideHint {
-            0%, 100% { transform: translateX(0); }
-            50% { transform: translateX(-8px); }
-        }
-        .rating-badge { color: var(--warning); font-weight: bold; font-size: 11px; margin-left: 5px; display: flex; align-items: center; gap: 2px; text-shadow: 0 1px 2px black; }
-        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 10px; margin-top: 10px; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px; }
-        .stat-item { display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .stat-lbl { font-size: 14px; margin-bottom: 2px; }
-        .stat-val { color: #fff; font-weight: 900; font-size: 11px; }
-        .dev-credits { font-size: 10px; color: #666; margin-top: -5px; margin-bottom: 15px; text-align: center; display: block; width: 100%; }
-        .error-screen { height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #220000; color: #ff5555; padding: 20px; text-align: center; }
-        .rank-tabs { display: flex; gap: 8px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 10px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-        .rank-tabs::-webkit-scrollbar { display: none; }
-        .rank-tab { background: #333; border: 1px solid #444; color: #888; padding: 8px 16px; border-radius: 20px; font-size: 12px; white-space: nowrap; cursor: pointer; transition: 0.2s; font-weight: bold; display: flex; align-items: center; gap: 5px; }
-        .rank-tab.active { background: var(--primary); color: #000; border-color: var(--primary); box-shadow: 0 0 10px rgba(0,230,118,0.3); }
-        .rank-tab i { font-size: 14px; }
-        .highlight-card { background: linear-gradient(135deg, #1a237e 0%, #0d47a1 100%); border: 1px solid var(--secondary); padding: 20px; text-align: center; margin-bottom: 15px; border-radius: 12px; position: relative; overflow: hidden; }
-        .highlight-card::after { content: '★'; position: absolute; top: -10px; right: -10px; font-size: 100px; color: rgba(255,255,255,0.05); }
-  
-        /* MARCAÇÕES DO CAMPO VISUAL */
-        .football-field {
-            width: 100%;
-            aspect-ratio: 2 / 3; /* Formato vertical de campo */
-            background: #2e7d32;
-            background-image: 
-                linear-gradient(rgba(255,255,255,0.1) 2px, transparent 2px),
-                linear-gradient(90deg, rgba(255,255,255,0.1) 2px, transparent 2px);
-            background-size: 100% 10%, 10% 100%;
-            border: 3px solid #fff;
-            border-radius: 10px;
-            position: relative;
-            margin: 20px 0;
-            overflow: hidden;
-        }
-
-        .football-field::before {
-            content: '';
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: 25%; height: 16%;
-            border: 2px solid rgba(255,255,255,0.5);
-            border-radius: 50%;
-        }
-
-        .player-slot {
-            position: absolute;
-            transform: translate(-50%, -50%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            width: 60px;
-            cursor: pointer;
-            z-index: 10;
-        }
-
-        .player-photo-circle {
-            width: 40px;
-            height: 40px;
-            background: #1a237e; /* Azul escuro se estiver vazio */
-            border: 2px solid gold;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            color: white;
-            font-size: 10px;
-            font-weight: bold;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
-        }
-
-        .player-photo-circle img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .player-name-label {
-            background: rgba(0,0,0,0.7);
-            color: white;
-            font-size: 9px;
-            padding: 2px 5px;
-            border-radius: 3px;
-            margin-top: 3px;
-            white-space: nowrap;
-            max-width: 70px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-    </style>
+    <link rel="stylesheet" href="styles/colors.css">
+    <link rel="stylesheet" href="styles/main.css">
 </head>
 <body>
-   <script>
-    // FUNÇÃO DE EMERGÊNCIA (Ativar via Console F12 digitando: emergencyClearSales())
-    async function emergencyClearSales() {
-        const pass = prompt("Digite a senha master para limpar o banco:");
-        if (pass !== '2503') return alert("Senha errada!");
-        
-        console.log("Iniciando faxina de emergência...");
-        
-        try {
-            // 1. Limpa a coleção de vendas (mochilas) que causa o crash de objetos
-            const salesSnap = await firebase.firestore().collection('sales').get();
-            const b = firebase.firestore().batch();
-            
-            salesSnap.docs.forEach(doc => {
-                b.delete(doc.ref);
-            });
-            
-            // 2. Reseta fama e itens equipados dos jogadores (limpa dados zumbis)
-            const playersSnap = await firebase.firestore().collection('players').get();
-            playersSnap.docs.forEach(doc => {
-                b.update(doc.ref, { 
-                    equippedItem: firebase.firestore.FieldValue.delete(),
-                    fame: 0 
-                });
-            });
-
-            await b.commit();
-            alert("✅ BANCO LIMPO COM SUCESSO! O App vai recarregar.");
-            window.location.reload();
-        } catch (e) {
-            alert("Erro na limpeza: " + e.message);
-            console.error(e);
-        }
-    }
-</script>
+   <script src="scripts/emergency.js"></script>
     <div id="root"></div>
 
     <script type="text/babel">
@@ -12543,46 +12338,6 @@ const TeamStandingsEditor = ({ teams, onUpdateTeamStats }) => {
         <div style="position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 10px solid #00E676;"></div>
         <div style="font-size: 20px; position: absolute; bottom: -35px; left: 50%; transform: translateX(-50%); color: #00E676; animation: bounce 1s infinite;">⬇</div>
     </div>
-    <style>@keyframes bounce { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, 5px); } }</style>
-
-    <script>
-        // 1. REGISTRA O "MOTOR DE LIMPEZA" (Garante que está online)
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-                // Força o navegador a buscar o novo arquivo no servidor
-                navigator.serviceWorker.register('service-worker.js', { scope: './' })
-                .then(registration => {
-                    // Tenta atualizar imediatamente
-                    registration.update(); 
-                    console.log('App Online Registrado');
-                });
-            });
-            
-            // Recarrega a página automaticamente se uma nova versão assumir o controle
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
-                window.location.reload();
-            });
-        }
-
-        // 2. DETECTOR DE INTERNET (TRAVA)
-        function checkInternet() {
-            const blocker = document.getElementById('offline-blocker');
-            if (!navigator.onLine) {
-                blocker.style.display = 'flex';
-            } else {
-                blocker.style.display = 'none';
-            }
-        }
-        window.addEventListener('offline', checkInternet);
-        window.addEventListener('online', checkInternet);
-        checkInternet();
-
-        // 3. LÓGICA IPHONE
-        const isIos = () => /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
-        const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
-        if (isIos() && !isInStandaloneMode()) {
-            document.getElementById('ios-install-prompt').style.display = 'block';
-        }
-    </script>
+    <script src="scripts/pwa.js"></script>
 </body>
 </html>

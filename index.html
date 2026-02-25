@@ -444,6 +444,12 @@ const TournamentManagerModal = ({ tournaments, teams, awards, onClose }) => {
         setF({ name: '', format: 'MATA-MATA', matchType: 'IDA_VOLTA', trophyId: '', selectedTeams: [], prize: '', finalType: 'UNICO', neutralFinal: true });
     };
 
+    const MatchTeamLogo = ({ logo }) => (
+        logo
+            ? <img src={logo} className="match-team-logo" />
+            : <div className="match-team-logo-placeholder">🛡️</div>
+    );
+
     return (
         <div className="modal-overlay" style={{zIndex: 99999}}>
             <div className="modal-content" style={{maxWidth: '600px', border:'2px solid cyan'}} onClick={e => e.stopPropagation()}>
@@ -1442,7 +1448,7 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
 
                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5, marginTop: isAdmin ? 15 : 0}}>
                         <div style={{textAlign:'center', width:'40%', display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-                            {m.homeLogo ? <img src={m.homeLogo} style={{width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', marginBottom: 5, border: '1px solid #444'}} /> : <div style={{width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'grid', placeItems: 'center', marginBottom: 5, fontSize: 12}}>🛡️</div>}
+                            <MatchTeamLogo logo={m.homeLogo} />
                             <b style={{fontSize:13}}>{m.homeName}</b>
                             <div style={{fontSize:18, fontWeight:'bold'}}>
                                 {m.status==='FINISHED' ? <>{m.scoreHome} {m.hasPenalties && <span style={{fontSize:12, color:'gold', marginLeft:4}}>({m.penaltiesHome})</span>}</> : '-'}
@@ -1450,7 +1456,7 @@ const MatchCenter = ({ matches, teams, onReportMatch, isAdmin, onEditMatch, onDe
                         </div>
                         <div style={{fontSize:12, color:'#aaa'}}>X</div>
                         <div style={{textAlign:'center', width:'40%', display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-                            {m.awayLogo ? <img src={m.awayLogo} style={{width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', marginBottom: 5, border: '1px solid #444'}} /> : <div style={{width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'grid', placeItems: 'center', marginBottom: 5, fontSize: 12}}>🛡️</div>}
+                            <MatchTeamLogo logo={m.awayLogo} />
                             <b style={{fontSize:13}}>{m.awayName}</b>
                             <div style={{fontSize:18, fontWeight:'bold'}}>
                                 {m.status==='FINISHED' ? <>{m.hasPenalties && <span style={{fontSize:12, color:'gold', marginRight:4}}>({m.penaltiesAway})</span>} {m.scoreAway}</> : '-'}
@@ -1747,7 +1753,7 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
 
                                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop: user.type === 'ADMIN' ? 15 : 0}}>
                                         <div style={{textAlign:'center', width:'40%', cursor:'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center'}} onClick={() => { const t = teams.find(x => x.id === m.homeId); if(t) onInspectTeam(t); }}>
-                                            {m.homeLogo ? <img src={m.homeLogo} style={{width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', marginBottom: 5, border: '1px solid #444'}} /> : <div style={{width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'grid', placeItems: 'center', marginBottom: 5, fontSize: 12}}>🛡️</div>}
+                                            <MatchTeamLogo logo={m.homeLogo} />
                                             <b style={{fontSize:13, color:'var(--primary)'}}>{m.homeName}</b>
                                             <div style={{fontSize:18, fontWeight:'bold'}}>
                                                 {m.status==='FINISHED' ? <>{m.scoreHome} {m.hasPenalties && <span style={{fontSize:12, color:'gold', marginLeft:4}}>({m.penaltiesHome})</span>}</> : '-'}
@@ -1758,7 +1764,7 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
                                             <small style={{color:'gold'}}>{m.round ? `Fase: ${m.round}` : 'Mata-Mata'}</small>
                                         </div>
                                         <div style={{textAlign:'center', width:'40%', cursor:'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center'}} onClick={() => { const t = teams.find(x => x.id === m.awayId); if(t) onInspectTeam(t); }}>
-                                            {m.awayLogo ? <img src={m.awayLogo} style={{width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', marginBottom: 5, border: '1px solid #444'}} /> : <div style={{width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'grid', placeItems: 'center', marginBottom: 5, fontSize: 12}}>🛡️</div>}
+                                            <MatchTeamLogo logo={m.awayLogo} />
                                             <b style={{fontSize:13, color:'var(--primary)'}}>{m.awayName}</b>
                                             <div style={{fontSize:18, fontWeight:'bold'}}>
                                                 {m.status==='FINISHED' ? <>{m.hasPenalties && <span style={{fontSize:12, color:'gold', marginRight:4}}>({m.penaltiesAway})</span>} {m.scoreAway}</> : '-'}
@@ -1972,10 +1978,10 @@ const TeamDashboard = ({ team, players, staff, isVisitor, onEdit, onAdd, onFireC
 
     return (
         <div>
-            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:15}}>
+            <div className="card-row" style={{justifyContent:'space-between', alignItems:'center', marginBottom:15}}>
                 <div>
                     <h2 style={{margin:0}}>{team.name}</h2>
-                    <small style={{color:'#aaa'}}>Folha: <span style={{color:'var(--danger)', fontWeight:'bold'}}>{fmt(wageBill)}/sem</span></small>
+                    <small className="page-subtitle-muted">Folha: <span className="pill pill-danger">{fmt(wageBill)}/sem</span></small>
                 </div>
             </div>
 
@@ -2000,7 +2006,7 @@ const TeamDashboard = ({ team, players, staff, isVisitor, onEdit, onAdd, onFireC
             {tab === 'ELENCO' && (
                 <div>
                     <div style={{marginBottom:15}}>
-                        <div style={{fontSize:16, fontWeight:'bold', marginBottom:10}}>Jogadores ({sortedPlayers.length})</div>
+                        <div className="page-section-title">Jogadores ({sortedPlayers.length})</div>
                         
                         {/* BOTÃO EXCLUSIVO DO ADMIN NA TELA DO TIME */}
                         {isAdmin && (
@@ -2013,28 +2019,28 @@ const TeamDashboard = ({ team, players, staff, isVisitor, onEdit, onAdd, onFireC
                     {/* LISTA DE JOGADORES ORDENADA */}
                     {sortedPlayers.map(p => (
                         <div key={p.id} className="card" style={{borderLeft: `4px solid ${getPosColor(p.position)}`, marginBottom:10}}>
-                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'start'}}>
+                            <div className="card-row" style={{justifyContent:'space-between', alignItems:'flex-start'}}>
                                 <div>
                                     <span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span>
                                     <b style={{fontSize:16, marginLeft:8}}>{p.name}</b>
-                                    <div style={{fontSize:11, color:'#888', marginTop:4}}>
+                                    <div className="page-subtitle-muted">
                                         Sal: {fmt(p.salary)} <span style={{margin:'0 5px'}}>|</span> Con: {p.contract}
-                                        {p.status === 'VENDA' && <span style={{color:'var(--primary)', marginLeft:5}}> (À VENDA)</span>}
+                                        {p.status === 'VENDA' && <span className="pill pill-success" style={{marginLeft:5}}> (À VENDA)</span>}
                                     </div>
                                 </div>
                                 <div className="player-ov">{p.overall}</div>
                             </div>
 
-                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:5, textAlign:'center', marginTop:10, background:'rgba(0,0,0,0.3)', padding:5, borderRadius:5}}>
-                                <div><small style={{color:'#aaa'}}>⚽ {p.stats?.goals||0}</small></div>
-                                <div><small style={{color:'#aaa'}}>👟 {p.stats?.assists||0}</small></div>
-                                <div><small style={{color:'#aaa'}}>🛡️ {p.stats?.tackles||0}</small></div>
-                                <div><small style={{color:'#aaa'}}>🧤 {p.stats?.saves||0}</small></div>
-                                <div><small style={{color:'#aaa'}}>🟨 {p.stats?.yellows||0}</small></div>
-                                <div><small style={{color:'#aaa'}}>🟥 {p.stats?.reds||0}</small></div>
+                            <div className="grid-stats-3">
+                                <div><small className="page-subtitle-muted">⚽ {p.stats?.goals||0}</small></div>
+                                <div><small className="page-subtitle-muted">👟 {p.stats?.assists||0}</small></div>
+                                <div><small className="page-subtitle-muted">🛡️ {p.stats?.tackles||0}</small></div>
+                                <div><small className="page-subtitle-muted">🧤 {p.stats?.saves||0}</small></div>
+                                <div><small className="page-subtitle-muted">🟨 {p.stats?.yellows||0}</small></div>
+                                <div><small className="page-subtitle-muted">🟥 {p.stats?.reds||0}</small></div>
                             </div>
 
-                            <div style={{marginTop:10, paddingTop:5, borderTop:'1px dashed #444'}}>
+                            <div className="divider-soft">
                                 <AttributeGrid attrs={p.attributes} pendingXP={p.pendingXP} />
                             </div>
 
@@ -2066,9 +2072,9 @@ const TeamDashboard = ({ team, players, staff, isVisitor, onEdit, onAdd, onFireC
             {tab === 'STAFF' && (
                 <div>
                     {(!staff || staff.length === 0) ? (
-                        <div className="card" style={{textAlign:'center', padding:20, border:'1px dashed #666'}}>
-                            <h3 style={{color:'#666'}}>Sem Comissão Técnica</h3>
-                            <p style={{fontSize:12, color:'#aaa'}}>Vá ao Mercado > Comissão para contratar profissionais.</p>
+                        <div className="card empty-state">
+                            <h3>Sem Comissão Técnica</h3>
+                            <p>Vá ao Mercado &gt; Comissão para contratar profissionais.</p>
                         </div>
                     ) : (
                         <div style={{display:'grid', gap:10}}>
@@ -2079,12 +2085,12 @@ const TeamDashboard = ({ team, players, staff, isVisitor, onEdit, onAdd, onFireC
                                 
                                 return (
                                     <div key={c.id} className="highlight-card" style={{borderLeft: isCoach ? '4px solid gold' : '4px solid #00E676', padding: 15}}>
-                                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
-                                            <div style={{display:'flex', gap:10, alignItems:'center'}}>
-                                                {c.face ? <img src={c.face} style={{width:45,height:45,borderRadius:'50%',objectFit:'cover',border:`2px solid ${isCoach?'gold':'#00E676'}`}}/> : <div style={{width:45,height:45,background:'#333',borderRadius:'50%',display:'grid',placeItems:'center',fontSize:20, border:`2px solid ${isCoach?'gold':'#00E676'}`}}>{roleIcon}</div>}
-                                                <div style={{textAlign: 'left'}}>
+                                        <div className="card-row" style={{justifyContent:'space-between', alignItems:'flex-start'}}>
+                                            <div className="card-row-wide" style={{alignItems:'center'}}>
+                                                {c.face ? <img src={c.face} className="avatar-md" style={{border:`2px solid ${isCoach?'gold':'#00E676'}`}}/> : <div className="avatar-md-placeholder" style={{border:`2px solid ${isCoach?'gold':'#00E676'}`}}>{roleIcon}</div>}
+                                                <div className="text-left">
                                                     <h3 style={{margin:0, color: isCoach ? 'gold' : '#00E676'}}>{c.name}</h3>
-                                                    <span className="badge" style={{background:'var(--primary)', marginTop:5, fontSize:9}}>{roleNames[c.type]} (Nvl {c.level})</span>
+                                                    <span className="badge-muted" style={{marginTop:5}}>{roleNames[c.type]} (Nvl {c.level})</span>
                                                 </div>
                                             </div>
                                             {!isVisitor && (
@@ -2110,7 +2116,7 @@ const TeamDashboard = ({ team, players, staff, isVisitor, onEdit, onAdd, onFireC
                                             </div>
                                             <div>
                                                 <span style={{color:'#aaa'}}>Multa Rescisória:</span><br/>
-                                                <b style={{color:'red'}}>{fmt(c.clause || c.salary * 4)}</b>
+                                                <b className="pill pill-danger">{fmt(c.clause || c.salary * 4)}</b>
                                             </div>
                                             <div>
                                                 <span style={{color:'#aaa'}}>Energia / Físico:</span><br/>
@@ -2142,17 +2148,17 @@ const TeamDashboard = ({ team, players, staff, isVisitor, onEdit, onAdd, onFireC
                     <div className="card" style={{borderLeft:'4px solid gold', background:'rgba(255,215,0,0.05)', marginBottom:15, minHeight: '200px'}}>
                         <h3 style={{marginTop:0, color:'gold'}}>🏆 Galeria de Títulos e Honrarias</h3>
                         {(!team.trophies || team.trophies.length === 0) ? (
-                            <div style={{textAlign:'center', color:'#666', marginTop: 40}}>
-                                <i className="fas fa-box-open" style={{fontSize: 40, marginBottom: 10}}></i>
-                                <p style={{fontSize:12}}>A estante do clube ainda está vazia. Vença campeonatos para preenchê-la!</p>
+                            <div className="empty-state">
+                                <i className="fas fa-box-open empty-state-icon"></i>
+                                <p className="empty-state-text">A estante do clube ainda está vazia. Vença campeonatos para preenchê-la!</p>
                             </div>
                         ) : (
-                            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(90px, 1fr))', gap:15, marginTop: 20}}>
+                            <div className="trophy-grid">
                                 {[...team.trophies].reverse().map((t, i) => (
-                                    <div key={i} style={{textAlign:'center', background:'rgba(0,0,0,0.6)', padding:15, borderRadius:8, border:'1px solid #555', boxShadow:'0 4px 10px rgba(0,0,0,0.5)'}}>
-                                        <img src={t.img} style={{width:60, height:60, objectFit:'contain', filter:'drop-shadow(0 0 8px rgba(255,215,0,0.6))'}} />
-                                        <div style={{fontSize:10, fontWeight:'bold', color:'#fff', marginTop:8}}>{t.name}</div>
-                                        <div style={{fontSize:9, color:'gold', marginTop: 2}}>{t.tournament}</div>
+                                    <div key={i} className="trophy-card">
+                                        <img src={t.img} className="trophy-image" />
+                                        <div className="trophy-name">{t.name}</div>
+                                        <div className="trophy-tournament">{t.tournament}</div>
                                     </div>
                                 ))}
                             </div>
@@ -3938,7 +3944,7 @@ const GameCalendar = ({ calendar }) => {
             const [screen, setScreen] = useState('HOME');
            const [matchesTab, setMatchesTab] = useState('LIGAS'); 
            const [modal, setModal] = useState(null);
-            const [loading, setLoading] = useState(true);
+            const [loading, setLoading] = useState(false);
             const [newNews, setNewNews] = useState(false);
             const [adminTeam, setAdminTeam] = useState(null); 
             const [sales, setSales] = useState([]);
@@ -8437,8 +8443,8 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
     };
 
     return (
-        <div style={{minHeight:'100vh', padding:20, textAlign:'center'}}>
-            <h1 style={{color:'var(--primary)'}}>Gerenciador de Times<br/><span style={{color:'white'}}>de Mato Real</span></h1>
+        <div className="login-wrapper">
+            <h1 className="login-title">Gerenciador de Times<br/><span className="login-title-span">de Mato Real</span></h1>
             <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.3 MEDICOS  </div>
             
             <div className="login-tabs">
@@ -8451,7 +8457,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
             </div>
 
             {tab==='LOGIN' && <div>
-                <div style={{marginBottom:15, display:'flex', gap:10, justifyContent:'center'}}>
+                <div className="login-tab-buttons">
                     <button className={`btn ${subTab==='TEAM'?'btn-green':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>setSubTab('TEAM')}>TIMES</button>
                     <button className={`btn ${subTab==='PLAYER'?'btn-blue':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>{setSubTab('PLAYER'); setSelTeamForPlayer(null);}}>JOGADORES</button>
                     <button className={`btn ${subTab==='COMPANY'?'btn-purple':'btn-ghost'}`} style={{width:'auto'}} onClick={()=>setSubTab('COMPANY')}>EMPRESAS</button>
@@ -8461,16 +8467,15 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
 
                {/* --- ABA DE LOGIN DE TIMES (MENU VERTICAL) --- */}
                 {subTab === 'TEAM' && (
-                    <div style={{textAlign: 'left'}}>
+                    <div className="text-left">
                         {!loginSerie ? (
                             /* TELA 1: BOTÕES DAS SÉRIES NA VERTICAL */
-                            <div className="animate-in" style={{display: 'flex', flexDirection: 'column', gap: 10}}>
-                                <h4 style={{color:'var(--primary)', textAlign:'center', marginTop: 0, marginBottom: 10}}>Selecione a Divisão</h4>
+                            <div className="animate-in login-series-wrapper">
+                                <h4 className="login-series-title">Selecione a Divisão</h4>
                                 {SERIES.map(s => (
                                     <button 
                                         key={`btn-s-${s}`} 
-                                        className="btn btn-ghost" 
-                                        style={{padding: '15px', fontSize: '14px', border: '1px solid var(--primary)', color: 'white', background: 'rgba(0, 230, 118, 0.05)'}}
+                                        className="btn btn-ghost login-series-button-team" 
                                         onClick={() => setLoginSerie(s)}
                                     >
                                         {s === 'VARZEA' ? '🚜 O Terrão (Várzea)' : `🏆 Campeonato Série ${s}`}
@@ -8480,22 +8485,22 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                         ) : (
                             /* TELA 2: LISTA DE TIMES DA SÉRIE ESCOLHIDA */
                             <div className="animate-in">
-                                <button className="btn" style={{marginBottom:15, background:'#333', width:'auto'}} onClick={() => setLoginSerie(null)}>
+                                <button className="btn login-back-button" onClick={() => setLoginSerie(null)}>
                                     ⬅ VOLTAR PARA DIVISÕES
                                 </button>
-                                <h4 style={{color: loginSerie === 'VARZEA' ? 'gold' : 'var(--primary)', borderBottom: '1px solid #333', paddingBottom: 5, marginTop: 0}}>
+                                <h4 className={`login-series-header-team ${loginSerie === 'VARZEA' ? 'login-series-title-varzea' : 'login-series-title-main'}`}>
                                     {loginSerie === 'VARZEA' ? '🚜 Terrão (Várzea)' : `Série ${loginSerie}`}
                                 </h4>
                                 
                                 {(() => {
                                     const teamsInSerie = (teams||[]).filter(t => t.status !== 'PENDING' && t.serie === loginSerie).sort((a,b) => a.name.localeCompare(b.name));
                                     
-                                    if (teamsInSerie.length === 0) return <p style={{textAlign:'center', color:'#666', marginTop: 20}}>Nenhum time cadastrado nesta série.</p>;
+                                    if (teamsInSerie.length === 0) return <p className="login-empty-text">Nenhum time cadastrado nesta série.</p>;
                                     
                                     return teamsInSerie.map(t => (
-                                        <div key={t.id} className="card" onClick={()=>setSel({...t, type:'TEAM'})} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>
-                                            {t.logo ? <img src={t.logo} style={{width:40, height:40, borderRadius:'50%', objectFit:'cover', border:'1px solid #444'}}/> : <div style={{width:40, height:40, borderRadius:'50%', background:'#333', display:'grid', placeItems:'center'}}>🛡️</div>}
-                                            <div><b style={{fontSize: 15}}>{t.name}</b></div>
+                                        <div key={t.id} className="card card-row card-clickable" onClick={()=>setSel({...t, type:'TEAM'})}>
+                                            {t.logo ? <img src={t.logo} className="login-team-card-logo"/> : <div className="login-team-card-logo-placeholder">🛡️</div>}
+                                            <div><b className="card-main-title">{t.name}</b></div>
                                         </div>
                                     ));
                                 })()}
@@ -8506,21 +8511,20 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                 
                 {/* --- ABA DE LOGIN DE JOGADOR (MENU VERTICAL) --- */}
                 {subTab === 'PLAYER' && !selTeamForPlayer && (
-                    <div style={{textAlign: 'left'}}>
+                    <div className="text-left">
                         {!loginSerie ? (
                             /* TELA 1: BOTÕES DAS SÉRIES + AGENTE LIVRE */
-                            <div className="animate-in" style={{display: 'flex', flexDirection: 'column', gap: 10}}>
-                                <p style={{color:'#aaa', textAlign:'center', fontSize: 12, margin: '0 0 10px 0'}}>Selecione o clube onde você joga ou acesse como livre:</p>
+                            <div className="animate-in login-series-wrapper">
+                                <p className="login-player-help">Selecione o clube onde você joga ou acesse como livre:</p>
                                 
-                                <div className="card pulse" onClick={() => setSelTeamForPlayer({ id: 'FREE', name: 'Agentes Livres' })} style={{cursor:'pointer', border: '1px solid var(--warning)', background: 'rgba(255, 196, 0, 0.1)', textAlign:'center', padding: '15px', marginBottom: 10}}>
-                                    <b style={{color: 'var(--warning)', fontSize: 14}}>🆓 SOU AGENTE LIVRE</b>
+                                <div className="card pulse login-free-agent-card" onClick={() => setSelTeamForPlayer({ id: 'FREE', name: 'Agentes Livres' })}>
+                                    <b className="login-free-agent-title">🆓 SOU AGENTE LIVRE</b>
                                 </div>
 
                                 {SERIES.map(s => (
                                     <button 
                                         key={`btn-p-s-${s}`} 
-                                        className="btn btn-ghost" 
-                                        style={{padding: '15px', fontSize: '14px', border: '1px solid var(--secondary)', color: 'white', background: 'rgba(41, 121, 255, 0.05)'}}
+                                        className="btn btn-ghost login-series-button-player" 
                                         onClick={() => setLoginSerie(s)}
                                     >
                                         {s === 'VARZEA' ? '🚜 O Terrão (Várzea)' : `🏆 Campeonato Série ${s}`}
@@ -8530,21 +8534,21 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                         ) : (
                             /* TELA 2: LISTA DE TIMES DA SÉRIE (PARA O JOGADOR CLICAR) */
                             <div className="animate-in">
-                                <button className="btn" style={{marginBottom:15, background:'#333', width:'auto'}} onClick={() => setLoginSerie(null)}>
+                                <button className="btn login-back-button" onClick={() => setLoginSerie(null)}>
                                     ⬅ VOLTAR PARA DIVISÕES
                                 </button>
-                                <h4 style={{color: loginSerie === 'VARZEA' ? 'gold' : 'var(--secondary)', borderBottom: '1px solid #333', paddingBottom: 5, marginTop: 0}}>
+                                <h4 className={`login-series-header-team ${loginSerie === 'VARZEA' ? 'login-series-title-varzea' : ''}`}>
                                     {loginSerie === 'VARZEA' ? '🚜 Terrão (Várzea)' : `Série ${loginSerie}`}
                                 </h4>
                                 
                                 {(() => {
                                     const teamsInSerie = (teams||[]).filter(t => t.status !== 'PENDING' && t.serie === loginSerie).sort((a,b) => a.name.localeCompare(b.name));
                                     
-                                    if (teamsInSerie.length === 0) return <p style={{textAlign:'center', color:'#666', marginTop: 20}}>Nenhum time cadastrado nesta série.</p>;
+                                    if (teamsInSerie.length === 0) return <p className="login-empty-text">Nenhum time cadastrado nesta série.</p>;
                                     
                                     return teamsInSerie.map(t => (
                                         <div key={t.id} className="card" onClick={()=>setSelTeamForPlayer(t)} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>
-                                            {t.logo ? <img src={t.logo} style={{width:35, height:35, borderRadius:'50%', objectFit:'cover'}}/> : <div style={{width:35, height:35, borderRadius:'50%', background:'#333', display:'grid', placeItems:'center', fontSize:12}}>🛡️</div>}
+                                            {t.logo ? <img src={t.logo} className="login-player-team-logo"/> : <div className="login-player-team-logo-placeholder">🛡️</div>}
                                             <b style={{fontSize: 15}}>{t.name}</b>
                                             <i className="fas fa-chevron-right" style={{marginLeft: 'auto', color: '#555'}}></i>
                                         </div>
@@ -8557,56 +8561,54 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
 
                 {/* --- ABA DE LOGIN DE JOGADOR (TELA 3: LISTA DO ELENCO COM FOTO E ALFABÉTICA) --- */}
                 {subTab === 'PLAYER' && selTeamForPlayer && (
-                    <div className="animate-in" style={{textAlign: 'left'}}>
-                        <button className="btn" style={{marginBottom:15, background:'#333', width:'auto'}} onClick={()=>setSelTeamForPlayer(null)}>
+                    <div className="animate-in text-left">
+                        <button className="btn login-back-button" onClick={()=>setSelTeamForPlayer(null)}>
                             ⬅ VOLTAR AOS CLUBES
                         </button>
-                        <h4 style={{color:'var(--secondary)', borderBottom: '1px solid #333', paddingBottom: 5, marginTop: 0}}>Elenco: {selTeamForPlayer.name}</h4>
+                        <h4 className="login-series-header-team">Elenco: {selTeamForPlayer.name}</h4>
                         
                         {(() => {
                             const teamPlayers = (players||[]).filter(p => p.teamId === selTeamForPlayer.id).sort((a,b) => a.name.localeCompare(b.name));
                             
-                            if (teamPlayers.length === 0) return <p style={{color:'#666', textAlign:'center', marginTop: 20}}>Nenhum jogador encontrado neste clube.</p>;
+                            if (teamPlayers.length === 0) return <p className="login-empty-text">Nenhum jogador encontrado neste clube.</p>;
                             
                             return teamPlayers.map(p => (
-                                <div key={p.id} className="card" onClick={()=>setSel({...p, type:'PLAYER'})} style={{cursor:'pointer', borderLeft:'4px solid var(--secondary)', display: 'flex', alignItems: 'center', gap: 12}}>
+                                <div key={p.id} className="card card-row card-clickable card-accent-secondary" onClick={()=>setSel({...p, type:'PLAYER'})}>
                                     {p.face ? (
-                                        <img src={p.face} style={{width: 45, height: 45, borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border: '1px solid #555'}} />
+                                        <img src={p.face} className="avatar-md" />
                                     ) : (
-                                        <div style={{width: 45, height: 45, borderRadius: '50%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20}}>👤</div>
+                                        <div className="avatar-md-placeholder">👤</div>
                                     )}
                                     
-                                    <div style={{flex: 1}}>
-                                        <b style={{fontSize: 15}}>{p.name} {p.recoveryLeft > 0 ? '❌' : ''}</b><br/>
-                                        <span style={{fontSize:10, background: 'var(--secondary)', color: '#000', padding: '2px 6px', borderRadius: 4, fontWeight: 'bold'}}>{p.position}</span>
+                                    <div className="flex-1">
+                                        <b className="card-main-title">{p.name} {p.recoveryLeft > 0 ? '❌' : ''}</b><br/>
+                                        <span className="login-player-position-badge">{p.position}</span>
                                     </div>
-                                    <i className="fas fa-sign-in-alt" style={{color: 'var(--secondary)'}}></i>
+                                    <i className="fas fa-sign-in-alt icon-right-muted"></i>
                                 </div>
                             ));
                         })()}
                     </div>
                 )}
 
-                {subTab==='COMPANY' && (companies||[]).filter(c=>c.status!=='PENDING').map(c=><div key={c.id} className="card" onClick={()=>setSel({...c, type:'COMPANY'})} style={{cursor:'pointer', borderLeft:'4px solid var(--purple)'}}>🏢 <b>{c.name}</b><br/><small>{(c.companyType)}</small></div>)}
+                {subTab==='COMPANY' && (companies||[]).filter(c=>c.status!=='PENDING').map(c=><div key={c.id} className="card login-company-card" onClick={()=>setSel({...c, type:'COMPANY'})}>🏢 <b>{c.name}</b><br/><small>{(c.companyType)}</small></div>)}
                 
                
                 {/* --- ABA DE LOGIN DE COMISSÃO TÉCNICA (MENU VERTICAL CORRIGIDO) --- */}
                 {subTab === 'COACH' && !selTeamForPlayer && (
-                    <div style={{textAlign: 'left'}}>
+                    <div className="text-left">
                         {!loginSerie ? (
-                            /* TELA 1: BOTÕES DAS SÉRIES + PROFISSIONAL LIVRE (VERTICAL) */
-                            <div className="animate-in" style={{display: 'flex', flexDirection: 'column', gap: 10}}>
-                                <p style={{color:'#aaa', textAlign:'center', fontSize: 12, margin: '0 0 10px 0'}}>Selecione o clube onde trabalha ou acesse como livre:</p>
+                            <div className="animate-in login-series-wrapper">
+                                <p className="login-coach-help">Selecione o clube onde trabalha ou acesse como livre:</p>
                                 
-                                <div className="card pulse" onClick={() => setSelTeamForPlayer({ id: 'FREE', name: 'Profissionais Livres' })} style={{cursor:'pointer', border: '1px solid gold', background: 'rgba(255, 215, 0, 0.1)', textAlign:'center', padding: '15px', marginBottom: 10}}>
-                                    <b style={{color: 'gold', fontSize: 14}}>🆓 SOU PROFISSIONAL LIVRE</b>
+                                <div className="card pulse login-coach-free-card" onClick={() => setSelTeamForPlayer({ id: 'FREE', name: 'Profissionais Livres' })}>
+                                    <b className="login-coach-free-title">🆓 SOU PROFISSIONAL LIVRE</b>
                                 </div>
 
                                 {SERIES.map(s => (
                                     <button 
                                         key={`btn-c-s-${s}`} 
-                                        className="btn btn-ghost" 
-                                        style={{padding: '15px', fontSize: '14px', border: '1px solid gold', color: 'white', background: 'rgba(255, 215, 0, 0.05)'}}
+                                        className="btn btn-ghost login-coach-series-button" 
                                         onClick={() => setLoginSerie(s)}
                                     >
                                         {s === 'VARZEA' ? '🚜 O Terrão (Várzea)' : `🏆 Campeonato Série ${s}`}
@@ -8614,23 +8616,22 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                                 ))}
                             </div>
                         ) : (
-                            /* TELA 2: LISTA DE TIMES DA SÉRIE */
                             <div className="animate-in">
-                                <button className="btn" style={{marginBottom:15, background:'#333', width:'auto'}} onClick={() => setLoginSerie(null)}>
+                                <button className="btn login-back-button" onClick={() => setLoginSerie(null)}>
                                     ⬅ VOLTAR PARA DIVISÕES
                                 </button>
-                                <h4 style={{color: loginSerie === 'VARZEA' ? 'gold' : 'gold', borderBottom: '1px solid #333', paddingBottom: 5, marginTop: 0}}>
+                                <h4 className="login-coach-series-header">
                                     {loginSerie === 'VARZEA' ? '🚜 Terrão (Várzea)' : `Série ${loginSerie}`}
                                 </h4>
                                 
                                 {(() => {
                                     const teamsInSerie = (teams||[]).filter(t => t.status !== 'PENDING' && t.serie === loginSerie).sort((a,b) => a.name.localeCompare(b.name));
                                     
-                                    if (teamsInSerie.length === 0) return <p style={{textAlign:'center', color:'#666', marginTop: 20}}>Nenhum time cadastrado nesta série.</p>;
+                                    if (teamsInSerie.length === 0) return <p className="login-empty-text">Nenhum time cadastrado nesta série.</p>;
                                     
                                     return teamsInSerie.map(t => (
                                         <div key={t.id} className="card" onClick={()=>setSelTeamForPlayer(t)} style={{display:'flex', alignItems:'center', gap:10, cursor:'pointer'}}>
-                                            {t.logo ? <img src={t.logo} style={{width:35, height:35, borderRadius:'50%', objectFit:'cover'}}/> : <div style={{width:35, height:35, borderRadius:'50%', background:'#333', display:'grid', placeItems:'center', fontSize:12}}>🛡️</div>}
+                                            {t.logo ? <img src={t.logo} className="login-coach-team-logo"/> : <div className="login-coach-team-logo-placeholder">🛡️</div>}
                                             <b style={{fontSize: 15}}>{t.name}</b>
                                             <i className="fas fa-chevron-right" style={{marginLeft: 'auto', color: '#555'}}></i>
                                         </div>
@@ -8643,62 +8644,64 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
 
                 {/* --- TELA 3: FOTO DA COMISSÃO NO TIME ESCOLHIDO --- */}
                 {subTab === 'COACH' && selTeamForPlayer && (
-                    <div className="animate-in" style={{textAlign: 'left'}}>
-                        <button className="btn" style={{marginBottom:15, background:'#333', width:'auto'}} onClick={()=>setSelTeamForPlayer(null)}>
+                    <div className="animate-in text-left">
+                        <button className="btn login-back-button" onClick={()=>setSelTeamForPlayer(null)}>
                             ⬅ VOLTAR AOS CLUBES
                         </button>
-                        <h4 style={{color:'gold', borderBottom: '1px solid #333', paddingBottom: 5, marginTop: 0}}>
+                        <h4 className="login-coach-list-header">
                             {selTeamForPlayer.id === 'FREE' ? 'Mercado de Profissionais' : `Staff: ${selTeamForPlayer.name}`}
                         </h4>
                         
                         {(() => {
                             const teamCoaches = (coaches||[]).filter(c => c.status === 'ACTIVE' && c.teamId === selTeamForPlayer.id).sort((a,b) => a.name.localeCompare(b.name));
                             
-                            if (teamCoaches.length === 0) return <p style={{color:'#666', textAlign:'center', marginTop: 20}}>Nenhum profissional contratado neste clube.</p>;
+                            if (teamCoaches.length === 0) return <p className="login-empty-text">Nenhum profissional contratado neste clube.</p>;
                             
                             const roleNames = { 'COACH': '👔 Técnico', 'DOCTOR': '🩺 Médico', 'SCOUT': '🕵️‍♂️ Olheiro', 'ASSISTANT': '📋 Auxiliar' };
 
-                            return teamCoaches.map(c => (
-<div key={c.id} className="card" onClick={()=>setSel({...c, type: c.type || 'COACH'})} style={{cursor:'pointer', borderLeft:'4px solid gold', display: 'flex', alignItems: 'center', gap: 12}}>
-    {c.face ? (
-                                        <img src={c.face} style={{width: 45, height: 45, borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border: '1px solid gold'}} />
+                                    return teamCoaches.map(c => (
+                                        <div key={c.id} className="card login-coach-card card-clickable" onClick={()=>setSel({...c, type: c.type || 'COACH'})}>
+                                    {c.face ? (
+                                        <img src={c.face} className="login-coach-photo" />
                                     ) : (
-                                        <div style={{width: 45, height: 45, borderRadius: '50%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, border: '1px solid gold'}}>
+                                        <div className="login-coach-photo-placeholder">
                                             {c.type === 'DOCTOR' ? '🩺' : (c.type === 'SCOUT' ? '🕵️‍♂️' : '👔')}
                                         </div>
                                     )}
                                     
-                                    <div style={{flex: 1}}>
-                                        <b style={{fontSize: 15, color: 'gold'}}>{c.name}</b><br/>
-                                        <span style={{fontSize:10, color: '#aaa'}}>
+                                    <div className="flex-1">
+                                        <b className="login-coach-name">{c.name}</b><br/>
+                                        <span className="login-coach-subtitle">
                                             {roleNames[c.type] || '👔 Técnico'} | Nível {c.level}
                                             {c.type === 'COACH' && c.affinities ? ` | Esp: ${c.affinities[0]}` : ''}
                                         </span>
                                     </div>
-                                    <i className="fas fa-sign-in-alt" style={{color: 'gold'}}></i>
+                                    <i className="fas fa-sign-in-alt icon-login-gold"></i>
                                 </div>
                             ));
                         })()}
                     </div>
                 )}
 
-                <div style={{marginTop:20}}><button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button><button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button></div>
+                <div className="login-footer-actions">
+                    <button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button>
+                    <button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button>
+                </div>
             </div>}
 
 {tab==='CREATE' && <div>
                 <h3 style={{color:'var(--primary)'}}>Fundar Novo Clube</h3>
                 
-                {/* --- ÁREA DE PRÉ-VISUALIZAÇÃO E UPLOAD DO ESCUDO --- */}
-                <div style={{textAlign: 'center', marginBottom: 15, background: 'rgba(0,0,0,0.2)', padding: 15, borderRadius: 8}}>
-                    <div style={{marginBottom: 10}}>
+                <div className="login-create-club-preview">
+                    <div>
                         {f.l ? (
-                            <img src={f.l} style={{width: 100, height: 100, objectFit: 'contain', borderRadius: '50%', border: '3px solid var(--primary)', background:'#fff'}} />
+                            <img src={f.l} className="login-club-logo" />
                         ) : (
-                            <div style={{width: 100, height: 100, margin: '0 auto', background: '#333', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, border: '3px solid #555'}}>🛡️</div>
+                            <div className="login-club-logo-placeholder">🛡️</div>
                         )}
                     </div>
                     
-                    <label className="btn btn-blue" style={{display: 'block', margin: '0 auto', width: 'fit-content', cursor: 'pointer', padding: '10px 20px'}}>
+                    <label className="btn btn-blue login-upload-badge">
                         <i className="fas fa-upload" style={{marginRight: 5}}></i> ESCOLHER ESCUDO
                         <input type="file" style={{display:'none'}} accept="image/*" onChange={handleUpload} />
                     </label>
@@ -8708,13 +8711,12 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                 
                 {/* Lógica de Saldo Travado para Várzea */}
                 <input 
-                    className="input-field" 
+                    className={`input-field ${f.s === 'VARZEA' ? 'login-varzea-balance' : ''}`} 
                     type="number" 
                     placeholder="Saldo Inicial" 
                     value={f.s === 'VARZEA' ? 200000 : f.b} 
                     onChange={e=>setF({...f, b:e.target.value})} 
-                    disabled={f.s === 'VARZEA'} // Trava se for Várzea
-                    style={{opacity: f.s === 'VARZEA' ? 0.6 : 1, borderColor: f.s === 'VARZEA' ? 'gold' : '#333'}}
+                    disabled={f.s === 'VARZEA'}
                 />
                 
                 <select className="input-field" value={f.s} onChange={e=>{
@@ -8730,9 +8732,9 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                 
                 {/* --- AVISO DE VÁRZEA FECHADA --- */}
                 {f.s === 'VARZEA' && config?.varzeaOpen === false && (
-                    <div style={{background: 'rgba(255, 23, 68, 0.1)', border: '1px solid red', padding: 15, borderRadius: 8, marginTop: 10, marginBottom: 15}}>
-                        <b style={{color: '#ff1744', display:'block', marginBottom: 5, fontSize: 14}}>🛑 INSCRIÇÕES ENCERRADAS!</b>
-                        <span style={{fontSize: 11, color: '#ffaaaa', lineHeight: 1.4, display: 'block'}}>
+                    <div className="login-varzea-warning">
+                        <b className="login-varzea-warning-title">🛑 INSCRIÇÕES ENCERRADAS!</b>
+                        <span className="login-varzea-warning-text">
                             A Federação informa que o limite de clubes filiados ao Terrão (Várzea) foi atingido. Novas vagas estarão disponíveis apenas na próxima temporada. Fique atento aos comunicados oficiais!
                         </span>
                     </div>
@@ -8770,7 +8772,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                     });
                 }}>FUNDAR CLUBE</button>
                 
-                {f.s === 'VARZEA' && <p style={{fontSize:10, color:'gold', marginTop:10}}>* Times da Várzea iniciam com teto de ₣ 200.000 e aprovação imediata.</p>}
+                {f.s === 'VARZEA' && <p className="login-varzea-note">* Times da Várzea iniciam com teto de ₣ 200.000 e aprovação imediata.</p>}
             </div>}           
             {tab==='PRESS' && <div><div style={{display:'flex', gap:10, marginBottom:10}}><button className="btn btn-ghost" onClick={()=>setSubTab('LOGIN_P')}>LOGIN</button><button className="btn btn-ghost" onClick={()=>setSubTab('NEW_PAPER')}>CRIAR JORNAL</button><button className="btn btn-ghost" onClick={()=>setSubTab('NEW_JOURNO')}>SOU JORNALISTA</button></div>
                 {subTab==='LOGIN_P' && !selPaper && <div><h4>Selecione o Jornal</h4>{(papers||[]).filter(p=>p.status==='ACTIVE').map(p=><div key={p.id} className="card" onClick={()=>setSelPaper(p)}>📰 {p.name}</div>)}</div>}
@@ -8783,23 +8785,23 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                 <input className="input-field" placeholder="Nome da Empresa" value={fc.n} onChange={e=>setFC({...fc, n:e.target.value})} />
                 <input className="input-field" placeholder="Nome do Dono" value={fc.owner} onChange={e=>setFC({...fc, owner:e.target.value})} />
                 
-                <label style={{textAlign:'left', display:'block', color:'#aaa', fontSize:12}}>Porte da Empresa</label>
+                <label className="login-company-label">Porte da Empresa</label>
                 <select className="input-field" value={fc.type} onChange={e=>setFC({...fc, type:e.target.value})}>
                     <option value="COMERCIO">Comércio Local</option>
                     <option value="MEDIA">Média Empresa</option>
                     <option value="GRANDE">Grande Empresa</option>
                 </select>
 
-                <div style={{background: 'rgba(255, 255, 255, 0.05)', padding: 10, borderRadius: 5, marginBottom: 10, textAlign: 'left', border: '1px solid #444'}}>
-                    <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 5}}>
+                <div className="login-company-box">
+                    <div className="login-info-row" style={{marginBottom: 5}}>
                         <span>💰 Capital Inicial:</span>
-                        <span style={{color: 'var(--primary)', fontWeight: 'bold'}}>{fmt(selectedTypeInfo.start)}</span>
+                        <span className="login-company-highlight-primary">{fmt(selectedTypeInfo.start)}</span>
                     </div>
-                    <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                    <div className="login-info-row">
                         <span>💸 Imposto Semanal:</span>
-                        <span style={{color: 'var(--danger)', fontWeight: 'bold'}}>{fmt(selectedTypeInfo.tax)}</span>
+                        <span className="login-company-highlight-danger">{fmt(selectedTypeInfo.tax)}</span>
                     </div>
-                    <p style={{fontSize: 11, color: '#888', marginTop: 8, fontStyle: 'italic', borderTop:'1px solid #333', paddingTop:5}}>
+                    <p className="login-company-tax-note">
                         "{selectedTypeInfo.desc}"
                     </p>
                 </div>
@@ -8810,22 +8812,21 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
 
            {/* --- NOVO BLOCO: ABA COMISSÃO TÉCNICA --- */}
             {tab==='COACH' && <div>
-                <h3 style={{color:'gold'}}>🎓 Licença Profissional</h3>
+                <h3 className="login-coach-title">🎓 Licença Profissional</h3>
                 <p style={{fontSize:12, color:'#aaa'}}>Inicie sua carreira no Staff de um Clube.</p>
                 
-                <div className="card" style={{border:'1px solid gold', background:'rgba(255,215,0,0.05)', marginBottom:15}}>
-                    <div style={{display:'flex', justifyContent:'space-between', fontSize:12}}>
+                <div className="card login-coach-card-info">
+                    <div className="login-info-row">
                         <span>Nível Inicial: <b>1</b></span>
                         <span>Salário Base: <b>{fmt(2500)}</b></span>
                     </div>
                 </div>
 
-                {/* UPLOAD DE FOTO (COMPRIMIDO) */}
-                <div style={{textAlign: 'center', marginBottom: 15}}>
-                    <div style={{width: 80, height: 80, margin: '0 auto 10px auto', background: '#222', borderRadius: '50%', border: '2px dashed gold', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                <div className="login-coach-avatar-wrapper">
+                    <div className="login-coach-avatar">
                         {coachData.face ? <img src={coachData.face} style={{width:'100%', height:'100%', objectFit:'cover', objectPosition:'top'}} /> : <span style={{fontSize:30}}>📷</span>}
                     </div>
-                    <label className="btn btn-ghost" style={{fontSize:10, padding:'5px 10px', width:'auto', display:'inline-block'}}>
+                    <label className="btn btn-ghost login-coach-upload-label">
                         ESCOLHER FOTO DE PERFIL
                         <input type="file" style={{display:'none'}} accept="image/*" onChange={(e) => {
                             const file = e.target.files[0];
@@ -8910,20 +8911,20 @@ const VisitorDashboard = ({ players, teams }) => {
                 <small>Resumo da Temporada</small>
                 <div style={{marginTop:15, textAlign:'left'}}>
                     <div style={{marginBottom:10}}>
-                        <span style={{color:'#aaa', fontSize:10, textTransform:'uppercase'}}>Artilheiro</span>
+                        <span className="page-subtitle-muted" style={{textTransform:'uppercase'}}>Artilheiro</span>
                         <div style={{fontWeight:'bold', fontSize:16}}>
-                            ⚽ {topScorer?.name || 'Ninguém'} <span style={{color:'var(--primary)'}}>{topScorer?.stats?.goals||0} Gols</span>
+                            ⚽ {topScorer?.name || 'Ninguém'} <span className="pill pill-success">{topScorer?.stats?.goals||0} Gols</span>
                         </div>
                     </div>
                     <div>
-                        <span style={{color:'#aaa', fontSize:10, textTransform:'uppercase'}}>Rei das Assistências</span>
+                        <span className="page-subtitle-muted" style={{textTransform:'uppercase'}}>Rei das Assistências</span>
                         <div style={{fontWeight:'bold', fontSize:16}}>
-                            👟 {topAssist?.name || 'Ninguém'} <span style={{color:'var(--secondary)'}}>{topAssist?.stats?.assists||0} Assis</span>
+                            👟 {topAssist?.name || 'Ninguém'} <span className="pill pill-success">{topAssist?.stats?.assists||0} Assis</span>
                         </div>
                     </div>
                 </div>
             </div>
-            <div style={{textAlign:'center', color:'#666', marginTop: 15, fontSize: 12}}>
+            <div className="empty-state" style={{marginTop: 15}}>
                 Acesse a aba <b>JOGOS</b> abaixo para ver a Classificação.
             </div>
         </div>
@@ -12315,28 +12316,28 @@ const TeamStandingsEditor = ({ teams, onUpdateTeamStats }) => {
 
     </script>
 
-    <div id="offline-blocker" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 999999; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
-        <div style="font-size: 50px;">📡</div>
-        <h2 style="color: white; font-family: sans-serif; margin: 20px 0;">Sem Conexão</h2>
-        <p style="color: #888; font-family: sans-serif;">O Mato Real precisa de internet para funcionar.</p>
-        <button onclick="window.location.reload()" style="padding: 10px 20px; background: #00E676; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 20px;">TENTAR RECONECTAR</button>
+    <div id="offline-blocker">
+        <div id="offline-blocker-icon">📡</div>
+        <h2 id="offline-blocker-title">Sem Conexão</h2>
+        <p id="offline-blocker-text">O Mato Real precisa de internet para funcionar.</p>
+        <button class="btn-offline-retry" onclick="window.location.reload()">TENTAR RECONECTAR</button>
     </div>
 
-    <div id="ios-install-prompt" style="display: none; position: fixed; bottom: 40px; left: 5%; right: 5%; background: rgba(30, 30, 30, 0.95); border: 1px solid #00E676; padding: 20px; border-radius: 15px; z-index: 99999; box-shadow: 0 10px 30px rgba(0,0,0,0.8); text-align: center; color: white; font-family: sans-serif; backdrop-filter: blur(10px);">
-        <button onclick="document.getElementById('ios-install-prompt').style.display='none'" style="position: absolute; top: 10px; right: 15px; background: transparent; border: none; color: #666; font-size: 24px; cursor: pointer;">&times;</button>
-        <div style="font-size: 40px; margin-bottom: 10px;">📲</div>
-        <p style="margin: 0 0 5px 0; font-size: 16px; font-weight: bold; color: #00E676;">Instalar App</p>
-        <p style="font-size: 13px; color: #ccc; margin-bottom: 20px; line-height: 1.4;">Instale para jogar em tela cheia:</p>
-        <div style="text-align: left; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; font-size: 13px;">
-            <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 20px;">1.</span> <span>Toque em <b>Compartilhar</b> <span style="font-size: 18px;">⎋</span></span>
+    <div id="ios-install-prompt">
+        <button class="ios-install-close" onclick="document.getElementById('ios-install-prompt').style.display='none'">&times;</button>
+        <div class="ios-install-icon">📲</div>
+        <p class="ios-install-title">Instalar App</p>
+        <p class="ios-install-subtitle">Instale para jogar em tela cheia:</p>
+        <div class="ios-install-steps">
+            <div class="ios-install-step">
+                <span class="ios-install-step-number">1.</span> <span>Toque em <b>Compartilhar</b> <span style="font-size: 18px;">⎋</span></span>
             </div>
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 20px;">2.</span> <span><b>"Adicionar à Tela de Início"</b> <span style="font-size: 18px;">⊞</span></span>
+            <div class="ios-install-step">
+                <span class="ios-install-step-number">2.</span> <span><b>"Adicionar à Tela de Início"</b> <span style="font-size: 18px;">⊞</span></span>
             </div>
         </div>
-        <div style="position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 10px solid #00E676;"></div>
-        <div style="font-size: 20px; position: absolute; bottom: -35px; left: 50%; transform: translateX(-50%); color: #00E676; animation: bounce 1s infinite;">⬇</div>
+        <div class="ios-install-arrow"></div>
+        <div class="ios-install-pointer">⬇</div>
     </div>
     <script src="scripts/pwa.js"></script>
 </body>

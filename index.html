@@ -10335,6 +10335,10 @@ const ScoutDashboard = ({ scout, team, players, onSelfAction, setModal }) => {
     const energy = scout.energy !== undefined ? scout.energy : 100;
     const isExhausted = energy < 30;
 
+    // --- LÓGICA DE XP DO OLHEIRO ---
+    const xpNext = scout.level * 100;
+    const progress = ((scout.xp || 0) / xpNext) * 100;
+
     const runPeneira = async (level, maxOvr) => {
         if (!team || team.id === 'FREE') return alert("Você precisa estar contratado por um clube para realizar peneiras!");
         
@@ -10377,12 +10381,26 @@ const ScoutDashboard = ({ scout, team, players, onSelfAction, setModal }) => {
             peneiraList: newProspects // Substitui a lista antiga
         });
 
-        // 3. Atualiza o Olheiro
+        // 3. Atualiza o XP e o Nível do Olheiro
+        let newXp = (scout.xp || 0) + 50; // Ganha 50 XP por peneira
+        let newLevel = scout.level;
+        let pending = scout.pendingPerks || 0;
+
+        // Lógica de subir de nível
+        if (newXp >= newLevel * 100) { 
+            newXp -= (newLevel * 100); 
+            newLevel++; 
+            if (newLevel % 3 === 0) pending++; // Ganha perk a cada 3 níveis (se quiser adicionar habilidades depois)
+            alert(`🎉 PARABÉNS! Você evoluiu para o Nível ${newLevel} de Olheiro!`); 
+        }
+
         b.update(db.collection('users').doc(scout.id), {
             energy: energy - 50,
             lastScoutDate: today,
             scoutsToday: scoutsDone + 1,
-            xp: firebase.firestore.FieldValue.increment(50) // Ganha XP por achar jogadores
+            xp: newXp,
+            level: newLevel,
+            pendingPerks: pending
         });
 
         await b.commit();
@@ -10403,10 +10421,31 @@ const ScoutDashboard = ({ scout, team, players, onSelfAction, setModal }) => {
                     </div>
                 </div>
                 
-                <div style={{margin:'15px auto', width:'80%', background:'#333', height:10, borderRadius:5, overflow:'hidden'}}>
+                <div style={{margin:'15px auto', width:'80%', background:'#333', height:10, borderRadius:5, overflow:'hidden', border:'1px solid #555'}}>
                     <div style={{width:`${energy}%`, background: energy > 50 ? 'lime' : 'red', height:'100%', transition:'0.5s'}}></div>
                 </div>
                 <small style={{color: isExhausted ? 'red' : 'lime', fontWeight:'bold'}}>{energy}% Energia</small>
+
+                {/* SALDO E SALÁRIO DO OLHEIRO */}
+                <div style={{display:'flex', justifyContent:'center', gap:15, marginTop:15}}>
+                    <div style={{textAlign:'center'}}>
+                        <div style={{fontSize:20, fontWeight:'bold', color:'var(--success)'}}>{fmt(scout.balance || 0)}</div>
+                        <span style={{fontSize:9, color:'#888'}}>CAIXA</span>
+                    </div>
+                    <div style={{width:1, background:'#333'}}></div>
+                    <div style={{textAlign:'center'}}>
+                        <div style={{fontSize:20, fontWeight:'bold', color:'var(--primary)'}}>{fmt(scout.salary)}</div>
+                        <span style={{fontSize:9, color:'#888'}}>SALÁRIO</span>
+                    </div>
+                </div>
+
+                {/* BARRA DE XP ROXA */}
+                <div style={{position:'absolute', bottom:0, left:0, right:0, height:8, background:'#222', borderTop:'1px solid #444'}}>
+                    <div style={{width:`${Math.min(100, progress)}%`, background:'linear-gradient(90deg, #9c27b0, #e040fb)', height:'100%', transition:'1s'}}></div>
+                    <div style={{position:'absolute', top:'-14px', right:'5px', fontSize:'9px', color:'#e040fb', fontWeight:'bold', textShadow:'1px 1px 2px black'}}>
+                        XP: {scout.xp || 0} / {xpNext}
+                    </div>
+                </div>
             </div>
 
             <div style={{marginTop: 20}}>
@@ -10441,7 +10480,7 @@ const ScoutDashboard = ({ scout, team, players, onSelfAction, setModal }) => {
                 </div>
             </div>
             
-             {/* BOTÃO DO CT (Abre o Modal diretamente para ver a Peneira) */}
+             {/* BOTÃO DO CT */}
              <button className="btn btn-warning" style={{marginTop: 15}} onClick={() => team ? setModal({type:'CT_TYCOON', data: team}) : alert("🚫 Você precisa estar contratado!")}>
                 🏟️ VISITAR CT (VER PENEIRA)
             </button>

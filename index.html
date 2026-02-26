@@ -317,7 +317,7 @@ const calculateSocios = (team, teamPlayers) => {
         
         // --- TABELA DE TETO SALARIAL (REAJUSTADA) ---
 const SALARY_CAPS = [
-    { minOv: 0,  maxOv: 45, minSal: 0,    maxSal: 1500,   label: 'Várzea/Amador' }, // Permitir salário 0 ou baixo
+    { minOv: 0,  maxOv: 45, minSal: 500,  maxSal: 1500,   label: 'Várzea/Amador' }, // Ninguém joga de graça
     { minOv: 46, maxOv: 55, minSal: 1500,   maxSal: 6000,   label: 'Iniciante' },
     { minOv: 56, maxOv: 65, minSal: 5000,   maxSal: 18000,  label: 'Profissional' },
     { minOv: 66, maxOv: 75, minSal: 15000,  maxSal: 45000,  label: 'Estrela' },
@@ -3387,12 +3387,18 @@ const TrainingCenterManager = ({ team, players, coach, user, onClose, onTrain, o
                                                 <button className="btn btn-green" style={{fontSize:9, padding:'5px', margin:0}} onClick={() => {
                                                     // A TRAVA DE 7 BOTS POR TIME FICA AQUI!
                                                     const currentNpcs = players.filter(p => p.teamId === team.id && p.isNPC).length;
+                                                    
+                                                    // 1. Trava se já tiver 7
                                                     if (currentNpcs >= 7) {
-                                                        return alert(`🚫 LIMITE ATINGIDO!\nAtualmente você tem ${currentNpcs}/7 BOTS no elenco. Você só poderá contratar outro quando 1 deles for vendido ou demitido.`);
+                                                        return alert(`🚫 LIMITE ATINGIDO!\nVocê já tem 7/7 BOTS no elenco. Você só poderá contratar outro quando 1 deles sair do elenco.`);
                                                     }
                                                     
-                                                    if(confirm(`Atualmente você tem ${currentNpcs}/7 BOTS.\n\nContratar ${npc.name} pagando as luvas de ${fmt(npc.value)}?`)) {
-                                                        if (team.balance < npc.value) return alert("Saldo insuficiente para as luvas!");
+                                                    // 2. Balão de fala EXATO que você pediu!
+                                                    if (!confirm(`⚠️ AVISO DA BASE\n\nAtualmente você tem ${currentNpcs}/7 BOTS.\nTem certeza que quer contratar ${npc.name} por ${fmt(npc.value)}?\n\nAssim que você completar 7 de 7, você só poderá contratar outro quando 1 deles sair do elenco.`)) {
+                                                        return; // O usuário clicou em Cancelar
+                                                    }
+
+                                                    if (team.balance < npc.value) return alert("Saldo insuficiente para as luvas!");
                                                         
                                                         const db = firebase.firestore();
                                                         const b = db.batch();
@@ -7163,9 +7169,18 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
         // --- 1. TRAVA DO LIMITE DE 7 BOTS (MERCADO GLOBAL) ---
         if (target.isNPC && user.type === 'USER') {
             const myTeamBots = players.filter(p => p.teamId === user.data.id && p.isNPC).length;
+            
+            // 1. Trava se já tiver 7 e estiver tentando comprar de fora
             if (myTeamBots >= 7 && target.teamId !== user.data.id) {
-                 alert(`🚫 LIMITE DA BASE ATINGIDO!\nVocê já tem ${myTeamBots}/7 BOTS no elenco. Venda ou demita um antes de contratar novos.`);
-                 return; // Aborta!
+                 alert(`🚫 LIMITE DA BASE ATINGIDO!\nVocê já tem 7/7 BOTS no elenco. Você só poderá contratar outro quando 1 deles sair do elenco.`);
+                 return; // Aborta a compra!
+            }
+
+            // 2. Balão de fala EXATO que você pediu! (Aparece antes de enviar a proposta)
+            if (target.teamId !== user.data.id) { // Só avisa se o Bot não for do próprio time
+                 if (!confirm(`⚠️ AVISO DA BASE\n\nAtualmente você tem ${myTeamBots}/7 BOTS no elenco.\nTem certeza que quer enviar esta proposta para ${target.name}?\n\nAssim que você completar 7 de 7, você só poderá contratar outro quando 1 deles sair do elenco.`)) {
+                     return; // O usuário clicou em Cancelar e desistiu de enviar a proposta
+                 }
             }
         }
 
@@ -8163,7 +8178,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.92.7</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.92.8</div>
                             </div>
                         </div>
                         
@@ -8866,7 +8881,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
     return (
         <div className="login-wrapper">
             <h1 className="login-title">Gerenciador de Times<br/><span className="login-title-span">de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.7 COMISSÃO TÉCNICA COMPLETA   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.8 COMISSÃO TÉCNICA COMPLETA   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

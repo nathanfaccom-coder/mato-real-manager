@@ -869,7 +869,55 @@ const AdminPlayerModal = ({ player, teams, onClose }) => {
         </div>
     );
 };
-        
+        // ==========================================
+// SISTEMA DE BASE E NPCS (BOTS)
+// ==========================================
+
+const NPC_FIRST_NAMES = ["Enzo", "Valentim", "Kauan", "Miguel", "Arthur", "Gael", "Heitor", "Theo", "Davi", "Bernardo", "Gabriel", "Samuel", "João", "Pedro", "Lucas", "Mateus", "Gustavo", "Felipe", "Nicolas", "Daniel", "Carlos", "Eduardo", "Diego", "Bruno", "Leonardo", "Thiago", "Rafael", "Marcos", "André", "Yuri", "Igor", "Vitor", "Vinicius", "Alexandre", "Rodrigo", "Marcelo", "Fernando", "Ricardo"];
+const NPC_LAST_NAMES = ["Priori", "Santos", "Oliveira", "Souza", "Rodrigues", "Ferreira", "Alves", "Pereira", "Lima", "Gomes", "Costa", "Ribeiro", "Martins", "Carvalho", "Almeida", "Lopes", "Soares", "Fernandes", "Vieira", "Barbosa", "Rocha", "Reis", "Nascimento", "Andrade", "Moreira", "Nunes", "Marques", "Machado", "Mendes", "Freitas", "Cardoso", "Ramos", "Gonçalves", "Santana", "Teixeira"];
+
+const generateNpcName = () => {
+    const first = NPC_FIRST_NAMES[Math.floor(Math.random() * NPC_FIRST_NAMES.length)];
+    const last = NPC_LAST_NAMES[Math.floor(Math.random() * NPC_LAST_NAMES.length)];
+    return `${first} ${last} 🤖`;
+};
+
+// Calcula o custo da peneira baseado no jogador mais caro (Goleiro) daquele OVR
+const getPeneiraCost = (maxOvr) => {
+    if (maxOvr <= 40) return 0; // Peneira Nível 1 é de graça
+    return getRecommendedPrice(maxOvr, 'GOL'); // Usa a tabela oficial do jogo
+};
+
+// --- A "CONSCIÊNCIA" DO BOT (INTELIGÊNCIA ARTIFICIAL) ---
+// Avalia se o NPC aceita a proposta
+const processBotDecision = (offer, buyingTeam, npcPlayer) => {
+    const minFairSalary = getSalaryLimits(npcPlayer.overall).minSal;
+    const offeredSalary = parseFloat(offer.meta.newSalary) || 0;
+    
+    // Fator Fase do Time (O Bot não quer ir para time que só perde)
+    const form = buyingTeam.recentForm || [];
+    const wins = form.filter(r => r === 'VITORIA').length;
+    const losses = form.filter(r => r === 'DERROTA').length;
+    
+    // Se o time está muito mal, o bot exige mais dinheiro para aceitar ir (Mercenário)
+    let salaryRequirementMult = 1.0;
+    if (losses > wins) salaryRequirementMult = 1.2; // Exige 20% a mais
+    if (wins > losses) salaryRequirementMult = 0.9; // Aceita ganhar 10% a menos pra jogar em time vencedor
+    
+    const targetSalary = minFairSalary * salaryRequirementMult;
+
+    if (offeredSalary >= targetSalary) {
+        return { decision: 'ACCEPT', message: `🤖 O empresário de ${npcPlayer.name} achou a oferta excelente e aceitou os termos contratuais!` };
+    } else if (offeredSalary >= targetSalary * 0.8) {
+        return { 
+            decision: 'COUNTER', 
+            counterValue: targetSalary, 
+            message: `🤖 O jogador tem interesse no ${buyingTeam.name}, mas pede um ajuste salarial para ${fmt(targetSalary)}.` 
+        };
+    } else {
+        return { decision: 'REJECT', message: `🤖 A proposta salarial foi considerada muito baixa pelo staff de ${npcPlayer.name}. Negociação encerrada.` };
+    }
+};
         
         // ==========================================
 // BANCO DE DADOS: CT E POSIÇÕES
@@ -3054,7 +3102,10 @@ const TeamDashboard = ({ team, players, staff, isVisitor, onEdit, onAdd, onFireC
 };
 //FIM
       
-        const TrainingCenterManager = ({ team, players, coach, user, onClose, onTrain, onTrainSolo }) => {
+        // ==========================================
+// CT DO CLUBE (TRAINING CENTER MANAGER)
+// ==========================================
+const TrainingCenterManager = ({ team, players, coach, user, onClose, onTrain, onTrainSolo }) => {
     const lvl = team.ctLevel || 1;
     const db = CT_DB[lvl];
     const nextDb = CT_DB[lvl + 1];
@@ -3121,10 +3172,12 @@ const TeamDashboard = ({ team, players, staff, isVisitor, onEdit, onAdd, onFireC
                     </div>
                 </div>
 
-                <div style={{display:'flex', gap:5, marginBottom:15, overflowX:'auto'}}>
+                {/* BOTÕES DE NAVEGAÇÃO DO CT */}
+                <div style={{display:'flex', gap:5, marginBottom:15, overflowX:'auto', paddingBottom:5}}>
                     <button className={`btn ${tab==='GERAL'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('GERAL')}>ESTRUTURA & ELENCO</button>
                     {(isCoach || isPlayer) && <button className={`btn ${tab==='TREINO'?'btn-green':'btn-ghost'}`} onClick={()=>setTab('TREINO')}>🏋️‍♂️ TREINAR</button>}
                     {isCoach && <button className={`btn ${tab==='POSICOES'?'btn-warning':'btn-ghost'}`} onClick={()=>setTab('POSICOES')}>🔄 POSIÇÕES</button>}
+                    <button className={`btn ${tab==='PENEIRA'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('PENEIRA')}>🔎 PENEIRA</button>
                 </div>
 
                 {/* ABA 1: ESTRUTURA E QUEM ESTÁ NO CT */}
@@ -3311,6 +3364,71 @@ const TeamDashboard = ({ team, players, staff, isVisitor, onEdit, onAdd, onFireC
                         )}
                     </div>
                 )}
+
+                {/* ABA 4: PENEIRA (RESULTADO DOS OLHEIROS) */}
+                {tab === 'PENEIRA' && (
+                    <div className="animate-in">
+                        <h3 style={{color:'var(--purple)', marginTop:0}}>🔎 Talentos Observados</h3>
+                        <p style={{fontSize:11, color:'#aaa'}}>Estes atletas (Bots) foram descobertos pelo Olheiro. Contrate os que desejar. Se uma nova peneira for feita, estes irão desaparecer!</p>
+                        
+                        {(!team.peneiraList || team.peneiraList.length === 0) ? (
+                            <div className="card" style={{textAlign:'center', padding:30}}>O Olheiro ainda não realizou buscas hoje.</div>
+                        ) : (
+                            <div style={{display:'grid', gap:10}}>
+                                {team.peneiraList.map(npc => (
+                                    <div key={npc.id} className="card" style={{borderLeft:`4px solid ${getPosColor(npc.position)}`, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                        <div>
+                                            <b>{npc.name}</b> <span className="badge-pos" style={{background:getPosColor(npc.position)}}>{npc.position}</span><br/>
+                                            <small style={{color:'#aaa'}}>OVR: <b style={{color:'gold'}}>{npc.overall}</b> | Salário Base: {fmt(npc.salary)}</small>
+                                        </div>
+                                        <div style={{display:'flex', gap:5, flexDirection:'column'}}>
+                                            {/* O Presidente contrata */}
+                                            {isPresident && (
+                                                <button className="btn btn-green" style={{fontSize:9, padding:'5px', margin:0}} onClick={() => {
+                                                    // A TRAVA DE 7 BOTS POR TIME FICA AQUI!
+                                                    const currentNpcs = players.filter(p => p.teamId === team.id && p.isNPC).length;
+                                                    if (currentNpcs >= 7) {
+                                                        return alert(`🚫 LIMITE ATINGIDO!\nAtualmente você tem ${currentNpcs}/7 BOTS no elenco. Você só poderá contratar outro quando 1 deles for vendido ou demitido.`);
+                                                    }
+                                                    
+                                                    if(confirm(`Atualmente você tem ${currentNpcs}/7 BOTS.\n\nContratar ${npc.name} pagando as luvas de ${fmt(npc.value)}?`)) {
+                                                        if (team.balance < npc.value) return alert("Saldo insuficiente para as luvas!");
+                                                        
+                                                        const db = firebase.firestore();
+                                                        const b = db.batch();
+                                                        
+                                                        // Tira o dinheiro do clube
+                                                        b.update(db.collection('teams').doc(team.id), {
+                                                            balance: firebase.firestore.FieldValue.increment(-npc.value),
+                                                            peneiraList: team.peneiraList.filter(x => x.id !== npc.id) // Tira da lista
+                                                        });
+                                                        
+                                                        // Cria o jogador Oficial no Banco de Dados
+                                                        b.set(db.collection('players').doc(), {
+                                                            name: npc.name, position: npc.position, overall: npc.overall, attributes: npc.attributes,
+                                                            salary: npc.salary, value: npc.value, teamId: team.id, status: 'NAO_A_VENDA', mood: '😐',
+                                                            contract: 3, isNPC: true, balance: npc.value, xp: 0, fame: 0, stats: {goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0}
+                                                        });
+
+                                                        b.commit().then(() => alert(`✅ ${npc.name} assinou contrato e já está no seu elenco!`));
+                                                    }
+                                                }}>CONTRATAR ({fmt(npc.value)})</button>
+                                            )}
+                                            
+                                            {/* O Técnico indica */}
+                                            {isCoach && (
+                                                <button className="btn btn-gold" style={{fontSize:9, padding:'5px', margin:0}} onClick={() => {
+                                                    alert(`Você indicou ${npc.name} para a diretoria. Peça ao dono do time para vir no CT e contratar!`);
+                                                }}>💡 RECOMENDAR</button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+                              
                 <button className="btn btn-red" style={{marginTop:15}} onClick={onClose}>FECHAR CT</button>
             </div>
         </div>
@@ -4300,7 +4418,7 @@ db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTA
                     if (foundType === 'COACH') setScreen('COACH_DASH');
                     else if (foundType === 'DOCTOR') setScreen('DOCTOR_DASH');
                     else if (foundType === 'ASSISTANT') setScreen('ASSISTANT_DASH');
-                    else if (foundType === 'SCOUT') { alert("Painel de Olheiro em construção."); setScreen('HOME'); }
+                    else if (foundType === 'SCOUT') setScreen('SCOUT_DASH');
                     else if (foundType === 'COMPANY') setScreen('COMPANY_DASH');
                     else if (foundType === 'PLAYER') setScreen('PLAYER_DASH');
                     else if (foundType === 'PRESS' || foundType === 'PRESS_WORKER') setScreen('PRESS_DASH'); // Redireciona Imprensa
@@ -4832,9 +4950,12 @@ if (act === 'VARZEA') {
                 }
             });
 
-        // 2.4. COMISSÃO TÉCNICA (Salário e Reset de Treino)
-            const coachSnap = await db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTANT']).get();    
-        chSnap.docs.forEach(doc => {
+        
+           // 2.4. COMISSÃO TÉCNICA (Salário e Reset de Treino)
+        const coachSnap = await db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTANT']).get();    
+        
+        // CORREÇÃO: O nome correto da variável é coachSnap
+        coachSnap.docs.forEach(doc => {
                 const c = doc.data();
                 let updates = { trainingsLeft: 2 }; 
 
@@ -4843,13 +4964,15 @@ if (act === 'VARZEA') {
                     const teamExists = teams.some(t => t.id === c.teamId);
 
                     if (teamExists) {
-                        // Se o time existe, cobra o salário normalmente
-                        b.update(db.collection('teams').doc(c.teamId), {
-                            balance: firebase.firestore.FieldValue.increment(-c.salary)
-                        });
-                        const currentCoachBal = parseFloat(c.balance) || 0;
-                        updates.balance = currentCoachBal + parseFloat(c.salary);
-                    } else {
+    // 1. Ele tira o salário do Olheiro de dentro do cofre do Clube
+    b.update(db.collection('teams').doc(c.teamId), {
+        balance: firebase.firestore.FieldValue.increment(-c.salary)
+    });
+    
+    // 2. Ele deposita esse mesmo valor no saldo pessoal do Olheiro
+    const currentCoachBal = parseFloat(c.balance) || 0;
+    updates.balance = currentCoachBal + parseFloat(c.salary);
+}else {
                         // Se o time NÃO existe mais (foi excluído), libera o técnico automaticamente
                         // Isso corrige o erro "No document to update"
                         updates.teamId = 'FREE';
@@ -7030,7 +7153,101 @@ const handleCoachTrain = async (playerIds, type) => {
 
 // --- SISTEMA DE NEGOCIAÇÃO E MERCADO (VERSÃO REALISTA 3.3 - FINAL BLINDADA) ---
 const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
-    try {
+        const v = parseFloat(value) || 0;
+        const contractYears = parseInt(con) || 1;
+        const actingTeamName = user.data.name;
+        const targetPlayerName = target.name;
+        const finalSal = parseFloat(meta.newSalary) || 0;
+        const role = meta.role || 'ROTACAO';
+
+        // --- 1. TRAVA DO LIMITE DE 7 BOTS (MERCADO GLOBAL) ---
+        if (target.isNPC && user.type === 'USER') {
+            const myTeamBots = players.filter(p => p.teamId === user.data.id && p.isNPC).length;
+            if (myTeamBots >= 7 && target.teamId !== user.data.id) {
+                 alert(`🚫 LIMITE DA BASE ATINGIDO!\nVocê já tem ${myTeamBots}/7 BOTS no elenco. Venda ou demita um antes de contratar novos.`);
+                 return; // Aborta!
+            }
+        }
+
+        // --- LÓGICA DE DESTINATÁRIO INTELIGENTE ---
+        let recipientId; 
+        const isFreeAgent = target.teamId === 'FREE' || !target.teamId;
+
+        if (old && old.id) {
+            if (old.type === 'RENOVACAO_URGENTE') recipientId = old.playerId;
+            else if (old.sellerAccepted === true) recipientId = (user.data.id === old.buyerId) ? old.playerId : old.buyerId;
+            else recipientId = (user.data.id === old.buyerId) ? ((old.sellerId === 'FREE' || !old.sellerId) ? old.playerId : old.sellerId) : old.buyerId;
+        } else {
+            if (type === 'PRE_CONTRATO' || type === 'RENOVACAO') recipientId = target.id; 
+            else recipientId = isFreeAgent ? target.id : target.teamId;
+        }
+
+        // --- 2. INTELIGÊNCIA DO BOT (Apenas se a proposta for DIRETAMENTE para ele) ---
+        if (target.isNPC && user.type === 'USER' && recipientId === target.id) {
+            const teamObj = teams.find(t => t.id === user.data.id);
+            const botResponse = processBotDecision({ meta: { newSalary: finalSal } }, teamObj, target);
+            
+            if (botResponse.decision === 'REJECT') {
+                alert(botResponse.message); 
+                return; // 🛑 ABORTA: Bot não gostou, fim de papo.
+            } 
+            else if (botResponse.decision === 'COUNTER') {
+                if (confirm(`${botResponse.message}\n\nVocê aceita pagar ${fmt(botResponse.counterValue)} de salário para fechar negócio AGORA?`)) {
+                    meta.newSalary = botResponse.counterValue; // Atualiza forçado se o humano aceitou
+                } else {
+                    alert("Negociação cancelada. O jogador encerrou as conversas.");
+                    return; // 🛑 ABORTA: O humano não quis pagar o que o Bot pediu.
+                }
+            }
+            else if (botResponse.decision === 'ACCEPT') {
+                alert(botResponse.message);
+            }
+
+            // 🚀 SE CHEGOU AQUI: O BOT DISSE SIM! VAMOS ASSINAR O CONTRATO NA HORA!
+            try {
+                setLoading(true);
+                const db = firebase.firestore();
+                const b = db.batch();
+                const luvas = parseFloat(meta.signingBonus) || 0;
+                
+                // Se o clube não tiver dinheiro para as luvas, bloqueia
+                if (teamObj.balance < luvas) {
+                    setLoading(false);
+                    return alert(`Seu clube não tem ${fmt(luvas)} no caixa para pagar as Luvas de Assinatura. O negócio melou!`);
+                }
+
+                // Desconta Luvas do Clube
+                if (luvas > 0) b.update(db.collection('teams').doc(user.data.id), { balance: firebase.firestore.FieldValue.increment(-luvas) });
+                
+                // Paga as luvas ao Bot e atualiza o contrato
+                b.update(db.collection('players').doc(target.id), {
+                    teamId: user.data.id,
+                    status: 'NAO_A_VENDA',
+                    contract: contractYears,
+                    salary: parseFloat(meta.newSalary),
+                    role: role,
+                    balance: firebase.firestore.FieldValue.increment(luvas),
+                    history: firebase.firestore.FieldValue.arrayUnion({ 
+                        date: Date.now(), from: isFreeAgent ? 'AGENTE LIVRE' : 'Clube Anterior', to: user.data.name, type: type, value: 0 
+                    })
+                });
+
+                // Se era uma negociação antiga rolando, apaga a pendência
+                if (old && old.id) b.delete(db.collection('offers').doc(old.id));
+
+                await b.commit();
+                postNews(`🤝 **NOVA CONTRATAÇÃO!**\nO Atleta da Base **${target.name}** aceitou os termos e assinou com o **${user.data.name}**!`, 'transfer');
+                setLoading(false);
+                setModal(null);
+                return alert(`Negócio fechado! ${target.name} já está no seu elenco.`);
+            } catch (error) {
+                setLoading(false);
+                return alert("Erro ao assinar com o Bot: " + error.message);
+            }
+        }
+        // --- FIM DA INTELIGÊNCIA DO BOT ---
+
+        try {
         const v = parseFloat(value) || 0;
         const contractYears = parseInt(con) || 1;
         const actingTeamName = user.data.name;
@@ -7946,7 +8163,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.92.6</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.92.7</div>
                             </div>
                         </div>
                         
@@ -8346,22 +8563,42 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                                 </div>
                             </div>
                         }
+                        {/* --- PAINEL DO OLHEIRO (SCOUT) --- */}
+{(screen === 'HOME' || screen === 'SCOUT_DASH') && user.type === 'SCOUT' && 
+    <div key="scout-home-container">
+        <ScoutDashboard 
+            scout={user.data} 
+            team={teams.find(t => t.id === user.data.teamId)} 
+            players={players.filter(p => p.teamId === user.data.teamId)} 
+            setModal={setModal}
+            onSelfAction={(act, payload) => {
+                if(act === 'ACCEPT_OFFER') handleFinalizeCoachContract(payload.offer);
+                if(act === 'REJECT_OFFER') rejectOffer(payload.offer);
+                handleCoachSelfActions(act, payload);
+            }} 
+        />
+        <div style={{marginTop: 20, textAlign:'center', color:'#666', fontSize:12}}>
+            <i>Acesse a aba <b>JOGOS</b> para ver a tabela e partidas.</i>
+        </div>
+    </div>
+}
                 {/* INDICADOR DE ROLAGEM ANIMADO */}
                     <div className="scroll-hint">Deslize <i className="fas fa-arrow-right"></i></div>
                  <div className="bottom-nav">
                    {/* 1. HOME */}
-                            <div className={`nav-item ${['HOME','COMPANY_HOME','COMPANY_DASH','PLAYER_DASH','COACH_DASH','DOCTOR_DASH','ASSISTANT_DASH','PRESS_DASH'].includes(screen)?'active':''}`}
-                            onClick={() => { 
-                            if(user.type.includes('PRESS')) setScreen('PRESS_DASH'); 
-                            else if(user.type === 'COMPANY') setScreen('COMPANY_HOME'); 
-                            else if(user.type === 'PLAYER') setScreen('PLAYER_DASH'); 
-                            else if(user.type === 'COACH') setScreen('COACH_DASH'); 
-                            else if(user.type === 'DOCTOR') setScreen('DOCTOR_DASH');
-                            else if(user.type === 'ASSISTANT') setScreen('ASSISTANT_DASH');
-                            else setScreen('HOME'); 
-                        }}>
-                        <i className="fas fa-home"></i><span>INÍCIO</span>
-                    </div>
+<div className={`nav-item ${['HOME','COMPANY_HOME','COMPANY_DASH','PLAYER_DASH','COACH_DASH','DOCTOR_DASH','ASSISTANT_DASH','SCOUT_DASH','PRESS_DASH'].includes(screen)?'active':''}`}
+onClick={() => { 
+    if(user.type.includes('PRESS')) setScreen('PRESS_DASH'); 
+    else if(user.type === 'COMPANY') setScreen('COMPANY_HOME'); 
+    else if(user.type === 'PLAYER') setScreen('PLAYER_DASH'); 
+    else if(user.type === 'COACH') setScreen('COACH_DASH'); 
+    else if(user.type === 'DOCTOR') setScreen('DOCTOR_DASH');
+    else if(user.type === 'ASSISTANT') setScreen('ASSISTANT_DASH');
+    else if(user.type === 'SCOUT') setScreen('SCOUT_DASH'); // <-- OLHEIRO ADICIONADO AQUI
+    else setScreen('HOME'); 
+}}>
+    <i className="fas fa-home"></i><span>INÍCIO</span>
+</div>
                     
                     {/* 2. JOGOS (NOVO - PARA TODOS) */}
                     <div className={`nav-item ${screen==='MATCHES'?'active':''}`} onClick={()=>setScreen('MATCHES')}>
@@ -8629,7 +8866,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
     return (
         <div className="login-wrapper">
             <h1 className="login-title">Gerenciador de Times<br/><span className="login-title-span">de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.6 MEDICOS  </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.7 COMISSÃO TÉCNICA COMPLETA   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -10118,6 +10355,129 @@ const AssistantDashboard = ({ assistant, team, players, offers, sales, onTrainRe
     );
 };
 
+
+        // ==========================================
+// PAINEL PROFISSIONAL: OLHEIRO (SCOUT)
+// ==========================================
+const ScoutDashboard = ({ scout, team, players, onSelfAction, setModal }) => {
+    const energy = scout.energy !== undefined ? scout.energy : 100;
+    const isExhausted = energy < 30;
+
+    const runPeneira = async (level, maxOvr) => {
+        if (!team || team.id === 'FREE') return alert("Você precisa estar contratado por um clube para realizar peneiras!");
+        
+        const today = new Date().toDateString();
+        const scoutsDone = scout.lastScoutDate === today ? (scout.scoutsToday || 0) : 0;
+        
+        if (scoutsDone >= 2) return alert("Você já realizou 2 peneiras hoje! Descanse a vista e volte amanhã.");
+        if (energy < 50) return alert("Você precisa de pelo menos 50⚡ de Energia para viajar e avaliar jogadores.");
+
+        const cost = getPeneiraCost(maxOvr);
+        if ((team.balance || 0) < cost) return alert(`A diretoria não liberou verba para esta Peneira. Necessário: ${fmt(cost)} no caixa do clube.`);
+
+        if (!confirm(`Realizar Peneira Nível ${level}?\nCusto para o Clube: ${fmt(cost)}\nEnergia gasta: -50⚡\n\nIsso apagará a lista da peneira anterior.`)) return;
+
+        const db = firebase.firestore();
+        const b = db.batch();
+
+        // 1. Gera 5 NPCs aleatórios
+        const newProspects = [];
+        for (let i = 0; i < 5; i++) {
+            const ovr = Math.floor(Math.random() * (maxOvr - (maxOvr - 10))) + (maxOvr - 10); // Ex: Se max 50, gera entre 40 e 50
+            const pos = POS[Math.floor(Math.random() * POS.length)];
+            const attrs = generateAttributes(pos, ovr);
+            
+            newProspects.push({
+                id: `npc_${Date.now()}_${i}`,
+                name: generateNpcName(),
+                position: pos,
+                overall: ovr,
+                attributes: attrs,
+                salary: getSalaryLimits(ovr).minSal,
+                value: getRecommendedPrice(ovr, pos),
+                isNPC: true // Marcação vital
+            });
+        }
+
+        // 2. Cobra do clube e salva a lista no clube
+        b.update(db.collection('teams').doc(team.id), {
+            balance: firebase.firestore.FieldValue.increment(-cost),
+            peneiraList: newProspects // Substitui a lista antiga
+        });
+
+        // 3. Atualiza o Olheiro
+        b.update(db.collection('users').doc(scout.id), {
+            energy: energy - 50,
+            lastScoutDate: today,
+            scoutsToday: scoutsDone + 1,
+            xp: firebase.firestore.FieldValue.increment(50) // Ganha XP por achar jogadores
+        });
+
+        await b.commit();
+        alert(`🔎 Peneira Concluída!\nForam encontrados 5 novos talentos. Eles já estão disponíveis na aba PENEIRA do CT do ${team.name}.`);
+    };
+
+    return (
+        <div>
+            {/* CABEÇALHO DO OLHEIRO */}
+            <div className="highlight-card" style={{textAlign:'center', paddingBottom:30, position:'relative', border:'2px solid #9c27b0', background:'linear-gradient(135deg, #311b92 0%, #000 100%)'}}>
+                <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:15}}>
+                    <div style={{width:65, height:65, borderRadius:'50%', background:'#333', border:'2px solid #9c27b0', display:'flex', alignItems:'center', justifyContent:'center', fontSize:30}}>
+                        {scout.face ? <img src={scout.face} style={{width:'100%', height:'100%', borderRadius:'50%', objectFit: 'cover'}} /> : '🕵️‍♂️'}
+                    </div>
+                    <div>
+                        <h2 style={{margin:0, color:'#e040fb'}}>{scout.name}</h2>
+                        <small style={{color:'#ccc'}}>{team ? team.name : 'Agente Livre'} | Olheiro Nvl {scout.level}</small>
+                    </div>
+                </div>
+                
+                <div style={{margin:'15px auto', width:'80%', background:'#333', height:10, borderRadius:5, overflow:'hidden'}}>
+                    <div style={{width:`${energy}%`, background: energy > 50 ? 'lime' : 'red', height:'100%', transition:'0.5s'}}></div>
+                </div>
+                <small style={{color: isExhausted ? 'red' : 'lime', fontWeight:'bold'}}>{energy}% Energia</small>
+            </div>
+
+            <div style={{marginTop: 20}}>
+                <h3 style={{color:'var(--purple)'}}>🔎 Rede de Olheiros (Peneiras)</h3>
+                <p style={{fontSize:11, color:'#aaa', marginBottom:15}}>Viaje e organize peneiras para descobrir novos "Bots" para a base do clube. Limite: 2 por dia.</p>
+                
+                <div style={{display:'grid', gap:10}}>
+                    {/* PENEIRA LVL 1 */}
+                    <div className="card" style={{borderLeft:'4px solid #fff'}}>
+                        <b>Peneira Amadora (OVR 30-40)</b>
+                        <div style={{fontSize:10, color:'#888', margin:'5px 0'}}>Custo Clube: <b style={{color:'lime'}}>GRÁTIS</b> | Seu Custo: <b style={{color:'orange'}}>-50⚡</b></div>
+                        <button className="btn btn-ghost" onClick={() => runPeneira(1, 40)}>INICIAR BUSCA</button>
+                    </div>
+
+                    {/* PENEIRA LVL 2 */}
+                    <div className="card" style={{borderLeft:'4px solid cyan', opacity: scout.level >= 2 ? 1 : 0.5}}>
+                        <b>Peneira Profissional (OVR 41-50)</b>
+                        <div style={{fontSize:10, color:'#888', margin:'5px 0'}}>Custo Clube: <b style={{color:'var(--danger)'}}>{fmt(getPeneiraCost(50))}</b> | Seu Custo: <b style={{color:'orange'}}>-50⚡</b></div>
+                        {scout.level >= 2 ? (
+                            <button className="btn btn-blue" onClick={() => runPeneira(2, 50)}>INICIAR BUSCA NACIONAL</button>
+                        ) : <small style={{display:'block', textAlign:'center', color:'cyan'}}>Desbloqueia no Nível 2</small>}
+                    </div>
+
+                    {/* PENEIRA LVL 3 */}
+                    <div className="card" style={{borderLeft:'4px solid gold', opacity: scout.level >= 5 ? 1 : 0.5}}>
+                        <b>Peneira Internacional (OVR 51-60)</b>
+                        <div style={{fontSize:10, color:'#888', margin:'5px 0'}}>Custo Clube: <b style={{color:'var(--danger)'}}>{fmt(getPeneiraCost(60))}</b> | Seu Custo: <b style={{color:'orange'}}>-50⚡</b></div>
+                        {scout.level >= 5 ? (
+                            <button className="btn btn-gold" onClick={() => runPeneira(3, 60)}>VIAGEM INTERNACIONAL</button>
+                        ) : <small style={{display:'block', textAlign:'center', color:'gold'}}>Desbloqueia no Nível 5</small>}
+                    </div>
+                </div>
+            </div>
+            
+             {/* BOTÃO DO CT (Abre o Modal diretamente para ver a Peneira) */}
+             <button className="btn btn-warning" style={{marginTop: 15}} onClick={() => team ? setModal({type:'CT_TYCOON', data: team}) : alert("🚫 Você precisa estar contratado!")}>
+                🏟️ VISITAR CT (VER PENEIRA)
+            </button>
+        </div>
+    );
+};
+
+        
     
 // ==========================================
 // PAINEL PROFISSIONAL: MÉDICO CHEFE (DOCTOR)

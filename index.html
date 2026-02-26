@@ -3382,10 +3382,9 @@ const TrainingCenterManager = ({ team, players, coach, user, onClose, onTrain, o
                                             <small style={{color:'#aaa'}}>OVR: <b style={{color:'gold'}}>{npc.overall}</b> | Salário Base: {fmt(npc.salary)}</small>
                                         </div>
                                         <div style={{display:'flex', gap:5, flexDirection:'column'}}>
-                                            {/* O Presidente contrata */}
+                                           {/* O Presidente contrata */}
                                             {isPresident && (
                                                 <button className="btn btn-green" style={{fontSize:9, padding:'5px', margin:0}} onClick={() => {
-                                                    // A TRAVA DE 7 BOTS POR TIME FICA AQUI!
                                                     const currentNpcs = players.filter(p => p.teamId === team.id && p.isNPC).length;
                                                     
                                                     // 1. Trava se já tiver 7
@@ -3394,30 +3393,29 @@ const TrainingCenterManager = ({ team, players, coach, user, onClose, onTrain, o
                                                     }
                                                     
                                                     // 2. Balão de fala EXATO que você pediu!
-                                                    if (!confirm(`⚠️ AVISO DA BASE\n\nAtualmente você tem ${currentNpcs}/7 BOTS.\nTem certeza que quer contratar ${npc.name} por ${fmt(npc.value)}?\n\nAssim que você completar 7 de 7, você só poderá contratar outro quando 1 deles sair do elenco.`)) {
+                                                    if (!confirm(`⚠️ AVISO DA BASE\n\nAtualmente você tem ${currentNpcs}/7 BOTS no elenco.\nTem certeza que quer contratar ${npc.name} por ${fmt(npc.value)}?\n\nAssim que você completar 7 de 7, você só poderá contratar outro quando 1 deles sair do elenco.`)) {
                                                         return; // O usuário clicou em Cancelar
                                                     }
 
                                                     if (team.balance < npc.value) return alert("Saldo insuficiente para as luvas!");
-                                                        
-                                                        const db = firebase.firestore();
-                                                        const b = db.batch();
-                                                        
-                                                        // Tira o dinheiro do clube
-                                                        b.update(db.collection('teams').doc(team.id), {
-                                                            balance: firebase.firestore.FieldValue.increment(-npc.value),
-                                                            peneiraList: team.peneiraList.filter(x => x.id !== npc.id) // Tira da lista
-                                                        });
-                                                        
-                                                        // Cria o jogador Oficial no Banco de Dados
-                                                        b.set(db.collection('players').doc(), {
-                                                            name: npc.name, position: npc.position, overall: npc.overall, attributes: npc.attributes,
-                                                            salary: npc.salary, value: npc.value, teamId: team.id, status: 'NAO_A_VENDA', mood: '😐',
-                                                            contract: 3, isNPC: true, balance: npc.value, xp: 0, fame: 0, stats: {goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0}
-                                                        });
+                                                    
+                                                    const db = firebase.firestore();
+                                                    const b = db.batch();
+                                                    
+                                                    // Tira o dinheiro do clube
+                                                    b.update(db.collection('teams').doc(team.id), {
+                                                        balance: firebase.firestore.FieldValue.increment(-npc.value),
+                                                        peneiraList: team.peneiraList.filter(x => x.id !== npc.id) // Tira da lista
+                                                    });
+                                                    
+                                                    // Cria o jogador Oficial no Banco de Dados
+                                                    b.set(db.collection('players').doc(), {
+                                                        name: npc.name, position: npc.position, overall: npc.overall, attributes: npc.attributes,
+                                                        salary: npc.salary, value: npc.value, teamId: team.id, status: 'NAO_A_VENDA', mood: '😐',
+                                                        contract: 3, isNPC: true, balance: npc.value, xp: 0, fame: 0, stats: {goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0}
+                                                    });
 
-                                                        b.commit().then(() => alert(`✅ ${npc.name} assinou contrato e já está no seu elenco!`));
-                                                    }
+                                                    b.commit().then(() => alert(`✅ ${npc.name} assinou contrato e já está no seu elenco!`));
                                                 }}>CONTRATAR ({fmt(npc.value)})</button>
                                             )}
                                             

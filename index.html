@@ -7181,7 +7181,7 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
                  }
             }
         }
-  }
+
         // --- LÓGICA DE DESTINATÁRIO INTELIGENTE ---
         let recipientId; 
         const isFreeAgent = target.teamId === 'FREE' || !target.teamId;
@@ -7218,6 +7218,49 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
 
             // 🚀 SE CHEGOU AQUI: O BOT DISSE SIM! VAMOS ASSINAR O CONTRATO NA HORA!
             try {
+                setLoading(true);
+                const db = firebase.firestore();
+                const b = db.batch();
+                const luvas = parseFloat(meta.signingBonus) || 0;
+                
+                // Se o clube não tiver dinheiro para as luvas, bloqueia
+                if (teamObj.balance < luvas) {
+                    setLoading(false);
+                    return alert(`Seu clube não tem ${fmt(luvas)} no caixa para pagar as Luvas de Assinatura. O negócio melou!`);
+                }
+
+                // Desconta Luvas do Clube
+                if (luvas > 0) b.update(db.collection('teams').doc(user.data.id), { balance: firebase.firestore.FieldValue.increment(-luvas) });
+                
+                // Paga as luvas ao Bot e atualiza o contrato
+                b.update(db.collection('players').doc(target.id), {
+                    teamId: user.data.id,
+                    status: 'NAO_A_VENDA',
+                    contract: contractYears,
+                    salary: parseFloat(meta.newSalary),
+                    role: role,
+                    balance: firebase.firestore.FieldValue.increment(luvas),
+                    history: firebase.firestore.FieldValue.arrayUnion({ 
+                        date: Date.now(), from: isFreeAgent ? 'AGENTE LIVRE' : 'Clube Anterior', to: user.data.name, type: type, value: 0 
+                    })
+                });
+
+                // Se era uma negociação antiga rolando, apaga a pendência
+                if (old && old.id) b.delete(db.collection('offers').doc(old.id));
+
+                await b.commit();
+                postNews(`🤝 **NOVA CONTRATAÇÃO!**\nO Atleta da Base **${target.name}** aceitou os termos e assinou com o **${user.data.name}**!`, 'transfer');
+                setLoading(false);
+                setModal(null);
+                return alert(`Negócio fechado! ${target.name} já está no seu elenco.`);
+            } catch (error) {
+                setLoading(false);
+                return alert("Erro ao assinar com o Bot: " + error.message);
+            }
+        }
+        // --- FIM DA INTELIGÊNCIA DO BOT ---
+
+        try {
                 setLoading(true);
                 const db = firebase.firestore();
                 const b = db.batch();

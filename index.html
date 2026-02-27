@@ -4526,20 +4526,7 @@ db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTA
         }
     };
 
-    // --- RENOVAR CONTRATO (TIME -> TÉCNICO) ---
-    const handleRenewCoachContract = async (coach) => {
-        const currentSalary = parseFloat(coach.salary) || 2500;
-        if (!confirm(`Renovar contrato de ${coach.name} por mais 1 temporada?\nSalário atual: ${fmt(currentSalary)}`)) return;
-        
-        // Aumenta o salário em 10% na renovação
-        const newSalary = Math.round(currentSalary * 1.10); 
-        
-        await db.collection('users').doc(coach.id).update({
-            contract: (parseInt(coach.contract) || 0) + 1,
-            salary: newSalary
-        });
-        alert(`Contrato renovado com sucesso!\nNovo salário: ${fmt(newSalary)}`);
-    };
+   
 
     // 2. AÇÕES DO PRÓPRIO TÉCNICO (AUMENTO, SAIR, MULTA)
     const handleCoachSelfActions = async (action, coach) => {
@@ -7064,52 +7051,42 @@ const isStaff = ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTANT'].includes(target.type);
     if (isStaff) {
         try {
             setLoading(true);
-            const isRenewal = target.teamId === user.data.id;
             const luvas = parseFloat(meta.signingBonus) || 0;
             const db = firebase.firestore();
 
-            // Se for RENOVAÇÃO com o seu próprio funcionário, renova na hora
-            if (isRenewal) {
-                if (user.data.balance < luvas) {
-                    setLoading(false);
-                    return alert(`Seu clube não tem saldo para pagar as Luvas de Assinatura (${fmt(luvas)}).`);
-                }
-                const b = db.batch();
-                if (luvas > 0) {
-                    b.update(db.collection('teams').doc(user.data.id), { balance: firebase.firestore.FieldValue.increment(-luvas) });
-                    b.update(db.collection('users').doc(target.id), { balance: firebase.firestore.FieldValue.increment(luvas) });
-                }
-                b.update(db.collection('users').doc(target.id), {
+            // Verifica se é uma contra-proposta (Alguém respondendo)
+            if (old && old.id) {
+                await db.collection('offers').doc(old.id).update({
                     salary: finalSal,
-                    contract: (parseInt(target.contract) || 0) + contractYears
+                    contract: contractYears,
+                    luvas: luvas,
+                    status: 'PENDING', // Volta para o outro lado avaliar
+                    recipientId: target.id, // Envia para o profissional
+                    senderId: user.data.id
                 });
-                await b.commit();
-                setLoading(false);
-                setModal(null);
-                return alert(`✅ Contrato de ${target.name} renovado com sucesso!`);
+            } else {
+                // É uma Proposta Nova ou Renovação inicial
+                await db.collection('offers').add({
+                    type: 'COACH_OFFER',
+                    coachId: target.id,
+                    staffType: target.type,
+                    recipientId: target.id,
+                    senderId: user.data.id,
+                    teamId: user.data.id,
+                    teamName: actingTeamName,
+                    coachName: target.name,
+                    salary: finalSal,
+                    contract: contractYears,
+                    clause: finalSal * 10, // Multa padrão
+                    luvas: luvas, // Bônus de Assinatura
+                    status: 'PENDING',
+                    createdAt: Date.now()
+                });
             }
-
-            // Se for NOVA CONTRATAÇÃO, envia a proposta para a Caixa de Entrada dele
-            await db.collection('offers').add({
-                type: 'COACH_OFFER',
-                coachId: target.id,
-                staffType: target.type,
-                recipientId: target.id,
-                senderId: user.data.id,
-                teamId: user.data.id,
-                teamName: actingTeamName,
-                coachName: target.name,
-                salary: finalSal,
-                contract: contractYears,
-                clause: finalSal * 10, // Multa padrão é 10x o salário
-                luvas: luvas, // Salva o bônus de assinatura na proposta
-                status: 'PENDING',
-                createdAt: Date.now()
-            });
 
             setLoading(false);
             setModal(null);
-            return alert(`Proposta formal enviada para ${target.name}! Aguarde a resposta dele.`);
+            return alert(`📋 Proposta formal enviada para ${target.name}! Aguarde a resposta na sua Caixa de Entrada.`);
         } catch (e) {
             setLoading(false);
             return alert("Erro ao enviar proposta para a Comissão Técnica.");
@@ -8165,7 +8142,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                                     players={players.filter(p=>p.teamId===user.data.id)} 
                                     staff={coaches.filter(c => c.teamId === user.data.id && c.status === 'ACTIVE')}
                                     onFireCoach={handleFireCoach}
-                                    onRenewCoach={handleRenewCoachContract} 
+                                    onRenewCoach={(c) => setModal({type: 'OFFER', data: c})} 
                                     isVisitor={false} setModal={setModal} 
                                     onEdit={(p)=>setModal({type:'PLAYER', data:p})} 
                                     onAdd={()=>setModal({type:'PLAYER', data: { teamId: user.data.id } })} 
@@ -11987,7 +11964,7 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
 const finalVal = (isPreContract || isFreeAgent || isMyPlayer) ? 0 : v;
             onSend(target, t, finalVal, swaps, (t === 'EMPRESTIMO' ? meta.loanDuration : con), {...meta, hasBuyOption, newSalary: finalSal, role, status: 'PENDING'}, old);
                     }}>
-                        {isUrgentRenewal ? 'OFERECER RENOVAÇÃO' : (isPreContract ? 'ENVIAR PRÉ-CONTRATO' : 'ENVIAR RESPOSTA')}
+                        {isCounter ? 'ENVIAR CONTRA-PROPOSTA' : (isMyPlayer ? 'OFERECER RENOVAÇÃO' : 'ENVIAR PROPOSTA')}
                     </button>
                     <button className="btn btn-red" style={{flex: 1}} onClick={()=>setModal(null)}>CANCELAR</button>
                 </div>

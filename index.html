@@ -4062,11 +4062,7 @@ const GameCalendar = ({ calendar }) => {
                     db.collection('tournaments').onSnapshot(s => setTourns(s.docs.map(d => ({id:d.id, ...d.data()})))),
                      db.collection('hallOfFame').orderBy('season', 'desc').onSnapshot(s => setHallOfFame(s.docs.map(d => ({id:d.id, ...d.data()})))),                                 
     
-    // --- CORREÇÃO AQUI: REMOVIDO O LIMIT(50) PARA OS ITENS NÃO SUMIREM ---
-                    db.collection('sales').orderBy('date', 'desc').onSnapshot(s => {
-                        const cleanData = s.docs.map(d => ({id:d.id, ...d.data()}));
-                        setSales(cleanData);
-                    }),
+    
                     
                     db.collection('news').orderBy('date', 'desc').limit(50).onSnapshot(s => { 
                         const list = s.docs.map(d => ({id:d.id, ...d.data()})); 
@@ -4107,6 +4103,46 @@ db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTA
         return () => unsub();
     }, [user]);
 
+           // ==========================================================
+    // NOVO: SISTEMA DE MOCHILA INTELIGENTE (ECONOMIZA FIREBASE)
+    // Carrega apenas os itens da pessoa logada, evitando que sumam
+    // ==========================================================
+    useEffect(() => {
+        // Se não tem ninguém logado, esvazia a lista e não gasta Firebase
+        if (!user || !user.data) {
+            setSales([]);
+            return;
+        }
+
+        let query = db.collection('sales');
+
+        if (user.type === 'COMPANY') {
+            // Se for Empresa, puxa só as últimas 100 vendas dela para ver o lucro
+            query = query.where('companyId', '==', user.data.id).orderBy('date', 'desc').limit(100);
+        } 
+        else if (['PLAYER', 'COACH', 'DOCTOR', 'SCOUT', 'ASSISTANT'].includes(user.type)) {
+            // Se for Pessoa Física (Jogador/Staff), puxa TODOS os itens que ela comprou
+            // (Não colocamos limite aqui para garantir que os itens nunca sumam da mochila)
+            query = query.where('buyerId', '==', user.data.id).orderBy('date', 'desc');
+        } 
+        else {
+            // Se for Presidente de Clube ou Visitante, não precisa carregar loja
+            setSales([]);
+            return;
+        }
+
+        const unsubSales = query.onSnapshot(snap => {
+            const myItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            setSales(myItems);
+        }, error => {
+            console.error("Erro ao carregar mochila:", error);
+        });
+
+        // Limpa a busca ao sair da tela/deslogar
+        return () => unsubSales();
+    }, [user?.data?.id, user?.type]);
+
+           
     // --- NOVO: SINCRONIZADOR DE FAMA (CORREÇÃO AUTOMÁTICA) ---
     // Isso garante que a Fama seja SEMPRE a soma dos itens na mochila.
     // Se o jogador tiver 2 bonés (200), e estiver mostrando 300, isso corrige para 200 na hora.

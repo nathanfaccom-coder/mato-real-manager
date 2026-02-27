@@ -2148,23 +2148,23 @@ const TeamDashboard = ({ team, players, staff, isVisitor, onEdit, onAdd, onFireC
                                                 </div>
                                             </div>
                                             {!isVisitor && (
-    <div style={{display:'flex', gap:5, flexDirection:'column', position:'relative', zIndex: 50}}>
-        <button 
-            className="btn btn-blue" 
-            style={{width:'auto', fontSize:10, padding:'6px 10px', cursor:'pointer', pointerEvents:'auto'}} 
-            onClick={(e)=>{ e.stopPropagation(); onRenewCoach(c); }}
-        >
-            RENOVAR
-        </button>
-        <button 
-            className="btn btn-red" 
-            style={{width:'auto', fontSize:10, padding:'6px 10px', cursor:'pointer', pointerEvents:'auto'}} 
-            onClick={(e)=>{ e.stopPropagation(); onFireCoach(c); }}
-        >
-            DEMITIR
-        </button>
-    </div>
-)}
+                                                <div style={{display:'flex', gap:5, flexDirection:'column', position:'relative', zIndex: 50}}>
+                                                    <button 
+                                                        className="btn btn-blue" 
+                                                        style={{width:'auto', fontSize:10, padding:'6px 10px', cursor:'pointer', pointerEvents:'auto'}} 
+                                                        onClick={(e)=>{ e.stopPropagation(); setModal({type:'OFFER', data: c}); }}
+                                                    >
+                                                        RENOVAR
+                                                    </button>
+                                                    <button 
+                                                        className="btn btn-red" 
+                                                        style={{width:'auto', fontSize:10, padding:'6px 10px', cursor:'pointer', pointerEvents:'auto'}} 
+                                                        onClick={(e)=>{ e.stopPropagation(); onFireCoach(c); }}
+                                                    >
+                                                        DEMITIR
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                         
                                         <hr style={{borderColor:'rgba(255,255,255,0.1)', margin:'15px 0'}}/>
@@ -4672,15 +4672,20 @@ db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTA
         }
 
         // 2. Atualiza o Profissional com o NOVO CONTRATO
+        const luvas = parseFloat(offer.luvas) || 0;
+        
         b.update(db.collection('users').doc(coachId), { 
             teamId: teamId,
             salary: parseFloat(offer.salary),
             contract: parseInt(offer.contract), 
-            clause: parseFloat(offer.clause)    
+            clause: parseFloat(offer.clause),
+            balance: firebase.firestore.FieldValue.increment(luvas) // Paga as luvas ao profissional
         });
 
-        // 3. Paga Luvas (1º Salário) e desconta do time
-        b.update(db.collection('teams').doc(teamId), { balance: teamData.balance - offer.salary });
+        // 3. Paga Luvas e o 1º Salário e desconta do time
+        b.update(db.collection('teams').doc(teamId), { 
+            balance: teamData.balance - offer.salary - luvas 
+        });
 
         // 4. Apaga a oferta (negócio fechado)
         b.delete(db.collection('offers').doc(offer.id));
@@ -7051,6 +7056,67 @@ const sendOffer = async (target, type, value, swapIds, con, meta, old) => {
     const finalSal = parseFloat(meta.newSalary) || 0;
     const role = meta.role || 'ROTACAO';
 
+const isStaff = ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTANT'].includes(target.type);
+
+    // ==========================================
+    // ROTA ESPECIAL: NEGOCIAÇÃO COM A COMISSÃO TÉCNICA
+    // ==========================================
+    if (isStaff) {
+        try {
+            setLoading(true);
+            const isRenewal = target.teamId === user.data.id;
+            const luvas = parseFloat(meta.signingBonus) || 0;
+            const db = firebase.firestore();
+
+            // Se for RENOVAÇÃO com o seu próprio funcionário, renova na hora
+            if (isRenewal) {
+                if (user.data.balance < luvas) {
+                    setLoading(false);
+                    return alert(`Seu clube não tem saldo para pagar as Luvas de Assinatura (${fmt(luvas)}).`);
+                }
+                const b = db.batch();
+                if (luvas > 0) {
+                    b.update(db.collection('teams').doc(user.data.id), { balance: firebase.firestore.FieldValue.increment(-luvas) });
+                    b.update(db.collection('users').doc(target.id), { balance: firebase.firestore.FieldValue.increment(luvas) });
+                }
+                b.update(db.collection('users').doc(target.id), {
+                    salary: finalSal,
+                    contract: (parseInt(target.contract) || 0) + contractYears
+                });
+                await b.commit();
+                setLoading(false);
+                setModal(null);
+                return alert(`✅ Contrato de ${target.name} renovado com sucesso!`);
+            }
+
+            // Se for NOVA CONTRATAÇÃO, envia a proposta para a Caixa de Entrada dele
+            await db.collection('offers').add({
+                type: 'COACH_OFFER',
+                coachId: target.id,
+                staffType: target.type,
+                recipientId: target.id,
+                senderId: user.data.id,
+                teamId: user.data.id,
+                teamName: actingTeamName,
+                coachName: target.name,
+                salary: finalSal,
+                contract: contractYears,
+                clause: finalSal * 10, // Multa padrão é 10x o salário
+                luvas: luvas, // Salva o bônus de assinatura na proposta
+                status: 'PENDING',
+                createdAt: Date.now()
+            });
+
+            setLoading(false);
+            setModal(null);
+            return alert(`Proposta formal enviada para ${target.name}! Aguarde a resposta dele.`);
+        } catch (e) {
+            setLoading(false);
+            return alert("Erro ao enviar proposta para a Comissão Técnica.");
+        }
+    }
+    // ==========================================
+    
     // --- 1. TRAVA DO LIMITE DE 7 BOTS (MERCADO GLOBAL) ---
     if (target.isNPC && user.type === 'USER') {
         const myTeamBots = players.filter(p => p.teamId === user.data.id && p.isNPC).length;
@@ -8005,7 +8071,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.93.0</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.93.1</div>
                             </div>
                         </div>
                         
@@ -8708,7 +8774,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
     return (
         <div className="login-wrapper">
             <h1 className="login-title">Gerenciador de Times<br/><span className="login-title-span">de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.0 COMISSÃO TÉCNICA COMPLETA   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.1 COMISSÃO TÉCNICA COMPLETA   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -11690,9 +11756,9 @@ const Market = ({ user, me, teams, players, coaches, open, isVis, onNeg, onPayCl
                                 Salário Pretendido: {fmt(c.salary)}/sem
                             </div>
                             
-                            {isPresident && (
-                                <button className="btn btn-green" onClick={() => onHireCoach(c)}>
-                                    CONTRATAR {roleNames[c.type] ? roleNames[c.type].toUpperCase() : 'PROFISSIONAL'}
+                           {isPresident && (
+                                <button className="btn btn-green" onClick={() => setModal({ type: 'OFFER', data: c })}>
+                                    NEGOCIAR CONTRATO DE {roleNames[c.type] ? roleNames[c.type].toUpperCase() : 'PROFISSIONAL'}
                                 </button>
                             )}
                         </div>
@@ -11723,41 +11789,38 @@ const Market = ({ user, me, teams, players, coaches, open, isVis, onNeg, onPayCl
 };
 
 const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
-const old = target.oldOffer || {};
+    const old = target.oldOffer || {};
     const isCounter = !!old.id;
-    const isPlayerActing = user?.type === 'PLAYER';
+    const isPlayerActing = user?.type === 'PLAYER' || ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTANT'].includes(user?.type);
     const clubsHaveAgreed = old?.sellerAccepted === true;
     const isUrgentRenewal = old?.type === 'RENOVACAO_URGENTE';
-    // NOVA REGRA: Verifica se é agente livre
+    
+    // Identifica se é Comissão Técnica ou Jogador
+    const isStaff = ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTANT'].includes(target.type);
+    
     const isFreeAgent = target.teamId === 'FREE' || !target.teamId; 
-    // NOVO: Verifica se o jogador já pertence ao time do usuário logado
     const isMyPlayer = user?.type === 'USER' && user.data.id === target.teamId;
     
-    // ESCONDE A PARTE 1 SE FOR AGENTE LIVRE OU SE FOR O SEU PRÓPRIO JOGADOR!
-    const shouldHidePart1 = isPlayerActing || clubsHaveAgreed || isUrgentRenewal || isFreeAgent || isMyPlayer;
+    // Esconde a Parte 1 (Clubes) se for Staff, Agente Livre ou seu próprio funcionário
+    const shouldHidePart1 = isPlayerActing || clubsHaveAgreed || isUrgentRenewal || isFreeAgent || isMyPlayer || isStaff;
 
     const maxLoanAllowed = parseInt(target.contract) || 1;
 
-    // --- NOVO: PEGA LIMITES SALARIAIS PARA O OVERALL DO ALVO ---
-    const limits = getSalaryLimits(target.overall);
+    // Se for Staff, os limites são abertos. Se for jogador, usa a tabela de Overall.
+    const limits = isStaff ? { minSal: 1000, maxSal: 9999999 } : getSalaryLimits(target.overall);
 
-    // Se vier do botão "Pré-Contrato", o type inicial será PRE_CONTRATO
-   const [t, setT] = useState(old.type || (isMyPlayer ? 'RENOVACAO' : 'COMPRA'));
+    const [t, setT] = useState(old.type || (isMyPlayer ? 'RENOVACAO' : 'COMPRA'));
     const [v, setV] = useState(old.value || '');
-    const [sal, setSal] = useState(old.meta?.newSalary || target.salary || 0);
+    const [sal, setSal] = useState(old.meta?.newSalary || target.salary || limits.minSal);
     const [con, setCon] = useState(old.offerContract || '1');
-    const [role, setRole] = useState(old.meta?.role || 'ROTACAO');
+    const [role, setRole] = useState(old.meta?.role || (isStaff ? 'STAFF' : 'ROTACAO'));
     const [hasBuyOption, setHasBuyOption] = useState(old.meta?.hasBuyOption || false);
 
     const [meta, setMeta] = useState(old.meta || { 
-        sellOn: 0, 
-        installments: 1, 
-        signingBonus: 0, 
-        loanDuration: 1, 
-        salarySplit: 100, 
-        buyOpt: 0 
+        sellOn: 0, installments: 1, signingBonus: 0, loanDuration: 1, salarySplit: 100, buyOpt: 0 
     });
     const [swaps, setSwaps] = useState(old.swapPlayerIds || []);
+    
 
     const toggleSwap = (id) => {
         if (swaps.length >= 3 && !swaps.includes(id)) return alert("Máximo de 3 jogadores!");
@@ -11773,8 +11836,8 @@ const old = target.oldOffer || {};
                     {isUrgentRenewal ? '🚨 Renovação Obrigatória' : (isPreContract ? '📝 Pré-Contrato' : (isCounter ? 'Responder Proposta' : `Negociar ${target.name}`))}
                 </h3>
                 
-                {/* --- NOVO: PAINEL DE REFERÊNCIA DE VALORES --- */}
-                {!isPreContract && !isUrgentRenewal && (
+               {/* --- PAINEL DE REFERÊNCIA DE VALORES --- */}
+                {!isPreContract && !isUrgentRenewal && !isStaff && (
                     <div style={{background: 'rgba(0, 0, 0, 0.3)', padding: '10px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #444', fontSize: '12px'}}>
                         <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '5px'}}>
                             <span style={{color: '#aaa'}}>Valor de Mercado (OVR):</span>

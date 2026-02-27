@@ -3819,7 +3819,7 @@ const SocialHub = ({ user, posts, onPost, onLike, onDeletePost, onSendChat, onSu
                             <div><b>{(user.data.followers || []).length || 0}</b><br/><small style={{color:'#888'}}>Seguidores</small></div>
                             <div><b>{(user.data.following || []).length || 0}</b><br/><small style={{color:'#888'}}>Seguindo</small></div>
                         </div>
-                        <button className="btn btn-ghost" style={{fontSize:10}}>EDITAR PERFIL</button>
+                        <button className="btn btn-ghost" style={{fontSize:10}} onClick={() => {     alert("Para editar sua foto ou nome, volte à tela INÍCIO e clique no ícone de Câmera 📷 (Jogadores/Técnicos) ou na Engrenagem ⚙️ (Clubes)."); }}>EDITAR PERFIL</button>
                     </div>
 
                     <h4 style={{marginLeft:5, marginTop:20}}>📸 Minhas Fotos</h4>
@@ -4484,68 +4484,49 @@ db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTA
 
 // FIM DAS FUNÇÕES DE CRIAÇÃO E ACESSO ADMIN
 
-            // --- DEMITIR TÉCNICO (DONO DO TIME) ---
+            // --- DEMITIR PROFISSIONAL (DONO DO TIME) ---
     const handleFireCoach = async (coach) => {
         const team = user.data;
-        const fine = coach.salary * 4; // Multa = 4 semanas de salário
+        const currentSalary = parseFloat(coach.salary) || 2500;
+        const fine = currentSalary * 4; // Multa = 4 semanas de salário
 
         if (confirm(`Demitir ${coach.name}?\nVocê terá que pagar uma multa rescisória de ${fmt(fine)}.`)) {
-            if (team.balance < fine) return alert("Saldo insuficiente para pagar a rescisão!");
+            const teamBalance = parseFloat(team.balance) || 0;
+            if (teamBalance < fine) return alert("Saldo insuficiente para pagar a rescisão!");
 
             const b = db.batch();
 
             // 1. Cobra a multa do time
             b.update(db.collection('teams').doc(team.id), { 
-                balance: team.balance - fine 
+                balance: teamBalance - fine 
             });
 
-            // 2. Libera o técnico (volta para FREE)
+            // 2. Libera o profissional, zera o contrato, volta salário pro base e paga a multa a ele
             b.update(db.collection('users').doc(coach.id), { 
-                teamId: 'FREE' 
+                teamId: 'FREE',
+                contract: 0,
+                salary: 2500,
+                balance: firebase.firestore.FieldValue.increment(fine)
             });
 
             await b.commit();
-            alert(`${coach.name} foi demitido.`);
+            alert(`${coach.name} foi demitido e a multa de ${fmt(fine)} foi paga.`);
         }
     };
-            //FIM
-    const handleHireCoach = async (coach) => {
-        if (!user.data || user.type !== 'USER') return alert("Apenas presidentes podem contratar!");
-        
-        const team = user.data;
-        if (team.balance < coach.salary) return alert("Saldo insuficiente para cobrir o primeiro salário!");
-        
-        if (confirm(`Enviar proposta para ${coach.name}?\nSalário Oferecido: ${fmt(coach.salary)}`)) {
-            // Cria a oferta na coleção 'offers'
-            await db.collection('offers').add({
-                type: 'COACH_OFFER',
-                recipientId: coach.id, // ID do Técnico
-                teamId: team.id,
-                teamName: team.name,
-                value: parseInt(coach.salary),
-                status: 'PENDING',
-                createdAt: Date.now()
-            });
 
-            alert(`Proposta enviada para ${coach.name}! Aguarde ele aceitar.`);
-        }
-    };
-            //FIM
-            // --- 1. ENVIAR PROPOSTA (PRESIDENTE -> TÉCNICO) ---
-            // --- FUNÇÕES DE GESTÃO DO TÉCNICO ---
-
-    // 1. RENOVAR CONTRATO (TIME -> TÉCNICO)
+    // --- RENOVAR CONTRATO (TIME -> TÉCNICO) ---
     const handleRenewCoachContract = async (coach) => {
-        if (!confirm(`Renovar contrato de ${coach.name} por mais 1 temporada?\nSalário atual: ${fmt(coach.salary)}`)) return;
+        const currentSalary = parseFloat(coach.salary) || 2500;
+        if (!confirm(`Renovar contrato de ${coach.name} por mais 1 temporada?\nSalário atual: ${fmt(currentSalary)}`)) return;
         
-        // Opcional: Aumentar salário automaticamente na renovação (ex: 10%)
-        const newSalary = Math.round(coach.salary * 1.10); 
+        // Aumenta o salário em 10% na renovação
+        const newSalary = Math.round(currentSalary * 1.10); 
         
         await db.collection('users').doc(coach.id).update({
-            contract: (coach.contract || 0) + 1,
+            contract: (parseInt(coach.contract) || 0) + 1,
             salary: newSalary
         });
-        alert(`Contrato renovado! Novo salário: ${fmt(newSalary)}`);
+        alert(`Contrato renovado com sucesso!\nNovo salário: ${fmt(newSalary)}`);
     };
 
     // 2. AÇÕES DO PRÓPRIO TÉCNICO (AUMENTO, SAIR, MULTA)
@@ -4599,16 +4580,19 @@ db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTA
             if (!confirm(`TEM CERTEZA? Você pagará ${fmt(clause)} do seu bolso para ficar livre agora.`)) return;
 
             const b = db.batch();
+            const currentCoachBal = parseFloat(coach.balance) || 0;
+            const currentTeamBal = parseFloat(team.balance) || 0;
+
             // Tira do Técnico
             b.update(db.collection('users').doc(coach.id), {
-                balance: coach.balance - clause,
+                balance: currentCoachBal - clause,
                 teamId: 'FREE',
                 contract: 0,
                 salary: 2500 // Volta ao base
             });
             // Paga ao Time
             b.update(db.collection('teams').doc(team.id), {
-                balance: team.balance + clause
+                balance: currentTeamBal + clause
             });
 
             await b.commit();
@@ -8009,7 +7993,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.92.9</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.93.0</div>
                             </div>
                         </div>
                         
@@ -8068,10 +8052,10 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                                 onApproveTeam={approveTeam} 
                                 onUpdateBal={updateBalance} 
                                 onDeleteTeam={deleteTeam} 
-                                onApprovePaper={async(id)=>{db.collection('newspapers').doc(id).update({status:'ACTIVE'});}} 
+                               onApprovePaper={async(id)=>{await db.collection('newspapers').doc(id).update({status:'ACTIVE'}); alert("Jornal Aprovado com sucesso!");}} 
                                 onDeletePaper={deletePaper} 
                                 onDeleteJourno={deleteJournalist} 
-                                onRejectPaper={(id)=>db.collection('newspapers').doc(id).delete()} 
+                                onRejectPaper={async(id)=>{await db.collection('newspapers').doc(id).delete(); alert("Jornal Recusado/Excluído!");}} 
                                 onConfig={(t)=>setModal({type:'SETTINGS', data:t})} 
                                 onReset={resetDatabase} 
                                 onApproveComp={async(id)=>{await db.collection('companies').doc(id).update({status:'ACTIVE'}); alert("Empresa Aprovada!");}} 
@@ -8159,7 +8143,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                                 {user.type==='PRESS' && journalists.filter(j=>j.newspaperId===user.data.id && j.status==='PENDING').map(j=>(
                                     <div key={j.id} className="card">
                                         {j.name}
-                                        <button className="btn btn-green" onClick={()=>db.collection('journalists').doc(j.id).update({status:'ACTIVE'})}>APROVAR</button>
+                                        <button className="btn btn-green" onClick={async ()=>{ await db.collection('journalists').doc(j.id).update({status:'ACTIVE'}); alert("Jornalista aprovado!"); }}>APROVAR</button>
                                     </div>
                                 ))}
                             </div>
@@ -8712,7 +8696,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
     return (
         <div className="login-wrapper">
             <h1 className="login-title">Gerenciador de Times<br/><span className="login-title-span">de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.9 COMISSÃO TÉCNICA COMPLETA   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.0 COMISSÃO TÉCNICA COMPLETA   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

@@ -4075,11 +4075,10 @@ db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTA
     }, [user]);
 
            // ==========================================================
+   // ==========================================================
     // NOVO: SISTEMA DE MOCHILA INTELIGENTE (ECONOMIZA FIREBASE)
-    // Carrega apenas os itens da pessoa logada, evitando que sumam
     // ==========================================================
     useEffect(() => {
-        // Se não tem ninguém logado, esvazia a lista e não gasta Firebase
         if (!user || !user.data) {
             setSales([]);
             return;
@@ -4088,22 +4087,22 @@ db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTA
         let query = db.collection('sales');
 
         if (user.type === 'COMPANY') {
-            // Se for Empresa, puxa só as últimas 100 vendas dela para ver o lucro
-            query = query.where('companyId', '==', user.data.id).orderBy('date', 'desc').limit(100);
+            // Removido o orderBy do Firebase para não exigir Índice Composto (evita o bug de sumir tudo)
+            query = query.where('companyId', '==', user.data.id);
         } 
         else if (['PLAYER', 'COACH', 'DOCTOR', 'SCOUT', 'ASSISTANT'].includes(user.type)) {
-            // Se for Pessoa Física (Jogador/Staff), puxa TODOS os itens que ela comprou
-            // (Não colocamos limite aqui para garantir que os itens nunca sumam da mochila)
-            query = query.where('buyerId', '==', user.data.id).orderBy('date', 'desc');
+            // Removido o orderBy do Firebase para não exigir Índice Composto
+            query = query.where('buyerId', '==', user.data.id);
         } 
         else {
-            // Se for Presidente de Clube ou Visitante, não precisa carregar loja
-            setSales([]);
-            return;
+            // Presidentes, Imprensa e Admin carregam o histórico geral recente para poderem inspecionar jogadores
+            query = query.orderBy('date', 'desc').limit(300);
         }
 
         const unsubSales = query.onSnapshot(snap => {
-            const myItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            // A MÁGICA AQUI: Fazemos a ordenação do mais novo para o mais velho usando o próprio JavaScript!
+            // Assim driblamos a limitação do Firebase e a mochila volta a carregar.
+            const myItems = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.date - a.date);
             setSales(myItems);
         }, error => {
             console.error("Erro ao carregar mochila:", error);

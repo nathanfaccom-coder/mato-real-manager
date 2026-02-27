@@ -8048,7 +8048,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.93.1</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.93.2</div>
                             </div>
                         </div>
                         
@@ -8560,93 +8560,146 @@ onClick={() => {
 
                             {modal?.type === 'VIEW_LINEUP' && (
                                 <div className="modal-overlay" onClick={() => setModal(null)}>
-                                    <div className="modal-content" style={{maxWidth: '450px', background: '#1a1a1a', border: '1px solid var(--primary)'}} onClick={e => e.stopPropagation()}>
-                                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15}}>
-                                            <h3 style={{margin: 0, color: 'var(--primary)'}}>{modal.data.name}</h3>
-                                            <button className="btn btn-red" style={{width: 'auto', padding: '5px 10px'}} onClick={() => setModal(null)}>X</button>
+                                    {/* Scroll liberado para caber todo o conteúdo novo */}
+                                    <div className="modal-content animate-in" style={{maxWidth: '550px', maxHeight: '90vh', overflowY: 'auto', background: '#121212', border: '1px solid var(--primary)', padding: '15px'}} onClick={e => e.stopPropagation()}>
+                                        
+                                        {/* CABEÇALHO FIXO NO TOPO */}
+                                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, position: 'sticky', top: '-15px', background: '#121212', zIndex: 100, padding: '15px 0 10px 0', borderBottom: '1px solid #333'}}>
+                                            <h3 style={{margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: 10}}>
+                                                {modal.data.logo ? <img src={modal.data.logo} style={{width: 35, height: 35, borderRadius: '50%', border: '1px solid var(--primary)', objectFit: 'cover'}} /> : <span style={{fontSize: 24}}>🛡️</span>}
+                                                {modal.data.name}
+                                            </h3>
+                                            <button className="btn btn-red" style={{width: 'auto', padding: '5px 10px', margin: 0}} onClick={() => setModal(null)}>FECHAR</button>
                                         </div>
 
+                                        {/* 1. ARENA (Mantido, mas estilizado) */}
                                         {(() => {
                                             const lvl = modal.data.stadiumLevel || 1;
                                             const sDb = STADIUM_DB[lvl] || STADIUM_DB[1];
                                             const ticPrice = modal.data.ticketPrice || sDb.minTic;
 
                                             return (
-                                                <div style={{position: 'relative', height: 130, borderRadius: 8, overflow: 'hidden', marginBottom: 15, border: '1px solid cyan', background: '#111', boxShadow: '0 4px 8px rgba(0,0,0,0.5)'}}>
+                                                <div style={{position: 'relative', height: 130, borderRadius: 8, overflow: 'hidden', marginBottom: 20, border: '1px solid cyan', background: '#111', boxShadow: '0 4px 8px rgba(0,0,0,0.5)'}}>
                                                     {modal.data.stadiumPic ? (
                                                         <img src={modal.data.stadiumPic} style={{width:'100%', height:'100%', objectFit:'cover', opacity: 0.6}} />
                                                     ) : (
                                                         <div style={{display:'grid', placeItems:'center', height:'100%', fontSize:50, color:'#333'}}>🏟️</div>
                                                     )}
-                                                    
                                                     <div style={{position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.95))', padding: '30px 10px 10px 10px'}}>
                                                         <b style={{color: 'cyan', fontSize: 15, display: 'block', marginBottom: 4, textShadow: '1px 1px 2px black'}}>{sDb.name} <small style={{color:'gold'}}>(Nvl {lvl})</small></b>
                                                         <div style={{display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#ddd', textShadow: '1px 1px 2px black'}}>
                                                             <span>👥 <b style={{color:'#fff'}}>{sDb.cap.toLocaleString('pt-BR')}</b></span>
                                                             <span>🎫 <b style={{color:'#00E676'}}>{fmt(ticPrice)}</b></span>
-                                                            <span>💸 <b style={{color:'var(--danger)'}}>{fmt(sDb.maint)}/sem</b></span>
                                                         </div>
                                                     </div>
                                                 </div>
                                             );
                                         })()}
 
+                                        {/* 2. COMISSÃO TÉCNICA COMPLETA */}
                                         {(() => {
-                                            const comandante = (coaches || []).find(c => c.teamId === modal.data.id);
+                                            // Filtra todo o staff do time
+                                            const teamStaff = (coaches || []).filter(c => c.teamId === modal.data.id && c.status === 'ACTIVE').sort((a,b) => a.type.localeCompare(b.type));
+                                            const roleIcons = { 'COACH': '👔', 'ASSISTANT': '📋', 'DOCTOR': '🩺', 'SCOUT': '🕵️‍♂️' };
+                                            const roleNames = { 'COACH': 'Técnico', 'ASSISTANT': 'Auxiliar', 'DOCTOR': 'Médico', 'SCOUT': 'Olheiro' };
+                                            
                                             return (
-                                                <div style={{display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,215,0,0.1)', padding: 10, borderRadius: 10, marginBottom: 15, border: '1px solid gold'}}>
-                                                    {comandante?.face ? 
-                                                        <img src={comandante.face} style={{width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '1px solid gold'}} /> 
-                                                        : <div style={{fontSize: 24, width: 40, textAlign: 'center'}}>👔</div>
-                                                    }
-                                                    <div>
-                                                        <small style={{display: 'block', color: 'gold', fontSize: '9px', fontWeight: 'bold'}}>COMANDANTE:</small>
-                                                        <b style={{color: '#fff'}}>{comandante ? comandante.name : "Sem técnico no cargo"}</b>
-                                                    </div>
+                                                <div style={{marginBottom: 25}}>
+                                                    <h4 style={{color:'gold', margin:'0 0 10px 0', fontSize:14, borderBottom:'1px solid #333', paddingBottom:5}}>👔 Comissão Técnica</h4>
+                                                    {teamStaff.length === 0 ? <p style={{fontSize:11, color:'#666', fontStyle:'italic'}}>Nenhum profissional contratado.</p> : (
+                                                        <div style={{display:'flex', gap:10, overflowX:'auto', paddingBottom:10}}>
+                                                            {teamStaff.map(c => (
+                                                                <div key={c.id} style={{minWidth:'110px', background:'rgba(255,215,0,0.05)', border:'1px solid gold', borderRadius:8, padding:10, textAlign:'center'}}>
+                                                                    {c.face ? <img src={c.face} style={{width:45, height:45, borderRadius:'50%', objectFit:'cover', marginBottom:5, border:'1px solid gold'}}/> : <div style={{fontSize:26, marginBottom:5}}>{roleIcons[c.type]}</div>}
+                                                                    <b style={{fontSize:11, display:'block', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{c.name}</b>
+                                                                    <span style={{fontSize:9, color:'gold', fontWeight:'bold'}}>{roleNames[c.type]} (Nv {c.level})</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         })()}
 
-                                        <div className="football-field" style={{height: '380px', pointerEvents: 'none', position: 'relative'}}>
-                                            {modal.data.tactics ? (
-                                                FORMATIONS[modal.data.tactics.formation].map((posLabel, idx) => {
-                                                    const coords = FORMATION_COORDINATES[modal.data.tactics.formation][idx];
-                                                    const pId = modal.data.tactics.lineup[idx];
-                                                    const player = players.find(p => p.id === pId);
+                                        {/* 3. CAMPO TÁTICO COM TITULARES (AGORA MOSTRA OVR) */}
+                                        <div style={{marginBottom: 25}}>
+                                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', borderBottom:'1px solid #333', paddingBottom:5, marginBottom:10}}>
+                                                <h4 style={{color:'var(--primary)', margin:0, fontSize:14}}>⚽ Escalação Principal</h4>
+                                                <span style={{fontSize:10, color:'#888'}}>Esquema: {modal.data.tactics?.formation || "Não definido"}</span>
+                                            </div>
 
-                                                    return (
-                                                        <div key={idx} style={{ 
-                                                            position: 'absolute', top: coords.t, left: coords.l, 
-                                                            transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' 
-                                                        }}>
-                                                            <div className="player-photo-circle" style={{
-                                                                width: '32px', height: '32px', 
-                                                                border: player ? '2px solid gold' : '1px dashed #666',
-                                                                background: player ? '#001a33' : 'rgba(0,0,0,0.4)',
-                                                                boxShadow: '0 4px 6px rgba(0,0,0,0.6)'
-                                                            }}>
-                                                                {player?.face ? <img src={player.face} style={{width:'100%', height:'100%', objectFit:'cover'}} /> : <span style={{fontSize: '8px'}}>{posLabel}</span>}
+                                            <div className="football-field" style={{height: '400px', pointerEvents: 'none', position: 'relative'}}>
+                                                {modal.data.tactics ? (
+                                                    FORMATIONS[modal.data.tactics.formation].map((posLabel, idx) => {
+                                                        const coords = FORMATION_COORDINATES[modal.data.tactics.formation][idx];
+                                                        const pId = modal.data.tactics.lineup[idx];
+                                                        const player = players.find(p => p.id === pId);
+
+                                                        return (
+                                                            <div key={idx} style={{ position: 'absolute', top: coords.t, left: coords.l, transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                                                <div className="player-photo-circle" style={{ width: '36px', height: '36px', border: player ? '2px solid gold' : '1px dashed #666', background: player ? '#001a33' : 'rgba(0,0,0,0.4)', boxShadow: '0 4px 6px rgba(0,0,0,0.6)' }}>
+                                                                    {player?.face ? <img src={player.face} style={{width:'100%', height:'100%', objectFit:'cover', objectPosition:'top'}} /> : <span style={{fontSize: '9px'}}>{posLabel}</span>}
+                                                                </div>
+                                                                <div className="player-name-label" style={{ fontSize: '9px', padding: '2px 6px', background: player ? '#fff' : 'rgba(0,0,0,0.8)', color: player ? '#000' : '#fff', fontWeight: '900', marginTop: '3px', borderRadius: '4px', border: player ? '1px solid #333' : 'none', boxShadow: '0 2px 5px rgba(0,0,0,0.8)', letterSpacing: '0.5px' }}>
+                                                                    {/* AQUI ESTÁ A MÁGICA DO OVERALL NO CAMPO! */}
+                                                                    {player ? `${player.name.split(' ')[0].toUpperCase()} | ${player.overall}` : "VAZIO"}
+                                                                </div>
                                                             </div>
-                                                            <div className="player-name-label" style={{
-                                                                fontSize: '9px', padding: '2px 6px', background: player ? '#fff' : 'rgba(0,0,0,0.8)',
-                                                                color: player ? '#000' : '#fff', fontWeight: '900', marginTop: '3px',
-                                                                borderRadius: '4px', border: player ? '1px solid #333' : 'none',
-                                                                boxShadow: '0 2px 5px rgba(0,0,0,0.8)', letterSpacing: '0.5px'
-                                                            }}>
-                                                                {player ? player.name.split(' ')[0].toUpperCase() : "VAZIO"}
-                                                            </div>
+                                                        );
+                                                    })
+                                                ) : (
+                                                    <div style={{display:'grid', placeItems:'center', height:'100%', color:'#fff', fontSize:'13px', textAlign: 'center', padding: 20}}>
+                                                        <br/>O técnico ainda não enviou a súmula tática.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* 4. BANCO DE RESERVAS E RESTANTE DO ELENCO */}
+                                        {(() => {
+                                            const lineupIds = modal.data.tactics ? Object.values(modal.data.tactics.lineup) : [];
+                                            // Pega jogadores do time que NÃO estão na prancheta
+                                            const benchPlayers = players.filter(p => p.teamId === modal.data.id && !lineupIds.includes(p.id)).sort((a,b) => b.overall - a.overall);
+                                            
+                                            return (
+                                                <div style={{marginBottom: 25}}>
+                                                    <h4 style={{color:'var(--secondary)', margin:'0 0 10px 0', fontSize:14, borderBottom:'1px solid #333', paddingBottom:5}}>🪑 Banco de Reservas ({benchPlayers.length})</h4>
+                                                    {benchPlayers.length === 0 ? <p style={{fontSize:11, color:'#666', fontStyle:'italic'}}>Nenhum jogador no banco de reservas.</p> : (
+                                                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                                                            {benchPlayers.map(p => (
+                                                                <div key={p.id} style={{display:'flex', alignItems:'center', gap:10, background:'#1a1a1a', padding:8, borderRadius:6, borderLeft:`3px solid ${getPosColor(p.position)}`, border:'1px solid #333'}}>
+                                                                    {p.face ? <img src={p.face} style={{width:32, height:32, borderRadius:'50%', objectFit:'cover', objectPosition:'top'}}/> : <div style={{width:32, height:32, borderRadius:'50%', background:'#333', display:'grid', placeItems:'center', fontSize:10}}>👤</div>}
+                                                                    <div style={{flex:1, overflow:'hidden'}}>
+                                                                        <b style={{fontSize:11, display:'block', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{p.name} {p.recoveryLeft > 0 ? '🏥' : ''}</b>
+                                                                        <span style={{fontSize:9, color:'#aaa'}}>{p.position}</span>
+                                                                    </div>
+                                                                    <b style={{color: p.overall >= 80 ? 'gold' : p.overall >= 70 ? 'lime' : 'white', fontSize:14}}>{p.overall}</b>
+                                                                </div>
+                                                            ))}
                                                         </div>
-                                                    );
-                                                })
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
+
+                                        {/* 5. SALA DE TROFÉUS */}
+                                        <div>
+                                            <h4 style={{color:'gold', margin:'0 0 10px 0', fontSize:14, borderBottom:'1px solid #333', paddingBottom:5}}>🏆 Sala de Troféus</h4>
+                                            {(!modal.data.trophies || modal.data.trophies.length === 0) ? (
+                                                <p style={{fontSize:11, color:'#666', textAlign:'center', padding:20, background:'#1a1a1a', borderRadius:8, fontStyle:'italic'}}>A estante do clube ainda está vazia.</p>
                                             ) : (
-                                                <div style={{display:'grid', placeItems:'center', height:'100%', color:'#fff', fontSize:'13px', textAlign: 'center', padding: 20}}>
-                                                    <br/>O técnico ainda não enviou a súmula tática.
+                                                <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(80px, 1fr))', gap:10}}>
+                                                    {[...modal.data.trophies].reverse().map((t, i) => (
+                                                        <div key={i} style={{textAlign:'center', background:'rgba(255,215,0,0.05)', padding:10, borderRadius:8, border:'1px solid #444'}}>
+                                                            <img src={t.img} style={{width:45, height:45, objectFit:'contain', filter:'drop-shadow(0 0 5px rgba(255,215,0,0.5))'}} />
+                                                            <div style={{fontSize:9, fontWeight:'bold', color:'#fff', marginTop:5}}>{t.name}</div>
+                                                            <div style={{fontSize:8, color:'gold'}}>{t.tournament}</div>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             )}
                                         </div>
-                                        <p style={{fontSize: '10px', color: '#888', textAlign: 'center', marginTop: 10}}>
-                                            Esquema: {modal.data.tactics?.formation || "Não definido"}
-                                        </p>
+
                                     </div>
                                 </div>
                             )}
@@ -8751,7 +8804,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
     return (
         <div className="login-wrapper">
             <h1 className="login-title">Gerenciador de Times<br/><span className="login-title-span">de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.1 COMISSÃO TÉCNICA COMPLETA   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.2 COMISSÃO TÉCNICA COMPLETA   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

@@ -3174,11 +3174,26 @@ const TrainingCenterManager = ({ team, players, staff, user, onClose, onTrain, o
                         <h4 style={{ color: 'gold', marginTop: 0 }}>🏃 Jogadores no Campo</h4>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, maxHeight: '200px', overflowY: 'auto' }}>
                             {players.map(p => (
-                                <div key={p.id} className="card" style={{ background: selectedPlayers.includes(p.id) ? 'rgba(0,255,0,0.1)' : '#111', border: selectedPlayers.includes(p.id) ? '1px solid var(--primary)' : '1px solid #333', cursor: isCoach ? 'pointer' : 'default', padding: '10px', opacity: (p.recoveryLeft || 0) > 0 ? 0.4 : 1 }} onClick={() => isCoach && handleTogglePlayer(p.id)}>
-                                    <div style={{ fontWeight: 'bold', fontSize: 11 }}>{p.name} {(p.recoveryLeft || 0) > 0 ? '🏥' : ''}</div>
-                                    <div style={{ fontSize: 9, color: '#aaa' }}>{p.position} | OV: {p.overall} | ⚡ {p.energy || 0}%</div>
-                                </div>
-                            ))}
+    <div key={p.id} className="card" style={{ background: selectedPlayers.includes(p.id) ? 'rgba(0,255,0,0.1)' : '#111', border: selectedPlayers.includes(p.id) ? '1px solid var(--primary)' : '1px solid #333', cursor: isCoach ? 'pointer' : 'default', padding: '10px', opacity: (p.recoveryLeft || 0) > 0 ? 0.4 : 1, display: 'flex', alignItems: 'center', gap: '10px' }} onClick={() => isCoach && handleTogglePlayer(p.id)}>
+        
+        {/* FOTO DO JOGADOR RESTAURADA */}
+        {p.face ? (
+            <img src={p.face} style={{ width: 35, height: 35, borderRadius: '50%', objectFit: 'cover' }} />
+        ) : (
+            <div style={{ width: 35, height: 35, borderRadius: '50%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>👤</div>
+        )}
+        
+        <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 'bold', fontSize: 11 }}>{p.name} {(p.recoveryLeft || 0) > 0 ? '🏥' : ''}</div>
+            <div style={{ fontSize: 9, color: '#aaa', marginBottom: '4px' }}>{p.position} | OV: {p.overall}</div>
+            
+            {/* BARRINHA DE ENERGIA RESTAURADA */}
+            <div style={{ width: '100%', background: '#222', height: 6, borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ width: `${p.energy || 0}%`, height: '100%', background: (p.energy || 0) > 70 ? 'lime' : (p.energy || 0) > 30 ? 'orange' : 'red' }}></div>
+            </div>
+        </div>
+    </div>
+))}
                         </div>
                     </div>
                 )}
@@ -3236,19 +3251,33 @@ const TrainingCenterManager = ({ team, players, staff, user, onClose, onTrain, o
                                         </div>
                                         {isPresident && (
                                             <button className="btn btn-green" style={{ fontSize: 9, padding: '5px', width: 'auto', margin: 0 }} onClick={async () => {
-                                                if (team.balance < npc.value) return alert("Caixa insuficiente!");
-                                                await firebase.firestore().collection('teams').doc(team.id).update({
-                                                    balance: firebase.firestore.FieldValue.increment(-npc.value),
-                                                    peneiraList: team.peneiraList.filter(x => x.id !== npc.id)
-                                                });
-                                                await firebase.firestore().collection('players').add({
-                                                    name: npc.name, position: npc.position, overall: npc.overall, attributes: npc.attributes,
-                                                    salary: npc.salary, value: npc.value, teamId: team.id, status: 'NAO_A_VENDA', contract: 3, isNPC: true,
-                                                    mood: '😐', balance: npc.value, xp: 0, fame: 0, stats: { goals: 0, assists: 0, tackles: 0, saves: 0, yellows: 0, reds: 0 }
-                                                });
-                                                alert(`${npc.name} foi contratado para a base!`);
-                                                onClose();
-                                            }}>APROVAR</button>
+    // --- RESTAURANDO A REGRA DOS 7 BOTS ---
+    const myTeamBots = players.filter(pl => pl.teamId === team.id && pl.isNPC).length;
+    
+    if (myTeamBots >= 7) {
+        return alert(`🚫 LIMITE DA BASE ATINGIDO!\nVocê já tem 7/7 BOTS no elenco. Venda ou dispense um antes de subir outro da peneira.`);
+    }
+    
+    if (!confirm(`⚠️ AVISO DA BASE\n\nAtualmente você tem ${myTeamBots}/7 BOTS no elenco.\nTem certeza que deseja aprovar a contratação de ${npc.name} por ${fmt(npc.value)}?`)) {
+        return;
+    }
+    
+    if (team.balance < npc.value) return alert("Caixa insuficiente!");
+    
+    await firebase.firestore().collection('teams').doc(team.id).update({
+        balance: firebase.firestore.FieldValue.increment(-npc.value),
+        peneiraList: team.peneiraList.filter(x => x.id !== npc.id)
+    });
+    
+    await firebase.firestore().collection('players').add({
+        name: npc.name, position: npc.position, overall: npc.overall, attributes: npc.attributes,
+        salary: npc.salary, value: npc.value, teamId: team.id, status: 'NAO_A_VENDA', contract: 3, isNPC: true,
+        mood: '😐', balance: npc.value, xp: 0, fame: 0, stats: { goals: 0, assists: 0, tackles: 0, saves: 0, yellows: 0, reds: 0 }
+    });
+    
+    alert(`${npc.name} foi contratado para a base!`);
+    onClose();
+}}>APROVAR</button>
                                         )}
                                     </div>
                                 ))}
@@ -7980,7 +8009,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.92.8</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v1.92.9</div>
                             </div>
                         </div>
                         
@@ -8683,7 +8712,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
     return (
         <div className="login-wrapper">
             <h1 className="login-title">Gerenciador de Times<br/><span className="login-title-span">de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.8 COMISSÃO TÉCNICA COMPLETA   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.92.9 COMISSÃO TÉCNICA COMPLETA   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

@@ -3105,48 +3105,36 @@ const TeamDashboard = ({ team, players, staff, isVisitor, onEdit, onAdd, onFireC
         // ==========================================
 // CT DO CLUBE (TRAINING CENTER MANAGER)
 // ==========================================
-const TrainingCenterManager = ({ team, players, coach, user, onClose, onTrain, onTrainSolo }) => {
+// ==========================================
+// CT DO CLUBE (QUARTEL GENERAL V2)
+// ==========================================
+const TrainingCenterManager = ({ team, players, staff, user, onClose, onTrain, onTrainSolo }) => {
     const lvl = team.ctLevel || 1;
     const db = CT_DB[lvl];
     const nextDb = CT_DB[lvl + 1];
+    
     const isPresident = user.type === 'USER' && user.data.id === team.id;
     const isCoach = user.type === 'COACH' && user.data.teamId === team.id;
     const isPlayer = user.type === 'PLAYER' && user.data.teamId === team.id;
 
-    const [tab, setTab] = useState('GERAL');
+    const [tab, setTab] = useState('LOBBY');
     const [trainingType, setTrainingType] = useState('FISICO_BASE');
     const [selectedPlayers, setSelectedPlayers] = useState([]);
-    
-    // Busca a energia atualizada do usuário logado
     const energy = user.data?.energy !== undefined ? user.data.energy : 100;
+
+    // Identificando quem é quem no Staff
+    const coach = (staff || []).find(c => c.type === 'COACH');
+    const assistant = (staff || []).find(c => c.type === 'ASSISTANT');
+    const doctor = (staff || []).find(c => c.type === 'DOCTOR');
+    const scout = (staff || []).find(c => c.type === 'SCOUT');
 
     const handleUpgrade = async () => {
         if (!nextDb) return;
-        if ((team.balance || 0) < db.upgCost) return alert("Saldo insuficiente do clube!");
-        if (confirm(`Evoluir para ${nextDb.name} por ${fmt(db.upgCost)}?\n\nA manutenção subirá para ${fmt(nextDb.maint)}/sem.`)) {
+        if ((team.balance || 0) < db.upgCost) return alert("Saldo insuficiente!");
+        if (confirm(`Evoluir para ${nextDb.name} por ${fmt(db.upgCost)}?`)) {
             await firebase.firestore().collection('teams').doc(team.id).update({ balance: firebase.firestore.FieldValue.increment(-db.upgCost), ctLevel: lvl + 1 });
-            alert("Centro de Treinamento evoluído com sucesso!");
+            alert("CT evoluído com sucesso!");
             onClose();
-        }
-    };
-
-    const assignLearning = async (player) => {
-        if (!isCoach) return alert("Apenas o Técnico pode designar treinos de posição.");
-        if (player.learningPosition) return alert("Este jogador já está aprendendo uma posição! Ele só pode aprender uma de cada vez.");
-        if ((player.secondaryPositions || []).length >= 3) return alert("Este jogador já atingiu o limite de 3 posições secundárias.");
-
-        const target = prompt(`Qual NOVA POSIÇÃO o jogador ${player.name} deve focar em aprender?\n(Ex: ZAG, ATA, VOL, MD, ME, PTD...)`);
-        if (!target) return;
-        const upperTarget = target.toUpperCase();
-        
-        if (!POS_TRAINING_MAP[upperTarget]) return alert("Posição inválida. Digite a sigla corretamente.");
-        if (player.position === upperTarget || (player.secondaryPositions || []).includes(upperTarget)) return alert("Ele já joga nessa posição!");
-
-        const cost = getPosLearningCost(player.position, upperTarget);
-        
-        if(confirm(`Definir ${player.name} para aprender a jogar de ${upperTarget}?\n\nEle precisará participar ativamente das sessões de treino com o foco em "${POS_TRAINING_MAP[upperTarget].train}".\nEstimativa de tempo: ${cost/10} sessões de treino.`)) {
-            await firebase.firestore().collection('players').doc(player.id).update({ learningPosition: { target: upperTarget, current: 0, required: cost } });
-            alert("Treino específico designado! Cobre o jogador nos coletivos.");
         }
     };
 
@@ -3156,288 +3144,195 @@ const TrainingCenterManager = ({ team, players, coach, user, onClose, onTrain, o
         else alert("Máximo de 5 jogadores!");
     };
 
+    const StaffCard = ({ roleName, member, icon, color }) => (
+        <div className="card" style={{ borderLeft: `3px solid ${color}`, padding: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {member && member.face ? <img src={member.face} style={{ width: 35, height: 35, borderRadius: '50%', objectFit: 'cover' }} /> : <div style={{ width: 35, height: 35, background: '#333', borderRadius: '50%', display: 'grid', placeItems: 'center' }}>{icon}</div>}
+            <div style={{ flex: 1 }}>
+                <small style={{ color: color, fontSize: '9px', fontWeight: 'bold' }}>{roleName}</small><br />
+                <b style={{ fontSize: '11px' }}>{member ? member.name : 'Vaga Aberta'}</b>
+                {member && (
+                    <div style={{ width: '100%', background: '#222', height: 4, borderRadius: 2, marginTop: 4 }}>
+                        <div style={{ width: `${member.energy || 0}%`, background: (member.energy || 0) > 40 ? 'lime' : 'red', height: '100%' }}></div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+
     return (
-        <div className="modal-overlay" style={{zIndex: 99999}} onClick={onClose}>
-            <div className="modal-content" style={{maxWidth: '600px', padding: '15px', background:'#121212'}} onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" style={{ zIndex: 99999 }} onClick={onClose}>
+            <div className="modal-content" style={{ maxWidth: '650px', padding: '15px', background: '#121212' }} onClick={e => e.stopPropagation()}>
                 
                 {/* CABEÇALHO DO CT */}
-                <div style={{position:'relative', height:120, background:'#1a1a1a', borderRadius:8, overflow:'hidden', marginBottom:15, border:'2px solid #00E676', boxShadow: '0 4px 15px rgba(0,230,118,0.2)'}}>
-                    <div style={{display:'flex', alignItems:'center', justifyContent:'center', height:'100%', fontSize:50, color:'#222'}}>🏋️‍♂️</div>
-                    <div style={{position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.95))', padding: '30px 10px 10px 10px'}}>
-                        <b style={{color: '#00E676', fontSize: 16, display: 'block', marginBottom: 4}}>{db.name} <small style={{color:'gold'}}>(Nvl {lvl})</small></b>
-                        <div style={{display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#ddd'}}>
-                            <span>🔥 Bônus XP: <b style={{color:'lime'}}>+{db.bonusXP}%</b></span>
-                            <span>🏥 Fisio Auto: <b style={{color:'cyan'}}>{db.healChance}%</b></span>
-                        </div>
+                <div style={{ position: 'relative', height: 100, background: '#1a1a1a', borderRadius: 8, overflow: 'hidden', marginBottom: 15, border: '2px solid #00E676' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 40, color: '#222' }}>🏋️‍♂️</div>
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.95))', padding: '20px 10px 5px 10px' }}>
+                        <b style={{ color: '#00E676', fontSize: 14, display: 'block' }}>{db.name} <small style={{ color: 'gold' }}>(Nvl {lvl})</small></b>
                     </div>
                 </div>
 
-                {/* BOTÕES DE NAVEGAÇÃO DO CT */}
-                <div style={{display:'flex', gap:5, marginBottom:15, overflowX:'auto', paddingBottom:5}}>
-                    <button className={`btn ${tab==='GERAL'?'btn-blue':'btn-ghost'}`} onClick={()=>setTab('GERAL')}>ESTRUTURA & ELENCO</button>
-                    {(isCoach || isPlayer) && <button className={`btn ${tab==='TREINO'?'btn-green':'btn-ghost'}`} onClick={()=>setTab('TREINO')}>🏋️‍♂️ TREINAR</button>}
-                    {isCoach && <button className={`btn ${tab==='POSICOES'?'btn-warning':'btn-ghost'}`} onClick={()=>setTab('POSICOES')}>🔄 POSIÇÕES</button>}
-                    <button className={`btn ${tab==='PENEIRA'?'btn-purple':'btn-ghost'}`} onClick={()=>setTab('PENEIRA')}>🔎 PENEIRA</button>
+                {/* ABAS SETORIZADAS */}
+                <div style={{ display: 'flex', gap: 5, marginBottom: 15, overflowX: 'auto', paddingBottom: 5 }}>
+                    <button className={`btn ${tab === 'LOBBY' ? 'btn-blue' : 'btn-ghost'}`} onClick={() => setTab('LOBBY')}>🏠 LOBBY (AVISOS)</button>
+                    <button className={`btn ${tab === 'CAMPO' ? 'btn-green' : 'btn-ghost'}`} onClick={() => setTab('CAMPO')}>⚽ CAMPO</button>
+                    <button className={`btn ${tab === 'DM' ? 'btn-red' : 'btn-ghost'}`} onClick={() => setTab('DM')}>🏥 DM</button>
+                    <button className={`btn ${tab === 'DIRETORIA' ? 'btn-purple' : 'btn-ghost'}`} onClick={() => setTab('DIRETORIA')}>💼 DIRETORIA</button>
                 </div>
 
-                {/* ABA 1: ESTRUTURA E QUEM ESTÁ NO CT */}
-                {tab === 'GERAL' && (
+                {/* ABA 1: LOBBY E DIÁRIO DE ATIVIDADES */}
+                {tab === 'LOBBY' && (
                     <div className="animate-in">
-                        {isPresident && nextDb && (
-                            <div style={{marginBottom:15, padding:10, border:'1px dashed gold', borderRadius:8, textAlign:'center', background:'rgba(255,215,0,0.05)'}}>
-                                <b style={{color:'gold'}}>Próximo Nível: {nextDb.name} (+{nextDb.bonusXP}% XP)</b>
-                                <button className="btn btn-gold" onClick={handleUpgrade} style={{color:'#000', margin:'10px 0 0 0', fontSize:10}}>
-                                    MELHORAR ESTRUTURA ({fmt(db.upgCost)})
-                                </button>
-                            </div>
-                        )}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 15 }}>
+                            <StaffCard roleName="TÉCNICO" member={coach} icon="👔" color="gold" />
+                            <StaffCard roleName="AUXILIAR" member={assistant} icon="📋" color="#2979FF" />
+                            <StaffCard roleName="MÉDICO" member={doctor} icon="🩺" color="#00E676" />
+                            <StaffCard roleName="OLHEIRO" member={scout} icon="🕵️‍♂️" color="#D500F9" />
+                        </div>
 
-                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                            {/* COLUNA ESQUERDA: JOGADORES PRESENTES */}
-                            <div>
-                                <h4 style={{color:'gold', borderBottom:'1px solid #333', paddingBottom:5, marginTop:0}}>👥 Elenco no CT</h4>
-                                <div style={{maxHeight:'300px', overflowY:'auto', paddingRight:5}}>
-                                    
-                                    {/* CARD DO TÉCNICO */}
-                                    {coach && (
-                                        <div className="card" style={{display:'flex', alignItems:'center', gap:10, borderLeft:'3px solid gold', padding:8, marginBottom:8}}>
-                                            {coach.face ? <img src={coach.face} style={{width:35,height:35,borderRadius:'50%',objectFit:'cover'}}/> : <div style={{width:35,height:35,background:'#333',borderRadius:'50%',display:'grid',placeItems:'center'}}>👔</div>}
-                                            <div style={{flex:1}}>
-                                                <b style={{fontSize:11, color:'gold'}}>{coach.name} <small style={{color:'#aaa'}}>(Prof.)</small></b>
-                                                <div style={{width:'100%', background:'#222', height:4, borderRadius:2, marginTop:4}}>
-                                                    <div style={{width:`${coach.energy||0}%`, background: (coach.energy||0)>50?'lime':'red', height:'100%'}}></div>
-                                                </div>
-                                            </div>
+                        <h4 style={{ color: 'cyan', borderBottom: '1px solid #333', paddingBottom: 5, marginTop: 0 }}>📋 Diário Oficial do Clube</h4>
+                        <div style={{ maxHeight: '300px', overflowY: 'auto', background: 'rgba(0,0,0,0.3)', padding: 10, borderRadius: 8, border: '1px solid #222' }}>
+                            {(!team.trainingLogs || team.trainingLogs.length === 0) ? (
+                                <p style={{ fontSize: 11, color: '#666', textAlign: 'center' }}>Nenhuma atividade da comissão registrada nesta semana.</p>
+                            ) : (
+                                team.trainingLogs.map((log, idx) => (
+                                    <div key={idx} style={{ marginBottom: 10, paddingBottom: 10, borderBottom: '1px dashed #444', fontSize: 11 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#aaa', marginBottom: 5 }}>
+                                            <b style={{ color: '#fff', background: '#333', padding: '2px 6px', borderRadius: 4 }}>{log.type}</b>
+                                            <span style={{ fontSize: 9 }}>{new Date(log.date).toLocaleString()}</span>
                                         </div>
-                                    )}
-
-                                    {/* CARDS DOS JOGADORES */}
-                                    {[...players].sort((a,b)=>b.overall - a.overall).map(p => (
-                                        <div key={p.id} className="card" style={{display:'flex', alignItems:'center', gap:10, borderLeft:`3px solid ${getPosColor(p.position)}`, padding:8, marginBottom:8, opacity: (p.recoveryLeft||0)>0 ? 0.5 : 1}}>
-                                            {p.face ? <img src={p.face} style={{width:35,height:35,borderRadius:'50%',objectFit:'cover'}}/> : <div style={{width:35,height:35,background:'#333',borderRadius:'50%',display:'grid',placeItems:'center',fontSize:12}}>👤</div>}
-                                            <div style={{flex:1}}>
-                                                <div style={{display:'flex', justifyContent:'space-between'}}>
-                                                    <b style={{fontSize:11}}>{p.name} {(p.recoveryLeft||0)>0?'🏥':''}</b>
-                                                    <b style={{color:'var(--warning)', fontSize:11}}>{p.overall}</b>
-                                                </div>
-                                                <div style={{fontSize:9, color:'#aaa'}}>{p.position} {p.secondaryPositions ? `(+ ${p.secondaryPositions.join(',')})` : ''} | 💎 {p.fame||0}</div>
-                                                <div style={{width:'100%', background:'#222', height:4, borderRadius:2, marginTop:4}}>
-                                                    <div style={{width:`${p.energy||0}%`, background: (p.energy||0)>50?'lime':'red', height:'100%'}}></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* COLUNA DIREITA: MURAL DE TREINOS */}
-                            <div>
-                                <h4 style={{color:'cyan', borderBottom:'1px solid #333', paddingBottom:5, marginTop:0}}>📋 Mural de Resultados</h4>
-                                <div style={{maxHeight:'300px', overflowY:'auto', background:'rgba(0,0,0,0.3)', padding:10, borderRadius:8}}>
-                                    {(!team.trainingLogs || team.trainingLogs.length === 0) ? (
-                                        <p style={{fontSize:11, color:'#666', textAlign:'center'}}>Nenhum treino realizado.</p>
-                                    ) : (
-                                        team.trainingLogs.map((log, idx) => (
-                                            <div key={idx} style={{marginBottom:10, paddingBottom:10, borderBottom:'1px dashed #444', fontSize:10}}>
-                                                <div style={{display:'flex', justifyContent:'space-between', color:'#aaa'}}>
-                                                    <b style={{color:'#fff'}}>Foco: {log.type}</b>
-                                                    <span>{new Date(log.date).toLocaleDateString()}</span>
-                                                </div>
-                                                <div style={{marginTop:5, color:'#00E676', whiteSpace:'pre-wrap'}}>{log.report}</div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
+                                        <div style={{ color: '#00E676', whiteSpace: 'pre-wrap', paddingLeft: 5 }}>{log.report}</div>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 )}
 
-                {/* ABA 2: APRENDER POSIÇÕES (SÓ TÉCNICO) */}
-                {tab === 'POSICOES' && isCoach && (
+                {/* ABA 2: CAMPO DE TREINO */}
+                {tab === 'CAMPO' && (
                     <div className="animate-in">
-                        <h4 style={{color:'var(--warning)', marginTop:0}}>🔄 Adaptação de Posições</h4>
-                        <p style={{fontSize:10, color:'#aaa', marginBottom:10}}>O boost entrará no final da temporada.</p>
-                        <div style={{display:'grid', gap:8, maxHeight:'300px', overflowY:'auto'}}>
-                            {players.map(p => (
-                                <div key={p.id} className="card" style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:10, borderLeft:`3px solid ${getPosColor(p.position)}`}}>
-                                    <div style={{width:'40%'}}>
-                                        <b style={{fontSize:12}}>{p.name}</b><br/>
-                                        <span style={{fontSize:9, color:'#888'}}>{p.position} {p.secondaryPositions ? `(+ ${p.secondaryPositions.join(', ')})` : ''}</span>
-                                    </div>
-                                    <div style={{flex:1, textAlign:'center'}}>
-                                        {p.learningPosition ? (
-                                            <div style={{fontSize:9}}>
-                                                <span style={{color:'gold'}}>Aprender: <b>{p.learningPosition.target}</b></span><br/>
-                                                <span style={{color:'cyan'}}>Treinar: <b>{POS_TRAINING_MAP[p.learningPosition.target].train}</b></span>
-                                                <div style={{width:'100%', background:'#222', height:4, borderRadius:2, marginTop:2}}>
-                                                    <div style={{width:`${Math.min(100, (p.learningPosition.current/p.learningPosition.required)*100)}%`, background:'lime', height:'100%'}}></div>
-                                                </div>
-                                            </div>
-                                        ) : <span style={{fontSize:9, color:'#666'}}>Sem treino.</span>}
-                                    </div>
-                                    <button className="btn btn-ghost" style={{width:'auto', fontSize:9, padding:'5px', marginLeft:10, border:'1px solid var(--warning)', color:'var(--warning)'}} onClick={() => assignLearning(p)}>
-                                        {p.learningPosition ? 'ALTERAR' : 'NOVA'}
+                        <p style={{ fontSize: 11, color: '#aaa' }}>Bônus atual da estrutura: <b style={{ color: 'lime' }}>+{db.bonusXP}% XP</b></p>
+                        
+                        {(isPlayer || isCoach) && (
+                            <div style={{ background: 'rgba(255,255,255,0.05)', padding: 10, borderRadius: 8, marginBottom: 15 }}>
+                                <label style={{ fontSize: 11 }}>Foco do Treino:</label>
+                                <select className="input-field" style={{ margin: '5px 0' }} value={trainingType} onChange={e => setTrainingType(e.target.value)}>
+                                    <option value="FISICO_BASE">🏋️‍♂️ Físico e Condicionamento</option>
+                                    <option value="PASSE">⚽ Passes e Visão</option>
+                                    <option value="CHUTE">🎯 Finalização</option>
+                                    <option value="DEFESA">🛡️ Marcação e Defesa</option>
+                                    <option value="GOLEIRO">🧤 Treino de Goleiro</option>
+                                </select>
+
+                                {isPlayer && (
+                                    <button className="btn btn-green" onClick={() => { onTrainSolo(user.data, trainingType); onClose(); }}>
+                                        🏃 INICIAR TREINO SOLO (-35⚡)
                                     </button>
+                                )}
+
+                                {isCoach && (
+                                    <button className="btn btn-gold" onClick={() => {
+                                        if (selectedPlayers.length === 0) return alert("Selecione os jogadores da lista abaixo primeiro.");
+                                        onTrain(selectedPlayers, trainingType); onClose();
+                                    }}>
+                                        👔 DAR TREINO COLETIVO (-20⚡)
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        <h4 style={{ color: 'gold', marginTop: 0 }}>🏃 Jogadores no Campo</h4>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, maxHeight: '200px', overflowY: 'auto' }}>
+                            {players.map(p => (
+                                <div key={p.id} className="card" style={{ background: selectedPlayers.includes(p.id) ? 'rgba(0,255,0,0.1)' : '#111', border: selectedPlayers.includes(p.id) ? '1px solid var(--primary)' : '1px solid #333', cursor: isCoach ? 'pointer' : 'default', padding: '10px', opacity: (p.recoveryLeft || 0) > 0 ? 0.4 : 1 }} onClick={() => isCoach && handleTogglePlayer(p.id)}>
+                                    <div style={{ fontWeight: 'bold', fontSize: 11 }}>{p.name} {(p.recoveryLeft || 0) > 0 ? '🏥' : ''}</div>
+                                    <div style={{ fontSize: 9, color: '#aaa' }}>{p.position} | OV: {p.overall} | ⚡ {p.energy || 0}%</div>
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
 
-                {/* ABA 3: AÇÃO DE TREINAR (COM BARRA DE ENERGIA) */}
-                {tab === 'TREINO' && (
+                {/* ABA 3: DEPARTAMENTO MÉDICO */}
+                {tab === 'DM' && (
                     <div className="animate-in">
-                        
-                        {/* DESTAQUE DA ENERGIA DO USUÁRIO ATUAL */}
-                        <div style={{background:'rgba(0,0,0,0.4)', padding:15, borderRadius:8, marginBottom:15, border: energy > 30 ? '1px solid #444' : '1px solid red', textAlign:'center'}}>
-                            <small style={{color:'#aaa', fontWeight:'bold'}}>SUA ENERGIA ATUAL</small>
-                            <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginTop:5}}>
-                                <i className="fas fa-bolt" style={{color: energy > 30 ? 'gold' : 'red', fontSize:18}}></i>
-                                <div style={{width:'70%', background:'#222', height:14, borderRadius:7, overflow:'hidden'}}>
-                                    <div style={{width:`${energy}%`, height:'100%', background: energy > 50 ? 'lime' : energy > 20 ? 'orange' : 'red', transition:'0.3s'}}></div>
-                                </div>
-                                <b style={{color: energy > 50 ? 'lime' : energy > 20 ? 'orange' : 'red', fontSize:16}}>{energy}%</b>
+                        <div style={{ background: '#b71c1c', padding: 10, borderRadius: 8, color: 'white', marginBottom: 15, display: 'flex', gap: 10 }}>
+                            <span style={{ fontSize: 24 }}>🚑</span>
+                            <div>
+                                <b style={{ display: 'block' }}>DEPARTAMENTO MÉDICO</b>
+                                <small>Os atletas abaixo não podem treinar nem jogar.</small>
                             </div>
                         </div>
 
-                        <label style={{fontSize:11}}>Foco do Treino (O que você quer melhorar?):</label>
-                        <select className="input-field" style={{margin:'5px 0 15px 0'}} value={trainingType} onChange={e=>setTrainingType(e.target.value)}>
-                            <optgroup label="🏋️‍♂️ Físico e Condicionamento">
-                                <option value="FISICO_BASE">Resistência, Equilíbrio e Força</option>
-                                <option value="VELOCIDADE">Velocidade, Aceleração e Agilidade</option>
-                                <option value="IMPULSAO">Impulsão e Condição Física</option>
-                            </optgroup>
-                            <optgroup label="⚽ Técnica com Bola">
-                                <option value="PASSE">Passe Curto, Longo e Visão</option>
-                                <option value="DRIBLE">Drible, Finta e Controle de Bola</option>
-                                <option value="CHUTE">Finalização, Força e Técnica de Chute</option>
-                            </optgroup>
-                            <optgroup label="🧠 Tático e Mental">
-                                <option value="DEFESA">Marcação, Agressividade e Resposta</option>
-                                <option value="MENTAL">Trabalho em Equipe e Mentalidade</option>
-                                <option value="BOLA_PARADA">Faltas, Efeito e Cabeceio</option>
-                            </optgroup>
-                            <optgroup label="🧤 Específico">
-                                <option value="GOLEIRO">Reflexos e Habilidades de Goleiro</option>
-                            </optgroup>
-                        </select>
-
-                        {isPlayer && (
-                            <div className="card" style={{border:'1px dashed cyan'}}>
-                                <h3>Treino Individualizado</h3>
-                                <p style={{fontSize:11, color:'#aaa'}}>Você vai usar as dependências do CT sozinho. A evolução é menor que treinar com o Professor.<br/><span style={{color:'red', fontWeight:'bold'}}>Custo: -35% Energia</span></p>
-                                <button className="btn btn-green" onClick={() => { onTrainSolo(user.data, trainingType); onClose(); }}>
-                                    INICIAR TREINO SOLO
-                                </button>
+                        {players.filter(p => (p.recoveryLeft || 0) > 0).length === 0 ? (
+                            <p style={{ textAlign: 'center', color: '#666' }}>Nenhum jogador lesionado!</p>
+                        ) : (
+                            <div style={{ display: 'grid', gap: 10 }}>
+                                {players.filter(p => (p.recoveryLeft || 0) > 0).map(p => (
+                                    <div key={p.id} className="card" style={{ borderLeft: '4px solid red' }}>
+                                        <b style={{ color: 'red' }}>{p.name}</b>
+                                        <div style={{ fontSize: 11 }}>Lesão: {typeof p.injury === 'object' ? p.injury.label : p.injury}</div>
+                                        <div style={{ fontSize: 11, color: '#aaa' }}>Faltam: <b>{p.recoveryLeft} jogos</b> para voltar.</div>
+                                    </div>
+                                ))}
                             </div>
                         )}
-
-                        {isCoach && (
-                            <div className="card" style={{border:'1px dashed var(--primary)'}}>
-                                <h3>Treino Coletivo Orientado</h3>
-                                <p style={{fontSize:11, color:'#aaa'}}>Você conduzirá o treino e a evolução dos jogadores será altíssima. Os resultados irão para o Mural!<br/><span style={{color:'orange', fontWeight:'bold'}}>Custo do Técnico: -20% Energia</span></p>
-                                
-                                <button className="btn btn-green" onClick={()=>{
-                                    if(energy < 20) return alert("Você está exausto!");
-                                    if(selectedPlayers.length === 0) return alert("Selecione os jogadores que participarão da atividade (Max 5).");
-                                    onTrain(selectedPlayers, trainingType);
-                                    setSelectedPlayers([]);
-                                    onClose();
-                                }}>
-                                    APLICAR TREINAMENTO (-20⚡)
-                                </button>
-
-                                <p style={{textAlign:'center', color:'#888', fontSize:11, margin:'10px 0'}}>👉 Selecione até <b>5 jogadores</b>:</p>
-                                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, maxHeight:'200px', overflowY:'auto'}}>
-                                    {players.map(p => (
-                                        <div key={p.id} className="card" style={{ background: selectedPlayers.includes(p.id) ? 'rgba(0,255,0,0.1)' : '#111', border: selectedPlayers.includes(p.id) ? '1px solid var(--primary)' : '1px solid #333', cursor: 'pointer', padding: '10px', opacity: (p.recoveryLeft||0)>0 ? 0.4 : 1 }} onClick={() => handleTogglePlayer(p.id)}>
-                                            <div style={{fontWeight:'bold', fontSize:11}}>{p.name} {(p.recoveryLeft||0)>0?'🏥':''}</div>
-                                            <div style={{fontSize:9, color:'#aaa'}}>{p.position} | OV: {p.overall}</div>
-                                            <div style={{margin:'4px 0', background:'#222', height:4, borderRadius:2, overflow:'hidden', width:'100%'}}>
-                                                <div style={{ width:`${p.energy || 0}%`, height:'100%', background: (p.energy||0) > 70 ? 'lime' : (p.energy||0) > 30 ? 'orange' : 'red' }}></div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                        <p style={{ fontSize: 10, color: '#aaa', textAlign: 'center', marginTop: 15 }}>* O <b>Médico</b> e o <b>Auxiliar</b> devem acessar seus painéis pessoais para realizar tratamentos e curar os jogadores.</p>
                     </div>
                 )}
 
-                {/* ABA 4: PENEIRA (RESULTADO DOS OLHEIROS) */}
-                {tab === 'PENEIRA' && (
+                {/* ABA 4: DIRETORIA (PENEIRAS E UPGRADES) */}
+                {tab === 'DIRETORIA' && (
                     <div className="animate-in">
-                        <h3 style={{color:'var(--purple)', marginTop:0}}>🔎 Talentos Observados</h3>
-                        <p style={{fontSize:11, color:'#aaa'}}>Estes atletas (Bots) foram descobertos pelo Olheiro. Contrate os que desejar. Se uma nova peneira for feita, estes irão desaparecer!</p>
-                        
+                        {isPresident && nextDb && (
+                            <div style={{ marginBottom: 15, padding: 10, border: '1px dashed gold', borderRadius: 8, textAlign: 'center', background: 'rgba(255,215,0,0.05)' }}>
+                                <b style={{ color: 'gold' }}>Melhoria de CT: {nextDb.name} (+{nextDb.bonusXP}% XP)</b>
+                                <button className="btn btn-gold" onClick={handleUpgrade} style={{ color: '#000', margin: '10px 0 0 0', fontSize: 10 }}>
+                                    AUTORIZAR OBRA ({fmt(db.upgCost)})
+                                </button>
+                            </div>
+                        )}
+
+                        <h4 style={{ color: 'var(--purple)', marginTop: 0 }}>🔎 Relatórios do Olheiro (Peneira)</h4>
                         {(!team.peneiraList || team.peneiraList.length === 0) ? (
-                            <div className="card" style={{textAlign:'center', padding:30}}>O Olheiro ainda não realizou buscas hoje.</div>
+                            <p style={{ textAlign: 'center', color: '#666', fontSize: 11 }}>O Olheiro ainda não enviou nenhum relatório hoje.</p>
                         ) : (
-                            <div style={{display:'grid', gap:10}}>
+                            <div style={{ display: 'grid', gap: 10 }}>
                                 {team.peneiraList.map(npc => (
-                                    <div key={npc.id} className="card" style={{borderLeft:`4px solid ${getPosColor(npc.position)}`, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                    <div key={npc.id} className="card" style={{ borderLeft: '4px solid var(--purple)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <div>
-                                            <b>{npc.name}</b> <span className="badge-pos" style={{background:getPosColor(npc.position)}}>{npc.position}</span><br/>
-                                            <small style={{color:'#aaa'}}>OVR: <b style={{color:'gold'}}>{npc.overall}</b> | Salário Base: {fmt(npc.salary)}</small>
+                                            <b>{npc.name}</b> <span style={{ fontSize: 9, background: '#333', padding: '2px 5px', borderRadius: 3 }}>{npc.position}</span><br />
+                                            <small style={{ color: '#aaa' }}>OVR: <b style={{ color: 'gold' }}>{npc.overall}</b> | Custo: {fmt(npc.value)}</small>
                                         </div>
-                                        <div style={{display:'flex', gap:5, flexDirection:'column'}}>
-                                           {/* O Presidente contrata */}
-                                            {isPresident && (
-                                                <button className="btn btn-green" style={{fontSize:9, padding:'5px', margin:0}} onClick={() => {
-                                                    const currentNpcs = players.filter(p => p.teamId === team.id && p.isNPC).length;
-                                                    
-                                                    // 1. Trava se já tiver 7
-                                                    if (currentNpcs >= 7) {
-                                                        return alert(`🚫 LIMITE ATINGIDO!\nVocê já tem 7/7 BOTS no elenco. Você só poderá contratar outro quando 1 deles sair do elenco.`);
-                                                    }
-                                                    
-                                                    // 2. Balão de fala EXATO que você pediu!
-                                                    if (!confirm(`⚠️ AVISO DA BASE\n\nAtualmente você tem ${currentNpcs}/7 BOTS no elenco.\nTem certeza que quer contratar ${npc.name} por ${fmt(npc.value)}?\n\nAssim que você completar 7 de 7, você só poderá contratar outro quando 1 deles sair do elenco.`)) {
-                                                        return; // O usuário clicou em Cancelar
-                                                    }
-
-                                                    if (team.balance < npc.value) return alert("Saldo insuficiente para as luvas!");
-                                                    
-                                                    const db = firebase.firestore();
-                                                    const b = db.batch();
-                                                    
-                                                    // Tira o dinheiro do clube
-                                                    b.update(db.collection('teams').doc(team.id), {
-                                                        balance: firebase.firestore.FieldValue.increment(-npc.value),
-                                                        peneiraList: team.peneiraList.filter(x => x.id !== npc.id) // Tira da lista
-                                                    });
-                                                    
-                                                    // Cria o jogador Oficial no Banco de Dados
-                                                    b.set(db.collection('players').doc(), {
-                                                        name: npc.name, position: npc.position, overall: npc.overall, attributes: npc.attributes,
-                                                        salary: npc.salary, value: npc.value, teamId: team.id, status: 'NAO_A_VENDA', mood: '😐',
-                                                        contract: 3, isNPC: true, balance: npc.value, xp: 0, fame: 0, stats: {goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0}
-                                                    });
-
-                                                    b.commit().then(() => alert(`✅ ${npc.name} assinou contrato e já está no seu elenco!`));
-                                                }}>CONTRATAR ({fmt(npc.value)})</button>
-                                            )}
-                                            
-                                            {/* O Técnico indica */}
-                                            {isCoach && (
-                                                <button className="btn btn-gold" style={{fontSize:9, padding:'5px', margin:0}} onClick={() => {
-                                                    alert(`Você indicou ${npc.name} para a diretoria. Peça ao dono do time para vir no CT e contratar!`);
-                                                }}>💡 RECOMENDAR</button>
-                                            )}
-                                        </div>
+                                        {isPresident && (
+                                            <button className="btn btn-green" style={{ fontSize: 9, padding: '5px', width: 'auto', margin: 0 }} onClick={async () => {
+                                                if (team.balance < npc.value) return alert("Caixa insuficiente!");
+                                                await firebase.firestore().collection('teams').doc(team.id).update({
+                                                    balance: firebase.firestore.FieldValue.increment(-npc.value),
+                                                    peneiraList: team.peneiraList.filter(x => x.id !== npc.id)
+                                                });
+                                                await firebase.firestore().collection('players').add({
+                                                    name: npc.name, position: npc.position, overall: npc.overall, attributes: npc.attributes,
+                                                    salary: npc.salary, value: npc.value, teamId: team.id, status: 'NAO_A_VENDA', contract: 3, isNPC: true,
+                                                    mood: '😐', balance: npc.value, xp: 0, fame: 0, stats: { goals: 0, assists: 0, tackles: 0, saves: 0, yellows: 0, reds: 0 }
+                                                });
+                                                alert(`${npc.name} foi contratado para a base!`);
+                                                onClose();
+                                            }}>APROVAR</button>
+                                        )}
                                     </div>
                                 ))}
                             </div>
                         )}
                     </div>
                 )}
-                              
-                <button className="btn btn-red" style={{marginTop:15}} onClick={onClose}>FECHAR CT</button>
+
+                <button className="btn btn-red" style={{ marginTop: 15 }} onClick={onClose}>FECHAR</button>
             </div>
         </div>
     );
 };
+//FIM
         
      const StadiumManager = ({ team, players, onClose }) => {
     const lvl = team.stadiumLevel || 1;
@@ -7928,36 +7823,25 @@ const renewContract = async (p) => {
     };
             // --- TREINO SOLO DO JOGADOR ---
  const handlePlayerSoloTrain = async (player, type) => {
-        // CORREÇÃO CRÍTICA: Define energia atual aceitando o ZERO
         const currentEnergy = player.energy !== undefined ? player.energy : 100;
 
-        // 1. Verifica Energia (Custo alto: 35) e se está lesionado
-        if (currentEnergy < 35) {
-            return alert(`Você está exausto (${currentEnergy}%)! Precisa de pelo menos 35% de energia.`);
-        }
-        if ((player.recoveryLeft || 0) > 0) {
-            return alert(`Você está lesionado (${player.injury}) e não pode treinar por mais ${player.recoveryLeft} jogos!`);
-        }
+        if (currentEnergy < 35) return alert(`Exausto (${currentEnergy}%)! Precisa de 35%.`);
+        if ((player.recoveryLeft || 0) > 0) return alert(`Você está lesionado e não pode treinar!`);
 
         setLoading(true);
         const b = db.batch();
         let report = [];
 
-        // --- CHANCE DE LESÃO AUTOMÁTICA (2%) ---
         if (Math.random() < 0.02) {
             const injuryName = INJURIES_DB.LEVE[Math.floor(Math.random() * INJURIES_DB.LEVE.length)];
             b.update(db.collection('players').doc(player.id), {
-                injury: injuryName,
-                recoveryLeft: 1,
-                energy: Math.max(0, currentEnergy - 20), // Gasta um pouco de energia no susto
-                mood: '😡'
+                injury: injuryName, recoveryLeft: 1, energy: Math.max(0, currentEnergy - 20), mood: '😡'
             });
             await b.commit();
             setLoading(false);
-            return alert(`❌ INFORTÚNIO!\nVocê sentiu o físico durante o treino.\nDiagnóstico: ${injuryName}\nTempo: 1 Jogo fora.`);
+            return alert(`❌ INFORTÚNIO!\nLesão no treino: ${injuryName}\n1 Jogo fora.`);
         }
 
-        // 2. Define Atributos baseados no Tipo (Atualizado para cobrir TODOS os atributos do sistema)
         let trainedAttrs = [];
         if(type === 'FISICO_BASE') trainedAttrs = ['stamina', 'balance', 'condition', 'strength'];
         else if(type === 'VELOCIDADE') trainedAttrs = ['speed', 'accel', 'agility', 'dribbleSpd'];
@@ -7970,51 +7854,46 @@ const renewContract = async (p) => {
         else if(type === 'BOLA_PARADA') trainedAttrs = ['freeKick', 'curve', 'header', 'penalties'];
         else if(type === 'GOLEIRO') trainedAttrs = ['gk', 'response', 'jump', 'longPass'];
 
-        // 3. Cálculos (Eficiência Baixa no Solo)
-        let xpGain = Math.floor(Math.random() * 4) + 3; // Ganha entre 3 e 6 XP
-        const newEnergy = currentEnergy - 35; // Gasta 35 de Energia (Cálculo seguro)
+        let xpGain = Math.floor(Math.random() * 4) + 3;
+        const newEnergy = currentEnergy - 35;
 
-        // --- BÔNUS DE ITEM EQUIPADO (CHUTEIRA/LUVA) ---
         if (player.equippedItem) {
-            const itemBonusPercent = player.equippedItem.power || 0;
-            const bonusAmount = Math.ceil(xpGain * (itemBonusPercent / 100));
+            const bonusAmount = Math.ceil(xpGain * ((player.equippedItem.power || 0) / 100));
             xpGain += bonusAmount;
-            report.push(`👟 Item usado: ${player.equippedItem.name} (+${bonusAmount} XP)`);
-            
-            // Consome o item (remove da coleção sales e do player)
-            const itemRef = db.collection('sales').doc(player.equippedItem.id);
-            b.delete(itemRef);
+            report.push(`Usou ${player.equippedItem.name} (+${bonusAmount} XP)`);
+            b.delete(db.collection('sales').doc(player.equippedItem.id));
             b.update(db.collection('players').doc(player.id), { equippedItem: firebase.firestore.FieldValue.delete() });
         }
 
-        // 4. Evolução de Atributos (Chance Baixa: 15%)
         let newAttrs = { ...(player.attributes || {}) };
         let evolved = false;
-        
         trainedAttrs.forEach(attr => {
-            if((newAttrs[attr] || 50) < 99) {
-                if(Math.random() < 0.15) { // 15% de chance de subir 1 ponto
-                    newAttrs[attr] = (newAttrs[attr] || 50) + 1;
-                    evolved = true;
-                }
+            if((newAttrs[attr] || 50) < 99 && Math.random() < 0.15) { 
+                newAttrs[attr] = (newAttrs[attr] || 50) + 1; evolved = true; 
             }
         });
 
-        // 5. Salva no Banco (SEM ATUALIZAR O OVERALL)
-        // O Overall agora só deve ser recalculado na virada de temporada pelo Admin
+        // SALVA DADOS DO JOGADOR
         b.update(db.collection('players').doc(player.id), {
-            xp: (player.xp || 0) + xpGain,
-            energy: newEnergy,
-            attributes: newAttrs
-            // overall removido para evitar inflação fora de época
+            xp: (player.xp || 0) + xpGain, energy: newEnergy, attributes: newAttrs
         });
+
+        // ESCREVE NO DIÁRIO DO CLUBE
+        const currentTeam = teams.find(t => t.id === player.teamId);
+        if (currentTeam) {
+            let newLogs = [...(currentTeam.trainingLogs || [])];
+            let msgLog = `${player.name} fez um treino extra e ganhou +${xpGain} XP.`;
+            if(evolved) msgLog += ` Alguns atributos evoluíram!`;
+            newLogs.unshift({ date: Date.now(), type: '🏃‍♂️ TREINO SOLO', report: msgLog });
+            if (newLogs.length > 15) newLogs.pop();
+            b.update(db.collection('teams').doc(currentTeam.id), { trainingLogs: newLogs });
+        }
 
         await b.commit();
         setLoading(false);
         
-        let msg = `Treino realizado!\n⚡ Energia: -35% (Resta: ${newEnergy}%)\n📈 XP: +${xpGain}`;
+        let msg = `Treino concluído!\nEnergia: -35%\nXP: +${xpGain}`;
         if(report.length > 0) msg += `\n${report.join('\n')}`;
-        if(evolved) msg += "\n✨ Alguns atributos melhoraram um pouco.";
         alert(msg);
     };
 
@@ -8625,8 +8504,8 @@ onClick={() => {
                         <div className="modal-content">
                             {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={async(id)=>{db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} onRenew={renewContract} isOwner={user.type==='USER' && modal.data?.teamId===user.data?.id} />}
                             {modal.type==='ADMIN_PLAYER' && <AdminPlayerModal player={modal.data} teams={teams} onClose={()=>setModal(null)} />}
-{modal.type==='CT_TYCOON' && modal.data && <TrainingCenterManager team={teams.find(t => t.id === modal.data.id) || modal.data} players={players.filter(p=>p.teamId===modal.data.id)} coach={(coaches||[]).find(c => c.teamId === modal.data.id && c.status === 'ACTIVE')} user={user} onClose={()=>setModal(null)} onTrain={handleCoachTrain} onTrainSolo={handlePlayerSoloTrain} />}
-        {modal.type==='OFFER' && <OfferForm target={modal.data} myPlayers={players.filter(p => p.teamId === user.data.id)} onSend={sendOffer} setModal={setModal} user={user} />}
+                            {modal.type==='CT_TYCOON' && modal.data && <TrainingCenterManager team={teams.find(t => t.id === modal.data.id) || modal.data} players={players.filter(p=>p.teamId===modal.data.id)} staff={(coaches||[]).filter(c => c.teamId === modal.data.id && c.status === 'ACTIVE')} user={user} onClose={()=>setModal(null)} onTrain={handleCoachTrain} onTrainSolo={handlePlayerSoloTrain} />}
+    {modal.type==='OFFER' && <OfferForm target={modal.data} myPlayers={players.filter(p => p.teamId === user.data.id)} onSend={sendOffer} setModal={setModal} user={user} />}
                             {modal.type==='SETTINGS' && <SettingsForm team={modal.data || user.data} isAdmin={user.type==='ADMIN'} onUp={(d)=>{const tid=(modal.data?.id)||user.data.id; db.collection('teams').doc(tid).update(d); setModal(null);}} onUpgrade={()=>{/*Up*/}} onReq={(t,a,d)=>{db.collection('financeRequests').add({teamId:user.data.id, teamName:user.data.name, type:t, amount:parseFloat(a), details:d, status:'PENDING'}); setModal(null); alert("Enviado!");}} onWithdraw={withdrawMoney} />}
                             {modal.type==='MATCH_PERFORMANCE' && <MatchPerformanceForm players={players} teams={teams} onSaveStats={saveMatchStats} matchData={modal.data?.match} />}
                             {modal.type==='TEAM_TABLE' && <TeamStandingsEditor teams={teams} onUpdateTeamStats={updateTeamStats} />}
@@ -10375,10 +10254,15 @@ const ScoutDashboard = ({ scout, team, players, onSelfAction, setModal }) => {
             });
         }
 
-        // 2. Cobra do clube e salva a lista no clube
+        // 2. Cobra do clube, salva a lista e avisa no Diário
+        let newLogs = [...(team.trainingLogs || [])];
+        newLogs.unshift({ date: Date.now(), type: '🔎 OLHEIRO (PENEIRA)', report: `O Olheiro ${scout.name} retornou de viagem e entregou um relatório com 5 novas promessas para a Diretoria avaliar.` });
+        if (newLogs.length > 15) newLogs.pop();
+
         b.update(db.collection('teams').doc(team.id), {
             balance: firebase.firestore.FieldValue.increment(-cost),
-            peneiraList: newProspects // Substitui a lista antiga
+            peneiraList: newProspects,
+            trainingLogs: newLogs
         });
 
         // 3. Atualiza o XP e o Nível do Olheiro
@@ -10665,7 +10549,7 @@ const DoctorDashboard = ({ doctor, team, players, offers, sales, onUseItem, onSe
 
             if (success) {
                 let tempoReduzido = cirurgia.timeRed;
-                if (hasMiracle) tempoReduzido += 1; // Habilidade Milagreiro
+                if (hasMiracle) tempoReduzido += 1;
 
                 const novoTempo = Math.max(0, p.recoveryLeft - tempoReduzido);
                 let newXp = (doctor.xp || 0) + 50;
@@ -10678,10 +10562,40 @@ const DoctorDashboard = ({ doctor, team, players, offers, sales, onUseItem, onSe
                     alert(`🎉 Nível ${newLevel} alcançado!`); 
                 }
 
+                // LOG DO DIÁRIO
+                let newLogs = [...(team?.trainingLogs || [])];
+                newLogs.unshift({ date: Date.now(), type: '🏥 DM (ALTA MÉDICA)', report: `O Dr. ${doctor.name} operou ${p.name} com SUCESSO e reduziu ${tempoReduzido} jogos de lesão!` });
+                if (newLogs.length > 15) newLogs.pop();
+                if(team) b.update(db.collection('teams').doc(team.id), { trainingLogs: newLogs });
+
                 b.update(pRef, { recoveryLeft: novoTempo, injury: novoTempo === 0 ? firebase.firestore.FieldValue.delete() : p.injury, donors: {} });
                 b.update(docRef, { energy: energy - 40, balance: firebase.firestore.FieldValue.increment(doctorFee), xp: newXp, level: newLevel, pendingPerks: pending });
                 
                 await b.commit();
+                alert(`✅ CIRURGIA UM SUCESSO!\nSuas mãos foram precisas. O jogador reduziu ${tempoReduzido} jogos de lesão!\nVocê ganhou ${fmt(doctorFee)} e +50 XP.`);
+            } else {
+                // ERRO MÉDICO!
+                let penalty = 2;
+                if (hasColdBlood) penalty = 0;
+
+                // LOG DO DIÁRIO
+                let newLogs = [...(team?.trainingLogs || [])];
+                newLogs.unshift({ date: Date.now(), type: '⚠️ ERRO MÉDICO', report: `Houve complicações na cirurgia de ${p.name}. O jogador precisará de mais tempo.` });
+                if (newLogs.length > 15) newLogs.pop();
+                if(team) b.update(db.collection('teams').doc(team.id), { trainingLogs: newLogs });
+
+                b.update(pRef, { recoveryLeft: p.recoveryLeft + penalty, mood: '😡' }); 
+                b.update(docRef, { energy: energy - 40, xp: Math.max(0, (doctor.xp || 0) - 20) }); 
+                
+                if (!hasColdBlood) {
+                    db.collection('news').add({
+                        text: `🚨 **ERRO MÉDICO!**\nO Dr. **${doctor.name}** do ${team?.name||'Clube'} cometeu uma falha grave na cirurgia de **${p.name}**!`,
+                        type: 'press', date: Date.now(), likes: []
+                    });
+                }
+
+                await b.commit();
+                
                 alert(`✅ CIRURGIA UM SUCESSO!\nSuas mãos foram precisas. O jogador reduziu ${tempoReduzido} jogos de lesão!\nVocê ganhou ${fmt(doctorFee)} e +50 XP.`);
             } else {
                 // ERRO MÉDICO!

@@ -2262,77 +2262,7 @@ const TeamDashboard = ({ team, players, staff, isVisitor, onEdit, onAdd, onFireC
         ]
     };
 
-    const handleSurgery = async (p) => {
-        let category = 'LEVE';
-        const injuryName = typeof p.injury === 'object' ? p.injury.label : p.injury;
-        
-        if (INJURIES_DB.MODERADA.includes(injuryName)) category = 'MODERADA';
-        if (INJURIES_DB.GRAVE.includes(injuryName)) category = 'GRAVE';
-        if (INJURIES_DB.EXTREMA.includes(injuryName)) category = 'EXTREMA';
-
-        if (category === 'LEVE' || injuryName === 'Intoxicação Alimentar') {
-            return alert(`🚫 PRONTUÁRIO NEGADO!\nA lesão "${injuryName}" é considerada leve ou clínica. O tratamento exige apenas repouso e tempo natural. Não há indicação cirúrgica.`);
-        }
-
-        const options = SURGERY_OPTIONS[category];
-        const lista = options.map((s, idx) => 
-            `${idx + 1}) ${s.name}\n💰 Custo: ${fmt(s.cost)} | ⏳ Reduz: ${s.timeRed} jogo(s) | 🎯 Sucesso: ${s.success * 100}%\n📝 ${s.text}`
-        ).join('\n\n');
-
-        const escolha = prompt(`HOSPITAL MUNICIPAL - PACIENTE: ${p.name}\nCategoria: ${category}\nSaldo na Vaquinha: ${fmt(p.hospitalFund || 0)}\n\nEscolha o procedimento (1-${options.length}):\n\n${lista}`);
-        
-        if (escolha) {
-           const cirurgia = options[parseInt(escolha) - 1];
-            if (!cirurgia) return alert("Opção inválida.");
-
-            let teamCoverage = 0;
-            if (p.teamId && p.teamId !== 'FREE') {
-                const teamDoc = await db.collection('teams').doc(p.teamId).get();
-                if (teamDoc.exists && teamDoc.data().healthPlan) {
-                    teamCoverage = teamDoc.data().healthPlan.coverage || 0;
-                }
-            }
-            
-            const playerCoverage = p.healthPlan ? (p.healthPlan.coverage || 0) : 0;
-            const bestCoverage = Math.max(teamCoverage, playerCoverage); 
-            
-            const discountAmount = bestCoverage > 0 ? (cirurgia.cost * (bestCoverage / 100)) : 0;
-            const finalCost = cirurgia.cost - discountAmount;
-            
-            if ((p.hospitalFund || 0) < finalCost) {
-                return alert(`Saldo na vaquinha insuficiente!\nCusto com desconto: ${fmt(finalCost)}\nSaldo atual: ${fmt(p.hospitalFund || 0)}`);
-            }
-
-            let confirmMsg = `Confirmar ${cirurgia.name}?`;
-            if (bestCoverage > 0) confirmMsg += `\n\n🛡️ SEGURO ATIVADO (-${bestCoverage}%)\nDe: ${fmt(cirurgia.cost)}\nPor: ${fmt(finalCost)}`;
-            else confirmMsg += `\n\n⚠️ SEM SEGURO\nCusto Total: ${fmt(finalCost)}`;
-
-            if (confirm(confirmMsg)) {
-                const sucesso = Math.random() < cirurgia.success;
-                const b = db.batch();
-                const pRef = db.collection('players').doc(p.id);
-
-                if (sucesso) {
-                    const novoTempo = Math.max(0, p.recoveryLeft - cirurgia.timeRed);
-                    b.update(pRef, { 
-                        recoveryLeft: novoTempo,
-                        hospitalFund: (p.hospitalFund || 0) - finalCost,
-                        injury: novoTempo === 0 ? firebase.firestore.FieldValue.delete() : p.injury,
-                        donors: {} 
-                    });
-                    alert(`✅ SUCESSO!\nA operação foi um êxito. ${p.name} deve retornar aos gramados em breve.`);
-                } else {
-                    b.update(pRef, { 
-                        hospitalFund: (p.hospitalFund || 0) - finalCost,
-                        recoveryLeft: p.recoveryLeft + 1, 
-                        mood: '😡'
-                    });
-                    alert(`❌ COMPLICAÇÕES...\nO corpo do atleta não reagiu bem ao procedimento. Ele ficará mais tempo em observação.`);
-                }
-                await b.commit();
-            }
-        }
-    };
+   
 
     const LOAN_LIMITS = { 'VARZEA': 500000, 'D': 2000000, 'C': 5000000, 'B': 10000000, 'A': 20000000 };
 

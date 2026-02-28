@@ -234,6 +234,7 @@
         
         const SERIES = ['A', 'B', 'C', 'D', 'VARZEA'];
         const COSTS = [0, 5000000, 20000000, 50000000, 100000000];
+        const ESTADOS = ['Vale do Mato', 'Lua Mare', 'Rio Manso', 'Serra Verde', 'Lagoa Azul'];
         const fmt = (v) => "₣ " + parseFloat(v||0).toLocaleString('pt-BR');
 const getPosColor = (p) => {
     if (p === 'GOL') return '#E65100'; 
@@ -4412,9 +4413,18 @@ db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTA
            // ... continuação do código anterior
             const loginAdmin = () => { setUser({ type: 'ADMIN', data: { id: 'admin', name: 'FEDERAÇÃO (ADM)', balance: 0, logo: null, stadiumLevel: 1, serie: 'ADM' } }); setScreen('HOME'); };
 
-          
-           const createTeam = async (name, bal, serie, pass, logo) => { if(teams.find(t=>t.name.toLowerCase()===name.toLowerCase())) return alert("Nome em uso!"); await db.collection('teams').add({ name, balance: parseFloat(bal), serie, password: pass, stadiumLevel: 1, logo: logo||null, status: 'PENDING' }); alert("Criado! Aguarde aprovação."); };
+          const createTeam = async (name, bal, serie, pass, logo, estado) => { 
+    if(!estado) return alert("Escolha um Estado!");
+    if(teams.find(t=>t.name.toLowerCase()===name.toLowerCase())) return alert("Nome em uso!"); 
+    await db.collection('teams').add({ 
+        name, balance: parseFloat(bal), serie, estado, password: pass, stadiumLevel: 1, logo: logo||null, status: 'PENDING',
+        stats: {pts:0, wins:0, draws:0, losses:0, gf:0, ga:0, cards:0},
+        stateStats: {pts:0, wins:0, draws:0, losses:0, gf:0, ga:0} // Stats separadas para o Estadual
+    }); 
+    alert("Clube fundado! Aguarde aprovação da Federação."); 
+};
 
+           
            // --- CRIAR JOGADOR NOVATO (VIA TELA INICIAL) ---
     const createPlayerAccount = async (data) => {
         if (!data.name || !data.password || !data.instagram) return alert("Preencha todos os campos!");
@@ -5076,61 +5086,57 @@ if (act === 'VARZEA') {
         
         try {
             // Limpa jogos antigos de forma segura
-            const oldMatches = await db.collection('matches').get();
-            oldMatches.forEach(doc => getBatch().delete(doc.ref));
-
-            // Incluída a VARZEA na lista de geração
+            // 1. GERA AS LIGAS NACIONAIS (SÉRIES)
             const seriesToGen = ['A', 'B', 'C', 'D', 'VARZEA'];
-            
             seriesToGen.forEach(serie => {
                 const leagueTeams = teams.filter(t => t.serie === serie && t.status === 'ACTIVE');
-                
-                // Várzea precisa de pelo menos 2 times para ter jogo
                 if (leagueTeams.length < 2) return; 
 
                 const numRounds = (leagueTeams.length - 1) * 2; 
                 let ids = leagueTeams.map(t => t.id);
-
-                // Se for ímpar, adiciona um "BYE" (folga) para a matemática funcionar
                 if (ids.length % 2 !== 0) ids.push(null);
 
                 for (let round = 0; round < numRounds; round++) {
-                    const roundNum = round + 1;
                     const isReturnLeg = round >= (numRounds / 2);
-
                     for (let i = 0; i < ids.length / 2; i++) {
-                        const homeIdx = i;
-                        const awayIdx = ids.length - 1 - i;
-
-                        let home = ids[homeIdx];
-                        let away = ids[awayIdx];
-
-                        // Pula se for folga
+                        let home = ids[i]; let away = ids[ids.length - 1 - i];
                         if (!home || !away) continue;
-
                         if (isReturnLeg) { [home, away] = [away, home]; } 
+                        
+                        const hTeam = teams.find(t => t.id === home); const aTeam = teams.find(t => t.id === away);
+                        getBatch().set(db.collection('matches').doc(), {
+                            serie: serie, round: round + 1, homeId: home, homeName: hTeam.name, homeLogo: hTeam.logo || null,
+                            awayId: away, awayName: aTeam.name, awayLogo: aTeam.logo || null, scoreHome: 0, scoreAway: 0, status: 'PENDING', played: false
+                        });
+                    }
+                    ids.splice(1, 0, ids.pop());
+                }
+            });
 
-                        if (home && away) { 
-                            const matchRef = db.collection('matches').doc();
-                            const homeTeam = teams.find(t => t.id === home);
-                            const awayTeam = teams.find(t => t.id === away);
+            // 2. GERA OS ESTADUAIS (FASE 1 - TODOS CONTRA TODOS DO ESTADO)
+            ESTADOS.forEach(estado => {
+                const stateTeams = teams.filter(t => t.estado === estado && t.status === 'ACTIVE');
+                if (stateTeams.length < 2) return;
 
-                            // Criando os novos jogos de forma segura
-                            getBatch().set(matchRef, {
-                                serie: serie,
-                                round: roundNum,
-                                homeId: home,
-                                homeName: homeTeam.name,
-                                homeLogo: homeTeam.logo || null,
-                                awayId: away,
-                                awayName: awayTeam.name,
-                                awayLogo: awayTeam.logo || null,
-                                scoreHome: 0,
-                                scoreAway: 0,
-                                status: 'PENDING',
-                                played: false
-                            });
-                        }
+                const numRounds = stateTeams.length - 1; // Apenas Jogo de Ida (Fase Curta)
+                let ids = stateTeams.map(t => t.id);
+                if (ids.length % 2 !== 0) ids.push(null);
+
+                for (let round = 0; round < numRounds; round++) {
+                    for (let i = 0; i < ids.length / 2; i++) {
+                        let home = ids[i]; let away = ids[ids.length - 1 - i];
+                        if (!home || !away) continue;
+                        // Sorteia quem joga em casa na fase única
+                        if (Math.random() > 0.5) { [home, away] = [away, home]; }
+                        
+                        const hTeam = teams.find(t => t.id === home); const aTeam = teams.find(t => t.id === away);
+                        getBatch().set(db.collection('matches').doc(), {
+                            serie: 'ESTADUAL', estado: estado, round: `Fase 1 (Rod. ${round + 1})`, 
+                            homeId: home, homeName: hTeam.name, homeLogo: hTeam.logo || null,
+                            awayId: away, awayName: aTeam.name, awayLogo: aTeam.logo || null, 
+                            scoreHome: 0, scoreAway: 0, status: 'PENDING', played: false,
+                            isEstadual: true
+                        });
                     }
                     ids.splice(1, 0, ids.pop());
                 }
@@ -6168,7 +6174,27 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                     <button className="btn" style={{background:'#333', border:'1px solid #666', marginTop:10}} onClick={onGenAttrs}>
                         🎲 GERAR ATRIBUTOS (ALL)
                     </button>
-                    
+                    <button className="btn" style={{background:'#1a237e', color:'white', border:'1px solid #5c6bc0', marginTop:10}} onClick={async () => {
+                        if(!confirm("Distribuir todos os times antigos aleatoriamente pelos 5 Estados?")) return;
+                        setLoading(true);
+                        const b = firebase.firestore().batch();
+                        let count = 0;
+                        teams.forEach(t => {
+                            if(!t.estado) {
+                                const randomState = ESTADOS[Math.floor(Math.random() * ESTADOS.length)];
+                                b.update(firebase.firestore().collection('teams').doc(t.id), { 
+                                    estado: randomState,
+                                    stateStats: {pts:0, wins:0, draws:0, losses:0, gf:0, ga:0}
+                                });
+                                count++;
+                            }
+                        });
+                        await b.commit();
+                        setLoading(false);
+                        alert(`Sucesso! ${count} times foram filiados aos Estaduais.`);
+                    }}>
+                        🗺️ ATRIBUIR ESTADOS AOS TIMES ANTIGOS
+                    </button>
                     <button 
                         className="btn" 
                         style={{background: 'black', color: 'red', border: '1px solid red', marginTop: 15}} 
@@ -8803,7 +8829,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
     return (
         <div className="login-wrapper">
             <h1 className="login-title">Gerenciador de Times<br/><span className="login-title-span">de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.2 COMISSÃO TÉCNICA COMPLETA   </div>
+            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.3COMISSÃO TÉCNICA COMPLETA   </div>
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>
@@ -9077,24 +9103,32 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                     disabled={f.s === 'VARZEA'}
                 />
                 
-                <select className="input-field" value={f.s} onChange={e=>{
-                    // Se mudar para Várzea, força 200k. Se sair, volta pro padrão.
-                    const newSerie = e.target.value;
-                    const newBal = newSerie === 'VARZEA' ? '200000' : '10000000';
-                    setF({...f, s:newSerie, b:newBal});
-                }}>
-                    {SERIES.map(s=><option key={s} value={s}>{s === 'VARZEA' ? 'Série E (Várzea)' : `Série ${s}`}</option>)}
-                </select>
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                    <div>
+                        <label style={{fontSize:11, color:'#aaa'}}>Divisão Nacional</label>
+                        <select className="input-field" value={f.s} onChange={e=>{
+                            const newSerie = e.target.value;
+                            const newBal = newSerie === 'VARZEA' ? '200000' : '10000000';
+                            setF({...f, s:newSerie, b:newBal});
+                        }}>
+                            {SERIES.map(s=><option key={s} value={s}>{s === 'VARZEA' ? 'Série E (Várzea)' : `Série ${s}`}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label style={{fontSize:11, color:'#aaa'}}>Federação Estadual</label>
+                        <select className="input-field" value={f.estado || ''} onChange={e=>setF({...f, estado:e.target.value})}>
+                            <option value="">-- Escolha --</option>
+                            {ESTADOS.map(est=><option key={est} value={est}>{est}</option>)}
+                        </select>
+                    </div>
+                </div>
 
                 <input className="input-field" type="password" placeholder="Crie uma Senha" value={f.p} onChange={e=>setF({...f, p:e.target.value})} />
                 
-                {/* --- AVISO DE VÁRZEA FECHADA --- */}
                 {f.s === 'VARZEA' && config?.varzeaOpen === false && (
                     <div className="login-varzea-warning">
                         <b className="login-varzea-warning-title">🛑 INSCRIÇÕES ENCERRADAS!</b>
-                        <span className="login-varzea-warning-text">
-                            A Federação informa que o limite de clubes filiados ao Terrão (Várzea) foi atingido. Novas vagas estarão disponíveis apenas na próxima temporada. Fique atento aos comunicados oficiais!
-                        </span>
+                        <span className="login-varzea-warning-text">A Federação informa que o limite de clubes da Várzea foi atingido.</span>
                     </div>
                 )}
 
@@ -9102,33 +9136,27 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                     className={`btn ${f.s === 'VARZEA' && config?.varzeaOpen === false ? 'btn-ghost' : 'btn-green'}`} 
                     disabled={f.s === 'VARZEA' && config?.varzeaOpen === false}
                     onClick={()=>{
-                    // Validações de segurança
-                    if(!f.n || !f.p) return alert("⚠️ Preencha o nome do clube e crie uma senha!");
+                    if(!f.n || !f.p || !f.estado) return alert("⚠️ Preencha nome, senha e escolha o ESTADO!");
                     if(teams.find(t=>t.name && t.name.toLowerCase() === f.n.toLowerCase())) return alert("🚫 Este nome de clube já está em uso!");
 
-                    // Lógica de Aprovação Automática
                     const statusInicial = f.s === 'VARZEA' ? 'ACTIVE' : 'PENDING';
                     const finalBal = f.s === 'VARZEA' ? 200000 : parseFloat(f.b);
                     
                     db.collection('teams').add({ 
-                        name: f.n, 
-                        balance: finalBal, 
-                        serie: f.s, 
-                        password: f.p, 
-                        stadiumLevel: 1, 
-                        logo: f.l||null, 
-                        status: statusInicial 
+                        name: f.n, balance: finalBal, serie: f.s, estado: f.estado, password: f.p, stadiumLevel: 1, logo: f.l||null, status: statusInicial,
+                        stats: {pts:0, wins:0, draws:0, losses:0, gf:0, ga:0, cards:0},
+                        stateStats: {pts:0, wins:0, draws:0, losses:0, gf:0, ga:0}
                     }).then(() => {
                         if(statusInicial === 'ACTIVE') {
-                            alert("✅ Clube de Várzea fundado e APROVADO automaticamente! Bons jogos.");
+                            alert("✅ Clube de Várzea fundado! Bem-vindo ao Estadual de " + f.estado + "!");
                             window.location.reload();
                         } else {
                             alert("✅ Solicitação enviada à Federação! Aguarde aprovação.");
-                            setF({n:'', b:'10000000', s:'A', p:'', l: null}); // Limpa o formulário
-                            setTab('LOGIN'); // Volta para a aba principal
+                            setF({n:'', b:'10000000', s:'A', p:'', l: null, estado: ''}); 
+                            setTab('LOGIN'); 
                         }
                     });
-                }}>FUNDAR CLUBE</button>
+                }}>FUNDAR CLUBE E FILIAR À FEDERAÇÃO</button>
                 
                 {f.s === 'VARZEA' && <p className="login-varzea-note">* Times da Várzea iniciam com teto de ₣ 200.000 e aprovação imediata.</p>}
             </div>}           

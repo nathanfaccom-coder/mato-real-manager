@@ -6243,7 +6243,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                     ))}
                     
                     <h4>Clubes Ativos</h4>
-                    {(players||[]).filter(p=>p.teamId==='FREE' && p.status!=='PENDING').map(p=>(
+                    {(teams||[]).filter(t=>t.status!=='PENDING').sort((a,b) => a.name.localeCompare(b.name)).map(t=>(
                         <div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                             <span><b>{t.name}</b></span>
                             <div style={{display:'flex', gap:5}}>

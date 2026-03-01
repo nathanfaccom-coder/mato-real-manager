@@ -368,11 +368,13 @@ const DEFAULT_PRIZES = {
 // FASE 2: MOTOR DE CAMPEONATOS PERSONALIZADOS (ATUALIZADO V2)
 // ==========================================
 // --- COMPONENTE GLOBAL DE LOGO (Usado nas Súmulas e Central de Jogos) ---
-const MatchTeamLogo = ({ logo }) => (
-    logo
-        ? <img src={logo} style={{width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', border: '1px solid #444'}} />
-        : <div style={{width: 35, height: 35, background: '#333', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, border: '1px solid #444'}}>🛡️</div>
-);
+// --- COMPONENTE GLOBAL DE LOGO (Usado nas Súmulas e Central de Jogos) ---
+function MatchTeamLogo({ logo }) {
+    if (logo) {
+        return <img src={logo} style={{width: 35, height: 35, borderRadius: '50%', objectFit: 'cover', border: '1px solid #444'}} />;
+    }
+    return <div style={{width: 35, height: 35, background: '#333', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, border: '1px solid #444'}}>🛡️</div>;
+}
         
 const TournamentManagerModal = ({ tournaments, teams, awards, onClose }) => {
     const [tab, setTab] = useState('LIST');

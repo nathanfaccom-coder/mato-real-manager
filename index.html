@@ -1602,7 +1602,7 @@ const TournamentHub = ({ tournaments, matches, players, user, teams, onInspectTe
                 b.set(matchRef2, {
                     serie: selTourn.id, round: roundName + ' (Volta)', status: 'PENDING', played: false, processed: false,
                     homeId: awayId, homeName: awayT?.name, homeLogo: awayT?.logo || null,
-                    awayId: homeId, awayName: homeT?.name, awayLogo: awayT?.logo || null,
+                    awayId: homeId, awayName: homeT?.name, awayLogo: homeT?.logo || null,
                     scoreHome: 0, scoreAway: 0
                 });
             }

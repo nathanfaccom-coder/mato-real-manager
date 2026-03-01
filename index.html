@@ -6003,7 +6003,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                 <div>
                     <h3>Técnicos Pendentes</h3>
                     {(coaches||[]).filter(c => c.status === 'PENDING').length === 0 && <p style={{color:'#666'}}>Nenhuma solicitação.</p>}
-                    {(coaches||[]).filter(c => c.status === 'PENDING').map(c => (
+                    {(coaches||[]).filter(c => c.status === 'PENDING').sort((a,b) => a.name.localeCompare(b.name)).map(c => (
                         <div key={c.id} className="card" style={{borderLeft:'4px solid gold'}}>
                             <div style={{display:'flex', justifyContent:'space-between'}}>
                                 <span><b>{c.name}</b> (Nível {c.level})</span>
@@ -6023,7 +6023,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                     <hr style={{borderColor:'#333'}}/>
                     
                     <h3>Técnicos Ativos</h3>
-                    {(coaches||[]).filter(c => c.status === 'ACTIVE').map(c => (
+                    {(coaches||[]).filter(c => c.status === 'ACTIVE').sort((a,b) => a.name.localeCompare(b.name)).map(c => (
                         <div key={c.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                             <div>
                                 <span style={{fontWeight:'bold', color:'gold'}}>{c.name}</span>
@@ -6205,7 +6205,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                     </div>
 
                     {(players||[]).some(p=>p.status==='PENDING') && <h4>📝 Novatos Pendentes (Verificar)</h4>}
-                    {(players||[]).filter(p=>p.status==='PENDING').map(p => (
+                    {(players||[]).filter(p=>p.status==='PENDING').sort((a,b) => a.name.localeCompare(b.name)).map(p => (
                         <div key={p.id} className="card" style={{borderLeft:'4px solid cyan', background:'rgba(0, 255, 255, 0.05)'}}>
                             <div style={{display:'flex', justifyContent:'space-between'}}>
                                 <b>{p.name}</b>
@@ -6231,7 +6231,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                     
                     <hr style={{borderColor:'#444', margin:'20px 0'}}/>
                     
-                    {(teams||[]).filter(t=>t.status==='PENDING').map(t=>(
+                    {(teams||[]).filter(t=>t.status==='PENDING').sort((a,b) => a.name.localeCompare(b.name)).map(t=>(
                         <div key={t.id} className="card" style={{borderLeft:'4px solid var(--warning)'}}>
                             <b>{t.name} (PENDENTE)</b>
                             <div style={{display:'flex', gap:5, marginTop:5}}>
@@ -6243,7 +6243,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                     ))}
                     
                     <h4>Clubes Ativos</h4>
-                    {(teams||[]).filter(t=>t.status!=='PENDING').map(t=>(
+                    {(players||[]).filter(p=>p.teamId==='FREE' && p.status!=='PENDING').map(p=>(
                         <div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                             <span><b>{t.name}</b></span>
                             <div style={{display:'flex', gap:5}}>
@@ -6284,7 +6284,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                     </div>
                     
                     <h4>Elenco: {selTeamPlayers.name}</h4>
-                    {(players||[]).filter(p => p.teamId === selTeamPlayers.id).sort((a,b)=>b.overall - a.overall).map(p => (
+                    {(players||[]).filter(p => p.teamId === selTeamPlayers.id).sort((a,b) => a.name.localeCompare(b.name)).map(p => (
                         <div key={p.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderLeft:`4px solid ${getPosColor(p.position)}`}}>
                             <div>
                                 <b>{p.name}</b> <small>({p.position} - {p.overall})</small><br/>
@@ -6343,7 +6343,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                     <h4>Solicitações Financeiras</h4>
                     {(reqs||[]).filter(r=>r.status==='PENDING').length === 0 && <p style={{color:'#666'}}>Nenhum pedido pendente.</p>}
                     
-                    {(reqs||[]).filter(r=>r.status==='PENDING').map(r=>(
+                    {(reqs||[]).filter(r=>r.status==='PENDING').sort((a,b) => (a.teamName||'').localeCompare(b.teamName||'')).map(r=>(
                         <div key={r.id} className="card" style={{borderLeft: '4px solid gold'}}>
                             <b>{r.teamName}</b>: {fmt(r.amount)} <small>({r.type})</small><br/>
                             <span style={{fontSize:11, color:'#ccc'}}>{r.details}</span>
@@ -6359,7 +6359,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                     <h4>🏛️ Patrocínios Ativos da Federação</h4>
                     {fedSpons.length === 0 && <p style={{color:'#666'}}>Nenhum patrocínio governamental ativo.</p>}
                     
-                    {fedSpons.map(s => (
+                    {fedSpons.sort((a,b) => (a.teamName||'').localeCompare(b.teamName||'')).map(s => (
                         <div key={s.id} className="card" style={{borderLeft: '4px solid var(--primary)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                             <div>
                                 <b>{s.teamName}</b><br/>
@@ -6379,7 +6379,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
             {tab==='PRESS' && <div>
                 {/* Jornais Pendentes */}
                 {(papers||[]).some(p=>p.status==='PENDING') && <h4>Jornais Pendentes</h4>}
-                {(papers||[]).filter(p=>p.status==='PENDING').map(p=>(
+                {(papers||[]).filter(p=>p.status==='PENDING').sort((a,b) => a.name.localeCompare(b.name)).map(p=>(
                     <div key={p.id} className="card" style={{borderLeft:'4px solid cyan'}}>
                         <b>📰 {p.name} (PENDENTE)</b><br/>
                         <small>Dono: {p.ownerName}</small>
@@ -6405,7 +6405,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
 
                         {/* Lista de Jornalistas deste Jornal */}
                         <div style={{marginLeft:20, marginTop:5}}>
-                            {journalists.filter(j => j.newspaperId === p.id).map(j => (
+                            {journalists.filter(j => j.newspaperId === p.id).sort((a,b) => a.name.localeCompare(b.name)).map(j => (
                                 <div key={j.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 15px', borderLeft:'2px solid cyan'}}>
                                     <small>✒️ {j.name}</small>
                                     <div style={{display:'flex', gap:5}}>
@@ -6424,7 +6424,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
             {tab==='COMP' && <div>
                 {/* Empresas Pendentes */}
                 {(companies||[]).some(c=>c.status==='PENDING') && <h4>Empresas Pendentes</h4>}
-                {(companies||[]).filter(c=>c.status==='PENDING').map(c => (
+                {(companies||[]).filter(c=>c.status==='PENDING').sort((a,b) => a.name.localeCompare(b.name)).map(c => (
                     <div key={c.id} className="card" style={{borderLeft:'4px solid var(--purple)'}}>
                         <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
                             <div>
@@ -6468,7 +6468,7 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                     }}>♻️ RE-SINCRONIZAR EMPRESAS</button>
                 </div>
     
-                {(companies||[]).filter(c=>c.status!=='PENDING').map(c => (
+                {(companies||[]).filter(c=>c.status!=='PENDING').sort((a,b) => a.name.localeCompare(b.name)).map(c => (
                     <div key={c.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                         <div>
                             <b>{c.name}</b> {c.status==='BLOCKED' && <span style={{color:'red'}}>(BLOQUEADA)</span>}

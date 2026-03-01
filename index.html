@@ -35,9 +35,19 @@
 
         const firebaseConfig = { apiKey: "AIzaSyBrtJFfWAqT0AZYHlm4it-noB5h9jIPJEI", authDomain: "gerenciador-de-times-matoreal.firebaseapp.com", projectId: "gerenciador-de-times-matoreal", storageBucket: "gerenciador-de-times-matoreal.firebasestorage.app", messagingSenderId: "29096266740", appId: "1:29096266740:web:ec48e7225c18c20dbc07a1" };
         try { if (!firebase.apps.length) firebase.initializeApp(firebaseConfig); } catch (e) { console.error(e); }
+        
         const db = firebase.firestore();
-        const { useState, useEffect } = React;
 
+        // 🔥 O MOTOR DE PERFORMANCE: ATIVANDO CACHE LOCAL
+        db.enablePersistence({ synchronizeTabs: true }).catch(function(err) {
+            if (err.code === 'failed-precondition') {
+                console.warn("Várias abas abertas, cache ativado apenas na principal.");
+            } else if (err.code === 'unimplemented') {
+                console.warn("Navegador não suporta armazenamento offline.");
+            }
+        });
+
+        const { useState, useEffect } = React;
         const FORMATIONS = {
     // --- LINHA DE 4 (OS CLÁSSICOS) ---
     '4-3-3 OFENSIVO':    ['GOL', 'LD', 'ZAG', 'ZAG', 'LE', 'VOL', 'MC', 'MEI', 'PTD', 'ATA', 'PTE'],

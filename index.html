@@ -5283,32 +5283,76 @@ if (act === 'VARZEA') {
         teams.forEach(t => { getBatch().update(db.collection('teams').doc(t.id), { stats: { pts:0, wins:0, draws:0, losses:0, gf:0, ga:0, cards:0 } }); });
         getBatch().update(db.collection('config').doc('system'), { season: currentSeason + 1 });
 
-        // 🔥 SOLUÇÃO BUG B: JOGADORES (Evolução Justa e Contratos)
+       // --- FUNÇÕES DE EVOLUÇÃO INTELIGENTE (FIFA STYLE) ---
+        const getPrimaryAttrs = (pos) => {
+            if (pos === 'GOL') return ['gk', 'response', 'jump', 'longPass', 'balance', 'condition'];
+            if (pos.includes('ZAG')) return ['defense', 'header', 'balance', 'jump', 'aggression', 'stamina'];
+            if (pos.includes('LAT') || pos.includes('LD') || pos.includes('LE')) return ['speed', 'accel', 'stamina', 'shortPass', 'dribble', 'defense'];
+            if (pos.includes('VOL') || pos.includes('MC') || pos === 'MD' || pos === 'ME') return ['shortPass', 'stamina', 'teamwork', 'defense', 'balance', 'tech'];
+            if (pos.includes('MEI') || pos.includes('MAT')) return ['dribble', 'shortPass', 'vision', 'tech', 'curve', 'agility'];
+            if (pos === 'PTD' || pos === 'PTE') return ['speed', 'accel', 'dribble', 'agility', 'curve', 'stamina'];
+            if (pos.includes('ATA') || pos.includes('SA') || pos.includes('PNT')) return ['shot', 'attack', 'header', 'shotPower', 'balance', 'speed'];
+            return ['stamina', 'balance', 'speed', 'shortPass', 'dribble', 'shot'];
+        };
+
+        const getXpCost = (ovr) => {
+            if (ovr <= 50) return 50;   // Sobe voando (Base)
+            if (ovr <= 60) return 80;   // Sobe rápido (Iniciante)
+            if (ovr <= 70) return 150;  // Normal (Profissional)
+            if (ovr <= 80) return 300;  // Difícil (Estrela)
+            if (ovr <= 85) return 600;  // Muito difícil (Craque)
+            if (ovr <= 90) return 1000; // Quase travado (World Class)
+            return 2000;                // Lenda Absoluta
+        };
+
+        // 🔥 SOLUÇÃO BUG B: JOGADORES (Evolução Inteligente e Contratos)
         players.forEach(p => {
             let updates = { stats: {goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0}, pressRatingSum: 0, pressRatingCount: 0, pressRatingAvg: 0 };
 
-            const totalXP = (p.xp || 0) + (p.pendingXP || 0);
-            const pointsToDistribute = Math.floor(totalXP / 100);
-            const remainderXP = totalXP % 100;
+            let totalXP = (p.xp || 0) + (p.pendingXP || 0);
+            const safePos = p.position || 'ATA';
+            const xpCost = getXpCost(p.overall || 50);
+
+            // Permite XP negativo (regressão)
+            let isPositive = totalXP >= 0;
+            let absXP = Math.abs(totalXP);
+            
+            let pointsToDistribute = Math.floor(absXP / xpCost);
+            let remainderXP = isPositive ? (absXP % xpCost) : -(absXP % xpCost);
 
             if (p.attributes && pointsToDistribute !== 0) {
                 let newAttrs = { ...p.attributes };
-                const keys = Object.keys(newAttrs);
-                const absPoints = Math.abs(pointsToDistribute);
-                const isPositive = pointsToDistribute > 0;
+                const allKeys = Object.keys(ATTR_LABELS); 
+                const primaryKeys = getPrimaryAttrs(safePos);
 
-                for (let i = 0; i < absPoints; i++) {
-                    const randomKey = keys[Math.floor(Math.random() * keys.length)];
-                    if (isPositive) { if (newAttrs[randomKey] < 99) newAttrs[randomKey]++; } 
-                    else { if (newAttrs[randomKey] > 1) newAttrs[randomKey]--; }
+                for (let i = 0; i < pointsToDistribute; i++) {
+                    let targetKey;
+                    // 75% de chance de upar os 6 principais da posição, 25% de upar aleatório (Simula a realidade)
+                    if (Math.random() < 0.75) {
+                        targetKey = primaryKeys[Math.floor(Math.random() * primaryKeys.length)];
+                    } else {
+                        targetKey = allKeys[Math.floor(Math.random() * allKeys.length)];
+                    }
+                    
+                    // Filtros anti-bug (Zagueiro ganhando habilidade de GK ou Goleiro ganhando Chute)
+                    if (safePos === 'GOL' && ['shot', 'attack', 'dribble', 'curve', 'freeKick', 'weakFootAcc'].includes(targetKey)) targetKey = 'gk';
+                    if (safePos !== 'GOL' && targetKey === 'gk') targetKey = primaryKeys[0];
+
+                    // Evita atributos inexistentes
+                    if (newAttrs[targetKey] === undefined) newAttrs[targetKey] = 50;
+
+                    if (isPositive) { 
+                        if (newAttrs[targetKey] < 99) newAttrs[targetKey]++; 
+                    } else { 
+                        if (newAttrs[targetKey] > 1) newAttrs[targetKey]--; 
+                    }
                 }
 
                 // Cálculo realista do novo Overall baseado na Posição!
-                const safePos = p.position || 'ATA'; 
                 const ignoreList = safePos === 'GOL' ? ['shot', 'attack', 'dribble', 'curve', 'freeKick', 'weakFootAcc', 'weakFootFreq'] : ['gk'];
                 let sum = 0; let count = 0;
                 Object.entries(newAttrs).forEach(([key, val]) => { 
-                    if (!ignoreList.includes(key)) { sum += val; count++; } 
+                    if (!ignoreList.includes(key) && ATTR_LABELS[key]) { sum += val; count++; } 
                 });
                 
                 updates.attributes = newAttrs;
@@ -7713,7 +7757,7 @@ const renewContract = async (p) => {
         const b = db.batch();
         let count = 0;
 
-        const R = { GOAL: 150, ASSIST: 120, TACKLE: 80, SAVE: 100, WIN: 300, DRAW: 100, LOSS: -100, YELLOW: -50, RED: -200, RATING_MULT: 50 };
+        const R = { GOAL: 20, ASSIST: 15, TACKLE: 10, SAVE: 12, WIN: 30, DRAW: 10, LOSS: -10, YELLOW: -10, RED: -30, RATING_MULT: 5 };
 
         batchData.forEach(item => {
             const { player, match, xpOverride } = item;
@@ -7940,7 +7984,7 @@ const renewContract = async (p) => {
         else if(type === 'BOLA_PARADA') trainedAttrs = ['freeKick', 'curve', 'header', 'penalties'];
         else if(type === 'GOLEIRO') trainedAttrs = ['gk', 'response', 'jump', 'longPass'];
 
-        let xpGain = Math.floor(Math.random() * 4) + 3;
+        let xpGain = Math.floor(Math.random() * 8) + 8;
         const newEnergy = currentEnergy - 35;
 
         if (player.equippedItem) {
@@ -9642,17 +9686,28 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
     // Itens na Mochila (filtra sales onde eu sou comprador)
     const myItems = (sales||[]).filter(s => s.buyerId === player.id);
     
+    const getXpCostDisplay = (ovr) => {
+        if (ovr <= 50) return 50;
+        if (ovr <= 60) return 80;
+        if (ovr <= 70) return 150;
+        if (ovr <= 80) return 300;
+        if (ovr <= 85) return 600;
+        if (ovr <= 90) return 1000;
+        return 2000;
+    };
+    
+    const currentCost = getXpCostDisplay(player.overall || 50);
     const xpCurrent = (player.xp || 0) + (player.pendingXP || 0);
-    const pointsToGain = Math.floor(xpCurrent / 100); 
-    const xpRest = xpCurrent % 100; 
+    const pointsToGain = Math.floor(Math.abs(xpCurrent) / currentCost) * (xpCurrent < 0 ? -1 : 1); 
+    const xpRest = Math.abs(xpCurrent) % currentCost; 
     
     const attrCount = player.attributes ? Object.keys(player.attributes).length : 30;
-    const projectedOvIncrease = Math.floor(pointsToGain / attrCount);
-    // --- CÁLCULO DA ESTIMATIVA DE TREINOS SOLOS PARA +1 OVR ---
-    const xpNeededForNextOv = attrCount * 100; // XP total necessário para subir +1 OVR inteiro
-    const currentProgressForOv = xpCurrent % xpNeededForNextOv; // XP acumulado focado no próximo OVR
+    const projectedOvIncrease = Math.floor(pointsToGain / (attrCount * 0.75)); // Estimativa com a nova regra de 75%
+
+    const xpNeededForNextOv = attrCount * currentCost;
+    const currentProgressForOv = Math.abs(xpCurrent) % xpNeededForNextOv;
     const missingXpForOv = xpNeededForNextOv - currentProgressForOv;
-    const avgSoloXp = 4.5; // Um treino solo dá entre 3 e 6 XP (média 4.5)
+    const avgSoloXp = 11.5; // Nova média do treino solo (8 a 15)
     const estSoloTrains = Math.ceil(missingXpForOv / avgSoloXp);
     // ----------------------------------------------------------
 
@@ -9809,7 +9864,7 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                     <div style={{width:`${xpRest}%`, height:'100%', background:'linear-gradient(90deg, var(--warning), gold)', transition:'1s'}}></div>
                 </div>
                 <div style={{position:'absolute', bottom:10, right:5, fontSize:9, color:'#fff', textShadow:'0 1px 2px black'}}>
-                    Próx. Ponto: {xpRest} / 100 XP
+                    Próx. Ponto: {xpRest} / {currentCost} XP
                 </div>
             </div>
 

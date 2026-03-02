@@ -8950,18 +8950,46 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
    return (
         <div className="login-wrapper">
             
-            {/* --- O CÓDIGO MÁGICO PRO CELULAR (INVISÍVEL) --- */}
+           {/* --- ESTILOS DO CABEÇALHO (CORRIGIDOS) --- */}
             <style>{`
-                .login-header-container { text-align: center; margin-bottom: 35px; }
-                .logos-wrapper { display: flex; justify-content: center; align-items: center; gap: 25px; margin-bottom: 20px; }
-                .game-title { font-size: 56px; letter-spacing: 4px; }
+                .login-header-container { 
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    text-align: center;
+                    margin-bottom: 35px; 
+                    width: 100%;
+                }
+                .logos-wrapper { 
+                    display: flex; 
+                    justify-content: center; 
+                    align-items: center; 
+                    gap: 30px; 
+                    margin-bottom: 20px;
+                    width: 100%;
+                }
+                .side-logo {
+                    height: 80px;
+                    width: auto;
+                    object-fit: contain;
+                    filter: drop-shadow(0 0 10px rgba(255,255,255,0.2));
+                }
+                .main-logo {
+                    height: 130px;
+                    width: auto;
+                    object-fit: contain;
+                    filter: drop-shadow(0 0 20px rgba(0, 230, 118, 0.6));
+                    transform: scale(1.1);
+                }
+                .game-title { font-size: 56px; letter-spacing: 4px; margin: 0; color: #fff; text-transform: uppercase; font-family: Impact, sans-serif; text-shadow: 0px 5px 25px rgba(0, 230, 118, 0.8), 0px -2px 5px rgba(0,0,0,1); }
                 .dev-credits-sub { font-size: 12px; color: #aaa; margin-top: 10px; letter-spacing: 2px; text-transform: uppercase; font-weight: bold; }
                 
-                /* Quando a tela for pequena (Celular), ele muda as regras: */
+                /* Responsividade para Celular */
                 @media (max-width: 768px) {
-                    .side-logo { display: none !important; }
-                    .logos-wrapper { gap: 0 !important; margin-bottom: 15px; }
-                    .main-logo { height: 110px !important; transform: scale(1) !important; }
+                    .logos-wrapper { gap: 15px !important; margin-bottom: 15px; }
+                    .side-logo { height: 45px !important; } /* Diminui as laterais para caber na tela */
+                    .main-logo { height: 85px !important; transform: scale(1) !important; } /* Diminui a central */
                     .game-title { font-size: 36px !important; letter-spacing: 2px !important; line-height: 1.1; }
                     .login-wrapper { padding: 20px 15px !important; }
                 }
@@ -8969,16 +8997,15 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
 
             {/* --- CABEÇALHO COM AS IMAGENS --- */}
             <div className="login-header-container animate-in">
-                
                 <div className="logos-wrapper">
-                    <img src="assets/img1.jpg" alt="Sponsor 1" className="side-logo" style={{ height: '70px', objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.2))' }} />
-
-<img src="assets/img2.jpg" alt="Brasão Central" className="main-logo" style={{ height: '130px', objectFit: 'contain', filter: 'drop-shadow(0 0 20px rgba(0, 230, 118, 0.6))', transform: 'scale(1.1)' }} />
-
-<img src="assets/img3.jpg" alt="Sponsor 2" className="side-logo" style={{ height: '70px', objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.2))' }} />
+                    <img src="assets/img1.jpg" alt="Sponsor 1" className="side-logo" />
+                    
+                    <img src="assets/img2.jpg" alt="Brasão Central" className="main-logo" />
+                    
+                    <img src="assets/img3.jpg" alt="Sponsor 2" className="side-logo" />
                 </div>
 
-                <h1 className="game-title" style={{ fontWeight: '900', margin: '0', color: '#fff', textTransform: 'uppercase', fontFamily: 'Impact, sans-serif', textShadow: '0px 5px 25px rgba(0, 230, 118, 0.8), 0px -2px 5px rgba(0,0,0,1)' }}>
+                <h1 className="game-title">
                     MATO REAL
                 </h1>
 

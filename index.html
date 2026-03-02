@@ -8949,8 +8949,49 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
 
     return (
         <div className="login-wrapper">
-            <h1 className="login-title">Gerenciador de Times<br/><span className="login-title-span">de Mato Real</span></h1>
-            <div className="dev-credits">Desenvolvido por: Nathan Reis | v1.93.4COMISSÃO TÉCNICA COMPLETA   </div>
+            
+            {/* --- NOVO CABEÇALHO ESTILO VIDEOGAME --- */}
+            <div style={{ textAlign: 'center', marginBottom: '35px', animation: 'fadeIn 1s ease-in-out' }}>
+                
+                {/* CONTAINER DAS 3 IMAGENS */}
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '25px', marginBottom: '20px' }}>
+                    {/* Imagem 1 (Ex: Sport Pixel) */}
+                    <img src="assets/img1.png" alt="Sponsor 1" style={{ height: '70px', objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.2))' }} />
+                    
+                    {/* Imagem 2 CENTRAL MAIOR (Ex: O Brasão com a Coroa) */}
+                    <img src="assets/img2.png" alt="Brasão Central" style={{ height: '130px', objectFit: 'contain', filter: 'drop-shadow(0 0 20px rgba(0, 230, 118, 0.6))', transform: 'scale(1.1)' }} />
+                    
+                    {/* Imagem 3 (Ex: FFMR Jogador Bicicleta) */}
+                    <img src="assets/img3.png" alt="Sponsor 2" style={{ height: '70px', objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.2))' }} />
+                </div>
+
+                {/* NOVO TÍTULO "MATO REAL" */}
+                <h1 style={{
+                    fontSize: '56px',
+                    fontWeight: '900',
+                    margin: '0',
+                    color: '#fff',
+                    textTransform: 'uppercase',
+                    letterSpacing: '4px',
+                    fontFamily: 'Impact, sans-serif',
+                    textShadow: '0px 5px 25px rgba(0, 230, 118, 0.8), 0px -2px 5px rgba(0,0,0,1)'
+                }}>
+                    MATO REAL
+                </h1>
+
+                {/* CRÉDITOS LIMPOS E MODERNOS */}
+                <div style={{ 
+                    fontSize: '12px', 
+                    color: '#aaa', 
+                    marginTop: '10px', 
+                    letterSpacing: '2px', 
+                    textTransform: 'uppercase',
+                    fontWeight: 'bold'
+                }}>
+                    FUT PIXEL <span style={{color: '#00E676', margin: '0 8px'}}>•</span> POR NATHAN REIS
+                </div>
+            </div>
+            {/* --- FIM DO NOVO CABEÇALHO --- */}
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

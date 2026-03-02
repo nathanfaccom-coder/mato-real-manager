@@ -5249,9 +5249,9 @@ if (act === 'VARZEA') {
         const champA = tA[0]; const champB = tB[0]; const champC = tC[0]; const champD = tD[0]; const champVarzea = tVarzea[0];
         
         // 2. HALL DA FAMA
-        const topScorer = [...players].sort((a,b) => (b.stats?.goals||0) - (a.stats?.goals||0))[0];
-        const topAssist = [...players].sort((a,b) => (b.stats?.assists||0) - (a.stats?.assists||0))[0];
-        const topSaves = [...players].sort((a,b) => (b.stats?.saves||0) - (a.stats?.saves||0))[0];
+        const topScorer = [...players].sort((a,b) => ((b.stats && b.stats.goals) || 0) - ((a.stats && a.stats.goals) || 0))[0];
+        const topAssist = [...players].sort((a,b) => ((b.stats && b.stats.assists) || 0) - ((a.stats && a.stats.assists) || 0))[0];
+        const topSaves = [...players].sort((a,b) => ((b.stats && b.stats.saves) || 0) - ((a.stats && a.stats.saves) || 0))[0];
         const topRating = [...players].filter(p => p.pressRatingCount > 0).sort((a,b) => (b.pressRatingAvg||0) - (a.pressRatingAvg||0))[0];
 
         const hallRef = db.collection('hallOfFame').doc(`season_${currentSeason}`);
@@ -9447,10 +9447,10 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
     );
 };
 
-const VisitorDashboard = ({ players, teams }) => {
+    const VisitorDashboard = ({ players, teams }) => {
     // Adicionado [...players] para criar uma cópia segura antes de ordenar, evitando bugs na lista original
-    const topScorer = [...players].sort((a,b)=>(b.stats?.goals||0)-(a.stats?.goals||0))[0];
-    const topAssist = [...players].sort((a,b)=>(b.stats?.assists||0)-(a.stats?.assists||0))[0];
+    const topScorer = [...players].sort((a,b)=>((b.stats && b.stats.goals) || 0) - ((a.stats && a.stats.goals) || 0))[0];
+    const topAssist = [...players].sort((a,b)=>((b.stats && b.stats.assists) || 0) - ((a.stats && a.stats.assists) || 0))[0];
     
     return (
         <div>

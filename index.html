@@ -4767,93 +4767,92 @@ if (act === 'VARZEA') {
                 }
             });
 
-            // 2.2. TIMES (Salários, Patrocínios e BANCO)
+            // 2.2. TIMES (Salários, Patrocínios, BANCO e RELATÓRIO)
             teams.forEach(t => {
                 const currentBal = parseFloat(t.balance) || 0;
-                const wages = players.filter(p => p.teamId === t.id).reduce((a, p) => a + (parseFloat(p.salary) || 0), 0);
+                
+                // --- RECEITAS ---
+                const myPlayers = players.filter(p => p.teamId === t.id);
                 const income = sps.filter(s => s.teamId === t.id && s.status === 'ACTIVE').reduce((a, s) => a + parseFloat(s.value), 0);
-                
-               const healthCost = t.healthPlan ? (t.healthPlan.cost || 0) : 0;
-                
-                // --- COTA DA FEDERAÇÃO ---
-                // --- COTA DA FEDERAÇÃO ---
                 const serieBonuses = { 'A': 650000, 'B': 500000, 'C': 400000, 'D': 300000, 'VARZEA': 100000 };
                 const cotaFederacao = serieBonuses[t.serie || 'VARZEA'] || 100000;
-                
-                // --- MANUTENÇÃO DO ESTÁDIO ---
-                const stadiumLvl = t.stadiumLevel || 1;
-                // Puxa o custo de manutenção lá do nosso Banco de Dados de Estádios do topo do arquivo
-                const maintCost = STADIUM_DB[stadiumLvl] ? STADIUM_DB[stadiumLvl].maint : 0; 
-
-                // O novo saldo agora desconta a conta de luz do estádio também!
-                let newBalance = currentBal + income + cotaFederacao - wages - healthCost - maintCost;
-                let updates = {};
-
-                // --- LÓGICA DO BANCO ---
-                
-                // A) Investimentos (Rende 2% por semana)
-                if (t.bankInvestment && t.bankInvestment.amount > 0) {
-                    const currentInv = t.bankInvestment.amount;
-                    const interest = currentInv * 0.02; // Juros Compostos de 2%
-                    const newLocked = Math.max(0, (t.bankInvestment.weeksLocked || 0) - 1); // Reduz 1 semana de bloqueio
-                    
-                    updates.bankInvestment = {
-                        amount: currentInv + interest,
-                        weeksLocked: newLocked
-                    };
-                }
-
-                // B) Empréstimos (Desconta a parcela automaticamente)
-                if (t.bankLoan && t.bankLoan.installments > 0) {
-                    const payment = t.bankLoan.weeklyPayment;
-                    const remainingInstallments = t.bankLoan.installments - 1;
-                    
-                    newBalance -= payment; // Tira o dinheiro direto da conta do time
-
-                    if (remainingInstallments <= 0) {
-                        // Se pagou a última parcela, apaga a dívida
-                        updates.bankLoan = firebase.firestore.FieldValue.delete();
-                    } else {
-                        // Atualiza as parcelas restantes
-                        updates.bankLoan = {
-                            ...t.bankLoan,
-                            installments: remainingInstallments
-                        };
-                    }
-                }
-
-                // C) Financiamento de Estádio (Arena)
-                if (t.stadiumLoan && t.stadiumLoan.installments > 0) {
-                    const payment = t.stadiumLoan.weeklyPayment;
-                    const remainingInstallments = t.stadiumLoan.installments - 1;
-                    
-                    newBalance -= payment; // Tira o dinheiro direto da conta
-
-                    if (remainingInstallments <= 0) {
-                        updates.stadiumLoan = firebase.firestore.FieldValue.delete();
-                    } else {
-                        updates.stadiumLoan = {
-                            ...t.stadiumLoan,
-                            installments: remainingInstallments
-                        };
-                    }
-                }
-// D) Renda Passiva: Sócio Torcedor
-                const myPlayers = players.filter(p => p.teamId === t.id);
                 const activeSocios = calculateSocios(t, myPlayers);
                 const socioIncome = activeSocios * (t.socioPrice || 40);
+                const receitasCaixa = cotaFederacao + income + socioIncome;
+
+                // --- DESPESAS ---
+                const wages = myPlayers.reduce((a, p) => a + (parseFloat(p.salary) || 0), 0);
+                const staffWages = coaches.filter(c => c.teamId === t.id && c.status === 'ACTIVE').reduce((a, c) => a + (parseFloat(c.salary) || 0), 0);
+                const healthCost = t.healthPlan ? (t.healthPlan.cost || 0) : 0;
+                const stadiumLvl = t.stadiumLevel || 1;
+                const maintCost = STADIUM_DB[stadiumLvl] ? STADIUM_DB[stadiumLvl].maint : 0; 
                 
-                newBalance += socioIncome; // Injeta o dinheiro do sócio na conta!
-                // Salva o novo saldo consolidado
-                updates.balance = newBalance;
+                let updates = {};
+                let bankLoanPayment = 0;
+                let stadiumLoanPayment = 0;
+                let interest = 0;
+
+                // Investimentos (Rende 2% mas fica preso no banco)
+                if (t.bankInvestment && t.bankInvestment.amount > 0) {
+                    const currentInv = t.bankInvestment.amount;
+                    interest = currentInv * 0.02; 
+                    const newLocked = Math.max(0, (t.bankInvestment.weeksLocked || 0) - 1);
+                    updates.bankInvestment = { amount: currentInv + interest, weeksLocked: newLocked };
+                }
+
+                // Empréstimo Normal
+                if (t.bankLoan && t.bankLoan.installments > 0) {
+                    bankLoanPayment = t.bankLoan.weeklyPayment;
+                    const remainingInstallments = t.bankLoan.installments - 1;
+                    if (remainingInstallments <= 0) updates.bankLoan = firebase.firestore.FieldValue.delete();
+                    else updates.bankLoan = { ...t.bankLoan, installments: remainingInstallments };
+                }
+
+                // Financiamento de Estádio
+                if (t.stadiumLoan && t.stadiumLoan.installments > 0) {
+                    stadiumLoanPayment = t.stadiumLoan.weeklyPayment;
+                    const remainingInstallments = t.stadiumLoan.installments - 1;
+                    if (remainingInstallments <= 0) updates.stadiumLoan = firebase.firestore.FieldValue.delete();
+                    else updates.stadiumLoan = { ...t.stadiumLoan, installments: remainingInstallments };
+                }
+
+                const totalDespesas = wages + staffWages + healthCost + maintCost + bankLoanPayment + stadiumLoanPayment;
                 
+                // NOVO SALDO DO CLUBE
+                updates.balance = currentBal + receitasCaixa - totalDespesas;
+
+                // --- GERAR O RELATÓRIO DO DIÁRIO OFICIAL ---
+                let reportMsg = `🟢 RECEITAS:\n`;
+                reportMsg += `+ Federação/TV: ${fmt(cotaFederacao)}\n`;
+                if (socioIncome > 0) reportMsg += `+ Sócios-Torcedores: ${fmt(socioIncome)}\n`;
+                if (income > 0) reportMsg += `+ Patrocinadores: ${fmt(income)}\n`;
+                
+                reportMsg += `\n🔴 DESPESAS:\n`;
+                if (wages > 0) reportMsg += `- Salários (Elenco): ${fmt(wages)}\n`;
+                if (staffWages > 0) reportMsg += `- Salários (Comissão): ${fmt(staffWages)}\n`;
+                if (healthCost > 0) reportMsg += `- Convênio Médico: ${fmt(healthCost)}\n`;
+                if (maintCost > 0) reportMsg += `- Manutenção Arena: ${fmt(maintCost)}\n`;
+                if (bankLoanPayment > 0) reportMsg += `- Parcela Empréstimo: ${fmt(bankLoanPayment)}\n`;
+                if (stadiumLoanPayment > 0) reportMsg += `- Parcela Arena: ${fmt(stadiumLoanPayment)}\n`;
+                
+                const balancoCaixa = receitasCaixa - totalDespesas;
+                reportMsg += `\n⚖️ RESULTADO FINAL: ${balancoCaixa >= 0 ? 'Lucro de ' + fmt(balancoCaixa) : 'Prejuízo de ' + fmt(balancoCaixa)}`;
+                
+                if (interest > 0) reportMsg += `\n\n📈 Sua Renda Fixa rendeu +${fmt(interest)} (O valor continua aplicado no Banco).`;
+
+                // Salva o relatório no CT do time
+                let newLogs = [...(t.trainingLogs || [])];
+                newLogs.unshift({ date: Date.now(), type: '📊 BALANÇO FINANCEIRO', report: reportMsg });
+                if (newLogs.length > 15) newLogs.pop();
+                updates.trainingLogs = newLogs;
+
                 b.update(db.collection('teams').doc(t.id), updates);
             });
 
-          // 2.3. GERAR NOTÍCIA DA COTA DA FEDERAÇÃO
+            // 2.3. GERAR NOTÍCIA GLOBAL DA COTA DA FEDERAÇÃO
             const newsRef = db.collection('news').doc();
             b.set(newsRef, {
-                text: "💰 **COTAS DA FEDERAÇÃO PAGAS!**\nO apoio financeiro semanal foi depositado na conta de todos os clubes ativos pela Federação de Mato Real:\n\n🏆 Série A: ₣ 650.000\n🥈 Série B: ₣ 500.000\n🥉 Série C: ₣ 400.000\n🏅 Série D: ₣ 300.000\n🚜 Várzea: ₣ 100.000\n\nDiretorias, confiram o novo saldo do seu clube na aba do Banco Municipal!",
+                text: "💰 **COTAS DA FEDERAÇÃO PAGAS!**\nO apoio financeiro semanal foi depositado. Diretorias, confiram o Extrato no Diário Oficial do Clube (CT) para ver os lucros e despesas de sua equipe.",
                 date: Date.now(),
                 type: 'money',
                 likes: []
@@ -4871,31 +4870,22 @@ if (act === 'VARZEA') {
                 }
             });
 
+           // 2.4. COMISSÃO TÉCNICA (Pagar Conta Pessoal e Resetar Treino)
+            const coachSnap = await db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTANT']).get();    
         
-           // 2.4. COMISSÃO TÉCNICA (Salário e Reset de Treino)
-        const coachSnap = await db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTANT']).get();    
-        
-        // CORREÇÃO: O nome correto da variável é coachSnap
-        coachSnap.docs.forEach(doc => {
+            coachSnap.docs.forEach(doc => {
                 const c = doc.data();
                 let updates = { trainingsLeft: 2 }; 
 
                 if (c.teamId && c.teamId !== 'FREE') {
-                    // VERIFICAÇÃO DE SEGURANÇA: O time ainda existe?
                     const teamExists = teams.some(t => t.id === c.teamId);
 
                     if (teamExists) {
-    // 1. Ele tira o salário do Olheiro de dentro do cofre do Clube
-    b.update(db.collection('teams').doc(c.teamId), {
-        balance: firebase.firestore.FieldValue.increment(-c.salary)
-    });
-    
-    // 2. Ele deposita esse mesmo valor no saldo pessoal do Olheiro
-    const currentCoachBal = parseFloat(c.balance) || 0;
-    updates.balance = currentCoachBal + parseFloat(c.salary);
-}else {
-                        // Se o time NÃO existe mais (foi excluído), libera o técnico automaticamente
-                        // Isso corrige o erro "No document to update"
+                        // Atenção: Não descontamos do time aqui porque já foi descontado no relatório detalhado acima!
+                        // Apenas depositamos na conta do profissional
+                        const currentCoachBal = parseFloat(c.balance) || 0;
+                        updates.balance = currentCoachBal + parseFloat(c.salary);
+                    } else {
                         updates.teamId = 'FREE';
                         updates.contract = 0;
                     }

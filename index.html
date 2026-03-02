@@ -8947,51 +8947,51 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
         }
     };
 
-    return (
+   return (
         <div className="login-wrapper">
             
-            {/* --- NOVO CABEÇALHO ESTILO VIDEOGAME --- */}
-            <div style={{ textAlign: 'center', marginBottom: '35px', animation: 'fadeIn 1s ease-in-out' }}>
+            {/* --- O CÓDIGO MÁGICO PRO CELULAR (INVISÍVEL) --- */}
+            <style>{`
+                .login-header-container { text-align: center; margin-bottom: 35px; }
+                .logos-wrapper { display: flex; justify-content: center; align-items: center; gap: 25px; margin-bottom: 20px; }
+                .game-title { font-size: 56px; letter-spacing: 4px; }
+                .dev-credits-sub { font-size: 12px; color: #aaa; margin-top: 10px; letter-spacing: 2px; text-transform: uppercase; font-weight: bold; }
                 
-                {/* CONTAINER DAS 3 IMAGENS */}
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '25px', marginBottom: '20px' }}>
-                    {/* Imagem 1 (Ex: Sport Pixel) */}
-                    <img src="assets/img1.png" alt="Sponsor 1" style={{ height: '70px', objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.2))' }} />
+                /* Quando a tela for pequena (Celular), ele muda as regras: */
+                @media (max-width: 768px) {
+                    .side-logo { display: none !important; }
+                    .logos-wrapper { gap: 0 !important; margin-bottom: 15px; }
+                    .main-logo { height: 110px !important; transform: scale(1) !important; }
+                    .game-title { font-size: 36px !important; letter-spacing: 2px !important; line-height: 1.1; }
+                    .login-wrapper { padding: 20px 15px !important; }
+                }
+            `}</style>
+
+            {/* --- CABEÇALHO COM AS IMAGENS --- */}
+            <div className="login-header-container animate-in">
+                
+                <div className="logos-wrapper">
+                    {/* Imagem 1 (Some no celular) */}
+                    <img src="assets/img1.png" alt="Sponsor 1" className="side-logo" style={{ height: '70px', objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.2))' }} />
                     
-                    {/* Imagem 2 CENTRAL MAIOR (Ex: O Brasão com a Coroa) */}
-                    <img src="assets/img2.png" alt="Brasão Central" style={{ height: '130px', objectFit: 'contain', filter: 'drop-shadow(0 0 20px rgba(0, 230, 118, 0.6))', transform: 'scale(1.1)' }} />
+                    {/* Imagem 2 (Brasão Central - Fica em todos) */}
+                    <img src="assets/img2.png" alt="Brasão Central" className="main-logo" style={{ height: '130px', objectFit: 'contain', filter: 'drop-shadow(0 0 20px rgba(0, 230, 118, 0.6))', transform: 'scale(1.1)' }} />
                     
-                    {/* Imagem 3 (Ex: FFMR Jogador Bicicleta) */}
-                    <img src="assets/img3.png" alt="Sponsor 2" style={{ height: '70px', objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.2))' }} />
+                    {/* Imagem 3 (Some no celular) */}
+                    <img src="assets/img3.png" alt="Sponsor 2" className="side-logo" style={{ height: '70px', objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.2))' }} />
                 </div>
 
-                {/* NOVO TÍTULO "MATO REAL" */}
-                <h1 style={{
-                    fontSize: '56px',
-                    fontWeight: '900',
-                    margin: '0',
-                    color: '#fff',
-                    textTransform: 'uppercase',
-                    letterSpacing: '4px',
-                    fontFamily: 'Impact, sans-serif',
-                    textShadow: '0px 5px 25px rgba(0, 230, 118, 0.8), 0px -2px 5px rgba(0,0,0,1)'
-                }}>
+                <h1 className="game-title" style={{ fontWeight: '900', margin: '0', color: '#fff', textTransform: 'uppercase', fontFamily: 'Impact, sans-serif', textShadow: '0px 5px 25px rgba(0, 230, 118, 0.8), 0px -2px 5px rgba(0,0,0,1)' }}>
                     MATO REAL
                 </h1>
 
-                {/* CRÉDITOS LIMPOS E MODERNOS */}
-                <div style={{ 
-                    fontSize: '12px', 
-                    color: '#aaa', 
-                    marginTop: '10px', 
-                    letterSpacing: '2px', 
-                    textTransform: 'uppercase',
-                    fontWeight: 'bold'
-                }}>
+                <div className="dev-credits-sub">
                     FUT PIXEL <span style={{color: '#00E676', margin: '0 8px'}}>•</span> POR NATHAN REIS
                 </div>
             </div>
-            {/* --- FIM DO NOVO CABEÇALHO --- */}
+            {/* --- FIM DO CABEÇALHO --- */}
+            
+            <div className="login-tabs">
             
             <div className="login-tabs">
                 <div className={`tab ${tab==='LOGIN'?'active':''}`} onClick={()=>setTab('LOGIN')}>ENTRAR</div>

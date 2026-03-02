@@ -8940,7 +8940,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
    return (
         <div className="login-wrapper">
             
-           {/* --- ESTILOS DO CABEÇALHO (CORRIGIDOS) --- */}
+          {/* --- ESTILOS DO CABEÇALHO (CENTRALIZAÇÃO TOTAL E VERSÃO) --- */}
             <style>{`
                 .login-header-container { 
                     display: flex;
@@ -8948,59 +8948,90 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                     align-items: center;
                     justify-content: center;
                     text-align: center;
-                    margin-bottom: 35px; 
+                    margin-bottom: 30px; 
                     width: 100%;
+                    padding-top: 20px;
                 }
                 .logos-wrapper { 
                     display: flex; 
                     justify-content: center; 
                     align-items: center; 
-                    gap: 30px; 
-                    margin-bottom: 20px;
+                    gap: 20px; 
+                    margin-bottom: 15px;
                     width: 100%;
+                    max-width: 600px;
                 }
                 .side-logo {
-                    height: 80px;
+                    height: 70px;
                     width: auto;
                     object-fit: contain;
-                    filter: drop-shadow(0 0 10px rgba(255,255,255,0.2));
+                    filter: drop-shadow(0 0 10px rgba(255,255,255,0.1));
                 }
                 .main-logo {
-                    height: 130px;
+                    height: 120px;
                     width: auto;
                     object-fit: contain;
-                    filter: drop-shadow(0 0 20px rgba(0, 230, 118, 0.6));
-                    transform: scale(1.1);
+                    filter: drop-shadow(0 0 20px rgba(0, 230, 118, 0.5));
                 }
-                .game-title { font-size: 56px; letter-spacing: 4px; margin: 0; color: #fff; text-transform: uppercase; font-family: Impact, sans-serif; text-shadow: 0px 5px 25px rgba(0, 230, 118, 0.8), 0px -2px 5px rgba(0,0,0,1); }
-                .dev-credits-sub { font-size: 12px; color: #aaa; margin-top: 10px; letter-spacing: 2px; text-transform: uppercase; font-weight: bold; }
+                .game-title { 
+                    font-size: 52px; 
+                    letter-spacing: 3px; 
+                    margin: 0; 
+                    color: #fff; 
+                    text-transform: uppercase; 
+                    font-family: Impact, sans-serif; 
+                    text-shadow: 0px 4px 20px rgba(0, 230, 118, 0.6); 
+                }
+                .dev-info-row {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 5px;
+                    margin-top: 10px;
+                }
+                .dev-credits-sub { 
+                    font-size: 11px; 
+                    color: #aaa; 
+                    letter-spacing: 2px; 
+                    text-transform: uppercase; 
+                    font-weight: bold; 
+                }
+                .version-badge {
+                    background: rgba(0, 230, 118, 0.15);
+                    color: #00E676;
+                    padding: 2px 10px;
+                    border-radius: 20px;
+                    font-size: 10px;
+                    font-weight: 900;
+                    border: 1px solid rgba(0, 230, 118, 0.3);
+                    margin-top: 5px;
+                }
                 
-                /* Responsividade para Celular */
                 @media (max-width: 768px) {
-                    .logos-wrapper { gap: 15px !important; margin-bottom: 15px; }
-                    .side-logo { height: 45px !important; } /* Diminui as laterais para caber na tela */
-                    .main-logo { height: 85px !important; transform: scale(1) !important; } /* Diminui a central */
-                    .game-title { font-size: 36px !important; letter-spacing: 2px !important; line-height: 1.1; }
-                    .login-wrapper { padding: 20px 15px !important; }
+                    .logos-wrapper { gap: 10px; }
+                    .side-logo { height: 40px; }
+                    .main-logo { height: 75px; }
+                    .game-title { font-size: 34px; }
                 }
             `}</style>
 
-            {/* --- CABEÇALHO COM AS IMAGENS --- */}
+            {/* --- CABEÇALHO COM IMAGENS E VERSÃO --- */}
             <div className="login-header-container animate-in">
                 <div className="logos-wrapper">
+                    {/* Imagens agora perfeitamente alinhadas pelo Flexbox */}
                     <img src="assets/img1.jpg" alt="Sponsor 1" className="side-logo" />
-                    
                     <img src="assets/img2.jpg" alt="Brasão Central" className="main-logo" />
-                    
                     <img src="assets/img3.jpg" alt="Sponsor 2" className="side-logo" />
                 </div>
 
-                <h1 className="game-title">
-                    MATO REAL
-                </h1>
+                <h1 className="game-title">MATO REAL</h1>
 
-                <div className="dev-credits-sub">
-                    FUT PIXEL <span style={{color: '#00E676', margin: '0 8px'}}>•</span> POR NATHAN REIS
+                <div className="dev-info-row">
+                    <div className="dev-credits-sub">
+                        FUT PIXEL <span style={{color: '#00E676', margin: '0 5px'}}>•</span> POR NATHAN REIS
+                    </div>
+                    {/* Exibição da versão solicitada */}
+                    <div className="version-badge">VERSÃO 2.2.0</div>
                 </div>
             </div>
             {/* --- FIM DO CABEÇALHO --- */}

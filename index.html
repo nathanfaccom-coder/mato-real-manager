@@ -12032,10 +12032,10 @@ const Market = ({ user, me, teams, players, coaches, open, isVis, onNeg, onPayCl
                             </div>
                             
                            {isPresident && (
-                                <button className="btn btn-green" onClick={() => setModal({ type: 'OFFER', data: c })}>
-                                    NEGOCIAR CONTRATO DE {roleNames[c.type] ? roleNames[c.type].toUpperCase() : 'PROFISSIONAL'}
-                                </button>
-                            )}
+    <button className="btn btn-green" onClick={() => onHireCoach(c)}>
+        NEGOCIAR CONTRATO DE {roleNames[c.type] ? roleNames[c.type].toUpperCase() : 'PROFISSIONAL'}
+    </button>
+)}
                         </div>
                     ))}
                 </div>

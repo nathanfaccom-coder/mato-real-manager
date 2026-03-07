@@ -8178,7 +8178,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v2.2.2</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v2.2.3</div>
                             </div>
                         </div>
                         
@@ -8467,12 +8467,13 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             />
                         )}
 
-                        {screen === 'SHOPPING' && 
+                       {screen === 'SHOPPING' && 
     <ShoppingScreen 
         products={products} 
         companies={companies} 
         user={user}
         players={players} 
+        teams={teams}
         onBuy={buyProduct} 
         onDeleteProd={async(id)=>{if(confirm("Admin: Excluir produto?")) await db.collection('products').doc(id).delete();}} 
     />
@@ -9074,7 +9075,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                         FUT PIXEL <span style={{color: '#00E676', margin: '0 5px'}}>•</span> POR NATHAN REIS
                     </div>
                     {/* Exibição da versão solicitada */}
-                    <div className="version-badge">VERSÃO 2.2.2 PRESENTES </div>
+                    <div className="version-badge">VERSÃO 2.2.3 PRESENTES </div>
                 </div>
             </div>
             {/* --- FIM DO CABEÇALHO --- */}
@@ -10243,7 +10244,7 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
 };
         // ... continuação do código anterior
 
-   const ShoppingScreen = ({ products, companies, user, onBuy, onDeleteProd, players }) => {
+   const ShoppingScreen = ({ products, companies, user, onBuy, onDeleteProd, players, teams }) => {
     const [view, setView] = useState('MALL'); // MALL ou STORE
     const [selComp, setSelComp] = useState(null);
     const [inspectItem, setInspectItem] = useState(null); // Estado para o modal de Zoom do produto
@@ -10416,7 +10417,7 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                                     <optgroup label="🎁 Enviar Presente (Elenco)">
                                         {/* Se for clube, lista os próprios jogadores. Se for jogador, lista os colegas de time */}
                                         {players.filter(p => p.teamId !== 'FREE' && p.id !== user.data.id).sort((a,b)=>a.name.localeCompare(b.name)).map(p => (
-                                            <option key={p.id} value={`PLAYER_${p.id}`}>🎁 Presentear: {p.name}</option>
+                                            <option key={p.id} value={`PLAYER_${p.id}`}>🎁 Para: {p.name} ({p.position} - OV {p.overall}) | {teams.find(t => t.id === p.teamId)?.name || 'Sem Clube'}</option>
                                         ))}
                                     </optgroup>
                                 </select>

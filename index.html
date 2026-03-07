@@ -8281,7 +8281,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v2.2.5</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v2.2.6</div>
                             </div>
                         </div>
                         
@@ -9178,7 +9178,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                         FUT PIXEL <span style={{color: '#00E676', margin: '0 5px'}}>•</span> POR NATHAN REIS
                     </div>
                     {/* Exibição da versão solicitada */}
-                    <div className="version-badge">VERSÃO 2.2.5 PRESENTES </div>
+                    <div className="version-badge">VERSÃO 2.2.6 PRESENTES </div>
                 </div>
             </div>
             {/* --- FIM DO CABEÇALHO --- */}
@@ -9983,9 +9983,10 @@ const PlayerCard = ({ player, teamName, teamLogo, onFaceUpload }) => {
                 
                 .fut-name { text-align: center; font-size: 18px; font-weight: 900; margin-top: 10px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 1px; }
                 
-                .fut-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 20px; font-size: 12px; margin-top: 10px; padding: 0 10px;}
-                .fut-stat-row { display: flex; justify-content: space-between; font-weight: bold; }
-                .fut-stat-val { font-weight: 900; font-size: 14px; }
+                .fut-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 15px; font-size: 13px; margin-top: 12px; padding: 0 20px; }
+                .fut-stat-row { display: flex; justify-content: center; align-items: center; font-weight: bold; }
+                .fut-stat-val { font-weight: 900; font-size: 16px; width: 28px; text-align: right; margin-right: 6px; }
+                .fut-stat-row span:last-child { width: 30px; text-align: left; }
             `}</style>
             
             <div className={`fut-card ${tierClass}`}>

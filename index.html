@@ -8178,7 +8178,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v2.2.1</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v2.2.2</div>
                             </div>
                         </div>
                         
@@ -8468,14 +8468,15 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                         )}
 
                         {screen === 'SHOPPING' && 
-                            <ShoppingScreen 
-                                products={products} 
-                                companies={companies} 
-                                user={user} 
-                                onBuy={buyProduct} 
-                                onDeleteProd={async(id)=>{if(confirm("Admin: Excluir produto?")) await db.collection('products').doc(id).delete();}} 
-                            />
-                        }
+    <ShoppingScreen 
+        products={products} 
+        companies={companies} 
+        user={user}
+        players={players} 
+        onBuy={buyProduct} 
+        onDeleteProd={async(id)=>{if(confirm("Admin: Excluir produto?")) await db.collection('products').doc(id).delete();}} 
+    />
+}
 
                         {screen === 'SPONSORSHIPS' && user.type === 'USER' && (
                             <div>
@@ -9073,7 +9074,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                         FUT PIXEL <span style={{color: '#00E676', margin: '0 5px'}}>•</span> POR NATHAN REIS
                     </div>
                     {/* Exibição da versão solicitada */}
-                    <div className="version-badge">VERSÃO 2.2.1 PRESENTES </div>
+                    <div className="version-badge">VERSÃO 2.2.2 PRESENTES </div>
                 </div>
             </div>
             {/* --- FIM DO CABEÇALHO --- */}
@@ -10242,7 +10243,7 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
 };
         // ... continuação do código anterior
 
-   const ShoppingScreen = ({ products, companies, user, onBuy, onDeleteProd }) => {
+   const ShoppingScreen = ({ products, companies, user, onBuy, onDeleteProd, players }) => {
     const [view, setView] = useState('MALL'); // MALL ou STORE
     const [selComp, setSelComp] = useState(null);
     const [inspectItem, setInspectItem] = useState(null); // Estado para o modal de Zoom do produto

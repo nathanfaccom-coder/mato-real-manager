@@ -8178,7 +8178,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v2.2.3</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v2.2.4</div>
                             </div>
                         </div>
                         
@@ -9075,7 +9075,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                         FUT PIXEL <span style={{color: '#00E676', margin: '0 5px'}}>•</span> POR NATHAN REIS
                     </div>
                     {/* Exibição da versão solicitada */}
-                    <div className="version-badge">VERSÃO 2.2.3 PRESENTES </div>
+                    <div className="version-badge">VERSÃO 2.2.4 PRESENTES </div>
                 </div>
             </div>
             {/* --- FIM DO CABEÇALHO --- */}
@@ -9807,7 +9807,127 @@ Acesse a aba <b>JOGOS</b> abaixo para ver a Classificação.
 };
 // FIM DO COMPONENTE COMPANY DASHBOARD
 // --- JOGADOR, MERCADO E OUTROS COMPONENTES QUE FALTARAM ---
+// ==========================================
+// CARTA ESTILO FIFA (ULTIMATE TEAM)
+// ==========================================
+const PlayerCard = ({ player, teamName, teamLogo, onFaceUpload }) => {
+    if (!player) return null;
 
+    const attrs = player.attributes || {};
+    const ovr = player.overall || 50;
+    const pos = player.position || 'ATA';
+
+    // Função interna para calcular a média dos atributos
+    const getAvg = (keys) => {
+        let sum = 0; let count = 0;
+        keys.forEach(k => { if(attrs[k] !== undefined) { sum += attrs[k]; count++; } });
+        return count ? Math.round(sum/count) : 50;
+    };
+
+    // Mapeamento dos 6 status principais
+    let stats = [];
+    if (pos === 'GOL') {
+        stats = [
+            { l: 'DIV', v: getAvg(['gk', 'jump']) },
+            { l: 'HAN', v: getAvg(['gk', 'balance']) },
+            { l: 'KIC', v: getAvg(['longPass', 'gk']) },
+            { l: 'REF', v: getAvg(['response', 'gk']) },
+            { l: 'SPD', v: getAvg(['speed', 'accel']) },
+            { l: 'POS', v: getAvg(['mentality', 'gk']) }
+        ];
+    } else {
+        stats = [
+            { l: 'RIT', v: getAvg(['speed', 'accel']) },
+            { l: 'FIN', v: getAvg(['shot', 'shotPower', 'shotTech']) },
+            { l: 'PAS', v: getAvg(['shortPass', 'longPass', 'curve']) },
+            { l: 'DRI', v: getAvg(['dribble', 'agility', 'tech']) },
+            { l: 'DEF', v: getAvg(['defense', 'aggression']) },
+            { l: 'FÍS', v: getAvg(['stamina', 'balance', 'jump']) }
+        ];
+    }
+
+    // Definindo a Raridade (Cor do Fundo)
+    let tierClass = 'fut-bronze';
+    if (ovr >= 80) tierClass = 'fut-gold';
+    else if (ovr >= 65) tierClass = 'fut-silver';
+
+    return (
+        <div style={{display: 'flex', justifyContent: 'center', marginBottom: '15px'}}>
+            <style>{`
+                .fut-card {
+                    width: 220px; height: 320px; position: relative;
+                    border-radius: 10px 10px 40px 40px; padding: 15px; color: #333;
+                    font-family: 'Arial', sans-serif; box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+                    overflow: hidden; text-transform: uppercase;
+                }
+                .fut-card::after {
+                    content: ''; position: absolute; top:0; left:0; right:0; bottom:0;
+                    background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 100%);
+                    pointer-events: none;
+                }
+                .fut-gold { background: linear-gradient(135deg, #f9d976 0%, #e9b646 50%, #c4952d 100%); color: #4a3600; border: 2px solid #ffe699; }
+                .fut-silver { background: linear-gradient(135deg, #e0e0e0 0%, #bdbdbd 50%, #9e9e9e 100%); color: #222; border: 2px solid #f5f5f5; }
+                .fut-bronze { background: linear-gradient(135deg, #d29d71 0%, #b87333 50%, #8c531b 100%); color: #3e2004; border: 2px solid #eab890; }
+                
+                .fut-top { display: flex; justify-content: space-between; align-items: flex-start; }
+                .fut-top-left { text-align: center; }
+                .fut-ovr { font-size: 32px; font-weight: 900; line-height: 1; }
+                .fut-pos { font-size: 14px; font-weight: bold; }
+                .fut-logo { width: 30px; height: 30px; object-fit: contain; }
+                
+                .fut-img-container { text-align: center; margin-top: -10px; position: relative; z-index: 2; }
+                .fut-img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(255,255,255,0.5); box-shadow: 0 5px 15px rgba(0,0,0,0.4); background: #333; }
+                
+                .fut-name { text-align: center; font-size: 18px; font-weight: 900; margin-top: 10px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 1px; }
+                
+                .fut-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 20px; font-size: 12px; margin-top: 10px; padding: 0 10px;}
+                .fut-stat-row { display: flex; justify-content: space-between; font-weight: bold; }
+                .fut-stat-val { font-weight: 900; font-size: 14px; }
+            `}</style>
+            
+            <div className={`fut-card ${tierClass}`}>
+                <div className="fut-top">
+                    <div className="fut-top-left">
+                        <div className="fut-ovr">{ovr}</div>
+                        <div className="fut-pos">{pos}</div>
+                    </div>
+                    {teamLogo && <img src={teamLogo} className="fut-logo" />}
+                </div>
+
+                <div className="fut-img-container">
+                    {player.face ? (
+                        <img src={player.face} className="fut-img" />
+                    ) : (
+                        <div className="fut-img" style={{display:'flex', alignItems:'center', justifyContent:'center', fontSize:40, color:'#fff'}}>👤</div>
+                    )}
+                    {/* Botão de Upload Embutido */}
+                    {onFaceUpload && (
+                        <label style={{position: 'absolute', bottom: 5, right: 25, background: 'var(--blue)', color: 'white', borderRadius: '50%', width: 25, height: 25, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 12, border: '2px solid #121212', zIndex: 10 }}>
+                            📷 <input type="file" style={{display:'none'}} accept="image/*" onChange={onFaceUpload} />
+                        </label>
+                    )}
+                </div>
+
+                <div className="fut-name">{player.name}</div>
+
+                <div className="fut-stats">
+                    <div>
+                        <div className="fut-stat-row"><span className="fut-stat-val">{stats[0].v}</span><span>{stats[0].l}</span></div>
+                        <div className="fut-stat-row"><span className="fut-stat-val">{stats[1].v}</span><span>{stats[1].l}</span></div>
+                        <div className="fut-stat-row"><span className="fut-stat-val">{stats[2].v}</span><span>{stats[2].l}</span></div>
+                    </div>
+                    <div>
+                        <div className="fut-stat-row"><span className="fut-stat-val">{stats[3].v}</span><span>{stats[3].l}</span></div>
+                        <div className="fut-stat-row"><span className="fut-stat-val">{stats[4].v}</span><span>{stats[4].l}</span></div>
+                        <div className="fut-stat-row"><span className="fut-stat-val">{stats[5].v}</span><span>{stats[5].l}</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+        //FIM
+        
 const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTrainSolo, onUseItem, setModal }) => {
     const [newPass, setNewPass] = useState('');
     const [tab, setTab] = useState('PERFIL');
@@ -9931,40 +10051,17 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
 
     return (
         <div>
-            {/* CABEÇALHO COM BARRA DE XP */}
-            <div className="highlight-card" style={{textAlign:'center', paddingBottom:30, position:'relative'}}>
+            {/* CABEÇALHO COM A CARTA FIFA E BARRAS */}
+            <div className="highlight-card" style={{textAlign:'center', paddingBottom:30, position:'relative', paddingTop: 20}}>
                 
-                {/* --- FOTO DO JOGADOR (COM BOTÃO DE UPLOAD) --- */}
-                <div style={{position: 'relative', width: 80, height: 80, margin: '0 auto 10px auto'}}>
-                    {player.face ? (
-                        <img src={player.face} style={{
-                            width: '100%', height: '100%', borderRadius: '50%', 
-                            objectFit: 'cover', objectPosition: 'top', 
-                            border: '3px solid var(--primary)'
-                        }} />
-                    ) : (
-                        <div style={{
-                            width: '100%', height: '100%', borderRadius: '50%', 
-                            background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: 30, border: '3px solid #555'
-                        }}>
-                            👤
-                        </div>
-                    )}
-                    <label style={{
-                        position: 'absolute', bottom: 0, right: 0, 
-                        background: 'var(--blue)', color: 'white', 
-                        borderRadius: '50%', width: 25, height: 25, 
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                        fontSize: 12, border: '2px solid #121212'
-                    }}>
-                        📷
-                        <input type="file" style={{display:'none'}} accept="image/*" onChange={handleFaceUpload} />
-                    </label>
-                </div>
-
-                <h2 style={{margin:0}}>{String(player.name)} <span style={{fontSize:14}}>{String(player.mood || '😐')}</span></h2>
-                <small style={{color:'#ccc'}}>{team?.name || 'Agente Livre'}</small>
+                <PlayerCard 
+                    player={player} 
+                    teamName={team?.name} 
+                    teamLogo={team?.logo} 
+                    onFaceUpload={handleFaceUpload} 
+                />
+                
+                <h3 style={{margin:0}}>{String(player.mood || '😐')} {team?.name || 'Agente Livre'}</h3>
                 
                 {/* MOSTRADOR DE FAMA */}
                 <div style={{background:'rgba(0,0,0,0.3)', display:'inline-block', padding:'5px 15px', borderRadius:20, marginTop:5, border:'1px solid gold'}}>
@@ -9974,10 +10071,10 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                 <div style={{display:'flex', justifyContent:'center', gap:30, marginTop:15}}>
                     <div style={{textAlign:'center'}}>
                         <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:5}}>
-                            <div style={{fontSize:40, fontWeight:'900', color:'var(--warning)', lineHeight:1}}>{String(player.overall)}</div>
+                            <div style={{fontSize:24, fontWeight:'900', color:'var(--warning)', lineHeight:1}}>{String(player.overall)}</div>
                             {projectedOvIncrease > 0 && (
-                                <span className="pulse" style={{fontSize:16, color:'#00E676', fontWeight:'bold', display:'flex', alignItems:'center'}}>
-                                    <i className="fas fa-arrow-up" style={{fontSize:12, marginRight:2}}></i>{projectedOvIncrease}
+                                <span className="pulse" style={{fontSize:12, color:'#00E676', fontWeight:'bold', display:'flex', alignItems:'center'}}>
+                                    <i className="fas fa-arrow-up" style={{marginRight:2}}></i>{projectedOvIncrease}
                                 </span>
                             )}
                         </div>
@@ -9985,7 +10082,7 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                     </div>
                     
                     <div style={{textAlign:'center'}}>
-                        <div style={{fontSize:40, fontWeight:'900', color: energy > 50 ? 'var(--primary)' : 'var(--danger)', lineHeight:1}}>{String(energy)}%</div>
+                        <div style={{fontSize:24, fontWeight:'900', color: energy > 50 ? 'var(--primary)' : 'var(--danger)', lineHeight:1}}>{String(energy)}%</div>
                         <span style={{fontSize:10, textTransform:'uppercase', color:'#888'}}>Energia</span>
                     </div>
                 </div>
@@ -10064,7 +10161,6 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                     </div>
                 </div>
             </div>}
-
             {tab==='ACOES' && <div>
     
 
@@ -12253,7 +12349,10 @@ const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                 <h3 style={{color:'var(--primary)'}}>
                     {isUrgentRenewal ? '🚨 Renovação Obrigatória' : (isPreContract ? '📝 Pré-Contrato' : (isCounter ? 'Responder Proposta' : `Negociar ${target.name}`))}
                 </h3>
-                
+                <PlayerCard 
+                    player={target} 
+                    teamName={isFreeAgent ? 'Agente Livre' : target.teamId} 
+                />
                {/* --- PAINEL DE REFERÊNCIA DE VALORES --- */}
                 {!isPreContract && !isUrgentRenewal && !isStaff && (
                     <div style={{background: 'rgba(0, 0, 0, 0.3)', padding: '10px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #444', fontSize: '12px'}}>
@@ -13067,6 +13166,11 @@ const Ranking = ({ teams, players, sales, hallOfFame }) => {
 
                         {inspect.type === 'PLAYER' ? (
                             <div style={{maxHeight:'60vh', overflowY:'auto'}}>
+                                <PlayerCard 
+                                    player={inspect.data} 
+                                    teamName={teams.find(t=>t.id===inspect.data.teamId)?.name} 
+                                    teamLogo={teams.find(t=>t.id===inspect.data.teamId)?.logo} 
+                                />
                                 <div className="highlight-card" style={{padding:10, marginBottom:10}}>
                                     Fama Total: <b style={{color:'gold'}}>{String(inspect.data.fame || 0)}</b>
                                 </div>

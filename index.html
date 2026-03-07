@@ -349,7 +349,16 @@ const getSalaryLimits = (ovr) => {
             'GRANDE': { label: 'Grande Empresa', start: 100000000, tax: 2000000, desc: 'Gigante do mercado. Imposto alto.' }
         };
        // FIM
-        
+        // --- CALCULADORA DE PATROCÍNIO PESSOAL (GAROTO PROPAGANDA) ---
+const getPersonalSponsorLimits = (ovr) => {
+    const o = parseInt(ovr) || 0;
+    if (o <= 55) return { min: 2000, max: 10000 };
+    if (o <= 65) return { min: 10000, max: 50000 };
+    if (o <= 75) return { min: 50000, max: 200000 };
+    if (o <= 85) return { min: 200000, max: 800000 };
+    return { min: 1000000, max: 5000000 }; // Lendas
+};
+        //fim
        // --- CATEGORIAS E FÓRMULAS ECONÔMICAS (ATUALIZADO V2) ---
         const PROD_CATS = {
             'SAUDE': '💊 Saúde (+Energia)',
@@ -4754,9 +4763,27 @@ if (act === 'VARZEA') {
                         const salary = parseFloat(p.salary) || 0;
                         const tax = currentBal * 0.03;
                         const healthCost = p.healthPlan ? (p.healthPlan.cost || 0) : 0;
-                        const finalBalance = (currentBal + salary) - tax - healthCost;
-                        const xpTotal = (p.xp || 0) + (p.pendingXP || 0);
+                       // --- PAGAMENTO DO PATROCÍNIO PESSOAL (GAROTO PROPAGANDA) ---
+                        let sponsorIncome = 0;
+                        if (p.personalSponsor) {
+                            const compId = p.personalSponsor.companyId;
+                            const comp = companies.find(c => c.id === compId);
+                            const sponVal = parseFloat(p.personalSponsor.value) || 0;
+                            
+                            // Se a empresa existe e tem dinheiro
+                            if (comp && comp.status === 'ACTIVE' && (comp.balance || 0) >= sponVal) {
+                                sponsorIncome = sponVal;
+                                b.update(db.collection('companies').doc(compId), { balance: firebase.firestore.FieldValue.increment(-sponVal) });
+                            } else {
+                                // Empresa faliu ou não tem saldo: Quebra de contrato automática
+                                b.update(db.collection('players').doc(p.id), { personalSponsor: firebase.firestore.FieldValue.delete(), mood: '😡' });
+                                db.collection('news').add({ text: `📉 **CALOTE!** A empresa **${p.personalSponsor.companyName}** não teve fundos para pagar o patrocínio de **${p.name}** e o contrato foi rompido!`, type: 'press', date: Date.now(), likes: [] });
+                            }
+                        }
 
+                        const finalBalance = (currentBal + salary + sponsorIncome) - tax - healthCost;
+                        const xpTotal = (p.xp || 0) + (p.pendingXP || 0);
+                        
                         b.update(db.collection('players').doc(p.id), {
                             balance: finalBalance,
                             energy: 100,
@@ -5476,100 +5503,94 @@ if (act === 'VARZEA') {
 
             //FIM
     //AQUI É DENTRO DA App.js
-   const buyProduct = async (prod, seller) => {
+   const buyProduct = async (prod, seller, giftTarget = null) => {
         const buyerBalance = user.data.balance || 0;
         const price = parseFloat(prod.price);
         const currentStock = parseInt(prod.stock) || 0;
 
-        // 1. Validações
         if (currentStock <= 0) return alert("Produto Esgotado!");
         if (buyerBalance < price) return alert("Saldo insuficiente!");
-        if (!confirm(`Comprar ${prod.name} por ${fmt(price)}?`)) return;
+        
+        // --- SISTEMA DE PRESENTES ---
+        let isGift = !!giftTarget;
+        if (isGift) {
+            const today = new Date().toDateString();
+            const tracker = user.data.giftTracker || { date: '', count: 0 };
+            if (tracker.date === today && tracker.count >= 7) {
+                return alert("Você atingiu o limite máximo de 7 presentes enviados por dia!");
+            }
+            if (!confirm(`Comprar ${prod.name} como PRESENTE para ${giftTarget.name} por ${fmt(price)}?`)) return;
+        } else {
+            if (!confirm(`Comprar ${prod.name} por ${fmt(price)}?`)) return;
+        }
 
         setLoading(true);
-
-        // 2. Recupera o custo histórico que foi salvo no produto para cálculo de relatório
-        // (Nota: Isso é apenas visual para o histórico, não afeta o saldo)
-        const historicCost = parseFloat(prod.productionCost) || 0; 
-        // O custo unitário aproximado é o custo do lote / quantidade total original... 
-        // Mas para simplificar o log, vamos considerar que o lucro bruto agora é o preço cheio,
-        // já que o custo saiu do caixa da empresa lá atrás (na fabricação).
-        
-        // Se quiser ser muito preciso contabilmente: Lucro da Operação = Preço.
-        // O "Lucro Líquido" real a empresa vê no balanço geral.
-        
         const b = db.batch();
         
-        // 3. MOVIMENTAÇÃO FINANCEIRA
+        // 1. Tira do Comprador (Sempre quem clicou no botão)
+        const myCol = user.type === 'PLAYER' ? 'players' : (user.type === 'USER' ? 'teams' : 'users');
         
-        // A. Tira do Comprador (Jogador/Time)
-        if (user.type === 'PLAYER') {
-            b.update(db.collection('players').doc(user.data.id), { 
-                balance: firebase.firestore.FieldValue.increment(-price) 
-            });
-        } else if (user.type === 'COACH') { 
-            b.update(db.collection('users').doc(user.data.id), { 
-                balance: firebase.firestore.FieldValue.increment(-price) 
-            });
-        } else {
-            b.update(db.collection('teams').doc(user.data.id), { 
-                balance: firebase.firestore.FieldValue.increment(-price) 
-            });
+        let updatesToMe = { balance: firebase.firestore.FieldValue.increment(-price) };
+        if (isGift) {
+            const today = new Date().toDateString();
+            const tracker = user.data.giftTracker || { date: '', count: 0 };
+            updatesToMe.giftTracker = { date: today, count: (tracker.date === today ? tracker.count : 0) + 1 };
         }
+        b.update(db.collection(myCol).doc(user.data.id), updatesToMe);
 
-        // B. Paga a Empresa (VALOR CHEIO, pois o custo já foi pago na fábrica)
-        b.update(db.collection('companies').doc(seller.id), { 
-            balance: firebase.firestore.FieldValue.increment(price) 
-        });
+        // 2. Paga a Empresa
+        b.update(db.collection('companies').doc(seller.id), { balance: firebase.firestore.FieldValue.increment(price) });
 
-        // 4. BAIXA NO ESTOQUE (Diminui 1 unidade)
-        b.update(db.collection('products').doc(prod.id), {
-            stock: firebase.firestore.FieldValue.increment(-1)
-        });
+        // 3. Baixa no Estoque
+        b.update(db.collection('products').doc(prod.id), { stock: firebase.firestore.FieldValue.increment(-1) });
 
-        // 5. Gera o Item na Mochila do Jogador
-        // Recalcula Fama/Poder visual para salvar no item
+        // 4. Calcula Fama e Energia (Vão para quem RECEBER)
         let fameBonus = 0;
-        if (['VEICULO', 'IMOVEL', 'TECNOLOGIA', 'LUXO'].includes(prod.cat)) {
-            fameBonus = (parseInt(prod.power) || 0) * 100;
+        if (['VEICULO', 'IMOVEL', 'TECNOLOGIA', 'LUXO'].includes(prod.cat)) fameBonus = (parseInt(prod.power) || 0) * 100;
+        
+        const receiverId = isGift ? giftTarget.id : user.data.id;
+        const receiverName = isGift ? giftTarget.name : user.data.name;
+        
+        // Se for presente, injeta Fama e Energia direto no alvo agora
+        if (isGift) {
+            const targetCol = giftTarget.teamId !== undefined ? 'players' : 'users'; // teamId exists on players
+            let targetUpdates = {};
+            if (fameBonus > 0 && targetCol === 'players') targetUpdates.fame = firebase.firestore.FieldValue.increment(fameBonus);
+            b.update(db.collection(targetCol).doc(receiverId), targetUpdates);
+            
+            // Notificação na Imprensa para presentes de Luxo
+            if (fameBonus > 0 || price > 500000) {
+                db.collection('news').add({
+                    text: `🎁 **MIMO DE LUXO!**\nO ${user.data.name} acabou de enviar um(a) **${prod.name}** caríssimo(a) de presente para **${receiverName}**! O que será que está por trás dessa generosidade? 👀`,
+                    type: 'biz', date: Date.now(), likes: []
+                });
+            }
         }
 
+        // 5. Salva na Mochila do Recebedor
         const saleRef = db.collection('sales').doc();
         b.set(saleRef, { 
             companyId: seller.id, 
-            buyerId: user.data.id, 
-            buyerName: user.data.name, 
-            
+            buyerId: receiverId, 
+            buyerName: receiverName, 
+            giftedBy: isGift ? user.data.name : null, // Marca d'água de quem deu o presente
             productOriginalId: prod.id,
             productName: prod.name, 
             price: price,
-            cost: 0, // Custo é 0 nesta transação pois já foi pago na fábrica
-            profit: price, // Lucro de caixa imediato é o preço cheio
-            
-            img: prod.img, 
-            cat: prod.cat,
-            
-            // Grava os atributos fixos
+            cost: 0, profit: price, 
+            img: prod.img, cat: prod.cat,
             power: parseInt(prod.power) || 0, 
             fameGained: fameBonus, 
-            
             date: Date.now() 
         });
         
         try {
             await b.commit();
-            
-            // Atualiza saldo visualmente na hora
-            setUser(prev => ({
-                ...prev,
-                data: { ...prev.data, balance: buyerBalance - price }
-            }));
-
-            let msg = `✅ Compra realizada com sucesso!`;
-            if (fameBonus > 0) msg += `\n🌟 FAMA +${fameBonus} (Verifique seu perfil)`;
+            setUser(prev => ({ ...prev, data: { ...prev.data, balance: buyerBalance - price, giftTracker: updatesToMe.giftTracker || prev.data.giftTracker } }));
+            let msg = isGift ? `✅ Presente enviado com sucesso para ${receiverName}!` : `✅ Compra realizada com sucesso!`;
+            if (!isGift && fameBonus > 0) msg += `\n🌟 FAMA +${fameBonus}`;
             alert(msg);
         } catch (error) {
-            console.error(error);
             alert("Erro ao processar compra: " + error.message);
         }
         setLoading(false);
@@ -7335,6 +7356,29 @@ const acceptOffer = async (o) => {
             return;
         }
 
+        // --- LÓGICA DE PATROCÍNIO PESSOAL (GAROTO PROPAGANDA) ---
+        if (o.type === 'PERSONAL_SPONSOR_OFFER') {
+            if (!confirm(`Aceitar o patrocínio da ${o.companyName} por ${fmt(o.value)} semanais?\nSeu rosto aparecerá na loja deles!`)) return;
+            
+            const b = db.batch();
+            
+            // Grava o patrocínio no jogador
+            b.update(db.collection('players').doc(o.recipientId), {
+                personalSponsor: {
+                    companyId: o.senderId,
+                    companyName: o.companyName,
+                    value: o.value,
+                    clause: o.value * 4 // Multa de 4 semanas
+                }
+            });
+            b.delete(db.collection('offers').doc(o.id));
+            await b.commit();
+            
+            postNews(`📸 **NOVA ESTRELA!**\n**${o.playerName}** é o mais novo garoto propaganda da marca **${o.companyName}**!`, 'biz');
+            alert("Contrato assinado! Verifique seu Perfil.");
+            return;
+        }
+        
         // --- 2. LÓGICA DE PRÉ-CONTRATO (V1.52.9) ---
         // (Mantido para não perder a funcionalidade de assinar com jogadores em fim de contrato)
         if (o.type === 'PRE_CONTRATO') {
@@ -8134,7 +8178,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v2.2.0</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v2.2.1</div>
                             </div>
                         </div>
                         
@@ -8627,12 +8671,10 @@ onClick={() => {
                         <i className="fas fa-city"></i><span>CIDADE</span>
                     </div>
                     
-                    {/* 4. MERCADO (Esconde para empresas) */}
-                    {user.type!=='COMPANY' && 
-                        <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}>
-                            <i className="fas fa-globe"></i><span>MERCADO</span>
-                        </div>
-                    }
+                    {/* 4. MERCADO (Agora aberto para Empresas patrocinarem) */}
+                    <div className={`nav-item ${screen==='MARKET'?'active':''}`} onClick={()=>setScreen('MARKET')}>
+                        <i className="fas fa-globe"></i><span>MERCADO</span>
+                    </div>
                     
                     {/* 5. SHOP (Esconde para empresas) */}
                     {user.type!=='COMPANY' && 
@@ -9031,7 +9073,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                         FUT PIXEL <span style={{color: '#00E676', margin: '0 5px'}}>•</span> POR NATHAN REIS
                     </div>
                     {/* Exibição da versão solicitada */}
-                    <div className="version-badge">VERSÃO 2.2.0</div>
+                    <div className="version-badge">VERSÃO 2.2.1 PRESENTES </div>
                 </div>
             </div>
             {/* --- FIM DO CABEÇALHO --- */}
@@ -10066,6 +10108,38 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                     </div>
                 </div>
                 <div className="card" style={{borderLeft:'4px solid #fff'}}>
+
+                    {/* --- PATROCÍNIO PESSOAL --- */}
+                    {player.personalSponsor && (
+                        <div className="card" style={{borderLeft:'4px solid var(--purple)', marginBottom:15, background:'rgba(213,0,249,0.05)'}}>
+                            <h3 style={{marginTop:0, color:'var(--purple)'}}>📸 Garoto Propaganda</h3>
+                            <p style={{fontSize:12}}>Empresa: <b>{player.personalSponsor.companyName}</b></p>
+                            <p style={{fontSize:12, color:'lime', fontWeight:'bold'}}>Ganhos: +{fmt(player.personalSponsor.value)} / sem</p>
+                            
+                            {user.type === 'PLAYER' && (
+                                <button className="btn btn-red" style={{width:'auto', fontSize:10, marginTop:10}} onClick={async () => {
+                                    const multa = player.personalSponsor.clause;
+                                    if(player.balance < multa) return alert(`Você não tem dinheiro para a multa rescisória de ${fmt(multa)}.`);
+                                    if(!confirm(`Quebrar o contrato com a ${player.personalSponsor.companyName}?\nVocê pagará ${fmt(multa)} de multa do seu bolso.`)) return;
+                                    
+                                    const b = db.batch();
+                                    b.update(db.collection('players').doc(player.id), {
+                                        balance: firebase.firestore.FieldValue.increment(-multa),
+                                        personalSponsor: firebase.firestore.FieldValue.delete()
+                                    });
+                                    b.update(db.collection('companies').doc(player.personalSponsor.companyId), {
+                                        balance: firebase.firestore.FieldValue.increment(multa)
+                                    });
+                                    await b.commit();
+                                    alert("Contrato quebrado e multa paga à empresa.");
+                                }}>
+                                    QUEBRAR CONTRATO ({fmt(player.personalSponsor.clause)})
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    
                    {/* --- SALA DE TROFÉUS --- */}
                 <div className="card" style={{borderLeft:'4px solid gold', background:'rgba(255,215,0,0.05)', marginBottom:15}}>
                     <h3 style={{marginTop:0, color:'gold'}}>🏆 Sala de Troféus</h3>
@@ -10128,6 +10202,11 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                         return (
                             <div key={item.id || index} className="card" style={{border:'1px solid #444', textAlign:'center', padding:10, position:'relative'}}>
                                 <div style={{position:'absolute', top:5, left:5, fontSize:9, background:'#333', padding:'2px 5px', borderRadius:3}}>{item.cat}</div>
+                                {item.giftedBy && (
+                                    <div style={{position:'absolute', bottom:5, left:5, right:5, fontSize:8, background:'rgba(213,0,249,0.8)', padding:'2px', borderRadius:3, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>
+                                        🎁 De: {item.giftedBy}
+                                    </div>
+                                )}
                                 
                                 {item.img ? (
                                     <img src={item.img} style={{width:60, height:60, objectFit:'contain', marginBottom:5, borderRadius:5}} />
@@ -10167,7 +10246,8 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
     const [view, setView] = useState('MALL'); // MALL ou STORE
     const [selComp, setSelComp] = useState(null);
     const [inspectItem, setInspectItem] = useState(null); // Estado para o modal de Zoom do produto
-    
+    const [giftTarget, setGiftTarget] = useState(''); // Alvo do presente
+       
     // --- 1. VISÃO GERAL (SHOPPING CENTER - LISTA DE LOJAS) ---
     if (view === 'MALL') return (
         <div>
@@ -10188,13 +10268,27 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
 
     // --- 2. VISÃO DA LOJA (VITRINE DE PRODUTOS) ---
     const storeProducts = products.filter(p => p.companyId === selComp.id);
-    const isAdmin = user && user.type === 'ADMIN';
+    const brandAmbassadors = (players||[]).filter(p => p.personalSponsor && p.personalSponsor.companyId === selComp.id);
+       const isAdmin = user && user.type === 'ADMIN';
     const userTeam = user && (user.type === 'USER' || user.type === 'PLAYER' || user.type === 'COACH');
 
     return (
         <div>
             <button className="btn" style={{background:'#333', marginBottom:10, width:'auto'}} onClick={()=>{setView('MALL'); setSelComp(null);}}>⬅ VOLTAR AO SHOPPING</button>
-            
+            {/* VITRINE DE GAROTOS PROPAGANDA */}
+            {brandAmbassadors.length > 0 && (
+                <div style={{marginBottom:20, padding:10, background:'rgba(213,0,249,0.05)', borderRadius:8, border:'1px solid var(--purple)'}}>
+                    <div style={{fontSize:10, color:'var(--purple)', fontWeight:'bold', textTransform:'uppercase', marginBottom:10}}>📸 Garotos Propaganda da Marca</div>
+                    <div style={{display:'flex', gap:10, overflowX:'auto', paddingBottom:5}}>
+                        {brandAmbassadors.map(amb => (
+                            <div key={amb.id} style={{textAlign:'center', minWidth:'70px'}}>
+                                {amb.face ? <img src={amb.face} style={{width:50, height:50, borderRadius:'50%', objectFit:'cover', border:'2px solid var(--purple)'}} /> : <div style={{width:50, height:50, borderRadius:'50%', background:'#333', margin:'0 auto'}}></div>}
+                                <div style={{fontSize:10, fontWeight:'bold', marginTop:5, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{amb.name}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
             {/* CABEÇALHO DA LOJA */}
             <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:20, background:'rgba(0,0,0,0.3)', padding:10, borderRadius:8, border: '1px solid #333'}}>
                 {selComp.logo && <img src={selComp.logo} style={{width:50, height:50, borderRadius:'50%', objectFit:'cover'}} />}
@@ -10315,19 +10409,37 @@ const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTr
                         </div>
 
                         {userTeam && (
-                            <button 
-                                className={`btn ${(parseInt(inspectItem.stock)||0) <= 0 ? 'btn-ghost' : 'btn-green'}`} 
-                                style={{padding:15, fontSize:16, fontWeight:'bold', width:'100%'}} 
-                                onClick={() => {
-                                    if((parseInt(inspectItem.stock)||0) > 0) {
-                                        onBuy(inspectItem, selComp);
-                                        setInspectItem(null);
-                                    }
-                                }}
-                                disabled={(parseInt(inspectItem.stock)||0) <= 0}
-                            >
-                                {(parseInt(inspectItem.stock)||0) <= 0 ? '🔴 ESGOTADO' : '🛒 COMPRAR AGORA'}
-                            </button>
+                            <>
+                                <select className="input-field" style={{marginBottom:10, borderColor:'var(--secondary)'}} value={giftTarget} onChange={e=>setGiftTarget(e.target.value)} disabled={(parseInt(inspectItem.stock)||0) <= 0}>
+                                    <option value="">🛒 COMPRAR PARA MIM MESMO</option>
+                                    <optgroup label="🎁 Enviar Presente (Elenco)">
+                                        {/* Se for clube, lista os próprios jogadores. Se for jogador, lista os colegas de time */}
+                                        {players.filter(p => p.teamId !== 'FREE' && p.id !== user.data.id).sort((a,b)=>a.name.localeCompare(b.name)).map(p => (
+                                            <option key={p.id} value={`PLAYER_${p.id}`}>🎁 Presentear: {p.name}</option>
+                                        ))}
+                                    </optgroup>
+                                </select>
+
+                                <button 
+                                    className={`btn ${(parseInt(inspectItem.stock)||0) <= 0 ? 'btn-ghost' : 'btn-green'}`} 
+                                    style={{padding:15, fontSize:14, fontWeight:'bold', width:'100%', margin:0}} 
+                                    onClick={() => {
+                                        if((parseInt(inspectItem.stock)||0) > 0) {
+                                            let targetObj = null;
+                                            if (giftTarget) {
+                                                const tId = giftTarget.replace('PLAYER_', '');
+                                                targetObj = players.find(p => p.id === tId);
+                                            }
+                                            onBuy(inspectItem, selComp, targetObj);
+                                            setInspectItem(null);
+                                            setGiftTarget('');
+                                        }
+                                    }}
+                                    disabled={(parseInt(inspectItem.stock)||0) <= 0}
+                                >
+                                    {(parseInt(inspectItem.stock)||0) <= 0 ? '🔴 ESGOTADO' : (giftTarget ? '🎁 ENVIAR PRESENTE' : '🛒 COMPRAR AGORA')}
+                                </button>
+                            </>
                         )}
                         <div style={{marginTop:5, fontSize:10, color: (parseInt(inspectItem.stock)||0) > 0 ? 'lime' : 'red'}}>
                             Estoque disponível: {inspectItem.stock || 0} unidades
@@ -11855,6 +11967,35 @@ const Market = ({ user, me, teams, players, coaches, open, isVis, onNeg, onPayCl
                     <div style={{marginTop:10, background:'rgba(0,0,0,0.5)', padding:5, borderRadius:4, textAlign:'center', border:'1px solid var(--secondary)'}}>
                         <small style={{color:'var(--secondary)', fontWeight:'bold'}}>📝 JÁ ASSINOU PRÉ-CONTRATO</small><br/>
                         <small style={{color:'#aaa', fontSize:9}}>Vai para o {p.preContract.teamName} no fim da temporada.</small>
+                    </div>
+                )}
+
+               {/* --- BOTÃO DAS EMPRESAS (NOVO) --- */}
+                {user && user.type === 'COMPANY' && !p.personalSponsor && (
+                    <div style={{marginTop:12}}>
+                        <button className="btn btn-purple" style={{width:'100%', marginBottom:0, padding:'8px'}} onClick={() => {
+                            const limits = getPersonalSponsorLimits(p.overall);
+                            const val = prompt(`Patrocínio Pessoal para ${p.name}\n\nSeu Saldo: ${fmt(user.data.balance)}\nFaixa Permitida: ${fmt(limits.min)} a ${fmt(limits.max)} por semana.\n\nDigite o valor semanal oferecido:`);
+                            if (val) {
+                                const v = parseFloat(val);
+                                if (v < limits.min || v > limits.max) return alert("Valor fora da faixa permitida para o Overall deste jogador.");
+                                
+                                db.collection('offers').add({
+                                    type: 'PERSONAL_SPONSOR_OFFER',
+                                    recipientId: p.id,
+                                    senderId: user.data.id,
+                                    companyName: user.data.name,
+                                    playerName: p.name,
+                                    value: v,
+                                    status: 'PENDING',
+                                    description: `📸 **CONVITE PARA GAROTO PROPAGANDA**\nA marca **${user.data.name}** quer você como rosto oficial deles!\n\nPagamento Semanal: ${fmt(v)}\n\nMulta por quebra de contrato: 4 semanas de pagamento.`,
+                                    date: Date.now()
+                                });
+                                alert("Proposta enviada ao jogador!");
+                            }
+                        }}>
+                            📸 PROPOR PATROCÍNIO
+                        </button>
                     </div>
                 )}
 

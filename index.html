@@ -20,6 +20,109 @@
 
     <link rel="stylesheet" href="styles/colors.css">
     <link rel="stylesheet" href="styles/main.css">
+    <style>
+        /* 1. Fonte padrão moderna para todo o app */
+        body, input, select, button, textarea {
+            font-family: 'Roboto', sans-serif !important;
+        }
+
+        /* 2. Arrumando os textos tortos (Alinhamento perfeito) */
+        div[style*="display:'flex'"], 
+        div[style*="display: 'flex'"], 
+        div[style*="display:flex"],
+        .card-row {
+            align-items: center !important; /* Isso força os textos a não ficarem tortos */
+        }
+
+        /* 3. Embelezando os Cartões (Cards) */
+        .card, .highlight-card {
+            background-color: #1e293b !important; /* Cor de fundo mais premium */
+            border-radius: 12px !important; /* Cantos bem arredondados */
+            padding: 16px !important; /* Respiro interno para não colar nas bordas */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important; /* Sombra moderna */
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            margin-bottom: 15px !important;
+            transition: transform 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-2px); /* Efeito de pular ao passar o mouse */
+        }
+
+        /* 4. Arrumando Inputs e Caixas de Texto */
+        .input-field {
+            width: 100% !important;
+            padding: 12px 15px !important;
+            border-radius: 8px !important;
+            border: 1px solid #334155 !important;
+            background-color: #0f172a !important;
+            color: #f8fafc !important;
+            font-size: 14px !important;
+            box-sizing: border-box !important;
+            margin-bottom: 15px !important;
+            outline: none;
+        }
+        .input-field:focus {
+            border-color: #00E676 !important; /* Brilha verde ao clicar */
+            box-shadow: 0 0 0 2px rgba(0, 230, 118, 0.2) !important;
+        }
+
+        /* 5. Embelezando os Botões */
+        .btn {
+            border-radius: 8px !important;
+            padding: 10px 16px !important;
+            font-weight: 800 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+            border: none !important;
+            cursor: pointer !important;
+            transition: all 0.2s ease !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 8px !important;
+        }
+        .btn:active {
+            transform: scale(0.95) !important; /* Efeito de clique real */
+        }
+
+        /* 6. Arrumando as Tabelas (Rankings e Times) */
+        table {
+            width: 100% !important;
+            border-collapse: separate !important;
+            border-spacing: 0 5px !important; /* Espaço entre as linhas da tabela */
+        }
+        th {
+            background-color: #0f172a !important;
+            color: #94a3b8 !important;
+            font-size: 11px !important;
+            text-transform: uppercase !important;
+            padding: 10px !important;
+            border-radius: 4px;
+        }
+        td {
+            padding: 12px 10px !important;
+            background-color: #1e293b;
+            vertical-align: middle !important;
+        }
+        td:first-child { border-radius: 8px 0 0 8px; }
+        td:last-child { border-radius: 0 8px 8px 0; }
+
+        /* 7. Arrumando os menus na base (Bottom Nav) */
+        .bottom-nav {
+            background: rgba(15, 23, 42, 0.95) !important;
+            backdrop-filter: blur(10px);
+            border-top: 1px solid #334155 !important;
+            padding-bottom: 10px !important;
+        }
+        .nav-item {
+            border-radius: 10px !important;
+            transition: 0.3s !important;
+        }
+        .nav-item.active {
+            background-color: rgba(0, 230, 118, 0.2) !important;
+            color: #00E676 !important;
+        }
+    </style>
 </head>
 <body>
    <script src="scripts/emergency.js"></script>
@@ -8178,7 +8281,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v2.2.4</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v2.2.5</div>
                             </div>
                         </div>
                         
@@ -9075,7 +9178,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                         FUT PIXEL <span style={{color: '#00E676', margin: '0 5px'}}>•</span> POR NATHAN REIS
                     </div>
                     {/* Exibição da versão solicitada */}
-                    <div className="version-badge">VERSÃO 2.2.4 PRESENTES </div>
+                    <div className="version-badge">VERSÃO 2.2.5 PRESENTES </div>
                 </div>
             </div>
             {/* --- FIM DO CABEÇALHO --- */}

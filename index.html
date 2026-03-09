@@ -8654,11 +8654,12 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             <CompanyDashboard company={user.data} products={products.filter(p => p.companyId === user.data.id)} sps={sps.filter(s => s.companyId === user.data.id)} sales={sales || []} teams={teams} onSaveProd={saveProduct} onDeleteProd={async(id)=>{if(confirm("Excluir produto?")) await db.collection('products').doc(id).delete();}} onProcessSpons={processSponsorship} />
                         }
                         
-                      {screen === 'PLAYER_DASH' && user.type === 'PLAYER' && 
-                            <div key="player-dash-container">
-                                <PlayerDashboard 
-                                    player={players.find(p=>p.id===user.data.id) || user.data} 
-                                    team={teams.find(t=>t.id===user.data.teamId)} 
+                     {screen === 'PLAYER_DASH' && user.type === 'PLAYER' && 
+    <div key="player-dash-container">
+        <PlayerDashboard 
+            user={user} /* <-- ADICIONE ESTA LINHA AQUI! */
+            player={players.find(p=>p.id===user.data.id) || user.data} 
+            team={teams.find(t=>t.id===user.data.teamId)} 
                                     sales={sales || []} 
                                     onAction={handlePlayerActions} 
                                     onUpdatePassword={async(newP)=>{ await db.collection('players').doc(user.data.id).update({password: newP}); alert("Senha alterada!"); }} 
@@ -10032,7 +10033,7 @@ const PlayerCard = ({ player, teamName, teamLogo, onFaceUpload }) => {
 };
         //FIM
         
-const PlayerDashboard = ({ player, team, sales, onUpdatePassword, onAction, onTrainSolo, onUseItem, setModal }) => {
+const PlayerDashboard = ({ user, player, team, sales, onUpdatePassword, onAction, onTrainSolo, onUseItem, setModal }) => {
     const [newPass, setNewPass] = useState('');
     const [tab, setTab] = useState('PERFIL');
     const [trainType, setTrainType] = useState('FISICO_BASE'); 

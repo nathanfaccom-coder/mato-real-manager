@@ -895,11 +895,12 @@ const AdminPlayerModal = ({ player, teams, onClose }) => {
                 payload.attributes = generateAttributes(payload.position, payload.overall);
                 await db.collection('players').add(payload);
                 alert("Jogador criado com sucesso!");
+                onClose(); // Só fecha se for criação nova
             } else {
                 await db.collection('players').doc(player.id).update(payload);
                 alert("Dados atualizados com sucesso!");
+                // Removemos o onClose() daqui! A janela continuará aberta para facilitar edições seguidas.
             }
-            onClose();
         } catch (e) { alert("Erro ao salvar: " + e.message); }
     };
 
@@ -991,12 +992,13 @@ const AdminPlayerModal = ({ player, teams, onClose }) => {
                 <div style={{display:'flex', gap:10, marginTop:15}}>
                     <button className="btn btn-green" onClick={handleSave}>💾 SALVAR DADOS</button>
                     {isNew ? null : <button className="btn btn-red" onClick={()=>{ if(confirm("Excluir "+player.name+" permanentemente?")) { firebase.firestore().collection('players').doc(player.id).delete(); onClose(); } }}>🗑️ EXCLUIR</button>}
-                    <button className="btn btn-ghost" onClick={onClose}>CANCELAR</button>
+                    <button className="btn btn-ghost" onClick={onClose}>{isNew ? 'CANCELAR' : 'FECHAR JANELA'}</button>
                 </div>
             </div>
         </div>
     );
 };
+        
         // ==========================================
 // SISTEMA DE BASE E NPCS (BOTS)
 // ==========================================
@@ -6419,20 +6421,34 @@ const AdminPanel = ({ setModal, teams, players, onGenFixtures, onTurnSeasonAdvan
                         </div>
                     ))}
                     
-                    <h4>Clubes Ativos</h4>
-                    {(teams||[]).filter(t=>t.status!=='PENDING').sort((a,b) => a.name.localeCompare(b.name)).map(t=>(
-                        <div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                            <span><b>{t.name}</b></span>
-                            <div style={{display:'flex', gap:5}}>
-                                <button className="btn btn-ghost" style={{width:'auto', fontSize:10}} onClick={()=>onConfig(t)}>⚙️ CONFIG</button>
-                                <button className="btn btn-ghost" style={{width:'auto', fontSize:10}} onClick={()=>managePassword('teams', t.id, t.password, t.name)}>🔑 TIME</button>
-                                <button className="btn btn-green" style={{width:'auto', fontSize:10}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, parseFloat(n) || 0)}}>$</button>
-                                <button className="btn btn-purple" style={{width:'auto', fontSize:10}} onClick={()=>setSelTeamPlayers(t)}>👥 ELENCO</button>
-                                <button className="btn btn-blue" style={{width:'auto', fontSize:10}} onClick={()=>onEditT(t)}>📝 EDITAR CLUBE</button>
-                                <button className="btn btn-red" style={{width:'auto', fontSize:10}} onClick={()=>onDeleteTeam(t.id)}>🗑️</button>
-                            </div>
-                        </div>
-                    ))}
+                   <h4>Clubes Ativos por Divisão</h4>
+                    {['A', 'B', 'C', 'D', 'VARZEA', 'GUEST'].map(serie => {
+                        const teamsInSerie = (teams||[]).filter(t => t.status !== 'PENDING' && t.serie === serie).sort((a,b) => a.name.localeCompare(b.name));
+                        if (teamsInSerie.length === 0) return null;
+                        
+                        return (
+                            <details key={serie} style={{marginBottom: 10, background: '#1e293b', borderRadius: 8, border: '1px solid #334155'}}>
+                                <summary style={{padding: 15, cursor: 'pointer', fontWeight: 'bold', color: 'cyan', outline: 'none'}}>
+                                    {serie === 'VARZEA' ? '🚜 O Terrão (Várzea)' : (serie === 'GUEST' ? '🌍 Convidados' : `🏆 Série ${serie}`)} <span style={{color:'#aaa', fontSize:12}}>({teamsInSerie.length} times)</span>
+                                </summary>
+                                <div style={{padding: '0 10px 10px 10px', display:'grid', gap:10}}>
+                                    {teamsInSerie.map(t => (
+                                        <div key={t.id} className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center', margin:0}}>
+                                            <span><b>{t.name}</b></span>
+                                            <div style={{display:'flex', gap:5}}>
+                                                <button className="btn btn-ghost" style={{width:'auto', fontSize:10}} onClick={()=>onConfig(t)}>⚙️ CONFIG</button>
+                                                <button className="btn btn-ghost" style={{width:'auto', fontSize:10}} onClick={()=>managePassword('teams', t.id, t.password, t.name)}>🔑 SENHA</button>
+                                                <button className="btn btn-green" style={{width:'auto', fontSize:10}} onClick={()=>{const n=prompt("Novo Saldo:", t.balance); if(n)onUpdateBal(t.id, parseFloat(n) || 0)}}>$</button>
+                                                <button className="btn btn-purple" style={{width:'auto', fontSize:10}} onClick={()=>setSelTeamPlayers(t)}>👥 ELENCO</button>
+                                                <button className="btn btn-blue" style={{width:'auto', fontSize:10}} onClick={()=>onEditT(t)}>📝 EDITAR</button>
+                                                <button className="btn btn-red" style={{width:'auto', fontSize:10}} onClick={()=>onDeleteTeam(t.id)}>🗑️</button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </details>
+                        );
+                    })}
 
                     <hr style={{borderColor:'#444', margin:'20px 0'}}/>
                     
@@ -8281,7 +8297,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v2.2.6</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v2.2.7</div>
                             </div>
                         </div>
                         
@@ -9179,7 +9195,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                         FUT PIXEL <span style={{color: '#00E676', margin: '0 5px'}}>•</span> POR NATHAN REIS
                     </div>
                     {/* Exibição da versão solicitada */}
-                    <div className="version-badge">VERSÃO 2.2.6 PRESENTES </div>
+                    <div className="version-badge">VERSÃO 2.2.7 PRESENTES </div>
                 </div>
             </div>
             {/* --- FIM DO CABEÇALHO --- */}

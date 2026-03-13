@@ -2192,13 +2192,18 @@ const TeamDashboard = ({ team, players, staff, isVisitor, onEdit, onAdd, onFireC
                     <div style={{marginBottom:15}}>
                         <div className="page-section-title">Jogadores ({sortedPlayers.length})</div>
                         
-                        {/* BOTÃO EXCLUSIVO DO ADMIN NA TELA DO TIME */}
-                        {isAdmin && (
-                            <button className="btn btn-green" style={{width:'100%', padding:'12px', fontSize:12, fontWeight:'900', border:'1px solid lime'}} onClick={onAdd}>
-                                ✨ + CRIAR NOVO JOGADOR NESTE CLUBE
+                        {/* BOTÃO PARA ADMIN E PARA O DONO DO TIME */}
+                        {(isAdmin || !isVisitor) && (
+                            <button className="btn btn-green" style={{width:'100%', padding:'12px', fontSize:12, fontWeight:'900', border:'1px solid lime'}} onClick={() => {
+                                if (isAdmin) {
+                                    onAdd(); // Admin cria direto
+                                } else {
+                                    setModal({type: 'TEAM_REQUEST_PLAYER', data: team}); // Dono pede aprovação
+                                }
+                            }}>
+                                {isAdmin ? '✨ + CRIAR NOVO JOGADOR (ADM)' : '📝 + INSCREVER NOVO JOGADOR (Análise Federação)'}
                             </button>
                         )}
-                    </div>
                     
                     {/* LISTA DE JOGADORES ORDENADA */}
                     {sortedPlayers.map(p => (
@@ -4482,19 +4487,27 @@ const GameCalendar = ({ calendar }) => {
                                 <b>{p.name}</b>
                                 <span className="badge-pos" style={{background:getPosColor(p.position)}}>{p.position}</span>
                             </div>
+                            <div style={{margin:'5px 0', fontSize: 11, color: '#aaa'}}>
+                                <b>Time:</b> {p.teamId && p.teamId !== 'FREE' ? <span style={{color:'cyan'}}>{teams.find(t=>t.id===p.teamId)?.name || p.teamId}</span> : <span style={{color:'gold'}}>Agente Livre</span>}
+                            </div>
                             <div style={{margin:'10px 0'}}>
-                                <a href={`https://instagram.com/${p.instagram.replace('@','')}`} target="_blank" style={{color:'cyan', textDecoration:'none', fontWeight:'bold', display:'flex', alignItems:'center', gap:5}}>
+                                <a href={`https://instagram.com/${p.instagram?.replace('@','')}`} target="_blank" style={{color:'cyan', textDecoration:'none', fontWeight:'bold', display:'flex', alignItems:'center', gap:5}}>
                                     <i className="fab fa-instagram" style={{fontSize:18}}></i> {p.instagram}
                                 </a>
                             </div>
                             <div style={{display:'flex', gap:5}}>
                                 <button className="btn btn-green" onClick={async () => {
-                                    await firebase.firestore().collection('players').doc(p.id).update({ status: 'VENDA' });
-                                    alert(`${p.name} foi aprovado!`);
+                                    // Se ele tem um time, aprova com o status que o time pediu. Se for livre, vai pra venda.
+                                    const finalStatus = (p.teamId && p.teamId !== 'FREE') ? (p.requestedStatus || 'NAO_A_VENDA') : 'VENDA';
+                                    await firebase.firestore().collection('players').doc(p.id).update({ 
+                                        status: finalStatus,
+                                        requestedStatus: firebase.firestore.FieldValue.delete() // Limpa o rastro
+                                    });
+                                    alert(`${p.name} foi aprovado com sucesso!`);
                                 }}>APROVAR</button>
                                 <button className="btn btn-red" onClick={async () => {
                                     if(confirm("Recusar e excluir inscrição?")) await firebase.firestore().collection('players').doc(p.id).delete();
-                                }}>RECUSAR FAKE</button>
+                                }}>RECUSAR</button>
                                 <button className="btn btn-blue" style={{width:'auto'}} onClick={() => setModal({type: 'ADMIN_PLAYER', data: p})}>✏️</button>
                             </div>
                         </div>
@@ -8303,7 +8316,7 @@ if(!user) return <LoginScreen teams={teams} players={players} papers={papers} jo
                             {user.type==='USER' && user.data.logo && <img src={user.data.logo} style={{width:40, height:40, borderRadius:'50%', border:'2px solid var(--primary)', objectFit:'cover'}} />}
                             <div>
                                 <div style={{fontWeight:'900', fontSize:16}}>{user.type==='USER' ? user.data.name : user.data?.name || user.type}</div>
-                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v2.2.7</div>
+                                <div className="dev-credits" style={{textAlign:'left', margin:0}}>Desenvolvido por: Nathan Reis | v2.2.8</div>
                             </div>
                         </div>
                         
@@ -8835,6 +8848,30 @@ onClick={() => {
                     {modal && <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget && setModal(null)}>
                         <div className="modal-content">
                             {modal.type==='PLAYER' && <PlayerForm initial={modal.data} onSave={savePlayer} onDelete={async(id)=>{db.collection('players').doc(id).delete(); setModal(null);}} isAdmin={user.type==='ADMIN'} teams={teams} onRenew={renewContract} isOwner={user.type==='USER' && modal.data?.teamId===user.data?.id} />}
+                            {modal.type === 'TEAM_REQUEST_PLAYER' && <TeamRequestPlayerModal team={modal.data} onClose={() => setModal(null)} onSubmit={async (data) => {
+    try {
+        setLoading(true);
+        // Gera os atributos sorteados com base na posição e overall que o time pediu
+        const newAttrs = generateAttributes(data.position, data.overall);
+        
+        await db.collection('players').add({
+            ...data,
+            attributes: newAttrs,
+            requestedStatus: data.status, // Salva o status que o time quer que ele tenha quando for aprovado
+            status: 'PENDING', // Força o status PENDING para ficar invisível e ir pro Admin
+            xp: 0,
+            fame: 0,
+            balance: 0,
+            stats: {goals:0, assists:0, tackles:0, saves:0, yellows:0, reds:0}
+        });
+        setLoading(false);
+        setModal(null);
+        alert("Inscrição enviada com sucesso! O jogador aparecerá no seu elenco assim que a Federação aprovar.");
+    } catch(e) {
+        setLoading(false);
+        alert("Erro ao inscrever: " + e.message);
+    }
+}} />}
                             {modal.type==='ADMIN_PLAYER' && <AdminPlayerModal player={modal.data} teams={teams} onClose={()=>setModal(null)} />}
                             {modal.type==='CT_TYCOON' && modal.data && <TrainingCenterManager team={teams.find(t => t.id === modal.data.id) || modal.data} players={players.filter(p=>p.teamId===modal.data.id)} staff={(coaches||[]).filter(c => c.teamId === modal.data.id && c.status === 'ACTIVE')} user={user} onClose={()=>setModal(null)} onTrain={handleCoachTrain} onTrainSolo={handlePlayerSoloTrain} />}
     {modal.type==='OFFER' && <OfferForm target={modal.data} myPlayers={players.filter(p => p.teamId === user.data.id)} onSend={sendOffer} setModal={setModal} user={user} />}
@@ -9202,7 +9239,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
                         FUT PIXEL <span style={{color: '#00E676', margin: '0 5px'}}>•</span> POR NATHAN REIS
                     </div>
                     {/* Exibição da versão solicitada */}
-                    <div className="version-badge">VERSÃO 2.2.7 PRESENTES </div>
+                    <div className="version-badge">VERSÃO 2.2.8 UM RECOMEÇO </div>
                 </div>
             </div>
             {/* --- FIM DO CABEÇALHO --- */}
@@ -11945,6 +11982,88 @@ const CoachDashboard = ({ coach, team, players, offers, sales, onTrain, onEvolve
             return (<div><input className="input-field" placeholder="Buscar jogador..." value={search} onChange={e=>setSearch(e.target.value)} /><div style={{maxHeight:300, overflowY:'auto'}}>{search.length > 0 && filtered.map(p => (<div key={p.id} className="card" onClick={()=>{setSelP(p); setS(p.stats || {goals:0,assists:0,tackles:0,saves:0,yellows:0,reds:0})}}><b>{p.name} {p.recoveryLeft > 0 ? '❌' : ''}</b> <small>({teams.find(t=>t.id===p.teamId)?.name})</small></div>))}</div></div>);
         };
 
+    
+// ==========================================
+// MODAL: CLUBE INSCREVE NOVO JOGADOR (VAI PARA APROVAÇÃO)
+// ==========================================
+const TeamRequestPlayerModal = ({ team, onClose, onSubmit }) => {
+    const [f, setF] = useState({
+        name: '', instagram: '', position: 'ATA', overall: 45, password: '',
+        contract: 1, salary: 1500, value: 40000, mood: '😐', status: 'NAO_A_VENDA'
+    });
+
+    const limits = getSalaryLimits(f.overall);
+    const recPrice = getRecommendedPrice(f.overall, f.position);
+
+    const handleSubmit = () => {
+        if (!f.name || !f.instagram || !f.password) return alert("Preencha Nome, Instagram e Senha!");
+        
+        const payload = {
+            ...f,
+            overall: parseInt(f.overall) || 45,
+            salary: parseFloat(f.salary) || 0,
+            value: parseFloat(f.value) || 0,
+            contract: parseInt(f.contract) || 1,
+            teamId: team.id // Amarra o jogador ao time que pediu
+        };
+
+        if (payload.salary < limits.minSal || payload.salary > limits.maxSal) {
+            return alert(`Salário fora do teto da Federação!\nPermitido para Over ${payload.overall}: ${fmt(limits.minSal)} até ${fmt(limits.maxSal)}`);
+        }
+
+        onSubmit(payload);
+    };
+
+    return (
+        <div className="modal-overlay" style={{zIndex: 99999}}>
+            <div className="modal-content animate-in" style={{maxHeight: '90vh', overflowY: 'auto', border: '2px solid cyan'}}>
+                <h3 style={{color:'cyan', marginTop:0}}>📝 Inscrever Novo Atleta</h3>
+                <p style={{fontSize:11, color:'#aaa', marginBottom:15}}>Preencha os dados reais do jogador. O perfil irá para análise da Federação antes de ser liberado no seu elenco.</p>
+
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                    <div><label>Nome no Jogo</label><input className="input-field" value={f.name} onChange={e=>setF({...f, name:e.target.value})} placeholder="Ex: João Silva" /></div>
+                    <div><label>@ Instagram (Real)</label><input className="input-field" value={f.instagram} onChange={e=>setF({...f, instagram:e.target.value})} placeholder="@joaosilva" /></div>
+                </div>
+
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                    <div><label>Posição</label><select className="input-field" value={f.position} onChange={e=>setF({...f, position:e.target.value})}>{POS.map(p=><option key={p} value={p}>{p}</option>)}</select></div>
+                    <div><label>Overall Solicitado</label><input className="input-field" type="number" min="0" max="99" value={f.overall} onChange={e=>setF({...f, overall:e.target.value})} /></div>
+                </div>
+
+                <div style={{background:'rgba(255,255,255,0.05)', padding:10, borderRadius:8, marginBottom:10}}>
+                    <label style={{color:'gold', fontSize:11}}>Senha de Acesso do Jogador</label>
+                    <input className="input-field" type="text" style={{marginBottom:0}} value={f.password} onChange={e=>setF({...f, password:e.target.value})} placeholder="Crie uma senha inicial" />
+                </div>
+
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                    <div>
+                        <label>Salário Semanal (₣)</label>
+                        <div style={{fontSize:9, color:'cyan', marginBottom:5}}>Permitido: {fmt(limits.minSal)} a {fmt(limits.maxSal)}</div>
+                        <input className="input-field" type="number" value={f.salary} onChange={e=>setF({...f, salary:e.target.value})} />
+                    </div>
+                    <div>
+                        <label>Valor de Mercado (₣)</label>
+                        <div style={{fontSize:9, color:'cyan', marginBottom:5}}>Sugerido: {fmt(recPrice)}</div>
+                        <input className="input-field" type="number" value={f.value} onChange={e=>setF({...f, value:e.target.value})} />
+                    </div>
+                </div>
+
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10}}>
+                    <div><label>Contrato (Anos)</label><input className="input-field" type="number" value={f.contract} onChange={e=>setF({...f, contract:e.target.value})} /></div>
+                    <div><label>Humor</label><select className="input-field" value={f.mood} onChange={e=>setF({...f, mood:e.target.value})}><option>🤩</option><option>😐</option><option>😡</option></select></div>
+                    <div><label>Status</label><select className="input-field" value={f.status} onChange={e=>setF({...f, status:e.target.value})}><option value="NAO_A_VENDA">Privado</option><option value="VENDA">À Venda</option><option value="EMPRESTIMO">Empréstimo</option></select></div>
+                </div>
+
+                <div style={{display:'flex', gap:10, marginTop:15}}>
+                    <button className="btn btn-green" onClick={handleSubmit}>ENVIAR PARA APROVAÇÃO</button>
+                    <button className="btn btn-red" onClick={onClose}>CANCELAR</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+    
   const PlayerForm = ({ initial, onSave, onDelete, isAdmin, teams, onRenew, isOwner }) => {
     // 1. Definição dos dados padrão
     const defaultState = {

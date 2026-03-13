@@ -1,4 +1,13 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head> 
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gerenciador de Times de Mato Real</title>
 
+    <link rel="manifest" href="pwa/manifest.json">
+<meta name="theme-color" content="#00E676">
+<link rel="apple-touch-icon" href="assets/icon.png">
     
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -4360,7 +4369,7 @@ const GameCalendar = ({ calendar }) => {
                         onClick={async () => {
                             if(confirm("⚠️ ATENÇÃO: Isso vai apagar TODOS os itens de TODAS as mochilas e resetar a Fama de todos para 0. Isso limpa bugs de itens antigos. Continuar?")) {
                                 const senha = prompt("Confirme a senha master:");
-                                if(senha === '2503') {
+                                if(senha === '0102') {
                                     try {
                                         const db = firebase.firestore();
                                         const b = db.batch();
@@ -5173,7 +5182,7 @@ db.collection('users').where('type', 'in', ['COACH', 'DOCTOR', 'SCOUT', 'ASSISTA
                 }
 
                 // Tenta Admin
-                if (loginId === 'admin' && loginPass === '2503') { 
+                if (loginId === 'admin' && loginPass === '0102') { 
                     foundUser = { name: 'Admin' }; foundType = 'ADMIN';
                 }
             }
@@ -6708,7 +6717,7 @@ if (!user.data || !['COACH', 'DOCTOR', 'SCOUT', 'ASSISTANT'].includes(user.type)
             
 const resetDatabase = async () => {
     const senha = prompt("⚠️ PERIGO: Isso apagará TODOS os dados do jogo. Digite a senha master para confirmar:");
-    if (senha !== '2503') return; 
+    if (senha !== '0102') return; 
 
     if (!confirm("TEM CERTEZA? Todos os times, jogadores e finanças sumirão para sempre!")) return;
 
@@ -9434,7 +9443,7 @@ const [coachData, setCoachData] = useState({ name: '', password: '', affinity: '
 
                 <div className="login-footer-actions">
                     <button className="btn btn-blue" onClick={onVisitor}>ENTRAR COMO VISITANTE</button>
-                    <button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='2503') onAdmin()}}>ADMIN</button>
+                    <button className="btn btn-ghost" onClick={()=> {if(prompt("Senha:")==='0102') onAdmin()}}>ADMIN</button>
                 </div>
             </div>}
 

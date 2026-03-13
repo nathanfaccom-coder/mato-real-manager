@@ -141,16 +141,19 @@
         
         const db = firebase.firestore();
 
-        // 🔥 O MOTOR DE PERFORMANCE: ATIVANDO CACHE LOCAL
-        /*
-        db.enablePersistence({ synchronizeTabs: true }).catch(function(err) {
-            if (err.code === 'failed-precondition') {
-                console.warn("Várias abas abertas, cache ativado apenas na principal.");
-            } else if (err.code === 'unimplemented') {
-                console.warn("Navegador não suporta armazenamento offline.");
-            }
-        });
-            */
+        // 🔥 O MOTOR DE PERFORMANCE: CACHE MODERNO (ECONOMIZA SEU LIMITE DIÁRIO!)
+        try {
+            firebase.firestore().enableMultiTabIndexedDbPersistence().catch(function(err) {
+                if (err.code === 'failed-precondition') {
+                    console.log("Aba secundária: Cache funcionando na aba principal.");
+                } else if (err.code === 'unimplemented') {
+                    console.log("Navegador não suporta armazenamento offline.");
+                }
+            });
+        } catch (e) {
+            console.log("Cache já inicializado ou erro ignorado.");
+        }
+                    
         const { useState, useEffect } = React;
         const FORMATIONS = {
     // --- LINHA DE 4 (OS CLÁSSICOS) ---

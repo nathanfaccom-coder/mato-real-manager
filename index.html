@@ -142,6 +142,7 @@
         const db = firebase.firestore();
 
         // 🔥 O MOTOR DE PERFORMANCE: ATIVANDO CACHE LOCAL
+        /*
         db.enablePersistence({ synchronizeTabs: true }).catch(function(err) {
             if (err.code === 'failed-precondition') {
                 console.warn("Várias abas abertas, cache ativado apenas na principal.");
@@ -149,7 +150,7 @@
                 console.warn("Navegador não suporta armazenamento offline.");
             }
         });
-
+            */
         const { useState, useEffect } = React;
         const FORMATIONS = {
     // --- LINHA DE 4 (OS CLÁSSICOS) ---

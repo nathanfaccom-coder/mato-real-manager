@@ -1,0 +1,10 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+tests/.baseline/
+tests/.build/
+.env
+.env.*
+!.env.example
+*.log

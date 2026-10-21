@@ -1,0 +1,15 @@
+export const POS_TRAINING_MAP = {
+  GOL: { train: "GOLEIRO", attrs: ["gk", "response", "jump"] },
+  ZAG: { train: "DEFESA", attrs: ["defense", "aggression", "header"] },
+  LD: { train: "VELOCIDADE", attrs: ["speed", "stamina", "shortPass"] },
+  LE: { train: "VELOCIDADE", attrs: ["speed", "stamina", "shortPass"] },
+  VOL: { train: "DEFESA", attrs: ["defense", "shortPass", "stamina"] },
+  MC: { train: "PASSE", attrs: ["shortPass", "longPass", "teamwork"] },
+  MD: { train: "DRIBLE", attrs: ["dribble", "speed", "tech"] },
+  ME: { train: "DRIBLE", attrs: ["dribble", "speed", "tech"] },
+  MEI: { train: "PASSE", attrs: ["tech", "shortPass", "agility"] },
+  PTD: { train: "VELOCIDADE", attrs: ["speed", "accel", "dribble"] },
+  PTE: { train: "VELOCIDADE", attrs: ["speed", "accel", "dribble"] },
+  ATA: { train: "CHUTE", attrs: ["shot", "shotPower", "header"] },
+  SA: { train: "CHUTE", attrs: ["attack", "shot", "dribble"] },
+};

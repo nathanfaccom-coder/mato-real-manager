@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head> 
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gerenciador de Times de Mato Real</title>
+
+    <link rel="manifest" href="pwa/manifest.json">
+<meta name="theme-color" content="#00E676">
+<link rel="apple-touch-icon" href="assets/icon.png">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="styles/colors.css">
+    <link rel="stylesheet" href="styles/main.css">
+<link rel="stylesheet" href="styles/overrides.css">
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="module" src="/src/main.jsx"></script>
+
+    <div id="offline-blocker">
+        <div id="offline-blocker-icon">📡</div>
+        <h2 id="offline-blocker-title">Sem Conexão</h2>
+        <p id="offline-blocker-text">O Mato Real precisa de internet para funcionar.</p>
+        <button class="btn-offline-retry" onclick="window.location.reload()">TENTAR RECONECTAR</button>
+    </div>
+
+    <div id="ios-install-prompt">
+        <button class="ios-install-close" onclick="document.getElementById('ios-install-prompt').style.display='none'">&times;</button>
+        <div class="ios-install-icon">📲</div>
+        <p class="ios-install-title">Instalar App</p>
+        <p class="ios-install-subtitle">Instale para jogar em tela cheia:</p>
+        <div class="ios-install-steps">
+            <div class="ios-install-step">
+                <span class="ios-install-step-number">1.</span> <span>Toque em <b>Compartilhar</b> <span style="font-size: 18px;">⎋</span></span>
+            </div>
+            <div class="ios-install-step">
+                <span class="ios-install-step-number">2.</span> <span><b>"Adicionar à Tela de Início"</b> <span style="font-size: 18px;">⊞</span></span>
+            </div>
+        </div>
+        <div class="ios-install-arrow"></div>
+        <div class="ios-install-pointer">⬇</div>
+    </div>
+    <script src="scripts/pwa.js"></script>
+</body>
+</html>

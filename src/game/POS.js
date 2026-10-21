@@ -1,0 +1,15 @@
+export const POS = [
+  "GOL",
+  "ZAG",
+  "LD",
+  "LE",
+  "VOL",
+  "MC",
+  "MD",
+  "ME",
+  "MEI",
+  "PTD",
+  "PTE",
+  "SA",
+  "ATA",
+];

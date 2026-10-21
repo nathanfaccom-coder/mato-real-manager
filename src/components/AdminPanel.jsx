@@ -8,6 +8,7 @@ import { COMPANY_TYPES } from "../game/COMPANY_TYPES.js";
 
 export const AdminPanel = ({
   setModal,
+  onNationalTeams,
   teams,
   players,
   onGenFixtures,
@@ -243,6 +244,9 @@ export const AdminPanel = ({
   return (
     <div>
       <h2>Painel Administrativo</h2>
+      <button className="btn btn-green" onClick={onNationalTeams}>
+        🌍 SELEÇÕES — GERENCIAR TÉCNICOS
+      </button>
       <div
         style={{
           display: "flex",

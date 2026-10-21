@@ -1,3 +1,4 @@
+import { NationalitySelect } from "../national/NationalitySelect.jsx";
 import React, { useState, useEffect } from "react";
 import { db } from "../services/firebase.js";
 import { COMPANY_TYPES } from "../game/COMPANY_TYPES.js";
@@ -44,6 +45,7 @@ export const LoginScreen = ({
     face: null,
   });
   const [playerData, setPlayerData] = useState({
+    nationality: "MTR",
     name: "",
     instagram: "",
     position: "ATA",
@@ -201,7 +203,9 @@ export const LoginScreen = ({
             NATHAN REIS
           </div>
           {/* Exibição da versão solicitada */}
-          <div className="version-badge">VERSÃO 2.2.8 UM RECOMEÇO </div>
+          <div className="version-badge">
+            VERSÃO 2.3.0 — INCLUSÃO DAS SELEÇÕES{" "}
+          </div>
         </div>
       </div>
       {/* --- FIM DO CABEÇALHO --- */}
@@ -1257,6 +1261,15 @@ export const LoginScreen = ({
       {tab === "NEW_PLAYER" && (
         <div>
           <h3 style={{ color: "cyan" }}>⚽ Inscrição de Atleta</h3>
+          <NationalitySelect
+            value={playerData.nationality}
+            onChange={(nationality) =>
+              setPlayerData({ ...playerData, nationality })
+            }
+          />
+          <small>
+            A nacionalidade define qual seleção você poderá representar.
+          </small>
           <p style={{ fontSize: 12, color: "#aaa" }}>
             Crie seu jogador. Você começará nos Agentes Livres.
           </p>

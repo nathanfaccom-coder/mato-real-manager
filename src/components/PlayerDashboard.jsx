@@ -1,3 +1,4 @@
+import { NationalCareer } from "../national/NationalCareer.jsx";
 import React, { useState, useEffect } from "react";
 import { firebase, db } from "../services/firebase.js";
 import { PlayerCard } from "./PlayerCard.jsx";
@@ -176,6 +177,7 @@ export const PlayerDashboard = ({
           paddingTop: 20,
         }}
       >
+        <NationalCareer player={player} />
         <PlayerCard
           player={player}
           teamName={team?.name}

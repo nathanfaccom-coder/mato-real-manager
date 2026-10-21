@@ -81,6 +81,11 @@ for (const [name, user, screen] of cases)
     old.on("pageerror", (e) => oldErrors.push(e.message));
     await old.goto("/tests/.baseline/index.html");
     await ready(old);
+    await old
+      .locator(".version-badge")
+      .evaluateAll((nodes) =>
+        nodes.forEach((n) => (n.textContent = "VERSÃO (comparação visual)")),
+      );
     const before = PNG.sync.read(
       await old.screenshot({ animations: "disabled" }),
     );
@@ -94,6 +99,14 @@ for (const [name, user, screen] of cases)
     await expect(
       page.getByText("Ocorreu um erro!", { exact: true }),
     ).toHaveCount(0);
+    await page
+      .locator(".version-badge")
+      .evaluateAll((nodes) =>
+        nodes.forEach((n) => (n.textContent = "VERSÃO (comparação visual)")),
+      );
+    await page.addStyleTag({
+      content: ".national-career { display: none !important; }",
+    });
     const after = PNG.sync.read(
       await page.screenshot({ animations: "disabled" }),
     );
@@ -108,24 +121,18 @@ for (const [name, user, screen] of cases)
     );
     const ratio = changed / (before.width * before.height);
     if (ratio > 0.01) {
-      await test
-        .info()
-        .attach("before", {
-          body: PNG.sync.write(before),
-          contentType: "image/png",
-        });
-      await test
-        .info()
-        .attach("after", {
-          body: PNG.sync.write(after),
-          contentType: "image/png",
-        });
-      await test
-        .info()
-        .attach("diff", {
-          body: PNG.sync.write(diff),
-          contentType: "image/png",
-        });
+      await test.info().attach("before", {
+        body: PNG.sync.write(before),
+        contentType: "image/png",
+      });
+      await test.info().attach("after", {
+        body: PNG.sync.write(after),
+        contentType: "image/png",
+      });
+      await test.info().attach("diff", {
+        body: PNG.sync.write(diff),
+        contentType: "image/png",
+      });
     }
     expect(oldErrors).toEqual([]);
     expect(ratio, `${name}: ${(ratio * 100).toFixed(2)}% changed`).toBeLessThan(

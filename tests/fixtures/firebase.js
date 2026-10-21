@@ -116,6 +116,7 @@ class Query {
       );
     if (this.options.order) {
       const [field, dir] = this.options.order;
+      docs = docs.filter((d) => d.data()[field] !== undefined);
       docs.sort(
         (a, b) =>
           (a.data()[field] > b.data()[field]

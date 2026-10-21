@@ -21,6 +21,11 @@ import { ESTADOS } from "./game/ESTADOS.js";
 
 import { LoginScreen } from "./components/LoginScreen.jsx";
 import { GameCalendar } from "./components/GameCalendar.jsx";
+const NationalTeams = React.lazy(() =>
+  import("./national/NationalTeams.jsx").then((module) => ({
+    default: module.NationalTeams,
+  })),
+);
 const AdminPanel = React.lazy(() =>
   import("./components/AdminPanel.jsx").then((module) => ({
     default: module.AdminPanel,
@@ -584,7 +589,7 @@ export function App() {
               className="dev-credits"
               style={{ textAlign: "left", margin: 0 }}
             >
-              Desenvolvido por: Nathan Reis | v2.2.8
+              Desenvolvido por: Nathan Reis | v2.3.0
             </div>
           </div>
         </div>
@@ -687,8 +692,13 @@ export function App() {
       <div className="container">
         {/* WIDGET UNIVERSAL DO CALENDÁRIO */}
         {screen !== "LOGIN" && <GameCalendar calendar={calendar} />}
+        {screen === "NATIONAL_TEAMS" && (
+          <NationalTeams user={user} players={players} coaches={coaches} />
+        )}
+
         {screen === "HOME" && user.type === "ADMIN" && (
           <AdminPanel
+            onNationalTeams={() => setScreen("NATIONAL_TEAMS")}
             user={user}
             matches={matches}
             tourns={tourns}
@@ -1690,6 +1700,18 @@ export function App() {
           >
             <i className="fas fa-newspaper"></i>
             <span>NEWS</span>
+          </div>
+          <div
+            role="button"
+            tabIndex={0}
+            className={`nav-item ${screen === "NATIONAL_TEAMS" ? "active" : ""}`}
+            onClick={() => setScreen("NATIONAL_TEAMS")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") setScreen("NATIONAL_TEAMS");
+            }}
+          >
+            <span>🌍</span>
+            <span>SELEÇÕES</span>
           </div>
         </div>
 

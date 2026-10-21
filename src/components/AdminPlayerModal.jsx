@@ -1,3 +1,4 @@
+import { NationalitySelect } from "../national/NationalitySelect.jsx";
 import React, { useState, useEffect } from "react";
 import { firebase } from "../services/firebase.js";
 import { generateAttributes } from "../game/generateAttributes.js";
@@ -7,6 +8,7 @@ export const AdminPlayerModal = ({ player, teams, onClose }) => {
   const isNew = !player || !player.id;
   const [formData, setFormData] = useState({
     name: player?.name || "",
+    nationality: player?.nationality || "MTR",
     position: player?.position || "ATA",
     teamId: player?.teamId || "FREE",
     overall: player?.overall || 45,
@@ -37,6 +39,7 @@ export const AdminPlayerModal = ({ player, teams, onClose }) => {
     const db = firebase.firestore();
     try {
       const payload = { ...formData };
+      if (!isNew) delete payload.nationality;
       // Conversões de segurança (Anti-Bug de Texto)
       payload.salary = parseFloat(payload.salary) || 0;
       payload.value = parseFloat(payload.value) || 0;
@@ -81,6 +84,13 @@ export const AdminPlayerModal = ({ player, teams, onClose }) => {
 
         <div style={{ maxHeight: "65vh", overflowY: "auto", paddingRight: 5 }}>
           {/* INFO BÁSICA */}
+          <NationalitySelect
+            value={formData.nationality}
+            disabled={!isNew}
+            onChange={(nationality) =>
+              setFormData({ ...formData, nationality })
+            }
+          />
           <div
             style={{
               display: "grid",

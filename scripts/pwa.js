@@ -1,31 +1,17 @@
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function() {
-        navigator.serviceWorker.register('pwa/service-worker.js', { scope: './' })
-        .then(registration => {
-            registration.update(); 
-            console.log('App Online Registrado');
-        });
-    });
-    
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-        window.location.reload();
+if ('serviceWorker' in navigator && location.protocol !== 'file:' && !['localhost', '127.0.0.1'].includes(location.hostname)) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js', { scope: './' })
+            .catch(error => console.warn('Instalação offline indisponível:', error.message));
     });
 }
-
 function checkInternet() {
     const blocker = document.getElementById('offline-blocker');
-    if (!navigator.onLine) {
-        blocker.style.display = 'flex';
-    } else {
-        blocker.style.display = 'none';
-    }
+    if (blocker) blocker.style.display = navigator.onLine ? 'none' : 'flex';
 }
 window.addEventListener('offline', checkInternet);
 window.addEventListener('online', checkInternet);
 checkInternet();
-
-const isIos = () => /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
-const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
-if (isIos() && !isInStandaloneMode()) {
-    document.getElementById('ios-install-prompt').style.display = 'block';
-}
+const isIos = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+const isStandalone = navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+const installPrompt = document.getElementById('ios-install-prompt');
+if (isIos && !isStandalone && installPrompt) installPrompt.style.display = 'block';

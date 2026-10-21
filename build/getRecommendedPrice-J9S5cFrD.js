@@ -1,0 +1,1 @@
+const n=(f,s)=>{const i=parseInt(f)||0;let e=4e4;i>=90?e=2e7:i>=85?e=1e7:i>=80?e=6e6:i>=75?e=3e6:i>=70?e=1e6:i>=65?e=4e5:i>=60?e=15e4:i>=55&&(e=8e4);let l=1;return s==="GOL"?l=1.2:["ZAG"].includes(s)?l=1.15:["VOL","MC","MD","ME"].includes(s)?l=1.05:["PTD","PTE"].includes(s)?l=.95:["ATA","SA"].includes(s)&&(l=.9),Math.round(e*l)};export{n as g};

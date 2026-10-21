@@ -1,0 +1,35 @@
+export const ATTR_LABELS = {
+  // Físico
+  balance: "⚖️ Equilíbrio",
+  stamina: "🔋 Resistência",
+  speed: "⚡ Veloc. Máx.",
+  accel: "🚀 Aceleração",
+  agility: "🤸 Agilidade",
+  jump: "🦘 Impulsão",
+  condition: "💪 Cond. Física",
+  // Técnica
+  attack: "⚔️ Ataque",
+  dribble: "⚽ Drible",
+  dribbleSpd: "🏃💨 Drib. Veloc.",
+  shortPass: "🎯 Passe Curto",
+  shortPassSpd: "⏩ P. Curto Vel.",
+  longPass: "📡 Passe Longo",
+  longPassSpd: "🚀 P. Longo Vel.",
+  shot: "🔫 Finalização",
+  shotPower: "💣 Força Chute",
+  shotTech: "🎨 Téc. Chute",
+  freeKick: "🎯 Falta",
+  curve: "🍌 Efeito",
+  header: "🤕 Cabeceio",
+  tech: "✨ Técnica",
+  weakFootAcc: "🦶 Pior Pé Prec.",
+  weakFootFreq: "🔄 Pior Pé Freq.",
+  // Mental/Defesa
+  defense: "🛡️ Defesa",
+  response: "🧠 Resposta",
+  aggression: "😡 Agressividade",
+  mentality: "🧠 Atitude",
+  teamwork: "🤝 Trabalho Eq.",
+  // Goleiro
+  gk: "🧤 Hab. Goleiro",
+};

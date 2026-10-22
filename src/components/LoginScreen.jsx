@@ -204,7 +204,7 @@ export const LoginScreen = ({
           </div>
           {/* Exibição da versão solicitada */}
           <div className="version-badge">
-            VERSÃO 2.3.0 — INCLUSÃO DAS SELEÇÕES{" "}
+            VERSÃO 2.3.1 — INCLUSÃO DAS SELEÇÕES{" "}
           </div>
         </div>
       </div>

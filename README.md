@@ -57,3 +57,9 @@ Neste ambiente, o navegador foi executado com `PW_DISABLE_TS_ESM=1` e `PLAYWRIGH
 ## Limites conhecidos
 
 As sessões legadas ainda não constituem autenticação segura de servidor. A refatoração mantém as contas existentes funcionando. Leia [a migração de segurança pendente](docs/SECURITY_MIGRATION.md) e [o relatório técnico](docs/REFACTOR_REPORT.md).
+
+## Correção 2.3.1 — navegação e recuperação da sessão
+
+Seleções tem um botão de retorno ao painel. Ao atualizar, contas de jogadores e demais perfis cadastrados recuperam a sessão validando o cadastro no banco, a página, a aba de jogos e a seleção escolhida. A navegação é separada por conta; páginas inválidas retornam ao painel correspondente. Falhas de conexão oferecem nova tentativa sem apagar a sessão. Sair explicitamente limpa esses dados.
+
+O ADM continua exigindo senha após atualizar; depois de entrar novamente, retorna à página e seleção anteriores. Apenas o destino é salvo, nunca uma autorização administrativa. Formulários não salvos e modais não são restaurados.

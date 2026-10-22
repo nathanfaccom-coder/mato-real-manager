@@ -9,6 +9,10 @@ import {
   readPreference,
   savePreference,
   ACCOUNT_COLLECTION,
+  homeScreen,
+  restoreScreen,
+  readNavigation,
+  saveNavigation,
 } from "./services/session.js";
 import React, { useState, useEffect } from "react";
 import { firebase, db } from "./services/firebase.js";
@@ -187,6 +191,8 @@ import { getPosColor } from "./game/getPosColor.js";
 
 export function App() {
   const [user, setUser] = useState(null);
+  const [restoring, setRestoring] = useState(true);
+  const [restoreError, setRestoreError] = useState(false);
   const [teams, setTeams] = useState([]);
   const [players, setPlayers] = useState([]);
   const [offers, setOffers] = useState([]);
@@ -242,21 +248,40 @@ export function App() {
           };
           setUser(restored);
           saveSession(restored);
-          const savedScreen = readPreference("savedScreen");
-          if (savedScreen && savedScreen !== "LOGIN") setScreen(savedScreen);
+          setScreen(
+            restoreScreen(
+              restored.type,
+              readNavigation(restored, "screen", readPreference("savedScreen")),
+            ),
+          );
+          const tab = readNavigation(restored, "matchesTab", "LIGAS");
+          setMatchesTab(
+            ["LIGAS", "ESTADUAIS", "COPAS"].includes(tab) ? tab : "LIGAS",
+          );
         })
-        .catch((error) =>
-          console.error("Não foi possível restaurar a sessão:", error.code),
-        );
-    }
+        .catch((error) => {
+          console.error("Não foi possível restaurar a sessão:", error.code);
+          if (active) setRestoreError(true);
+        })
+        .finally(() => {
+          if (active) setRestoring(false);
+        });
+    } else setRestoring(false);
     return () => {
       active = false;
     };
   }, []);
 
   useEffect(() => {
-    if (screen && user) savePreference("savedScreen", screen);
+    if (screen && user) {
+      savePreference("savedScreen", screen);
+      saveNavigation(user, "screen", screen);
+    }
   }, [screen, user?.data?.id, user?.type]);
+
+  useEffect(() => {
+    if (user) saveNavigation(user, "matchesTab", matchesTab);
+  }, [matchesTab, user?.data?.id, user?.type]);
 
   const plan = subscriptionPlan(user?.type, screen, modal?.type);
   // Login still needs these public directories while legacy credentials are in use.
@@ -530,7 +555,31 @@ export function App() {
     setChatMessages,
   });
   // --- RENDER ---
-  if (loading)
+  if (restoreError)
+    return (
+      <div className="container" role="alert">
+        <p>
+          Não foi possível recuperar sua sessão. Verifique a conexão e tente
+          novamente.
+        </p>
+        <button
+          className="btn btn-primary"
+          onClick={() => window.location.reload()}
+        >
+          TENTAR NOVAMENTE
+        </button>
+        <button
+          className="btn"
+          onClick={() => {
+            clearSession();
+            setRestoreError(false);
+          }}
+        >
+          VOLTAR AO LOGIN
+        </button>
+      </div>
+    );
+  if (loading || restoring)
     return (
       <div style={{ display: "grid", placeItems: "center", height: "100vh" }}>
         Carregando...
@@ -589,7 +638,7 @@ export function App() {
               className="dev-credits"
               style={{ textAlign: "left", margin: 0 }}
             >
-              Desenvolvido por: Nathan Reis | v2.3.0
+              Desenvolvido por: Nathan Reis | v2.3.1
             </div>
           </div>
         </div>
@@ -693,7 +742,12 @@ export function App() {
         {/* WIDGET UNIVERSAL DO CALENDÁRIO */}
         {screen !== "LOGIN" && <GameCalendar calendar={calendar} />}
         {screen === "NATIONAL_TEAMS" && (
-          <NationalTeams user={user} players={players} coaches={coaches} />
+          <NationalTeams
+            user={user}
+            players={players}
+            coaches={coaches}
+            onBack={() => setScreen(homeScreen(user.type))}
+          />
         )}
 
         {screen === "HOME" && user.type === "ADMIN" && (

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { readNavigation, saveNavigation } from "../services/session.js";
 import { db } from "../services/firebase.js";
 import { NATIONS, flag, nationName, nationalityOf } from "./catalog.js";
 import { FORMATIONS } from "../game/FORMATIONS.js";
@@ -33,11 +34,14 @@ function useRows(collection, filter = null, enabled = true) {
   }, [collection, filter, enabled]);
   return [rows, error, ready];
 }
-export function NationalTeams({ user, players, coaches }) {
+export function NationalTeams({ user, players, coaches, onBack }) {
   const [teams, error, ready] = useRows("nationalTeams");
-  const [id, setId] = useState(
-    user.data?.nationalTeamId || nationalityOf(user.data),
-  );
+  const [id, setId] = useState(() => {
+    const saved = readNavigation(user, "nationalTeam");
+    return NATIONS.some((n) => n.id === saved)
+      ? saved
+      : user.data?.nationalTeamId || nationalityOf(user.data);
+  });
   const [search, setSearch] = useState("");
   const selected = teams.find((t) => t.id === id) || {
     id,
@@ -46,6 +50,12 @@ export function NationalTeams({ user, players, coaches }) {
   };
   return (
     <section data-testid="national-teams">
+      <button className="btn" onClick={onBack} style={{ marginBottom: 12 }}>
+        ←{" "}
+        {user.type === "ADMIN"
+          ? "VOLTAR AO PAINEL ADM"
+          : "VOLTAR AO MEU PAINEL"}
+      </button>
       <h2>🌍 Seleções</h2>
       <p>212 seleções • uma carreira além do clube</p>
       {error && (
@@ -64,7 +74,10 @@ export function NationalTeams({ user, players, coaches }) {
         className="input-field"
         aria-label="Seleção"
         value={id}
-        onChange={(e) => setId(e.target.value)}
+        onChange={(e) => {
+          setId(e.target.value);
+          saveNavigation(user, "nationalTeam", e.target.value);
+        }}
       >
         {NATIONS.filter(
           (n) =>

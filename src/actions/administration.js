@@ -533,6 +533,10 @@ export function createAdministrationActions(context, actions) {
       "companies",
       "journalists",
       "newspapers",
+      "nationalTeams",
+      "nationalMatches",
+      "nationalCompetitions",
+      "nationalWindows",
     ];
 
     try {

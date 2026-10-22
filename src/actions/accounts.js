@@ -1,3 +1,4 @@
+import { assertNation } from "../national/rules.js";
 import { COMPANY_TYPES } from "../game/COMPANY_TYPES.js";
 import { generateAttributes } from "../game/generateAttributes.js";
 import { db } from "../services/firebase.js";
@@ -227,6 +228,12 @@ export function createAccountsActions(context, actions) {
   };
 
   const createPlayerAccount = async (data) => {
+    try {
+      assertNation(data.nationality);
+    } catch (error) {
+      alert(error.message);
+      return;
+    }
     if (!data.name || !data.password || !data.instagram)
       return alert("Preencha todos os campos!");
     setLoading(true);
@@ -239,6 +246,7 @@ export function createAccountsActions(context, actions) {
 
       await db.collection("players").add({
         name: data.name,
+        nationality: data.nationality,
         instagram: data.instagram, // Salva o @ para o Admin ver
         position: data.position,
         password: data.password,
@@ -335,16 +343,14 @@ export function createAccountsActions(context, actions) {
 
   const createCompany = async (f) => {
     if (!f.n || !f.p) return alert("Preencha tudo!");
-    await db
-      .collection("companies")
-      .add({
-        name: f.n,
-        owner: f.owner,
-        password: f.p,
-        companyType: f.type,
-        balance: COMPANY_TYPES[f.type].start,
-        status: "PENDING",
-      });
+    await db.collection("companies").add({
+      name: f.n,
+      owner: f.owner,
+      password: f.p,
+      companyType: f.type,
+      balance: COMPANY_TYPES[f.type].start,
+      status: "PENDING",
+    });
     alert("Solicitação enviada! Aguarde a Federação.");
   };
   return {

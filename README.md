@@ -2,6 +2,10 @@
 
 Jogo de gestão da liga Mato Real: clubes, jogadores, comissão técnica, empresas, imprensa, transferências, campeonatos e economia. React 18 e Firestore, com suporte a PWA.
 
+## Seleções — versão 2.3.0
+
+212 seleções, nacionalidade, técnicos nomeados pelo ADM, convocação, escalação, amistosos e copas. Consulte [as regras e o guia de uso](docs/NATIONAL_TEAMS.md).
+
 ## Desenvolvimento
 
 Use Node.js 22.18+ e npm:

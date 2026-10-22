@@ -1,3 +1,4 @@
+import { canAdmin } from "../admin/permissions.js";
 import {
   assertNation,
   eligible,
@@ -9,14 +10,14 @@ import {
 import { nationName, nationalityOf } from "./catalog.js";
 import { generateAttributes } from "../game/generateAttributes.js";
 const admin = (user) => {
-  if (user?.type !== "ADMIN")
+  if (!canAdmin(user, "nationalTeams"))
     throw Error("Apenas o ADM pode realizar esta operação.");
 };
 const ref = (db, col, id) => db.collection(col).doc(id);
 const data = (s) => (s.exists ? s.data() : {});
 const manager = (user, team) => {
   if (
-    user?.type !== "ADMIN" &&
+    !canAdmin(user, "nationalTeams") &&
     (user?.type !== "COACH" || team.coachId !== user.data.id)
   )
     throw Error("Você não é o técnico desta seleção.");

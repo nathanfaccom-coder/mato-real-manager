@@ -8,6 +8,12 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: "firebase/compat/auth",
+        replacement: fileURLToPath(
+          new URL("./tests/fixtures/empty.js", import.meta.url),
+        ),
+      },
+      {
         find: "firebase/compat/app",
         replacement: fileURLToPath(
           new URL("./tests/fixtures/firebase.js", import.meta.url),

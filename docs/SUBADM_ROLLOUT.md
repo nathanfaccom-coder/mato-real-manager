@@ -1,42 +1,31 @@
-# SubADMs — base em desenvolvimento, não publicada
+# SubADMs gratuitos — versão 2.4.0
 
-## Estado
+Usa Firebase Authentication E-mail/senha e Firestore no plano Spark, dentro das cotas gratuitas. Não exige Blaze, cartão ou Cloud Functions.
 
-O proprietário informou o UID `NEXLYzsJfLPsTxzp3LKHKwaPhEZ2` após habilitar E-mail/senha no Firebase Authentication. A implementação não verificou diretamente essa conta no projeto. O UID é público e não serve como credencial: `requireAccess` só pode receber identidade extraída de um token validado pelo servidor, nunca do corpo de uma solicitação.
+## Ativar
 
-`server/admin/policy.js` e `service.js` implementam a política e o serviço independentes do provedor de hospedagem, com uma interface compatível com Firebase Admin Auth. Ainda NÃO há endpoint, integração ao painel ou regras de produção novas. O site continua na versão 2.3.1.
+1. Mantenha E-mail/senha ativado em Firebase Authentication.
+2. O principal é a conta de UID `NEXLYzsJfLPsTxzp3LKHKwaPhEZ2`. Entre em ADMIN no jogo com o e-mail e a senha dessa conta. A antiga senha fixa não concede mais acesso.
+3. Em Firestore Database → Regras, substitua TODO o conteúdo pelo arquivo `firebase/firestore-subadmins-transition.rules` deste repositório e publique. Não adicione as regras abaixo de uma regra pública: qualquer regra permissiva sobreposta prevalece.
+4. No jogo, entre em GERENCIAR SUBADMS. Informe nome, login, senha de pelo menos 12 caracteres e marque os módulos permitidos.
+5. O auxiliar entra em ADMIN usando o login e a senha cadastrados. O principal pode alterar as permissões ou excluir o acesso. Alterações entram em vigor no painel aberto quando recebidas pelo Firestore.
 
-## Contrato preparado
+O cadastro é bloqueado enquanto o teste anônimo detectar leitura pública dos perfis administrativos. A publicação no GitHub não publica regras no Firebase automaticamente.
 
-- Somente o UID principal pode criar, listar, editar permissões e excluir subADMs.
-- Cadastro: nome de exibição, login único, senha de 12 a 128 caracteres e lista explícita de permissões. Login sem e-mail real usa alias interno `login@subadmins.matoreal.invalid`, sem prometer recuperação por e-mail.
-- Permissões: times, jogadores, finanças, campeonatos/partidas, seleções, imprensa/notícias, empresas, comissão e calendário. Sem seleção, nenhum acesso privilegiado.
-- Reset, manutenção global e gestão dos administradores são exclusivos do principal; não são permissões delegáveis.
-- Senhas seguem diretamente para Authentication; não devem ser retornadas, registradas em logs ou gravadas no Firestore.
-- Permissões são mantidas em custom claims do Authentication, que só o servidor pode alterar. O serviço recarrega a conta no servidor em cada ação: token antigo não conserva permissões removidas.
-- Criar primeiro desativado e habilitar somente após salvar claims. Excluir primeiro desativa e revoga sessões; falha na exclusão não reabre acesso.
-- A UI deverá desativar funções não permitidas, mas toda operação precisará da mesma autorização no servidor.
+## Permissões e limites
 
-## Bloqueio concreto de publicação
+Oito módulos: times/jogadores, finanças/premiações, imprensa, empresas, comissão técnica, calendário, campeonatos/partidas e seleções. Botões de módulos não permitidos ficam desabilitados. Reset, manutenção global e gerenciamento de subADMs são exclusivos do principal.
 
-As capturas fornecidas mostram regras Firestore `allow read, write: if true` e plano Spark. O jogo escreve diretamente no Firestore e verifica senhas antigas no navegador. Mesmo um serviço de gestão de contas protegido NÃO protege essas escritas atuais.
+Senhas novas ficam no Firebase Authentication, nunca nos documentos de perfis. O cadastro usa uma instância isolada de Auth para preservar a sessão do principal. Recarregar exige novo login administrativo e mantém o destino anterior.
 
-Não integrar subADMs à produção antes de:
+Excluir remove o documento de autorização e revoga o painel. A identidade Auth permanece, pois o SDK cliente não pode excluir outra conta. Para liberar o mesmo login, o principal deve também remover sua identidade em Authentication → Usuários; o e-mail termina em `@subadmins.matoreal.invalid`. Essas identidades não recebem e-mails; recuperação por e-mail não se aplica.
 
-1. Definir hospedagem das operações privilegiadas. Cloud Functions for Firebase exige plano Blaze com faturamento; não ativar nem contratar sem decisão do proprietário. Outro servidor confiável é possível, mas requer integração e credenciais próprias; não é uma solução pronta no projeto atual.
-2. Implementar endpoints que validem tokens Firebase e chamem `requireAccess` antes de qualquer mutação. Não confiar em UID, tipo de conta ou permissões enviados pelo cliente.
-3. Migrar login e operações de jogadores/clubes para identidade autenticada e regras restritivas, preservando os fluxos econômicos existentes. Não substituir regras por bloqueio total sem adaptar o jogo.
-4. Conectar o painel à gestão, login e verificações no servidor, remover a senha administrativa embutida e definir recuperação do proprietário.
-5. Testar regras no emulador: anônimo, jogador, subADM sem permissão, subADM autorizado, token de conta excluída, promoção indevida, principal e mecânicas existentes.
-6. Fazer backup, preparar uma publicação coordenada de código e regras e validar a conta principal antes de abrir o recurso aos auxiliares.
+## Limitação de segurança existente
 
-Esta branch NÃO altera Firebase, senhas ou dados reais, não adiciona dependências faturáveis e não contém credenciais de servidor.
+As regras de transição protegem somente `adminProfiles`: apenas o principal gerencia; auxiliares leem somente o próprio perfil; visitantes não leem nem escrevem. Elas preservam o acesso público das demais coleções para não quebrar os logins antigos do jogo.
 
-## Validação executada
+Portanto, as permissões dos módulos são restrições do painel, NÃO uma barreira contra requisições diretas ao banco do jogo. A proteção completa depende de migrar todos os usuários antigos para autenticação e escrever regras específicas para cada operação. Não apresente essa versão como proteção completa de finanças, jogadores ou reset contra acesso externo. Não habilite nenhuma cobrança para esta implementação.
 
-Cinco testes unitários com Auth simulado verificam bloqueio de não proprietários, privilégios desconhecidos, revogação de permissões, exclusão com sessão existente, proteção do principal e falhas parciais. Eles não substituem integração real ou testes de regras.
+## Verificação
 
-Referências oficiais:
-- https://firebase.google.com/docs/auth/admin/manage-users
-- https://firebase.google.com/docs/functions/get-started
-- https://firebase.google.com/docs/rules/rules-behavior
+Testes locais usam dados e Auth simulados, sem alterar o banco real: fluxos existentes, login principal, cadastro/edição/exclusão, bloqueio de cadastro com regras públicas, permissões e revogação em tempo real. As regras precisam ser publicadas e verificadas no console do projeto antes de cadastrar usuários reais.

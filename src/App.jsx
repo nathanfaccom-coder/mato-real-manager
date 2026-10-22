@@ -1,3 +1,10 @@
+import {
+  canAdmin,
+  isMainAdmin,
+  isSubAdmin,
+  allowAdminModal,
+} from "./admin/permissions.js";
+import { adminAuth, observeAdmin } from "./admin/auth.js";
 import { createGameActions } from "./actions/index.js";
 
 import { useCollection } from "./hooks/useCollection.js";
@@ -216,12 +223,36 @@ export function App() {
   const [posts, setPosts] = useState([]);
   const [screen, setScreen] = useState("HOME");
   const [matchesTab, setMatchesTab] = useState("LIGAS");
-  const [modal, setModal] = useState(null);
+  const [modal, setModalState] = useState(null);
+  const setModal = (value) => {
+    if (!allowAdminModal(user, value)) {
+      alert("Você não tem permissão para esta função.");
+      return;
+    }
+    setModalState(value);
+  };
   const [loading, setLoading] = useState(false);
   const [newNews, setNewNews] = useState(false);
   const [adminTeam, setAdminTeam] = useState(null);
   const [sales, setSales] = useState([]);
   const [salesLoaded, setSalesLoaded] = useState(null);
+
+  useEffect(() => {
+    if (!isSubAdmin(user)) return;
+    return observeAdmin(
+      user,
+      (updated) => {
+        setUser(updated);
+        setModalState(null);
+      },
+      () => {
+        clearSession();
+        setUser(null);
+        setModalState(null);
+        adminAuth.signOut();
+      },
+    );
+  }, [user?.type, user?.data?.id]);
 
   // --- NOVO: PERSISTÊNCIA DE SESSÃO (LEMBRAR ONDE PAREI) ---
 
@@ -638,7 +669,7 @@ export function App() {
               className="dev-credits"
               style={{ textAlign: "left", margin: 0 }}
             >
-              Desenvolvido por: Nathan Reis | v2.3.1
+              Desenvolvido por: Nathan Reis | v2.4.0
             </div>
           </div>
         </div>
@@ -731,7 +762,7 @@ export function App() {
             onClick={() => {
               if (confirm("Deseja realmente sair e trocar de conta?")) {
                 clearSession();
-                window.location.reload();
+                adminAuth.signOut().finally(() => window.location.reload());
               }
             }}
           ></i>
@@ -753,6 +784,7 @@ export function App() {
         {screen === "HOME" && user.type === "ADMIN" && (
           <AdminPanel
             onNationalTeams={() => setScreen("NATIONAL_TEAMS")}
+            onCompetitions={() => setScreen("MATCHES")}
             user={user}
             matches={matches}
             tourns={tourns}
@@ -1104,7 +1136,7 @@ export function App() {
                 <MatchCenter
                   matches={matches}
                   teams={teams}
-                  isAdmin={user.type === "ADMIN"}
+                  isAdmin={canAdmin(user, "competitions")}
                   onCreateMatch={(serie, round) =>
                     setModal({
                       type: "MATCH_MANAGER",
@@ -1124,7 +1156,10 @@ export function App() {
                   }
                   onDeleteMatch={(id) => handleDeleteMatch(id)}
                   onReportMatch={(m) => {
-                    if (user.type.includes("PRESS") || user.type === "ADMIN")
+                    if (
+                      user.type.includes("PRESS") ||
+                      canAdmin(user, "competitions")
+                    )
                       setModal({
                         type: "MATCH_PERFORMANCE",
                         data: { match: m, player: null },
@@ -1195,7 +1230,7 @@ export function App() {
                                   (m) => m.isEstadual && m.estado === estado,
                                 )}
                                 teams={teams}
-                                isAdmin={user.type === "ADMIN"}
+                                isAdmin={canAdmin(user, "competitions")}
                                 onCreateMatch={() =>
                                   alert(
                                     "Jogos estaduais são gerados automaticamente.",
@@ -1208,7 +1243,7 @@ export function App() {
                                 onReportMatch={(m) => {
                                   if (
                                     user.type.includes("PRESS") ||
-                                    user.type === "ADMIN"
+                                    canAdmin(user, "competitions")
                                   )
                                     setModal({
                                       type: "MATCH_PERFORMANCE",
@@ -1783,7 +1818,7 @@ export function App() {
                     db.collection("players").doc(id).delete();
                     setModal(null);
                   }}
-                  isAdmin={user.type === "ADMIN"}
+                  isAdmin={canAdmin(user, "teams")}
                   teams={teams}
                   onRenew={renewContract}
                   isOwner={
@@ -1865,7 +1900,7 @@ export function App() {
               {modal.type === "SETTINGS" && (
                 <SettingsForm
                   team={modal.data || user.data}
-                  isAdmin={user.type === "ADMIN"}
+                  isAdmin={canAdmin(user, "teams")}
                   onUp={(d) => {
                     const tid = modal.data?.id || user.data.id;
                     let payload = { ...d };

@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function principal() {
+      return request.auth != null && request.auth.uid == 'NEXLYzsJfLPsTxzp3LKHKwaPhEZ2';
+    }
+    function validProfile() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['name', 'login', 'permissions', 'active', 'createdAt'])
+        && d.name is string && d.name.size() >= 2 && d.name.size() <= 80
+        && d.login is string && d.login.matches('^[a-z0-9][a-z0-9._-]{2,31}$')
+        && d.active is bool && d.createdAt is number
+        && d.permissions is list && d.permissions.size() <= 8
+        && d.permissions.hasOnly(['teams', 'finance', 'press', 'companies', 'staff', 'calendar', 'competitions', 'nationalTeams']);
+    }
+    match /adminProfiles/{uid} {
+      allow get: if principal() || (request.auth != null && request.auth.uid == uid);
+      allow list: if principal();
+      allow create, update: if principal() && uid != 'NEXLYzsJfLPsTxzp3LKHKwaPhEZ2' && validProfile();
+      allow delete: if principal() && uid != 'NEXLYzsJfLPsTxzp3LKHKwaPhEZ2';
+    }
+    // TRANSITION ONLY: preserve existing game behavior without breaking legacy
+    // accounts. The rest of the game remains public, as before. UI permissions
+    // are not a security boundary for these collections. Never describe this
+    // file as complete protection of the game or its economic operations.
+    // This excludes adminProfiles at every depth, so the broad legacy rule
+    // cannot override the protected account-management rules above.
+    match /{collection}/{document=**} {
+      allow read, write: if collection != 'adminProfiles';
+    }
+  }
+}

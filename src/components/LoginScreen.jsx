@@ -26,6 +26,11 @@ export const LoginScreen = ({
   onCreatePlayer,
   config,
 }) => {
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminLogin, setAdminLogin] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminError, setAdminError] = useState("");
+  const [adminBusy, setAdminBusy] = useState(false);
   const [tab, setTab] = useState("LOGIN");
   const [subTab, setSubTab] = useState("TEAM");
   const [f, setF] = useState({ n: "", b: "10000000", s: "A", p: "" });
@@ -204,7 +209,7 @@ export const LoginScreen = ({
           </div>
           {/* Exibição da versão solicitada */}
           <div className="version-badge">
-            VERSÃO 2.3.1 — INCLUSÃO DAS SELEÇÕES{" "}
+            VERSÃO 2.4.0 — SELEÇÕES E SUBADMS{" "}
           </div>
         </div>
       </div>
@@ -710,11 +715,72 @@ export const LoginScreen = ({
             <button
               className="btn btn-ghost"
               onClick={() => {
-                if (prompt("Senha:") === "0102") onAdmin();
+                setAdminOpen(true);
+                setAdminError("");
               }}
             >
               ADMIN
             </button>
+            {adminOpen && (
+              <form
+                className="card"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setAdminBusy(true);
+                  setAdminError("");
+                  try {
+                    await onAdmin(adminLogin, adminPassword);
+                    setAdminPassword("");
+                  } catch (error) {
+                    setAdminError(
+                      error.code?.startsWith("auth/")
+                        ? "Não foi possível entrar. Confira o login e a senha."
+                        : error.message,
+                    );
+                  } finally {
+                    setAdminBusy(false);
+                  }
+                }}
+              >
+                <h3>Acesso administrativo</h3>
+                <label>
+                  E-mail do principal ou login do subADM
+                  <input
+                    className="input-field"
+                    autoComplete="username"
+                    required
+                    value={adminLogin}
+                    onChange={(e) => setAdminLogin(e.target.value)}
+                  />
+                </label>
+                <label>
+                  Senha administrativa
+                  <input
+                    className="input-field"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                  />
+                </label>
+                {adminError && <p role="alert">{adminError}</p>}
+                <button className="btn btn-green" disabled={adminBusy}>
+                  ENTRAR NO PAINEL
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={adminBusy}
+                  onClick={() => {
+                    setAdminOpen(false);
+                    setAdminPassword("");
+                  }}
+                >
+                  CANCELAR
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}

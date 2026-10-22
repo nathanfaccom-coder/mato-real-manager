@@ -1,3 +1,4 @@
+import { guardAdminActions } from "../admin/permissions.js";
 import { createAccountsActions } from "./accounts.js";
 import { createAdministrationActions } from "./administration.js";
 import { createCompetitionActions } from "./competition.js";
@@ -14,5 +15,5 @@ export function createGameActions(context) {
   Object.assign(actions, createPlayersActions(context, actions));
   Object.assign(actions, createSocialActions(context, actions));
   Object.assign(actions, createFinanceActions(context, actions));
-  return actions;
+  return guardAdminActions(actions, context.user);
 }

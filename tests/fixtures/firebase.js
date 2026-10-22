@@ -230,3 +230,63 @@ window.__MOCK_DB__ = {
 };
 window.firebase = firebase;
 export default firebase;
+const OWNER = "NEXLYzsJfLPsTxzp3LKHKwaPhEZ2";
+const authAccounts = window.__AUTH_ACCOUNTS__ || {
+  "owner@example.test": { uid: OWNER, password: "test-owner-password" },
+};
+function makeAuth() {
+  return {
+    currentUser: null,
+    async setPersistence() {},
+    async signInWithEmailAndPassword(email, password) {
+      const account = authAccounts[email];
+      if (!account || account.password !== password)
+        throw Object.assign(Error("Invalid credentials"), {
+          code: "auth/invalid-credential",
+        });
+      this.currentUser = { uid: account.uid, email };
+      return { user: this.currentUser };
+    },
+    async createUserWithEmailAndPassword(email, password) {
+      if (authAccounts[email])
+        throw Object.assign(Error("Duplicate"), {
+          code: "auth/email-already-in-use",
+        });
+      const uid = `admin-created-${++sequence}`;
+      authAccounts[email] = { uid, password };
+      this.currentUser = {
+        uid,
+        email,
+        async delete() {
+          delete authAccounts[email];
+        },
+      };
+      return { user: this.currentUser };
+    },
+    async signOut() {
+      this.currentUser = null;
+    },
+  };
+}
+const primaryAuth = makeAuth();
+firebase.auth = () => primaryAuth;
+firebase.auth.Auth = { Persistence: { SESSION: "session", NONE: "none" } };
+firebase.app = () => ({ options: {} });
+firebase.initializeApp = (_, name) => {
+  if (!name) return;
+  const auth = makeAuth();
+  return {
+    auth: () => auth,
+    firestore: () => ({
+      collection: () => ({
+        doc: () => ({
+          get: async () => {
+            if (window.__ADMIN_RULES_OPEN__) return { exists: false };
+            throw Object.assign(Error("denied"), { code: "permission-denied" });
+          },
+        }),
+      }),
+    }),
+    delete: async () => {},
+  };
+};

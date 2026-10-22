@@ -1,3 +1,5 @@
+import { canAdmin, isMainAdmin } from "../admin/permissions.js";
+import { SubAdminManager } from "../admin/SubAdminManager.jsx";
 import React, { useState, useEffect } from "react";
 import { firebase } from "../services/firebase.js";
 import { getProdCost } from "../game/getProdCost.js";
@@ -9,6 +11,7 @@ import { COMPANY_TYPES } from "../game/COMPANY_TYPES.js";
 export const AdminPanel = ({
   setModal,
   onNationalTeams,
+  onCompetitions,
   teams,
   players,
   onGenFixtures,
@@ -43,7 +46,27 @@ export const AdminPanel = ({
   tourns,
   handleDeleteMatch,
 }) => {
-  const [tab, setTab] = useState("DASH");
+  const permissionForTab = {
+    TEAMS: "teams",
+    FINANCE: "finance",
+    PRESS: "press",
+    COMP: "companies",
+    COACH: "staff",
+    CALENDAR: "calendar",
+  };
+  const allowedTab = (id) =>
+    ["DASH", "SUBADM"].includes(id)
+      ? isMainAdmin(user)
+      : canAdmin(user, permissionForTab[id]);
+  const [tab, setTab] = useState(() =>
+    isMainAdmin(user)
+      ? "DASH"
+      : Object.keys(permissionForTab).find(allowedTab) || "NONE",
+  );
+  useEffect(() => {
+    if (!allowedTab(tab))
+      setTab(Object.keys(permissionForTab).find(allowedTab) || "NONE");
+  }, [user, tab]);
   const [selTeamPlayers, setSelTeamPlayers] = useState(null);
   const [pixLogs, setPixLogs] = useState(null); // Estado para a Receita Federal
 
@@ -60,6 +83,10 @@ export const AdminPanel = ({
   const fedSpons = (sps || []).filter((s) => s.companyId === "FEDERACAO");
 
   const managePassword = async (collection, docId, currentPass, name) => {
+    if (!isMainAdmin(user))
+      return alert(
+        "Somente o ADM principal pode alterar senhas de outras contas.",
+      );
     const newPass = prompt(
       `🔐 GESTÃO DE SENHAS\nUsuário: ${name}\n\nSenha Atual: ${currentPass || "Vazia"}\n\nDigite a NOVA SENHA para alterar:`,
       currentPass,
@@ -244,9 +271,32 @@ export const AdminPanel = ({
   return (
     <div>
       <h2>Painel Administrativo</h2>
-      <button className="btn btn-green" onClick={onNationalTeams}>
+      <button
+        className="btn btn-green"
+        disabled={!canAdmin(user, "nationalTeams")}
+        onClick={onNationalTeams}
+      >
         🌍 SELEÇÕES — GERENCIAR TÉCNICOS
       </button>
+      {isMainAdmin(user) && (
+        <button className="btn btn-blue" onClick={() => setTab("SUBADM")}>
+          GERENCIAR SUBADMS
+        </button>
+      )}
+      <button
+        className="btn"
+        disabled={!canAdmin(user, "competitions")}
+        onClick={onCompetitions}
+      >
+        CAMPEONATOS E PARTIDAS
+      </button>
+      {tab === "SUBADM" && isMainAdmin(user) && <SubAdminManager user={user} />}
+      {tab === "NONE" && (
+        <p>
+          Seu acesso não tem permissões de administração. Peça ao ADM principal
+          para liberá-las.
+        </p>
+      )}
       <div
         style={{
           display: "flex",
@@ -256,45 +306,58 @@ export const AdminPanel = ({
           paddingBottom: 5,
         }}
       >
-        <button style={tabStyle(tab === "DASH")} onClick={() => setTab("DASH")}>
+        <button
+          style={tabStyle(tab === "DASH")}
+          disabled={!allowedTab("DASH")}
+          onClick={() => setTab("DASH")}
+        >
           Geral
         </button>
         <button
           style={tabStyle(tab === "TEAMS")}
+          disabled={!allowedTab("TEAMS")}
           onClick={() => setTab("TEAMS")}
         >
           Times / Elenco
         </button>
         <button
           style={tabStyle(tab === "FINANCE")}
+          disabled={!allowedTab("FINANCE")}
           onClick={() => setTab("FINANCE")}
         >
           Finanças & Gala
         </button>
         <button
           style={tabStyle(tab === "PRESS")}
+          disabled={!allowedTab("PRESS")}
           onClick={() => setTab("PRESS")}
         >
           Imprensa
         </button>
-        <button style={tabStyle(tab === "COMP")} onClick={() => setTab("COMP")}>
+        <button
+          style={tabStyle(tab === "COMP")}
+          disabled={!allowedTab("COMP")}
+          onClick={() => setTab("COMP")}
+        >
           Empresas
         </button>
         <button
           style={tabStyle(tab === "COACH")}
+          disabled={!allowedTab("COACH")}
           onClick={() => setTab("COACH")}
         >
           Comissão
         </button>
         <button
           style={tabStyle(tab === "CALENDAR")}
+          disabled={!allowedTab("CALENDAR")}
           onClick={() => setTab("CALENDAR")}
         >
           📅 Calendário
         </button>
       </div>
       {/* ABA DE TÉCNICOS */}
-      {tab === "COACH" && (
+      {tab === "COACH" && allowedTab("COACH") && (
         <div>
           <h3>Técnicos Pendentes</h3>
           {(coaches || []).filter((c) => c.status === "PENDING").length ===
@@ -466,7 +529,7 @@ export const AdminPanel = ({
             ))}
         </div>
       )}
-      {tab === "DASH" && (
+      {tab === "DASH" && allowedTab("DASH") && (
         <div>
           <div className="card" style={{ border: "1px solid var(--danger)" }}>
             <h4 style={{ marginTop: 0, color: "var(--danger)" }}>
@@ -549,8 +612,10 @@ export const AdminPanel = ({
                     "⚠️ ATENÇÃO: Isso vai apagar TODOS os itens de TODAS as mochilas e resetar a Fama de todos para 0. Isso limpa bugs de itens antigos. Continuar?",
                   )
                 ) {
-                  const senha = prompt("Confirme a senha master:");
-                  if (senha === "0102") {
+                  const senha = prompt(
+                    "Digite CONFIRMAR para executar esta manutenção:",
+                  );
+                  if (isMainAdmin(user) && senha === "CONFIRMAR") {
                     try {
                       const db = firebase.firestore();
                       const b = db.batch();
@@ -711,7 +776,7 @@ export const AdminPanel = ({
         </div>
       )}
       {/* --- ABA TIMES E JOGADORES --- */}
-      {tab === "TEAMS" && !selTeamPlayers && (
+      {tab === "TEAMS" && allowedTab("TEAMS") && !selTeamPlayers && (
         <div>
           <div style={{ marginBottom: 20, textAlign: "center" }}>
             <button
@@ -1036,7 +1101,7 @@ export const AdminPanel = ({
       )}
 
       {/* SUB-ABA: ELENCO DO TIME ESPECÍFICO */}
-      {tab === "TEAMS" && selTeamPlayers && (
+      {tab === "TEAMS" && allowedTab("TEAMS") && selTeamPlayers && (
         <div className="animate-in">
           <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
             <button
@@ -1117,7 +1182,7 @@ export const AdminPanel = ({
         </div>
       )}
       {/* ABA FINANÇAS E GALA */}
-      {tab === "FINANCE" && (
+      {tab === "FINANCE" && allowedTab("FINANCE") && (
         <div>
           <button
             className="btn btn-gold"
@@ -1316,7 +1381,7 @@ export const AdminPanel = ({
         </div>
       )}
       {/* --- ABA IMPRENSA (ATUALIZADA COM GESTÃO DE SENHAS) --- */}
-      {tab === "PRESS" && (
+      {tab === "PRESS" && allowedTab("PRESS") && (
         <div>
           {/* Jornais Pendentes */}
           {(papers || []).some((p) => p.status === "PENDING") && (
@@ -1440,7 +1505,7 @@ export const AdminPanel = ({
       )}
 
       {/* --- ABA EMPRESAS (ATUALIZADA COM GESTÃO DE SENHAS) --- */}
-      {tab === "COMP" && (
+      {tab === "COMP" && allowedTab("COMP") && (
         <div>
           {/* Empresas Pendentes */}
           {(companies || []).some((c) => c.status === "PENDING") && (
@@ -1607,7 +1672,7 @@ export const AdminPanel = ({
         </div>
       )}
       {/* --- ABA CALENDÁRIO (ADMIN) --- */}
-      {tab === "CALENDAR" && (
+      {tab === "CALENDAR" && allowedTab("CALENDAR") && (
         <div className="animate-in">
           <div
             className="card"

@@ -25,8 +25,14 @@ test("ADM can leave selections; reload preserves destination after password entr
 }) => {
   page.on("dialog", (d) => d.accept("0102"));
   await setup(page);
-  const login = () =>
-    page.getByRole("button", { name: "ADMIN", exact: true }).click();
+  const login = async () => {
+    await page.getByRole("button", { name: "ADMIN", exact: true }).click();
+    await page
+      .getByLabel("E-mail do principal ou login do subADM")
+      .fill("owner@example.test");
+    await page.getByLabel("Senha administrativa").fill("test-owner-password");
+    await page.getByRole("button", { name: "ENTRAR NO PAINEL" }).click();
+  };
   const open = () =>
     page
       .getByRole("button", { name: "🌍 SELEÇÕES — GERENCIAR TÉCNICOS" })

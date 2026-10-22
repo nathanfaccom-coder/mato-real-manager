@@ -14,7 +14,7 @@ import {
   createFinal,
   finishMatch,
 } from "../../src/national/service.js";
-const adm = { type: "ADMIN", data: { id: "admin" } },
+const adm = { type: "ADMIN", data: { id: "NEXLYzsJfLPsTxzp3LKHKwaPhEZ2" } },
   coach = { type: "COACH", data: { id: "c" } };
 const make = () =>
   memoryDB({

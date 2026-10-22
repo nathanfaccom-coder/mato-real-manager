@@ -1,9 +1,11 @@
+import { loginAdministrator, adminAuth } from "../admin/auth.js";
 import { assertNation } from "../national/rules.js";
 import { COMPANY_TYPES } from "../game/COMPANY_TYPES.js";
 import { generateAttributes } from "../game/generateAttributes.js";
 import { db } from "../services/firebase.js";
 import {
   saveSession,
+  clearSession,
   readNavigation,
   restoreScreen,
 } from "../services/session.js";
@@ -24,6 +26,7 @@ export function createAccountsActions(context, actions) {
   const login = async (loginId, loginPass, type) => {
     setLoading(true);
     try {
+      await adminAuth.signOut();
       let foundUser = null;
       let foundType = "";
 
@@ -158,12 +161,6 @@ export function createAccountsActions(context, actions) {
             foundType = "PRESS_WORKER";
           }
         }
-
-        // Tenta Admin
-        if (loginId === "admin" && loginPass === "0102") {
-          foundUser = { id: "admin", name: "Admin" };
-          foundType = "ADMIN";
-        }
       }
 
       // 3. FINALIZA O LOGIN
@@ -197,24 +194,12 @@ export function createAccountsActions(context, actions) {
     setLoading(false);
   };
 
-  const loginAdmin = () => {
-    setUser({
-      type: "ADMIN",
-      data: {
-        id: "admin",
-        name: "FEDERAÇÃO (ADM)",
-        balance: 0,
-        logo: null,
-        stadiumLevel: 1,
-        serie: "ADM",
-      },
-    });
-    setScreen(
-      restoreScreen(
-        "ADMIN",
-        readNavigation({ type: "ADMIN", data: { id: "admin" } }, "screen"),
-      ),
-    );
+  const loginAdmin = async (login, password) => {
+    const administrator = await loginAdministrator(login, password);
+    // Do not restore an unrelated legacy player's account on the next refresh.
+    saveSession(administrator);
+    setUser(administrator);
+    setScreen(restoreScreen("ADMIN", readNavigation(administrator, "screen")));
   };
 
   const createTeam = async (name, bal, serie, pass, logo, estado) => {

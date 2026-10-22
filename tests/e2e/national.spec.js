@@ -58,9 +58,14 @@ async function admin(page) {
   page.on("dialog", (dialog) => dialog.accept("0102"));
   await open(page);
   await expect(page.locator(".version-badge")).toHaveText(
-    "VERSÃO 2.3.1 — INCLUSÃO DAS SELEÇÕES",
+    "VERSÃO 2.4.0 — SELEÇÕES E SUBADMS",
   );
   await page.getByRole("button", { name: "ADMIN", exact: true }).click();
+  await page
+    .getByLabel("E-mail do principal ou login do subADM")
+    .fill("owner@example.test");
+  await page.getByLabel("Senha administrativa").fill("test-owner-password");
+  await page.getByRole("button", { name: "ENTRAR NO PAINEL" }).click();
   await page
     .getByRole("button", { name: "🌍 SELEÇÕES — GERENCIAR TÉCNICOS" })
     .click();
@@ -234,9 +239,18 @@ test("new player registration offers all nationalities", async ({ page }) => {
   await expect(page.getByLabel("Nacionalidade", { exact: true })).toHaveValue(
     "BR",
   );
-  await page.evaluate(() => window.addEventListener('beforeunload', () => {
-    sessionStorage.setItem('lastRegistration', JSON.stringify(Object.values(window.__MOCK_DB__.data.players).find(p=>p.name==='Atleta Nacional') || null));
-  }));
+  await page.evaluate(() =>
+    window.addEventListener("beforeunload", () => {
+      sessionStorage.setItem(
+        "lastRegistration",
+        JSON.stringify(
+          Object.values(window.__MOCK_DB__.data.players).find(
+            (p) => p.name === "Atleta Nacional",
+          ) || null,
+        ),
+      );
+    }),
+  );
   page.on("dialog", (d) => d.accept());
   await page
     .getByPlaceholder("Nome no Jogo (Ex: João Silva)")
@@ -250,7 +264,8 @@ test("new player registration offers all nationalities", async ({ page }) => {
     .poll(() =>
       page.evaluate(
         () =>
-          JSON.parse(sessionStorage.getItem('lastRegistration') || 'null')?.nationality,
+          JSON.parse(sessionStorage.getItem("lastRegistration") || "null")
+            ?.nationality,
       ),
     )
     .toBe("BR");

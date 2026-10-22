@@ -1,3 +1,4 @@
+import { isMainAdmin } from "../admin/permissions.js";
 import { COMPANY_TYPES } from "../game/COMPANY_TYPES.js";
 import { fmt } from "../game/fmt.js";
 import { STADIUM_DB } from "../game/STADIUM_DB.js";
@@ -8,6 +9,7 @@ import { DEFAULT_PRIZES } from "../game/DEFAULT_PRIZES.js";
 
 export function createAdministrationActions(context, actions) {
   const {
+    user,
     setModal,
     conf,
     setLoading,
@@ -506,10 +508,12 @@ export function createAdministrationActions(context, actions) {
   };
 
   const resetDatabase = async () => {
-    const senha = prompt(
-      "⚠️ PERIGO: Isso apagará TODOS os dados do jogo. Digite a senha master para confirmar:",
+    if (!isMainAdmin(user))
+      return alert("Somente o ADM principal pode resetar o jogo.");
+    const confirmation = prompt(
+      "⚠️ PERIGO: Isso apagará TODOS os dados do jogo. Digite RESETAR para confirmar:",
     );
-    if (senha !== "0102") return;
+    if (confirmation !== "RESETAR") return;
 
     if (
       !confirm(

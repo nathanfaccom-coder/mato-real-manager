@@ -1,3 +1,4 @@
+import { canAdmin } from "../admin/permissions.js";
 import React, { useEffect, useState } from "react";
 import { readNavigation, saveNavigation } from "../services/session.js";
 import { db } from "../services/firebase.js";
@@ -106,7 +107,7 @@ export function NationalTeams({ user, players, coaches, onBack }) {
   );
 }
 function TeamDetail({ id, team, user, players, coaches }) {
-  const adm = user.type === "ADMIN",
+  const adm = canAdmin(user, "nationalTeams"),
     manage = adm || (user.type === "COACH" && team.coachId === user.data.id);
   const [coach, setCoach] = useState(team.coachId || ""),
     [squad, setSquad] = useState(team.squadIds || []),
@@ -397,7 +398,7 @@ function TeamDetail({ id, team, user, players, coaches }) {
   );
 }
 function CompetitionCenter({ user, teams, players }) {
-  const adm = user.type === "ADMIN";
+  const adm = canAdmin(user, "nationalTeams");
   const [recent, error] = useRows("nationalMatches");
   const [cups, cupError] = useRows("nationalCompetitions");
   const [cupId, setCupId] = useState("");

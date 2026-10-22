@@ -58,7 +58,7 @@ async function admin(page) {
   page.on("dialog", (dialog) => dialog.accept("0102"));
   await open(page);
   await expect(page.locator(".version-badge")).toHaveText(
-    "VERSÃO 2.3.0 — INCLUSÃO DAS SELEÇÕES",
+    "VERSÃO 2.3.1 — INCLUSÃO DAS SELEÇÕES",
   );
   await page.getByRole("button", { name: "ADMIN", exact: true }).click();
   await page

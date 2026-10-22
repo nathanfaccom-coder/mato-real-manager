@@ -2,7 +2,11 @@ import { assertNation } from "../national/rules.js";
 import { COMPANY_TYPES } from "../game/COMPANY_TYPES.js";
 import { generateAttributes } from "../game/generateAttributes.js";
 import { db } from "../services/firebase.js";
-import { saveSession } from "../services/session.js";
+import {
+  saveSession,
+  readNavigation,
+  restoreScreen,
+} from "../services/session.js";
 
 export function createAccountsActions(context, actions) {
   const {
@@ -205,7 +209,12 @@ export function createAccountsActions(context, actions) {
         serie: "ADM",
       },
     });
-    setScreen("HOME");
+    setScreen(
+      restoreScreen(
+        "ADMIN",
+        readNavigation({ type: "ADMIN", data: { id: "admin" } }, "screen"),
+      ),
+    );
   };
 
   const createTeam = async (name, bal, serie, pass, logo, estado) => {

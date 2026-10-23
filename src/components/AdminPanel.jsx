@@ -1,3 +1,4 @@
+import { BotRosterManager } from "../admin/BotRosterManager.jsx";
 import { canAdmin, isMainAdmin } from "../admin/permissions.js";
 import { SubAdminManager } from "../admin/SubAdminManager.jsx";
 import React, { useState, useEffect } from "react";
@@ -786,6 +787,8 @@ export const AdminPanel = ({
               ✨ CRIAR NOVO JOGADOR (MANUAL)
             </button>
           </div>
+
+          <BotRosterManager user={user} teams={teams} players={players} />
 
           {(players || []).some((p) => p.status === "PENDING") && (
             <h4>📝 Novatos Pendentes (Verificar)</h4>

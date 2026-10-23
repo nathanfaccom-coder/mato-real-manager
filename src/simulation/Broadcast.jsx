@@ -161,6 +161,13 @@ export function Broadcast({ user, teams, players, onBack }) {
         etapa, o amistoso gera sua própria súmula; não altera campeonatos,
         energia ou overall.
       </p>
+      <p>
+        <small>
+          Novos amistosos têm juiz, impedimento do receptor e substituições
+          automáticas por cansaço ou lesão, com até cinco trocas e reservas
+          disponíveis. As lesões ficam apenas nesta partida.
+        </small>
+      </p>
       {creator && (
         <details open={!record}>
           <summary>Preparar amistoso</summary>
@@ -210,11 +217,19 @@ export function Broadcast({ user, teams, players, onBack }) {
                     ))}
                   </ol>
                 )}
+                {team.bench?.length > 0 && (
+                  <p>
+                    Banco:{" "}
+                    {team.bench
+                      .map((p) => `#${p.pixelAppearance.number} ${p.name}`)
+                      .join(", ")}
+                  </p>
+                )}
               </details>
             ))}
             <p>
-              90 minutos de jogo são exibidos em 30 minutos reais. Quem abrir uma
-              transmissão em andamento acompanha o minuto correspondente ao
+              90 minutos de jogo são exibidos em 30 minutos reais. Quem abrir
+              uma transmissão em andamento acompanha o minuto correspondente ao
               relógio do dispositivo.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -302,8 +317,18 @@ export function Broadcast({ user, teams, players, onBack }) {
               style={{ padding: "4px 12px", fontSize: 13, color: "#b8dacc" }}
             >
               Em campo:{" "}
-              {current.positions.slice(0, 11).filter((p) => p[2]).length} ×{" "}
-              {current.positions.slice(11).filter((p) => p[2]).length} ·{" "}
+              {
+                current.positions.filter(
+                  (p, i) => p[2] && match.people[i].side === 0,
+                ).length
+              }{" "}
+              ×{" "}
+              {
+                current.positions.filter(
+                  (p, i) => p[2] && match.people[i].side === 1,
+                ).length
+              }{" "}
+              ·{" "}
               {camera === "wide"
                 ? "Campo inteiro"
                 : "Câmera TV — visão geral no minimapa"}
@@ -402,7 +427,9 @@ export function Broadcast({ user, teams, players, onBack }) {
                   </h4>
                   {match.people.map(
                     (p, i) =>
-                      p.side === side && (
+                      p.side === side &&
+                      (match.stats[i].seconds === undefined ||
+                        match.stats[i].seconds > 0) && (
                         <div
                           key={p.id}
                           style={{
@@ -419,10 +446,18 @@ export function Broadcast({ user, teams, players, onBack }) {
                             <b>{p.name}</b>
                             <br />
                             <small>
-                              {p.position} · {match.stats[i].goals} gols ·{" "}
+                              {p.position} ·{" "}
+                              {Math.ceil((match.stats[i].seconds ?? 5400) / 60)}{" "}
+                              min · {match.stats[i].goals} gols ·{" "}
                               {match.stats[i].assists} assist. ·{" "}
                               {match.stats[i].saves} defesas
-                              {match.stats[i].red ? " · EXPULSO" : ""}
+                              {match.stats[i].red
+                                ? " · EXPULSO"
+                                : match.stats[i].injured
+                                  ? " · LESIONADO"
+                                  : match.stats[i].substituted
+                                    ? " · SUBSTITUÍDO"
+                                    : ""}
                             </small>
                           </div>
                           <strong
@@ -433,7 +468,7 @@ export function Broadcast({ user, teams, players, onBack }) {
                             }}
                             aria-label={`Nota de ${p.name}`}
                           >
-                            {Number(match.ratings[i]).toFixed(1)}
+                            {match.ratings[i]}
                           </strong>
                         </div>
                       ),

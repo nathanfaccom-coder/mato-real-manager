@@ -71,7 +71,9 @@ test("full broadcast renders, replays end and shares only isolated friendly data
     page.getByLabel("Transmissão completa da partida em pixel art"),
   ).toBeVisible();
   await expect(page.getByTestId("on-field-count")).toContainText("11 × 11");
-  await expect(page.getByTestId("on-field-count")).toContainText("Campo inteiro");
+  await expect(page.getByTestId("on-field-count")).toContainText(
+    "Campo inteiro",
+  );
   await page.getByLabel("Velocidade do replay").selectOption("0.5");
   await page.getByRole("button", { name: "PAUSAR", exact: true }).click();
   await page.getByLabel("Momento da partida", { exact: true }).fill("1200");
@@ -86,9 +88,22 @@ test("full broadcast renders, replays end and shares only isolated friendly data
       exact: false,
     }),
   ).toBeVisible();
-  await expect(page.getByTestId("player-ratings").locator("strong[aria-label]")).toHaveCount(22);
-  const ratingBoxes = await page.getByTestId("player-ratings").locator("strong[aria-label]").evaluateAll(nodes => nodes.map(n => ({left:n.getBoundingClientRect().left,right:n.getBoundingClientRect().right})));
-  expect(ratingBoxes.every(b => b.left >= 0 && b.right <= 390)).toBe(true);
+  expect(
+    await page
+      .getByTestId("player-ratings")
+      .locator("strong[aria-label]")
+      .count(),
+  ).toBeGreaterThanOrEqual(22);
+  const ratingBoxes = await page
+    .getByTestId("player-ratings")
+    .locator("strong[aria-label]")
+    .evaluateAll((nodes) =>
+      nodes.map((n) => ({
+        left: n.getBoundingClientRect().left,
+        right: n.getBoundingClientRect().right,
+      })),
+    );
+  expect(ratingBoxes.every((b) => b.left >= 0 && b.right <= 390)).toBe(true);
   expect(await page.evaluate(() => window.__FIREBASE_METRICS__.writes)).toEqual(
     [],
   );
@@ -137,6 +152,8 @@ test("player editor uses club kit and persists appearance without changing attri
   await page.getByRole("button", { name: "PERSONAGEM", exact: true }).click();
   await page.getByLabel("Cabelo", { exact: true }).selectOption("ponytail");
   await page.getByLabel("Barba", { exact: true }).selectOption("full");
+  await expect(page.getByLabel("Número preferido")).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath("editor-mobile.png"), fullPage: true });
   await page.getByRole("button", { name: "SALVAR APARÊNCIA" }).click();
   await expect(page.getByRole("status")).toContainText("Aparência salva");
   const p = await page.evaluate(() => window.__MOCK_DB__.data.players.p1);
@@ -149,4 +166,26 @@ test("player editor uses club kit and persists appearance without changing attri
   await expect(
     page.getByRole("button", { name: "TRANSMITIR AMISTOSO" }),
   ).toHaveCount(0);
+});
+
+test("coach assigns unique shirt numbers and player cannot edit number", async ({
+  page,
+}) => {
+  await setup(page, { type: "COACH", data: { id: "staff0" } });
+  await page
+    .getByRole("button", { name: "NÚMEROS DAS CAMISAS", exact: true })
+    .click();
+  const form = page.getByTestId("coach-numbers");
+  await form.getByLabel("Número de Jogador Teste", { exact: true }).fill("88");
+  await form.getByRole("button", { name: "SALVAR NUMERAÇÃO" }).click();
+  await expect(form.getByRole("status")).toHaveText(
+    "Numeração salva pelo técnico.",
+  );
+  expect(
+    await page.evaluate(() => window.__MOCK_DB__.data.teams.t1.shirtNumbers.p1),
+  ).toBe(88);
+  const inputs = form.locator("input");
+  await inputs.nth(1).fill("88");
+  await form.getByRole("button", { name: "SALVAR NUMERAÇÃO" }).click();
+  await expect(form.getByRole("status")).toContainText("sem repetição");
 });

@@ -1,3 +1,20 @@
+# Mato Real TV — versão atual 2.6.0
+
+## Novidades 2.6.0
+
+- Novos snapshots usam motor 2; snapshots versão 1 continuam no motor original, sem alterar seus resultados.
+- Ritmo mantido em 30 minutos reais. Juiz, carrinhos, cartões, saída de expulsos/lesionados e entrada/saída de substituições usam os eventos da simulação.
+- Impedimento do receptor é avaliado no instante do passe usando bola, meio-campo e penúltimo adversário; é marcado ao receber o passe. Não cobre todas as situações de interferência da regra oficial.
+- Até nove reservas e cinco substituições automáticas por equipe, conforme disponibilidade, cansaço e lesão. Lesões só afetam o amistoso. Não há comando manual de substituição ao vivo.
+- Passes consideram bloqueios e espaço; atacantes buscam espaços e podem errar o tempo de corrida.
+- Técnico contratado usa NÚMEROS DAS CAMISAS para definir números únicos de 1 a 99 em teams.shirtNumbers. O atleta personaliza cabelo, olhos, pele e demais opções, sem escolher seu número.
+- Editor tem prévia animada e opções visuais de cabelo/cores, usando o mesmo desenho original do campo. Câmera TV mais próxima; campo inteiro continua disponível.
+- Notas incluem os reservas que entraram. Não altera overall, energia ou campeonato.
+
+As limitações de autenticação e regras públicas legadas descritas abaixo continuam aplicáveis. Escanteios, pênaltis e acréscimos ainda não estão implementados.
+
+## Histórico da primeira etapa
+
 # Mato Real TV — primeira etapa (2.5.0)
 
 ## Uso

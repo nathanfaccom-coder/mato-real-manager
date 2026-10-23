@@ -5,6 +5,7 @@ import {
   drawPlayer,
   SKIN,
   HAIR,
+  EYES,
   BOOTS,
   STYLES,
 } from "./appearance.js";
@@ -13,18 +14,47 @@ export function SpritePreview({ look, uniform }) {
   const ref = useRef(null);
   useEffect(() => {
     const c = ref.current.getContext("2d");
-    c.clearRect(0, 0, 180, 180);
-    c.fillStyle = "#102b25";
-    c.fillRect(0, 0, 180, 180);
-    drawPlayer(c, 90, 155, look, uniform, 0, 5);
+    let frame,
+      last = 0;
+    const render = (t) => {
+      if (t - last > 65) {
+        c.clearRect(0, 0, 300, 260);
+        c.fillStyle = "#102b25";
+        c.fillRect(0, 0, 300, 260);
+        c.fillStyle = "#1b443b";
+        c.fillRect(20, 213, 260, 3);
+        drawPlayer(c, 150, 224, look, uniform, t / 150, 5.5, false);
+        last = t;
+      }
+      frame = requestAnimationFrame(render);
+    };
+    frame = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(frame);
   }, [look, uniform]);
   return (
     <canvas
       ref={ref}
-      width="180"
-      height="180"
+      width="300"
+      height="260"
       style={{ imageRendering: "pixelated", maxWidth: "100%" }}
       aria-label="Prévia do personagem com uniforme"
+    />
+  );
+}
+function HairThumb({ look, style, uniform }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const c = ref.current.getContext("2d");
+    c.clearRect(0, 0, 80, 72);
+    drawPlayer(c, 40, 83, { ...look, style }, uniform, 0, 2.2);
+  }, [look, style, uniform]);
+  return (
+    <canvas
+      ref={ref}
+      width="80"
+      height="72"
+      aria-hidden="true"
+      style={{ imageRendering: "pixelated", display: "block" }}
     />
   );
 }
@@ -44,7 +74,13 @@ export function AppearanceEditor({ player, team, onChange }) {
   return (
     <section className="card" data-testid="appearance-editor">
       <h3>Meu personagem em campo</h3>
-      <SpritePreview look={look} uniform={uniform} />
+      <SpritePreview
+        look={{
+          ...look,
+          number: team?.shirtNumbers?.[player.id] || look.number,
+        }}
+        uniform={uniform}
+      />
       <p>
         {team
           ? `Uniforme atual: ${team.name}${player.position === "GOL" ? " — goleiro" : ""}`
@@ -54,10 +90,37 @@ export function AppearanceEditor({ player, team, onChange }) {
       {[
         [SKIN, "skin", "Tom de pele"],
         [HAIR, "hair", "Cor do cabelo"],
+        [EYES, "eyes", "Cor dos olhos"],
         [BOOTS, "boots", "Chuteiras"],
       ].map(([values, key, label]) => (
         <label key={key} style={{ display: "block", margin: "12px 0" }}>
           {label}
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 6,
+              margin: "8px 0",
+            }}
+          >
+            {values.map((c) => (
+              <button
+                key={c}
+                type="button"
+                aria-label={`${label}: ${c}`}
+                aria-pressed={look[key] === c}
+                onClick={() => field(key, c)}
+                style={{
+                  width: 38,
+                  height: 38,
+                  background: c,
+                  border:
+                    look[key] === c ? "3px solid #54e6ad" : "2px solid #667",
+                  borderRadius: 6,
+                }}
+              />
+            ))}
+          </div>
           <select
             className="input-field"
             aria-label={label}
@@ -87,6 +150,36 @@ export function AppearanceEditor({ player, team, onChange }) {
           ))}
         </select>
       </label>
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          overflowX: "auto",
+          padding: "10px 0",
+        }}
+      >
+        {Object.entries(STYLES).map(([key, label]) => (
+          <button
+            type="button"
+            key={key}
+            onClick={() => field("style", key)}
+            aria-label={`Escolher cabelo ${label}`}
+            aria-pressed={look.style === key}
+            style={{
+              minWidth: 100,
+              padding: 10,
+              border:
+                look.style === key ? "2px solid #54e6ad" : "1px solid #456",
+              background: "#18332e",
+              color: "#fff",
+              borderRadius: 8,
+            }}
+          >
+            <HairThumb look={look} style={key} uniform={uniform} />
+            {label}
+          </button>
+        ))}
+      </div>
       <label>
         Barba
         <select
@@ -112,20 +205,10 @@ export function AppearanceEditor({ player, team, onChange }) {
           <option value="long">Longas</option>
         </select>
       </label>
-      <label>
-        Número preferido
-        <input
-          className="input-field"
-          type="number"
-          min="1"
-          max="99"
-          value={look.number}
-          onChange={(e) => field("number", e.target.value)}
-        />
-      </label>
       <p>
-        Se dois titulares escolherem o mesmo número, o amistoso atribui um
-        número livre ao segundo.
+        Número da camisa:{" "}
+        <b>{team?.shirtNumbers?.[player.id] || "aguardando definição"}</b>. A
+        numeração é definida pelo técnico do clube.
       </p>
       {!onChange && (
         <button

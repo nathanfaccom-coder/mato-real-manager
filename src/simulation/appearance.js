@@ -66,32 +66,53 @@ export function drawPlayer(
     ctx.fillStyle = color;
     ctx.fillRect(x, y, w, h);
   };
-  rect("#00000040", -6, 0, 13, 3);
-  rect(a.skin, -3, -22, 7, 7);
-  rect(a.skin, -4, -21, 9, 4);
+  // Original outlined arcade sprite, shared by character editor and match renderer.
+  rect("#08131766", -8, 0, 17, 4);
+  rect("#10171d", -6, -29, 13, 12);
+  rect("#10171d", -8, -26, 17, 7);
+  rect(a.skin, -6, -27, 13, 9);
+  rect(a.skin, -7, -25, 15, 5);
+  rect("#00000022", 4, -25, 3, 8);
+  rect("#ffffff25", -5, -26, 5, 2);
+  rect(a.skin, -2, -18, 5, 3);
   if (a.style !== "bald") {
-    rect(a.hair, -4, -24, 9, a.style === "afro" ? 6 : 3);
+    rect("#10171d", -7, -31, 15, 7);
+    rect(a.hair, -6, -30, 13, 5);
+    rect(a.hair, -7, -27, 4, 4);
+    rect(a.hair, 5, -27, 3, 5);
+    rect("#ffffff22", -4, -30, 7, 2);
     if (a.style === "afro") {
-      rect(a.hair, -5, -24, 11, 5);
-      rect(a.hair, -4, -26, 9, 3);
+      rect("#10171d", -9, -31, 19, 10);
+      rect(a.hair, -8, -31, 17, 8);
+      rect(a.hair, -6, -33, 13, 4);
     }
     if (a.style === "mohawk") {
-      rect(a.skin, -4, -23, 3, 2);
-      rect(a.skin, 2, -23, 3, 2);
-      rect(a.hair, -1, -27, 3, 5);
+      rect(a.skin, -6, -28, 4, 3);
+      rect(a.skin, 3, -28, 4, 3);
+      rect(a.hair, -2, -34, 5, 9);
     }
     if (a.style === "long") {
-      rect(a.hair, -5, -21, 2, 9);
-      rect(a.hair, 4, -21, 2, 9);
+      rect("#10171d", -8, -26, 3, 13);
+      rect(a.hair, -7, -26, 2, 12);
+      rect(a.hair, 6, -26, 3, 12);
     }
-    if (a.style === "ponytail") rect(a.hair, 4, -22, 3, 8);
+    if (a.style === "ponytail") {
+      rect("#10171d", 7, -27, 5, 10);
+      rect(a.hair, 8, -26, 3, 8);
+    }
   }
   if (!back) {
-    rect("#20202c", -2, -19, 1, 1);
-    rect("#20202c", 2, -19, 1, 1);
+    rect("#fff9e9", -4, -24, 3, 3);
+    rect("#fff9e9", 2, -24, 3, 3);
+    rect("#172027", -3, -23, 2, 2);
+    rect("#172027", 3, -23, 2, 2);
+    rect("#00000033", 0, -21, 2, 2);
+    rect("#633e36", -1, -19, 3, 1);
     if (a.beard !== "none")
-      rect(a.hair, -2, -17, 5, a.beard === "full" ? 3 : 1);
+      rect(a.hair, -4, -20, 9, a.beard === "full" ? 4 : 2);
   }
+  rect("#10171d", -6, -16, 13, 12);
+  rect("#10171d", -8, -15, 17, 6);
   rect(uniform.shirt, -5, -15, 11, 8);
   rect(uniform.shirt, -7, -14, 3, 4);
   rect(uniform.shirt, 5, -14, 3, 4);
@@ -107,7 +128,12 @@ export function drawPlayer(
   }
   if (uniform.pattern === "sash")
     for (let i = 0; i < 7; i++) rect(uniform.detail, -4 + i, -15 + i, 3, 1);
+  rect("#ffffff24", -4, -15, 3, 6);
+  rect("#00000026", 4, -14, 2, 7);
+  rect(uniform.detail, -2, -15, 5, 1);
   rect(uniform.shorts, -5, -7, 11, 3);
+  rect("#10171d", -6, -4, 5, 7 + step);
+  rect("#10171d", 1, -4, 6, 7 - step);
   rect(uniform.socks, -4, -4, 3, 4 + step);
   rect(uniform.socks, 2, -4, 3, 4 - step);
   rect(a.boots, -5, step, 4, 2);

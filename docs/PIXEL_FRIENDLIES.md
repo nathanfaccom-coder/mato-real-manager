@@ -28,3 +28,20 @@ As permissões de criação continuam sendo verificações de interface dentro d
 ## Validação
 
 Testes de determinismo, limites das posições, equivalência entre gols e eventos/súmula, escalações inválidas, snapshot sem credenciais, aparência congelada, números únicos e contraste de uniformes. Fluxos de navegador cobrem prévia completa, gravação isolada, personalização e acesso de jogadores.
+
+## Apresentação 2.5.3
+
+Novas transmissões guardam `durationMs: 1800000` (30 minutos reais). Gravações
+anteriores sem esse campo continuam usando os seis minutos originais no relógio
+ao vivo, preservando a sincronização. Prévia e replay usam 30 minutos em 1×,
+com controles de 0,25×, 0,5×, 1×, 2× e 4×.
+
+O campo inteiro agora é a câmera inicial e permanece centralizado. A câmera TV
+inclui um minimapa. O contador mostra atletas ativos de cada lado e diminui em
+expulsões; cada equipe continua sendo escalada com 11 jogadores. Não foi alterado
+o motor determinístico nem o resultado de partidas já gravadas.
+
+As 22 notas finais aparecem em cartões por clube antes da súmula, sem rolagem
+horizontal no celular. A tabela detalhada continua disponível. Os sprites agora
+usam contornos, rosto maior e sombreamento; o editor e o campo compartilham o
+mesmo desenho, preservando os campos de aparência e os uniformes existentes.

@@ -9,7 +9,8 @@ import {
 } from "./engine.js";
 import { Pitch } from "./Pitch.jsx";
 import { KitEditor } from "./Editors.jsx";
-const duration = 360000;
+const durationOf = (record) => record?.durationMs || 360000;
+const newDuration = 1800000;
 const minute = (t) =>
   `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
 export function Broadcast({ user, teams, players, onBack }) {
@@ -22,7 +23,7 @@ export function Broadcast({ user, teams, players, onBack }) {
     [time, setTime] = useState(0),
     [playing, setPlaying] = useState(true),
     [rate, setRate] = useState(1),
-    [camera, setCamera] = useState("tv"),
+    [camera, setCamera] = useState("wide"),
     [kitTeam, setKitTeam] = useState("");
   const surface = useRef(null),
     clock = useRef(0);
@@ -53,6 +54,7 @@ export function Broadcast({ user, teams, players, onBack }) {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+  const duration = record ? durationOf(record) : newDuration;
   const live = record?.id && now < record.startedAt + duration;
   useEffect(() => {
     if (!match) return;
@@ -68,7 +70,10 @@ export function Broadcast({ user, teams, players, onBack }) {
           Math.max(0, ((Date.now() - record.startedAt) / duration) * 5400),
         );
       else if (playing)
-        clock.current = Math.min(5400, clock.current + elapsed * 0.015 * rate);
+        clock.current = Math.min(
+          5400,
+          clock.current + elapsed * (5400 / newDuration) * rate,
+        );
       if (t - lastDraw > 33) {
         setTime(clock.current);
         lastDraw = t;
@@ -83,10 +88,10 @@ export function Broadcast({ user, teams, players, onBack }) {
     clock.current = r.id
       ? Math.min(
           5400,
-          Math.max(0, ((Date.now() - r.startedAt) / duration) * 5400),
+          Math.max(0, ((Date.now() - r.startedAt) / durationOf(r)) * 5400),
         )
       : 0;
-    if (r.id && Date.now() >= r.startedAt + duration) clock.current = 0;
+    if (r.id && Date.now() >= r.startedAt + durationOf(r)) clock.current = 0;
     setTime(clock.current);
     setPlaying(true);
     setError("");
@@ -104,7 +109,12 @@ export function Broadcast({ user, teams, players, onBack }) {
     setError("");
     try {
       const snapshot = prepare();
-      const r = { snapshot, startedAt: Date.now(), createdBy: user.data.id };
+      const r = {
+        snapshot,
+        startedAt: Date.now(),
+        durationMs: newDuration,
+        createdBy: user.data.id,
+      };
       simulateMatch(snapshot);
       if (shared) {
         const doc = await db.collection("friendlyBroadcasts").add(r);
@@ -203,7 +213,7 @@ export function Broadcast({ user, teams, players, onBack }) {
               </details>
             ))}
             <p>
-              90 minutos de jogo são exibidos em 6 minutos reais. Quem abrir uma
+              90 minutos de jogo são exibidos em 30 minutos reais. Quem abrir uma
               transmissão em andamento acompanha o minuto correspondente ao
               relógio do dispositivo.
             </p>
@@ -287,6 +297,17 @@ export function Broadcast({ user, teams, players, onBack }) {
               </span>
               <b data-testid="match-clock">{minute(time)}</b>
             </div>
+            <div
+              data-testid="on-field-count"
+              style={{ padding: "4px 12px", fontSize: 13, color: "#b8dacc" }}
+            >
+              Em campo:{" "}
+              {current.positions.slice(0, 11).filter((p) => p[2]).length} ×{" "}
+              {current.positions.slice(11).filter((p) => p[2]).length} ·{" "}
+              {camera === "wide"
+                ? "Campo inteiro"
+                : "Câmera TV — visão geral no minimapa"}
+            </div>
             <Pitch match={match} time={time} camera={camera} />
             <p style={{ minHeight: 24, padding: "0 12px" }} aria-live="off">
               {last?.text}
@@ -335,7 +356,7 @@ export function Broadcast({ user, teams, players, onBack }) {
                 value={rate}
                 onChange={(e) => setRate(Number(e.target.value))}
               >
-                {[1, 2, 4].map((v) => (
+                {[0.25, 0.5, 1, 2, 4].map((v) => (
                   <option key={v} value={v}>
                     {v}×
                   </option>
@@ -365,6 +386,62 @@ export function Broadcast({ user, teams, players, onBack }) {
               <small>{n}</small>
             </p>
           ))}
+          {ended && (
+            <section
+              data-testid="player-ratings"
+              aria-label="Notas dos jogadores"
+            >
+              <h3>Notas finais dos jogadores</h3>
+              <p>Notas de 0 a 10, referentes apenas a este amistoso.</p>
+              {[0, 1].map((side) => (
+                <div key={side}>
+                  <h4>
+                    {side === 0
+                      ? match.snapshot.home.name
+                      : match.snapshot.away.name}
+                  </h4>
+                  {match.people.map(
+                    (p, i) =>
+                      p.side === side && (
+                        <div
+                          key={p.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 12,
+                            padding: "12px",
+                            marginBottom: 6,
+                            background: "#172631",
+                            borderRadius: 8,
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <b>{p.name}</b>
+                            <br />
+                            <small>
+                              {p.position} · {match.stats[i].goals} gols ·{" "}
+                              {match.stats[i].assists} assist. ·{" "}
+                              {match.stats[i].saves} defesas
+                              {match.stats[i].red ? " · EXPULSO" : ""}
+                            </small>
+                          </div>
+                          <strong
+                            style={{
+                              fontSize: 24,
+                              color: "#54e6ad",
+                              flexShrink: 0,
+                            }}
+                            aria-label={`Nota de ${p.name}`}
+                          >
+                            {Number(match.ratings[i]).toFixed(1)}
+                          </strong>
+                        </div>
+                      ),
+                  )}
+                </div>
+              ))}
+            </section>
+          )}
           <details open={ended}>
             <summary>
               Súmula e melhores momentos{" "}
@@ -445,6 +522,12 @@ export function Broadcast({ user, teams, players, onBack }) {
           </details>
         </>
       )}
+      <p>
+        <small>
+          Novas partidas: 30 minutos reais em 1×. Na prévia e no replay, use
+          0,5× ou 0,25× para acompanhar os lances com mais calma.
+        </small>
+      </p>
       <h3>Transmissões recentes</h3>
       {records.length === 0 && <p>Nenhum amistoso transmitido ainda.</p>}
       {records.map((r) => (
@@ -455,7 +538,7 @@ export function Broadcast({ user, teams, players, onBack }) {
           onClick={() => watch(r)}
         >
           {r.snapshot?.home?.name} × {r.snapshot?.away?.name} ·{" "}
-          {now < r.startedAt + duration ? "AO VIVO" : "REVER PARTIDA"}
+          {now < r.startedAt + durationOf(r) ? "AO VIVO" : "REVER PARTIDA"}
         </button>
       ))}
     </section>

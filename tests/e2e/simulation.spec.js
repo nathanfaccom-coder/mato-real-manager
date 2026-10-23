@@ -70,6 +70,9 @@ test("full broadcast renders, replays end and shares only isolated friendly data
   await expect(
     page.getByLabel("Transmissão completa da partida em pixel art"),
   ).toBeVisible();
+  await expect(page.getByTestId("on-field-count")).toContainText("11 × 11");
+  await expect(page.getByTestId("on-field-count")).toContainText("Campo inteiro");
+  await page.getByLabel("Velocidade do replay").selectOption("0.5");
   await page.getByRole("button", { name: "PAUSAR", exact: true }).click();
   await page.getByLabel("Momento da partida", { exact: true }).fill("1200");
   await expect(page.getByTestId("match-clock")).toHaveText("20:00");
@@ -83,6 +86,9 @@ test("full broadcast renders, replays end and shares only isolated friendly data
       exact: false,
     }),
   ).toBeVisible();
+  await expect(page.getByTestId("player-ratings").locator("strong[aria-label]")).toHaveCount(22);
+  const ratingBoxes = await page.getByTestId("player-ratings").locator("strong[aria-label]").evaluateAll(nodes => nodes.map(n => ({left:n.getBoundingClientRect().left,right:n.getBoundingClientRect().right})));
+  expect(ratingBoxes.every(b => b.left >= 0 && b.right <= 390)).toBe(true);
   expect(await page.evaluate(() => window.__FIREBASE_METRICS__.writes)).toEqual(
     [],
   );
@@ -94,7 +100,9 @@ test("full broadcast renders, replays end and shares only isolated friendly data
   const stored = await page.evaluate(
     () => Object.values(window.__MOCK_DB__.data.friendlyBroadcasts)[0],
   );
+  expect(stored.durationMs).toBe(1800000);
   expect(stored.snapshot.home.lineup).toHaveLength(11);
+  expect(stored.snapshot.away.lineup).toHaveLength(11);
   expect(JSON.stringify(stored)).not.toContain("password");
   expect(
     await page.evaluate(() =>

@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from "react";
 import { drawPlayer } from "./appearance.js";
 import { frameAt } from "./engine.js";
-export function Pitch({ match, time, camera = "tv" }) {
+export function Pitch({ match, time, camera = "wide" }) {
   const ref = useRef(null);
   useEffect(() => {
     const ctx = ref.current.getContext("2d"),
@@ -27,14 +27,22 @@ export function Pitch({ match, time, camera = "tv" }) {
     const zoom = camera === "tv" ? 1.25 : 1;
     ctx.translate(W / 2, H / 2);
     ctx.scale(zoom, zoom);
-    ctx.translate(-Math.max(384, Math.min(576, X(ball[0]))), -H / 2);
+    ctx.translate(
+      camera === "tv" ? -Math.max(384, Math.min(576, X(ball[0]))) : -W / 2,
+      -H / 2,
+    );
     ctx.fillStyle = "#1b6846";
     ctx.fillRect(38, 40, 884, 520);
     for (let i = 0; i < 10; i++) {
       ctx.fillStyle = i % 2 ? "#30834e" : "#2b7948";
       ctx.fillRect(X(i * 10), Y(0), 84, Y(64) - Y(0));
     }
-    ctx.strokeStyle = "#d4e4c8";
+    // Stable pixel grass texture, without per-frame randomness or image downloads.
+    for (let i = 0; i < 650; i++) {
+      ctx.fillStyle = i % 2 ? "#ffffff08" : "#082f2510";
+      ctx.fillRect(61 + ((i * 137) % 835), 55 + ((i * 73) % 485), 3, 2);
+    }
+    ctx.strokeStyle = "#e6edd1";
     ctx.lineWidth = 2;
     ctx.strokeRect(X(0), Y(0), 840, Y(64) - Y(0));
     const line = (x1, y1, x2, y2) => {
@@ -87,10 +95,16 @@ export function Pitch({ match, time, camera = "tv" }) {
         p.pixelAppearance,
         match.snapshot.kits[key],
         moving ? time * 3 + i : 0,
-        1.2,
+        1.55,
         p.side === a.period,
       );
       if (i === a.owner) {
+        ctx.fillStyle = "#65ffcf";
+        ctx.beginPath();
+        ctx.moveTo(X(x) - 5, Y(y) - 60);
+        ctx.lineTo(X(x) + 5, Y(y) - 60);
+        ctx.lineTo(X(x), Y(y) - 54);
+        ctx.fill();
         ctx.fillStyle = "#0d1825cc";
         ctx.fillRect(X(x) - 45, Y(y) + 6, 90, 13);
         ctx.fillStyle = "#fff";
@@ -99,6 +113,11 @@ export function Pitch({ match, time, camera = "tv" }) {
         ctx.fillText(p.name.slice(0, 16), X(x), Y(y) + 16);
       }
     }
+    ctx.strokeStyle = "#fff9";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(X(ball[0]), Y(ball[1]), 8, 7, 0, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.fillStyle = "#0005";
     ctx.fillRect(X(ball[0]) - 3, Y(ball[1]) + 2, 8, 3);
     ctx.fillStyle = "#fff";
@@ -106,6 +125,33 @@ export function Pitch({ match, time, camera = "tv" }) {
     ctx.fillStyle = "#17202c";
     ctx.fillRect(X(ball[0]) - 1, Y(ball[1]) - 2, 3, 3);
     ctx.restore();
+    if (camera === "tv") {
+      const mx = 390,
+        my = 488,
+        mw = 180,
+        mh = 100;
+      ctx.fillStyle = "#10231ee6";
+      ctx.fillRect(mx - 6, my - 6, mw + 12, mh + 12);
+      ctx.strokeStyle = "#c5ddbb";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(mx, my, mw, mh);
+      ctx.beginPath();
+      ctx.moveTo(mx + mw / 2, my);
+      ctx.lineTo(mx + mw / 2, my + mh);
+      ctx.stroke();
+      for (const { p, i, x, y } of people) {
+        if (!a.positions[i][2]) continue;
+        ctx.fillStyle = p.side === 0 ? "#53d5ff" : "#ff8c6f";
+        ctx.fillRect(mx + (x * mw) / 100 - 2, my + (y * mh) / 64 - 2, 4, 4);
+      }
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(
+        mx + (ball[0] * mw) / 100 - 2,
+        my + (ball[1] * mh) / 64 - 2,
+        4,
+        4,
+      );
+    }
     ctx.fillStyle = "#f7f2dc";
     ctx.font = "bold 12px monospace";
     ctx.textAlign = "right";

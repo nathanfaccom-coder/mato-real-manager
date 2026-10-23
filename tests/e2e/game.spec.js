@@ -105,7 +105,7 @@ for (const [name, user, screen] of cases)
         nodes.forEach((n) => (n.textContent = "VERSÃO (comparação visual)")),
       );
     await page.addStyleTag({
-      content: ".national-career { display: none !important; }",
+      content: ".pixel-feature, .national-career { display: none !important; }",
     });
     const after = PNG.sync.read(
       await page.screenshot({ animations: "disabled" }),

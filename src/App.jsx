@@ -32,6 +32,9 @@ import { ESTADOS } from "./game/ESTADOS.js";
 
 import { LoginScreen } from "./components/LoginScreen.jsx";
 import { GameCalendar } from "./components/GameCalendar.jsx";
+const Broadcast = React.lazy(() =>
+  import("./simulation/Broadcast.jsx").then((m) => ({ default: m.Broadcast })),
+);
 const NationalTeams = React.lazy(() =>
   import("./national/NationalTeams.jsx").then((module) => ({
     default: module.NationalTeams,
@@ -669,7 +672,7 @@ export function App() {
               className="dev-credits"
               style={{ textAlign: "left", margin: 0 }}
             >
-              Desenvolvido por: Nathan Reis | v2.4.0
+              Desenvolvido por: Nathan Reis | v2.5.0
             </div>
           </div>
         </div>
@@ -770,6 +773,22 @@ export function App() {
       </div>
 
       <div className="container">
+        {screen !== "BROADCAST" && (
+          <button
+            className="btn btn-green pixel-feature"
+            onClick={() => setScreen("BROADCAST")}
+          >
+            📺 MATO REAL TV — AMISTOSOS
+          </button>
+        )}
+        {screen === "BROADCAST" && (
+          <Broadcast
+            user={user}
+            teams={teams}
+            players={players}
+            onBack={() => setScreen(homeScreen(user.type))}
+          />
+        )}
         {/* WIDGET UNIVERSAL DO CALENDÁRIO */}
         {screen !== "LOGIN" && <GameCalendar calendar={calendar} />}
         {screen === "NATIONAL_TEAMS" && (

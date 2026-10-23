@@ -1,3 +1,4 @@
+import { AppearanceEditor } from "../simulation/Editors.jsx";
 import { NationalCareer } from "../national/NationalCareer.jsx";
 import React, { useState, useEffect } from "react";
 import { firebase, db } from "../services/firebase.js";
@@ -330,6 +331,12 @@ export const PlayerDashboard = ({
           PERFIL
         </button>
         <button
+          className="btn btn-ghost pixel-feature"
+          onClick={() => setTab("APPEARANCE")}
+        >
+          PERSONAGEM
+        </button>
+        <button
           className={`btn ${tab === "ACOES" ? "btn-red" : "btn-ghost"}`}
           onClick={() => setTab("ACOES")}
         >
@@ -361,6 +368,7 @@ export const PlayerDashboard = ({
         </button>
       </div>
 
+      {tab === "APPEARANCE" && <AppearanceEditor player={player} team={team} />}
       {tab === "PERFIL" && (
         <div>
           <div

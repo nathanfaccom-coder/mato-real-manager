@@ -1,3 +1,4 @@
+import { AppearanceEditor } from "../simulation/Editors.jsx";
 import { NationalitySelect } from "../national/NationalitySelect.jsx";
 import React, { useState, useEffect } from "react";
 import { db } from "../services/firebase.js";
@@ -208,9 +209,7 @@ export const LoginScreen = ({
             NATHAN REIS
           </div>
           {/* Exibição da versão solicitada */}
-          <div className="version-badge">
-            VERSÃO 2.4.0 — SELEÇÕES E SUBADMS{" "}
-          </div>
+          <div className="version-badge">VERSÃO 2.5.0 — MATO REAL TV </div>
         </div>
       </div>
       {/* --- FIM DO CABEÇALHO --- */}
@@ -1414,6 +1413,15 @@ export const LoginScreen = ({
             ))}
           </select>
 
+          <details>
+            <summary>Personalizar personagem em pixel art</summary>
+            <AppearanceEditor
+              player={{ pixelAppearance: playerData.pixelAppearance }}
+              onChange={(pixelAppearance) =>
+                setPlayerData((v) => ({ ...v, pixelAppearance }))
+              }
+            />
+          </details>
           <button
             className="btn btn-blue"
             onClick={() => onCreatePlayer(playerData)}

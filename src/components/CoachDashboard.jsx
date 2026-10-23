@@ -1,3 +1,4 @@
+import { CoachNumbers } from "../simulation/CoachNumbers.jsx";
 import React, { useState, useEffect } from "react";
 import { firebase } from "../services/firebase.js";
 import { COACH_PERKS } from "../game/COACH_PERKS.js";
@@ -375,6 +376,13 @@ export const CoachDashboard = ({
         >
           PRANCHETA
         </button>
+        <button
+          className={`pixel-feature btn ${tab === "NUMBERS" ? "btn-green" : "btn-ghost"}`}
+          disabled={!team}
+          onClick={() => setTab("NUMBERS")}
+        >
+          NÚMEROS DAS CAMISAS
+        </button>
         {/* BOTÃO DO CT (Abre o Modal diretamente) */}
         <button
           className="btn btn-warning"
@@ -402,6 +410,14 @@ export const CoachDashboard = ({
         </button>
       </div>
 
+      {tab === "NUMBERS" && team && (
+        <CoachNumbers
+          key={team.id}
+          coach={coach}
+          team={team}
+          players={players}
+        />
+      )}
       {/* ABA PRANCHETA (CAMPO VISUAL COM SELEÇÃO) */}
       {tab === "PRANCHETA" && (
         <div className="animate-in">

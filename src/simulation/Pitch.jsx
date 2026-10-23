@@ -1,3 +1,4 @@
+import { actorPresentation } from "./presentation.js";
 import React, { useRef, useEffect } from "react";
 import { drawPlayer } from "./appearance.js";
 import { frameAt } from "./engine.js";
@@ -24,11 +25,13 @@ export function Pitch({ match, time, camera = "wide" }) {
         ctx.fillRect(x, y, 5, 5);
       }
     ctx.save();
-    const zoom = camera === "tv" ? 1.25 : 1;
+    const zoom = camera === "tv" ? 1.65 : 1;
     ctx.translate(W / 2, H / 2);
     ctx.scale(zoom, zoom);
     ctx.translate(
-      camera === "tv" ? -Math.max(384, Math.min(576, X(ball[0]))) : -W / 2,
+      camera === "tv"
+        ? -Math.max(W / (2 * zoom), Math.min(W - W / (2 * zoom), X(ball[0])))
+        : -W / 2,
       -H / 2,
     );
     ctx.fillStyle = "#1b6846";
@@ -71,10 +74,14 @@ export function Pitch({ match, time, camera = "wide" }) {
         i,
         x: lerp(a.positions[i][0], b.positions[i][0]),
         y: lerp(a.positions[i][1], b.positions[i][1]),
+        pose: actorPresentation(match, a, i, time),
       }))
       .sort((v, w) => v.y - w.y);
-    for (const { p, i, x, y } of people) {
-      if (!a.positions[i][2]) continue;
+    for (const { p, i, x: baseX, y: baseY, pose } of people) {
+      if (!pose.visible) continue;
+      const departing = !a.positions[i][2] || pose.action === "walk";
+      const x = departing ? pose.x : baseX,
+        y = departing ? pose.y : baseY;
       const key =
         p.side === 0
           ? p.slot === 0
@@ -94,9 +101,10 @@ export function Pitch({ match, time, camera = "wide" }) {
         Y(y),
         p.pixelAppearance,
         match.snapshot.kits[key],
-        moving ? time * 3 + i : 0,
+        moving || departing ? time * (pose.action === "limp" ? 1 : 2.2) + i : 0,
         1.55,
-        p.side === a.period,
+        b.positions[i][1] < a.positions[i][1] - 0.1,
+        pose,
       );
       if (i === a.owner) {
         ctx.fillStyle = "#65ffcf";
@@ -112,6 +120,68 @@ export function Pitch({ match, time, camera = "wide" }) {
         ctx.textAlign = "center";
         ctx.fillText(p.name.slice(0, 16), X(x), Y(y) + 16);
       }
+    }
+    const stoppage = match.events.findLast(
+      (e) =>
+        e.t <= time &&
+        time - e.t < 18 &&
+        ["yellow", "red", "foul", "offside", "substitution", "injury"].includes(
+          e.type,
+        ),
+    );
+    const rx = stoppage?.at
+      ? Math.max(8, Math.min(92, stoppage.at[0] + 5))
+      : 25 + ball[0] * 0.5;
+    const ry = stoppage?.at
+      ? Math.max(6, Math.min(58, stoppage.at[1] - 5))
+      : Math.max(10, Math.min(54, ball[1] - 9));
+    drawPlayer(
+      ctx,
+      X(rx),
+      Y(ry),
+      { skin: "#cf9367", hair: "#171717", style: "short", number: 0 },
+      {
+        shirt: "#ffe133",
+        shorts: "#111827",
+        socks: "#111827",
+        detail: "#222222",
+      },
+      stoppage ? 0 : time * 1.8,
+      1.55,
+      false,
+      {
+        referee: true,
+        card: ["yellow", "red"].includes(stoppage?.type) ? stoppage.type : null,
+      },
+    );
+    if (stoppage?.type === "offside") {
+      ctx.strokeStyle = "#ffdb52";
+      ctx.lineWidth = 3;
+      line(stoppage.line, 0, stoppage.line, 64);
+      ctx.fillStyle = "#0c1b24";
+      ctx.fillRect(X(stoppage.line) - 42, Y(4), 84, 18);
+      ctx.fillStyle = "#ffdb52";
+      ctx.font = "bold 11px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("IMPEDIMENTO", X(stoppage.line), Y(4) + 13);
+    }
+    if (stoppage?.type === "substitution") {
+      ctx.fillStyle = "#101820";
+      ctx.fillRect(X(50) - 32, Y(64) - 18, 64, 22);
+      ctx.fillStyle = "#ff6977";
+      ctx.font = "bold 13px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(
+        String(match.people[stoppage.actor].pixelAppearance.number),
+        X(50) - 14,
+        Y(64) - 2,
+      );
+      ctx.fillStyle = "#52ffb3";
+      ctx.fillText(
+        String(match.people[stoppage.incoming].pixelAppearance.number),
+        X(50) + 14,
+        Y(64) - 2,
+      );
     }
     ctx.strokeStyle = "#fff9";
     ctx.lineWidth = 1;

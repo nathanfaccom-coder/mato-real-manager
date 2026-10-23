@@ -23,6 +23,14 @@ export const BOOTS = [
   "#68deae",
   "#64b5f6",
 ];
+export const EYES = [
+  "#172027",
+  "#663f25",
+  "#345e95",
+  "#437442",
+  "#9b792d",
+  "#686873",
+];
 export const STYLES = {
   short: "Curto",
   afro: "Afro",
@@ -30,12 +38,18 @@ export const STYLES = {
   long: "Longo",
   ponytail: "Rabo de cavalo",
   bald: "Careca",
+  curls: "Cachos",
+  spikes: "Espetado",
+  fade: "Degradê",
+  braids: "Tranças",
+  swept: "Franja lateral",
 };
 export function appearance(value = {}) {
   const pick = (list, v) => (list.includes(v) ? v : list[0]);
   return {
     skin: pick(SKIN, value.skin),
     hair: pick(HAIR, value.hair),
+    eyes: pick(EYES, value.eyes),
     boots: pick(BOOTS, value.boots),
     style: Object.hasOwn(STYLES, value.style) ? value.style : "short",
     beard: ["none", "short", "full"].includes(value.beard)
@@ -55,13 +69,20 @@ export function drawPlayer(
   phase = 0,
   scale = 1,
   back = false,
+  pose = {},
 ) {
   const a = appearance(custom),
     uniform = normalizeKit(typeof kit === "string" ? { shirt: kit } : kit),
-    step = Math.sin(phase) > 0 ? 1 : -1;
+    step = phase === 0 ? 0 : Math.round(Math.sin(phase) * 2);
   ctx.save();
   ctx.translate(Math.round(x), Math.round(y));
-  ctx.scale(scale, scale);
+  ctx.scale(scale * (pose.facing === -1 ? -1 : 1), scale);
+  if (pose.action === "tackle" || pose.action === "injury") {
+    ctx.translate(0, -3);
+    ctx.rotate(-Math.PI / 2);
+  }
+  if (pose.action === "kick") ctx.rotate(-0.13);
+
   const rect = (color, x, y, w, h) => {
     ctx.fillStyle = color;
     ctx.fillRect(x, y, w, h);
@@ -101,11 +122,35 @@ export function drawPlayer(
       rect(a.hair, 8, -26, 3, 8);
     }
   }
+  if (a.style === "curls")
+    for (let j = 0; j < 5; j++) {
+      rect(a.hair, -8 + j * 3, -32 + (j % 2), 4, 7);
+      rect("#ffffff22", -7 + j * 3, -31 + (j % 2), 2, 2);
+    }
+  if (a.style === "spikes")
+    for (let j = 0; j < 4; j++) {
+      rect(a.hair, -6 + j * 4, -34 + (j % 2) * 2, 3, 7);
+    }
+  if (a.style === "fade") {
+    rect(a.skin, -6, -26, 3, 3);
+    rect(a.skin, 4, -26, 3, 3);
+    rect("#00000033", -6, -26, 2, 2);
+  }
+  if (a.style === "braids")
+    for (let j = 0; j < 4; j++) {
+      rect(a.hair, -6 + j * 4, -31, 2, 14);
+      rect("#ffffff22", -6 + j * 4, -30, 1, 5);
+    }
+  if (a.style === "swept") {
+    rect(a.hair, -5, -29, 12, 5);
+    rect(a.hair, 2, -26, 5, 4);
+  }
+  if (back && a.style !== "bald") rect(a.hair, -5, -26, 11, 7);
   if (!back) {
     rect("#fff9e9", -4, -24, 3, 3);
     rect("#fff9e9", 2, -24, 3, 3);
-    rect("#172027", -3, -23, 2, 2);
-    rect("#172027", 3, -23, 2, 2);
+    rect(a.eyes, -3, -23, 2, 2);
+    rect(a.eyes, 3, -23, 2, 2);
     rect("#00000033", 0, -21, 2, 2);
     rect("#633e36", -1, -19, 3, 1);
     if (a.beard !== "none")
@@ -136,11 +181,21 @@ export function drawPlayer(
   rect("#10171d", 1, -4, 6, 7 - step);
   rect(uniform.socks, -4, -4, 3, 4 + step);
   rect(uniform.socks, 2, -4, 3, 4 - step);
+  if (pose.action === "kick") {
+    rect(uniform.socks, 3, -5, 7, 3);
+    rect(a.boots, 9, -6, 4, 4);
+  }
   rect(a.boots, -5, step, 4, 2);
   rect(a.boots, 2, -step, 4, 2);
   ctx.fillStyle = "#fff";
   ctx.font = "bold 5px monospace";
   ctx.textAlign = "center";
-  ctx.fillText(String(a.number), 0.5, -9);
+  if (!pose.referee) ctx.fillText(String(a.number), 0.5, -9);
+  if (pose.card) {
+    rect(uniform.shirt, 5, -19, 3, 6);
+    rect(a.skin, 5, -27, 3, 8);
+    rect("#10171d", 4, -34, 6, 9);
+    rect(pose.card === "red" ? "#ff354a" : "#ffe133", 5, -33, 4, 7);
+  }
   ctx.restore();
 }

@@ -11,7 +11,11 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
   // Firestore/Auth and other API requests are never intercepted or cached.
   if (event.request.mode === 'navigate') {
-    event.respondWith(fetch(event.request).catch(() => caches.match(new URL('./index.html', self.registration.scope).href)));
+    event.respondWith(fetch(event.request, { cache: 'no-store' }).catch(() => caches.match(new URL('./index.html', self.registration.scope).href)));
+    return;
+  }
+  if (url.pathname === new URL('./scripts/pwa.js', self.registration.scope).pathname) {
+    event.respondWith(fetch(event.request, {cache: 'no-store'}).catch(() => caches.match(event.request)));
     return;
   }
   if (!PRECACHE.some(path => new URL(path, self.registration.scope).href === url.href)) return;

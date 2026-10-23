@@ -1,3 +1,4 @@
+import { KitEditor } from "../simulation/Editors.jsx";
 import React, { useState, useEffect } from "react";
 import { fmt } from "../game/fmt.js";
 import { getPosColor } from "../game/getPosColor.js";
@@ -90,6 +91,14 @@ export const TeamDashboard = ({
         >
           ELENCO
         </button>
+        {!isVisitor && (
+          <button
+            className="btn btn-ghost pixel-feature"
+            onClick={() => setTab("KITS")}
+          >
+            UNIFORMES
+          </button>
+        )}
         <button
           className={`btn ${tab === "STAFF" ? "btn-gold" : "btn-ghost"}`}
           onClick={() => setTab("STAFF")}
@@ -105,6 +114,7 @@ export const TeamDashboard = ({
       </div>
 
       {/* --- ABA 1: ELENCO (ORDENADO) --- */}
+      {tab === "KITS" && !isVisitor && <KitEditor key={team.id} team={team} />}
       {tab === "ELENCO" && (
         <div>
           <div style={{ marginBottom: 15 }}>

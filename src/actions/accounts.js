@@ -1,3 +1,4 @@
+import { appearance } from "../simulation/appearance.js";
 import { loginAdministrator, adminAuth } from "../admin/auth.js";
 import { assertNation } from "../national/rules.js";
 import { COMPANY_TYPES } from "../game/COMPANY_TYPES.js";
@@ -241,6 +242,7 @@ export function createAccountsActions(context, actions) {
       await db.collection("players").add({
         name: data.name,
         nationality: data.nationality,
+        pixelAppearance: appearance(data.pixelAppearance),
         instagram: data.instagram, // Salva o @ para o Admin ver
         position: data.position,
         password: data.password,

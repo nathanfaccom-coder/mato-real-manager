@@ -94,6 +94,7 @@ export function homeScreen(type) {
 }
 export function restoreScreen(type, saved) {
   const shared = [
+    "BROADCAST",
     "NATIONAL_TEAMS",
     "MATCHES",
     "MARKET",

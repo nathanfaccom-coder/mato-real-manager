@@ -29,7 +29,7 @@ await writeFile("dist/index.html", html);
 const builtFiles = (await readdir("dist/build"))
   .filter((file) => /\.(js|css)$/.test(file))
   .sort();
-const version = createHash("sha256").update(html).digest("hex").slice(0, 12);
+const version = createHash("sha256").update(html).update(await readFile("scripts/pwa.js")).update(await readFile("scripts/service-worker.template.js")).digest("hex").slice(0, 12);
 const precache = [
   "./index.html",
   ...builtFiles.map((file) => "./build/" + file),
@@ -56,6 +56,7 @@ for (const folder of ["assets", "pwa", "scripts"]) {
 await rm("build", { recursive: true, force: true });
 await cp("dist/build", "build", { recursive: true });
 await cp("dist/index.html", "index.html");
+await cp("update.html", "dist/update.html");
 await writeFile(".nojekyll", "");
 await writeFile("dist/.nojekyll", "");
 console.log("Built dist/ and the existing static GitHub Pages entry point.");

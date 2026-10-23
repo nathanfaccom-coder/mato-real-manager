@@ -209,7 +209,7 @@ export const LoginScreen = ({
             NATHAN REIS
           </div>
           {/* Exibição da versão solicitada */}
-          <div className="version-badge">VERSÃO 2.5.1 — MATO REAL TV </div>
+          <div className="version-badge">VERSÃO 2.5.2 — MATO REAL TV </div>
         </div>
       </div>
       {/* --- FIM DO CABEÇALHO --- */}
@@ -485,7 +485,7 @@ export const LoginScreen = ({
 
               {(() => {
                 const teamPlayers = (players || [])
-                  .filter((p) => p.teamId === selTeamForPlayer.id)
+                  .filter((p) => !p.isBot && p.teamId === selTeamForPlayer.id)
                   .sort((a, b) => a.name.localeCompare(b.name));
 
                 if (teamPlayers.length === 0)

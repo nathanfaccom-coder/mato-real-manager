@@ -42,7 +42,7 @@ export function createAccountsActions(context, actions) {
         }
       } else if (type === "PLAYER") {
         const p = players.find(
-          (x) => x.id === loginId && x.password === loginPass,
+          (x) => !x.isBot && x.id === loginId && x.password === loginPass,
         );
         if (p) {
           foundUser = p;
@@ -102,6 +102,7 @@ export function createAccountsActions(context, actions) {
         if (!foundUser) {
           let p = players.find(
             (x) =>
+              !x.isBot &&
               (x.id === loginId || x.name === loginId) &&
               x.password === loginPass,
           );

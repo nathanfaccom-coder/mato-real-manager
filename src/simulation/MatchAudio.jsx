@@ -1,98 +1,131 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import { audibleEvents } from "./audio-events.js";
-export function MatchAudio({ match, time, playing, seek }) {
+import { StadiumAudio } from "./stadium-audio.js";
+export const MatchAudio = forwardRef(function MatchAudio(
+  { match, time, playing, seek, ended },
+  ref,
+) {
   const [enabled, setEnabled] = useState(false),
-    [error, setError] = useState("");
-  const context = useRef(null),
+    [error, setError] = useState(""),
+    [whistle, setWhistle] = useState(65),
+    [crowd, setCrowd] = useState(40);
+  const audio = useRef(null),
+    muted = useRef(false),
     cursor = useRef(time),
     current = useRef(match),
-    lastSeek = useRef(seek),
-    voices = useRef([]);
-  const stop = () => {
-    for (const o of voices.current) {
-      try {
-        o.stop();
-      } catch {}
+    lastSeek = useRef(seek);
+  async function activate(manual = false) {
+    if (muted.current && !manual) return;
+    try {
+      const Context = window.AudioContext || window.webkitAudioContext;
+      if (!Context) throw Error();
+      if (!audio.current) audio.current = new StadiumAudio(Context);
+      // Must run directly from the start/watch/toggle button's user gesture.
+      await audio.current.unlock();
+      muted.current = false;
+      setEnabled(true);
+      setError("");
+    } catch {
+      setEnabled(false);
+      setError("Som bloqueado pelo navegador. Toque em ATIVAR SOM.");
     }
-    voices.current = [];
-  };
-  const whistle = (double = false) => {
-    const c = context.current;
-    if (!c || c.state !== "running") return;
-    stop();
-    for (let i = 0; i < (double ? 2 : 1); i++) {
-      const o = c.createOscillator(),
-        g = c.createGain(),
-        t = c.currentTime + i * 0.22;
-      o.type = "sine";
-      o.frequency.setValueAtTime(2400, t);
-      o.frequency.linearRampToValueAtTime(2900, t + 0.08);
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.055, t + 0.02);
-      g.gain.setValueAtTime(0.055, t + 0.13);
-      g.gain.linearRampToValueAtTime(0, t + 0.2);
-      o.connect(g);
-      g.connect(c.destination);
-      o.start(t);
-      o.stop(t + 0.21);
-      voices.current.push(o);
-      o.onended = () => {
-        o.disconnect();
-        g.disconnect();
-      };
-    }
-  };
+  }
+  useImperativeHandle(ref, () => ({ activate }));
+  useEffect(() => {
+    audio.current?.setVolumes(whistle / 100, crowd / 100);
+  }, [whistle, crowd, enabled]);
+  useEffect(() => {
+    audio.current?.setPlaying(Boolean(enabled && playing && match && !ended));
+  }, [enabled, playing, match, ended]);
   useEffect(() => {
     if (lastSeek.current !== seek) {
       lastSeek.current = seek;
       cursor.current = time;
-      stop();
+      audio.current?.stopWhistles();
       return;
     }
     if (current.current !== match) {
       current.current = match;
-      cursor.current = time;
-      if (enabled && playing && time < 2) whistle(true);
+      cursor.current = time < 2 ? -1 : time;
+    }
+    if (!match) return;
+    // Keep kickoff pending while the user gesture is finishing AudioContext.resume().
+    if (!enabled) {
+      if (time >= 2) cursor.current = time;
       return;
     }
     const cues = audibleEvents(match.events, cursor.current, time);
     cursor.current = time;
-    if (enabled && playing && cues.length) whistle(cues.at(-1).type !== "foul");
-    if (!playing) stop();
-  }, [match, time, enabled, playing, seek]);
+    if (playing && cues.length) {
+      const e = cues.at(-1);
+      if (e.type === "goal") audio.current?.cheer();
+      else audio.current?.whistle(e.type);
+    }
+  }, [match, time, playing, enabled, seek]);
   useEffect(
     () => () => {
-      stop();
-      context.current?.close();
+      audio.current?.close();
     },
     [],
   );
-  async function toggle() {
-    if (enabled) {
-      stop();
-      setEnabled(false);
-      return;
-    }
-    try {
-      const Audio = window.AudioContext || window.webkitAudioContext;
-      if (!Audio) throw Error();
-      if (!context.current) context.current = new Audio();
-      await context.current.resume();
-      cursor.current = time;
-      setEnabled(true);
-      setError("");
-      whistle();
-    } catch {
-      setError("O navegador não liberou o áudio. Tente tocar novamente.");
-    }
-  }
   return (
-    <div>
-      <button className="btn btn-ghost" aria-pressed={enabled} onClick={toggle}>
-        {enabled ? "APITO: LIGADO" : "ATIVAR APITO"}
+    <section
+      aria-label="Som da transmissão"
+      style={{
+        padding: "10px 12px",
+        background: "#102329",
+        borderRadius: 10,
+        margin: "12px 0",
+      }}
+    >
+      <button
+        className="btn btn-ghost"
+        aria-pressed={enabled}
+        onClick={() => {
+          if (enabled) {
+            muted.current = true;
+            setEnabled(false);
+            audio.current?.setPlaying(false);
+          } else activate(true);
+        }}
+      >
+        {enabled ? "SOM: LIGADO" : "ATIVAR SOM"}
       </button>
-      <small>Toque para liberar o som no celular.</small>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+        <label>
+          Volume do apito{" "}
+          <input
+            aria-label="Volume do apito"
+            type="range"
+            min="0"
+            max="100"
+            value={whistle}
+            onChange={(e) => setWhistle(+e.target.value)}
+          />
+        </label>
+        <label>
+          Volume da torcida{" "}
+          <input
+            aria-label="Volume da torcida"
+            type="range"
+            min="0"
+            max="100"
+            value={crowd}
+            onChange={(e) => setCrowd(+e.target.value)}
+          />
+        </label>
+      </div>
+      <small>
+        O som é liberado ao iniciar ou abrir a partida. Se necessário, toque em
+        ATIVAR SOM e confira o volume de mídia do celular.
+      </small>
       {error && <p role="status">{error}</p>}
-    </div>
+    </section>
   );
-}
+});

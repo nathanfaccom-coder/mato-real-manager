@@ -672,7 +672,7 @@ export function App() {
               className="dev-credits"
               style={{ textAlign: "left", margin: 0 }}
             >
-              Desenvolvido por: Nathan Reis | v2.7.0
+              Desenvolvido por: Nathan Reis | v2.7.1
             </div>
           </div>
         </div>

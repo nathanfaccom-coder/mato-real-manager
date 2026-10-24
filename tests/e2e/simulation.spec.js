@@ -63,7 +63,37 @@ test("full broadcast renders, replays end and shares only isolated friendly data
 }) => {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  await page.addInitScript(() => {
+    window.__audio = { whistles: 0, crowd: 0 };
+    const Native = window.AudioContext;
+    window.AudioContext = class extends Native {
+      createOscillator() {
+        const n = super.createOscillator(),
+          start = n.start.bind(n);
+        n.start = (...args) => {
+          window.__audio.whistles++;
+          return start(...args);
+        };
+        return n;
+      }
+      createBufferSource() {
+        const n = super.createBufferSource(),
+          start = n.start.bind(n);
+        n.start = (...args) => {
+          window.__audio.crowd++;
+          return start(...args);
+        };
+        return n;
+      }
+    };
+  });
   await owner(page);
+  await page.evaluate(() => {
+    crypto.getRandomValues = (a) => {
+      a.fill(1);
+      return a;
+    };
+  });
   await page.getByLabel("Mandante", { exact: true }).selectOption("t1");
   await page.getByLabel("Visitante", { exact: true }).selectOption("t2");
   await page.getByRole("button", { name: "PRÉVIA LOCAL" }).click();
@@ -71,15 +101,40 @@ test("full broadcast renders, replays end and shares only isolated friendly data
     page.getByLabel("Transmissão completa da partida em pixel art"),
   ).toBeVisible();
   await expect(page.getByTestId("on-field-count")).toContainText("11 × 11");
-  await page.getByRole("button", { name: "ATIVAR APITO", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "APITO: LIGADO", exact: true }),
+    page.getByRole("button", { name: "SOM: LIGADO", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
+  await expect
+    .poll(() => page.evaluate(() => window.__audio.whistles))
+    .toBeGreaterThanOrEqual(2);
+  expect(await page.evaluate(() => window.__audio.crowd)).toBe(1);
+  const foulTime = await page.evaluate(async () => {
+    const { makeSnapshot, simulateMatch } = await import(
+      "/src/simulation/engine.js"
+    );
+    const d = window.__TEST_DATA__;
+    return simulateMatch(
+      makeSnapshot(
+        { ...d.teams.t1, id: "t1" },
+        { ...d.teams.t2, id: "t2" },
+        Object.entries(d.players).map(([id, p]) => ({ ...p, id })),
+        1,
+      ),
+    ).events.find((e) => e.type === "foul").t;
+  });
+  await page.getByRole("button", { name: "PAUSAR", exact: true }).click();
   await page
-    .getByRole("button", { name: "APITO: LIGADO", exact: true })
-    .click();
+    .getByLabel("Momento da partida", { exact: true })
+    .fill(String(foulTime - 1));
+  const beforeFoul = await page.evaluate(() => window.__audio.whistles);
+  await page.getByRole("button", { name: "CONTINUAR", exact: true }).click();
+  await expect
+    .poll(() => page.evaluate(() => window.__audio.whistles))
+    .toBeGreaterThan(beforeFoul);
+
+  await page.getByRole("button", { name: "SOM: LIGADO", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "ATIVAR APITO", exact: true }),
+    page.getByRole("button", { name: "ATIVAR SOM", exact: true }),
   ).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByTestId("on-field-count")).toContainText(
     "Campo inteiro",
@@ -117,6 +172,14 @@ test("full broadcast renders, replays end and shares only isolated friendly data
   expect(await page.evaluate(() => window.__FIREBASE_METRICS__.writes)).toEqual(
     [],
   );
+  const corner = page.getByRole("button", { name: /REVER ESCANTEIO/ }).first();
+  await expect(corner).toBeVisible();
+  await corner.click();
+  await expect(page.getByTestId("corner-banner")).toContainText("ESCANTEIO");
+  await page.screenshot({
+    path: test.info().outputPath("corner-mobile.png"),
+    fullPage: true,
+  });
   await page.getByText("Preparar amistoso", { exact: true }).click();
   await page.getByRole("button", { name: "TRANSMITIR AMISTOSO" }).click();
   await expect(

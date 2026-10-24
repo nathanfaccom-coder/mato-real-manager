@@ -911,6 +911,7 @@ export function frameAt(match, time) {
 export function highlights(match) {
   return match.events.filter((e) =>
     [
+      "corner",
       "goal",
       "yellow",
       "red",

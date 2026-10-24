@@ -1,3 +1,9 @@
+# Correção 2.7.1 — áudio e visibilidade de escanteios
+
+O toque em iniciar/abrir a partida libera o contexto de áudio antes de operações assíncronas. Torcida sintetizada contínua durante o jogo, reação em gol, apito de início/faltas/impedimento/intervalo/fim e volumes independentes. Pausar ou silenciar interrompe o áudio; fechar a tela libera o contexto. Se o navegador bloquear, ATIVAR SOM permite tentar novamente. Não há downloads de áudio ou serviços pagos novos.
+
+Escanteios agora têm contador por equipe, faixa destacada, bandeirinhas, trajetória visual elevada da cobrança e botão REVER ESCANTEIO na súmula. O motor e os resultados dos replays não foram alterados.
+
 # Atualização 2.7.0
 
 Motor v3 para novos amistosos. Replays v1/v2 usam os respectivos motores preservados. Ritmo de 30 minutos mantido.

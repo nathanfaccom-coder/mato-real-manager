@@ -1,3 +1,4 @@
+import { LineupPresentation } from './LineupPresentation.jsx';
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { db } from "../services/firebase.js";
 import { canAdmin } from "../admin/permissions.js";
@@ -418,29 +419,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
             >
               <strong style={{ color: "#50dfac" }}>{presentationLabel}</strong>
               {presentationStage === "lineups" && (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 10,
-                    marginTop: 10,
-                    textAlign: "center",
-                  }}
-                >
-                  {[match.snapshot.home, match.snapshot.away].map((team) => (
-                    <div key={team.id}>
-                      <b>{team.name}</b>
-                      <br />
-                      <span style={{ color: "#b8dacc" }}>{team.formation}</span>
-                      <ol style={{ textAlign: "left", paddingLeft: 24, fontSize: 12, lineHeight: 1.45 }}>
-                        {team.lineup.map((player) => <li key={player.id}>#{player.pixelAppearance.number} {player.name} — {player.position}</li>)}
-                      </ol>
-                    </div>
-                  ))}
-                  <p style={{ gridColumn: "1 / -1", margin: 0, color: "#50dfac" }}>
-                    Sorteio: {match.snapshot[(match.snapshot.kickoffSide ?? 0) === 1 ? "away" : "home"].name} começa com a bola.
-                  </p>
-                </div>
+                <LineupPresentation snapshot={match.snapshot} elapsed={presentationElapsed} />
               )}
             </section>
           )}

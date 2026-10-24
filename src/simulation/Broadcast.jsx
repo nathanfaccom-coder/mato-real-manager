@@ -1,3 +1,4 @@
+import { LiveCoach } from "./LiveCoach.jsx";
 import { LineupPresentation } from './LineupPresentation.jsx';
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { db } from "../services/firebase.js";
@@ -59,10 +60,16 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
         ),
     [],
   );
+  useEffect(() => {
+    if (!record?.id || record.playbackIntroAt) return;
+    return db.collection('friendlyBroadcasts').doc(record.id).onSnapshot(doc => {
+      if (doc.exists) setRecord(previous => previous?.id === doc.id ? {...previous,...doc.data(),id:doc.id} : previous);
+    }, () => setError('Conexão com os comandos ao vivo interrompida.'));
+  }, [record?.id, record?.playbackIntroAt]);
   const prepared = useMemo(() => {
     if (!record) return {};
     try {
-      return { match: simulateMatch(record.snapshot) };
+      return { match: simulateMatch({ ...record.snapshot, commands: record.commands || [] }) };
     } catch (e) {
       return { failure: e.message };
     }
@@ -410,6 +417,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
       )}
       {match && (
         <>
+          {live && <LiveCoach key={record.id} user={user} record={record} match={match} time={time} />}
           {presenting && (
             <section
               data-testid="prematch-presentation"

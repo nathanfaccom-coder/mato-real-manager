@@ -1,3 +1,5 @@
+import { simulateMatch as simulateV7 } from "./engine-v7.js";
+import { POSTURES, validCommand } from "./live-tactics.js";
 import { simulateMatch as simulateV3 } from "./engine-v3.js";
 import { simulateMatch as simulateV4 } from "./engine-v4.js";
 import { simulateMatch as simulateV2 } from "./engine-v2.js";
@@ -11,7 +13,7 @@ import { appearance } from "./appearance.js";
 import { addedTimeForSeed, matchDurationSeconds } from "./timeline.js";
 import { simulateMatch as simulateV5 } from "./engine-v5.js";
 import { simulateMatch as simulateV6 } from "./engine-v6.js";
-export const ENGINE_VERSION = 7;
+export const ENGINE_VERSION = 8;
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const numeric = (v, f = 60) => (Number.isFinite(Number(v)) ? Number(v) : f);
 export const available = (p) =>
@@ -151,6 +153,7 @@ export function simulateMatch(snapshot) {
   if (snapshot.version === 4) return simulateV4(snapshot);
   if (snapshot.version === 5) return simulateV5(snapshot);
   if (snapshot.version === 6) return simulateV6(snapshot);
+  if (snapshot.version === 7) return simulateV7(snapshot);
   if (snapshot.version !== ENGINE_VERSION)
     throw Error("Este replay pertence a outra versão do simulador.");
   if (snapshot.home.lineup.length !== 11 || snapshot.away.lineup.length !== 11)
@@ -208,6 +211,25 @@ export function simulateMatch(snapshot) {
     pendingRestart = null,
     pendingFreeKick = null,
     pendingPenalty = null;
+  const commands = (snapshot.commands || []).filter(validCommand).slice().sort((a,b) => a.at-b.at || a.id.localeCompare(b.id));
+  const appliedCommands = new Set();
+  const postures = ['neutral', 'neutral'];
+  const formations = teams.map(team => team.formation);
+  function applyTactics(t) {
+    for (const c of commands) {
+      if (c.kind !== 'tactics' || c.at > t || appliedCommands.has(c.id)) continue;
+      appliedCommands.add(c.id);
+      formations[c.side] = c.formation;
+      postures[c.side] = c.posture;
+      people.forEach((p,i) => {
+        if (p.side !== c.side || !active(i)) return;
+        const coordinate = FORMATION_COORDINATES[c.formation][p.slot];
+        p.anchor = { x: (100 - parseFloat(coordinate.t))/100, y: parseFloat(coordinate.l)/100 };
+        p.role = FORMATIONS[c.formation][p.slot];
+      });
+      event(t, 'tactics-applied', c.side, null, `${teams[c.side].name}: ${c.formation} • ${POSTURES[c.posture].label}.`, { commandId: c.id, formation: c.formation, posture: c.posture });
+    }
+  }
   const direction = (side) => (side === period ? 1 : -1);
   const entered = people.map((p) => !p.reserve);
   const substitutions = [0, 0];
@@ -341,8 +363,8 @@ export function simulateMatch(snapshot) {
     flight = null;
     pendingRestart = null;
     pendingFreeKick = null;
-    pendingPenalty = { side, defendingSide, taker, keeper, at, fouler };
-    stop = t + 12;
+    pendingPenalty = { side, defendingSide, taker, keeper, at, fouler, awardedAt: t };
+    stop = t + 30;
     cooldown = stop;
     lastPass = null;
     event(
@@ -351,10 +373,11 @@ export function simulateMatch(snapshot) {
       side,
       taker,
       `Pênalti para ${teams[side].name}. ${people[taker].name} vai cobrar.`,
-      { at, fouler, keeper },
+      { at, fouler, keeper, deadline: stop },
     );
   }
   function awardRestart(t, point, lastTouchSide) {
+    applyTactics(t);
     const r = boundaryRestart(point, lastTouchSide, direction(lastTouchSide));
     const candidates = people
       .map((p, i) => i)
@@ -435,6 +458,8 @@ export function simulateMatch(snapshot) {
       score: [...score],
       owner,
       period,
+      formations: [...formations],
+      postures: [...postures],
     });
   }
   record(0);
@@ -515,6 +540,15 @@ export function simulateMatch(snapshot) {
       cooldown = t;
     }
     if (pendingPenalty && t > stop) {
+      const eligible = commands.filter(c => c.kind === 'penalty' && c.side === pendingPenalty.side && c.penaltyAt === pendingPenalty.awardedAt && c.at > pendingPenalty.awardedAt && c.at <= stop);
+      const choice = eligible.at(-1);
+      const selected = choice ? people.findIndex((p,i) => p.id === choice.playerId && p.side === choice.side && active(i)) : -1;
+      if (selected >= 0) {
+        owner = selected;
+        pendingPenalty.taker = selected;
+        positions[selected] = {x: pendingPenalty.at[0], y:pendingPenalty.at[1]};
+      }
+
       const kick = pendingPenalty,
         attack = skill(kick.taker, "shot", t),
         keeperSkill = skill(kick.keeper, "gk", t),
@@ -723,10 +757,10 @@ export function simulateMatch(snapshot) {
               : 95;
           y = clamp(32 + (ball[1] - 32) * (danger ? 0.6 : 0.2), 25, 39);
         } else {
-          x += clamp((ball[0] - 50) * 0.32, -12, 12);
+          x += clamp((ball[0] - 50) * 0.32, -12, 12) + dir * POSTURES[postures[who.side]].shift;
           y += Math.sin(t * 0.07 + i * 2) * 3 + (ball[1] - 32) * 0.12;
           if (i === owner) {
-            x = dir > 0 ? Math.min(96, p.x + 7) : Math.max(4, p.x - 7);
+            x = dir > 0 ? Math.min(96, p.x + 7 + POSTURES[postures[who.side]].shift / 4) : Math.max(4, p.x - 7 - POSTURES[postures[who.side]].shift / 4);
             y = clamp(p.y + (32 - p.y) * 0.09 + Math.sin(t * 0.21) * 2, 4, 60);
           }
           if (who.side === side && i !== owner && who.slot > 0) {
@@ -944,9 +978,9 @@ export function simulateMatch(snapshot) {
             positions[rival].x - ball[0],
             positions[rival].y - ball[1],
           ) < 3 &&
-          rand() < 0.14
+          rand() < 0.14 * POSTURES[postures[people[rival].side]].pressure
         ) {
-          if (rand() < clamp(0.045 + people[rival].attributes.aggression / 1800 + Math.max(0, 65 - people[rival].overall) / 700, 0.035, 0.16)) {
+          if (rand() < POSTURES[postures[people[rival].side]].pressure * clamp(0.045 + people[rival].attributes.aggression / 1800 + Math.max(0, 65 - people[rival].overall) / 700, 0.035, 0.16)) {
             const foulPoint = [...ball];
             const victimSide = people[owner].side;
             event(
@@ -1036,7 +1070,7 @@ export function simulateMatch(snapshot) {
           if (
             people[actor].slot !== 0 &&
             rand() <
-              shootingChance(
+              POSTURES[postures[s]].shot * shootingChance(
                 ball,
                 positions[keeperFor(1 - s)],
                 dir,

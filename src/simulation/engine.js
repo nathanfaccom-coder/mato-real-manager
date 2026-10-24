@@ -281,6 +281,8 @@ export function simulateMatch(snapshot) {
   }
   function restart(t, side, half = false) {
     pendingRestart = null;
+    pendingFreeKick = null;
+    pendingPenalty = null;
     positions = people.map((p, i) => ({
       x: direction(p.side) > 0 ? p.anchor.x * 42 + 4 : 96 - p.anchor.x * 42,
       y: 5 + p.anchor.y * 54,
@@ -313,7 +315,6 @@ export function simulateMatch(snapshot) {
       t,
       directShotArea ? "shot" : "shortPass",
     );
-    positions[taker] = { x: at[0], y: at[1] };
     owner = taker;
     ball = at;
     flight = null;
@@ -456,7 +457,7 @@ export function simulateMatch(snapshot) {
       t >= windows[0] &&
       !flight &&
       pendingKickoff === null &&
-      !pendingRestart
+      !pendingRestart && !pendingFreeKick && !pendingPenalty
     ) {
       windows.shift();
       for (const side of [0, 1]) {
@@ -534,6 +535,15 @@ export function simulateMatch(snapshot) {
       pendingPenalty = null;
       stop = t - 1;
       cooldown = t;
+    }
+    if (pendingFreeKick) {
+      const { taker, at } = pendingFreeKick;
+      const p = positions[taker];
+      const distance = Math.hypot(at[0] - p.x, at[1] - p.y);
+      const step = Math.min(1, 2.2 / (distance || 1));
+      positions[taker] = { x: p.x + (at[0] - p.x) * step, y: p.y + (at[1] - p.y) * step };
+      ball = [...at];
+      if (distance > 0.1) stop = Math.max(stop, t + 2);
     }
     if (pendingFreeKick && t > stop) {
       const kick = pendingFreeKick,

@@ -145,7 +145,7 @@ export function Pitch({ match, time, camera = "wide", presentation = null }) {
       for (let j = 1; j < 10; j++)
         line(side ? 100 : 0, 27 + j, side ? 102.5 : -2.5, 27 + j);
     }
-    const celebration = match.events.findLast((e) => e.type === "goal" && e.t <= time && time - e.t < 15);
+    const celebration = match.events.findLast((e) => e.type === "goal" && e.t <= time && time - e.t < 6 && !presentation);
     const celebrationGroup = celebration ? match.people.map((p, i) => i).filter((i) => match.people[i].side === celebration.side && i !== celebration.actor && ((i + celebration.t + match.snapshot.seed) % 5 < 2)).slice(0, 4) : [];
     const people = match.people
       .map((p, i) => ({
@@ -174,8 +174,19 @@ export function Pitch({ match, time, camera = "wide", presentation = null }) {
     for (const { p, i, x: baseX, y: baseY, pose } of people) {
       if (!pose.visible) continue;
       const departing = !a.positions[i][2] || pose.action === "walk";
-      const x = departing ? pose.x : baseX,
+      let x = departing ? pose.x : baseX,
         y = departing ? pose.y : baseY;
+      if (celebration && (i === celebration.actor || celebrationGroup.includes(i))) {
+        const age = time - celebration.t;
+        const scorer = a.positions[celebration.actor];
+        if (i !== celebration.actor) {
+          const progress = Math.min(1, age / 4);
+          const slot = celebrationGroup.indexOf(i);
+          x += (scorer[0] + (slot % 2 ? 2 : -2) - x) * progress;
+          y += (scorer[1] + (slot < 2 ? -2 : 2) - y) * progress;
+        }
+        y -= Math.abs(Math.sin(age * 4 + i)) * 1.2;
+      }
       const key =
         p.side === 0
           ? p.slot === 0

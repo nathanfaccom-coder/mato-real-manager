@@ -143,6 +143,16 @@ test("full broadcast renders, replays end and shares only isolated friendly data
   await page.getByRole("button", { name: "PAUSAR", exact: true }).click();
   await page.getByLabel("Momento da partida", { exact: true }).fill("1200");
   await expect(page.getByTestId("match-clock")).toHaveText("20:00");
+  await page.getByRole("button", { name: "ESTATÍSTICAS AO VIVO" }).click();
+  await expect(page.getByTestId("live-statistics")).toBeVisible();
+  await expect(page.getByTestId("match-clock-stats")).toHaveText("20:00");
+  await expect(page.getByTestId("broadcast-score-stats")).toHaveText(
+    await page.getByTestId("broadcast-score").innerText(),
+  );
+  await expect(page.getByTestId("corner-count")).toBeVisible();
+  await page.getByRole("button", { name: "JOGO AO VIVO" }).click();
+  await expect(page.getByTestId("live-statistics")).toHaveCount(0);
+  await expect(page.getByTestId("on-field-count")).toBeVisible();
   await page.screenshot({
     path: test.info().outputPath("pixel-match-mobile.png"),
     fullPage: true,

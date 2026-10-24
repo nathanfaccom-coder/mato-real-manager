@@ -58,7 +58,7 @@ async function admin(page) {
   page.on("dialog", (dialog) => dialog.accept("0102"));
   await open(page);
   await expect(page.locator(".version-badge")).toHaveText(
-    "VERSÃO 2.8.0 — MATO REAL TV",
+    "VERSÃO 2.9.1 — MATO REAL TV",
   );
   await page.getByRole("button", { name: "ADMIN", exact: true }).click();
   await page

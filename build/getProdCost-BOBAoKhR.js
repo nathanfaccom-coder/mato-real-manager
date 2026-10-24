@@ -1,0 +1,1 @@
+const t=(e,n)=>{const r=parseInt(n)||0;return["energy","SAUDE","CONSUMIVEL"].includes(e)?r*15:["training","CHUTEIRA","LUVAS"].includes(e)?r*100:["vehicle","real_estate","VEICULO","IMOVEL","TECNOLOGIA","LUXO"].includes(e)?r*500:50};export{t as g};

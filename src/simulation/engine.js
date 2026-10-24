@@ -1,4 +1,5 @@
 import { simulateMatch as simulateV3 } from "./engine-v3.js";
+import { simulateMatch as simulateV4 } from "./engine-v4.js";
 import { simulateMatch as simulateV2 } from "./engine-v2.js";
 import { shootingChance, boundaryRestart } from "./decisions.js";
 import { simulateMatch as simulateLegacy } from "./engine-v1.js";
@@ -7,7 +8,7 @@ import { matchKits, shirtNumbers } from "./kits.js";
 import { FORMATIONS } from "../game/FORMATIONS.js";
 import { FORMATION_COORDINATES } from "../game/FORMATION_COORDINATES.js";
 import { appearance } from "./appearance.js";
-export const ENGINE_VERSION = 4;
+export const ENGINE_VERSION = 5;
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const numeric = (v, f = 60) => (Number.isFinite(Number(v)) ? Number(v) : f);
 export const available = (p) =>
@@ -141,6 +142,7 @@ export function simulateMatch(snapshot) {
   if (snapshot.version === 1) return simulateLegacy(snapshot);
   if (snapshot.version === 2) return simulateV2(snapshot);
   if (snapshot.version === 3) return simulateV3(snapshot);
+  if (snapshot.version === 4) return simulateV4(snapshot);
   if (snapshot.version !== ENGINE_VERSION)
     throw Error("Este replay pertence a outra versão do simulador.");
   if (snapshot.home.lineup.length !== 11 || snapshot.away.lineup.length !== 11)
@@ -266,7 +268,7 @@ export function simulateMatch(snapshot) {
   function restart(t, side, half = false) {
     pendingRestart = null;
     positions = people.map((p, i) => ({
-      x: direction(p.side) > 0 ? p.anchor.x * 82 + 4 : 96 - p.anchor.x * 82,
+      x: direction(p.side) > 0 ? p.anchor.x * 42 + 4 : 96 - p.anchor.x * 42,
       y: 5 + p.anchor.y * 54,
     }));
     owner = people.findIndex(

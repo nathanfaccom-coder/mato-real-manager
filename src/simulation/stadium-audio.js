@@ -6,6 +6,7 @@ export class StadiumAudio {
     this.whistleVolume = 0.65;
     this.crowdVolume = 0.4;
     this.voices = [];
+    this.anthemVoices = [];
     this.playing = false;
     this.crowdGain = c.createGain();
     this.crowdGain.gain.value = 0;
@@ -44,7 +45,10 @@ export class StadiumAudio {
       t = this.context.currentTime;
     g.cancelScheduledValues(t);
     g.setTargetAtTime(value ? this.crowdVolume * 0.15 : 0, t, 0.15);
-    if (!value) this.stopWhistles();
+    if (!value) {
+      this.stopWhistles();
+      this.stopAnthem();
+    }
   }
   stopWhistles() {
     for (const o of this.voices) {
@@ -53,6 +57,55 @@ export class StadiumAudio {
       } catch {}
     }
     this.voices = [];
+  }
+  stopAnthem() {
+    for (const o of this.anthemVoices) {
+      try {
+        o.stop();
+      } catch {}
+    }
+    this.anthemVoices = [];
+  }
+  anthem() {
+    if (this.context.state !== "running" || !this.whistleVolume) return;
+    this.stopAnthem();
+    const c = this.context,
+      start = c.currentTime + 0.04,
+      beat = 0.62,
+      melody = [
+        392, 392, 440, 494, 523, 494, 440, 392,
+        330, 392, 440, 392, 330, 294, 330, 392,
+        440, 494, 523, 587, 523, 494, 440, 392,
+      ];
+    melody.forEach((frequency, i) => {
+      const at = start + i * beat,
+        length = beat * 0.88;
+      for (const [pitch, volume, type] of [
+        [frequency, 0.075, "triangle"],
+        [frequency / 2, 0.035, "sine"],
+      ]) {
+        const oscillator = c.createOscillator(),
+          gain = c.createGain();
+        oscillator.type = type;
+        oscillator.frequency.setValueAtTime(pitch, at);
+        gain.gain.setValueAtTime(0, at);
+        gain.gain.linearRampToValueAtTime(
+          this.whistleVolume * volume,
+          at + 0.07,
+        );
+        gain.gain.setValueAtTime(this.whistleVolume * volume, at + length * 0.65);
+        gain.gain.linearRampToValueAtTime(0, at + length);
+        oscillator.connect(gain);
+        gain.connect(c.destination);
+        oscillator.start(at);
+        oscillator.stop(at + length + 0.01);
+        this.anthemVoices.push(oscillator);
+        oscillator.onended = () => {
+          oscillator.disconnect();
+          gain.disconnect();
+        };
+      }
+    });
   }
   whistle(type = "foul") {
     if (this.context.state !== "running" || !this.whistleVolume) return;

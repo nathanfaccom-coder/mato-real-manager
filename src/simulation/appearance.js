@@ -177,12 +177,20 @@ export function drawPlayer(
   rect(uniform.shirt, -5, -15, 11, 8);
   rect(uniform.shirt, -7, -14, 3, 4);
   rect(uniform.shirt, 5, -14, 3, 4);
-  rect("#10171d", -8, -11 + step, 4, 5);
-  rect(a.sleeves === "long" ? uniform.shirt : a.skin, -7, -10 + step, 2, 3);
-  rect(a.skin, -6, -8 + step, 2, 2);
-  rect("#10171d", 5, -11 - step, 4, 5);
-  rect(a.sleeves === "long" ? uniform.shirt : a.skin, 6, -10 - step, 2, 3);
-  rect(a.skin, 5, -8 - step, 2, 2);
+  if (pose.action === "greet") {
+    rect("#10171d", 5, -17, 4, 8);
+    rect(a.sleeves === "long" ? uniform.shirt : a.skin, 6, -18, 2, 5);
+    rect(a.skin, 6, -20, 3, 3);
+    rect("#10171d", -8, -11, 4, 5);
+    rect(a.sleeves === "long" ? uniform.shirt : a.skin, -7, -10, 2, 3);
+  } else {
+    rect("#10171d", -8, -11 + step, 4, 5);
+    rect(a.sleeves === "long" ? uniform.shirt : a.skin, -7, -10 + step, 2, 3);
+    rect(a.skin, -6, -8 + step, 2, 2);
+    rect("#10171d", 5, -11 - step, 4, 5);
+    rect(a.sleeves === "long" ? uniform.shirt : a.skin, 6, -10 - step, 2, 3);
+    rect(a.skin, 5, -8 - step, 2, 2);
+  }
   if (uniform.pattern === "stripes") {
     rect(uniform.detail, -3, -15, 2, 8);
     rect(uniform.detail, 2, -15, 2, 8);

@@ -8,7 +8,7 @@ import React, {
 import { audibleEvents } from "./audio-events.js";
 import { StadiumAudio } from "./stadium-audio.js";
 export const MatchAudio = forwardRef(function MatchAudio(
-  { match, time, playing, seek, ended },
+  { match, time, playing, seek, ended, presentation = false, presentationKey },
   ref,
 ) {
   const [enabled, setEnabled] = useState(false),
@@ -19,7 +19,8 @@ export const MatchAudio = forwardRef(function MatchAudio(
     muted = useRef(false),
     cursor = useRef(time),
     current = useRef(match),
-    lastSeek = useRef(seek);
+    lastSeek = useRef(seek),
+    lastAnthem = useRef(null);
   async function activate(manual = false) {
     if (muted.current && !manual) return;
     try {
@@ -41,6 +42,16 @@ export const MatchAudio = forwardRef(function MatchAudio(
     audio.current?.setVolumes(whistle / 100, crowd / 100);
   }, [whistle, crowd, enabled]);
   useEffect(() => {
+    if (!presentation) {
+      if (lastAnthem.current === presentationKey) audio.current?.stopAnthem();
+      return;
+    }
+    if (!enabled || lastAnthem.current === presentationKey)
+      return;
+    lastAnthem.current = presentationKey;
+    audio.current?.anthem();
+  }, [enabled, presentation, presentationKey]);
+  useEffect(() => {
     audio.current?.setPlaying(Boolean(enabled && playing && match && !ended));
   }, [enabled, playing, match, ended]);
   useEffect(() => {
@@ -54,7 +65,7 @@ export const MatchAudio = forwardRef(function MatchAudio(
       current.current = match;
       cursor.current = time < 2 ? -1 : time;
     }
-    if (!match) return;
+    if (!match || presentation) return;
     // Keep kickoff pending while the user gesture is finishing AudioContext.resume().
     if (!enabled) {
       if (time >= 2) cursor.current = time;
@@ -67,7 +78,7 @@ export const MatchAudio = forwardRef(function MatchAudio(
       if (e.type === "goal") audio.current?.cheer();
       else audio.current?.whistle(e.type);
     }
-  }, [match, time, playing, enabled, seek]);
+  }, [match, time, playing, enabled, seek, presentation]);
   useEffect(
     () => () => {
       audio.current?.close();

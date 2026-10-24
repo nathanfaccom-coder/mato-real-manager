@@ -10,8 +10,10 @@ import {
 import { MatchAudio } from "./MatchAudio.jsx";
 import { Pitch } from "./Pitch.jsx";
 import { KitEditor } from "./Editors.jsx";
-const durationOf = (record) => record?.durationMs || 360000;
+const durationOf = (record) =>
+  (record?.durationMs || 360000) + (record?.preMatchMs || 0);
 const newDuration = 1800000;
+const PREMATCH_MS = 20000;
 const minute = (t) =>
   `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
 export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
@@ -22,6 +24,8 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [time, setTime] = useState(0),
+    [animationNow, setAnimationNow] = useState(Date.now()),
+    [presentationSkipped, setPresentationSkipped] = useState(false),
     [seek, setSeek] = useState(0),
     [playing, setPlaying] = useState(true),
     [rate, setRate] = useState(1),
@@ -60,6 +64,44 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
   }, []);
   const duration = record ? durationOf(record) : newDuration;
   const live = record?.id && now < record.startedAt + duration;
+  const introStart = record?.playbackIntroAt ?? record?.startedAt ?? 0;
+  const introDuration = record?.playbackPreMatchMs ?? record?.preMatchMs ?? 0;
+  const presentationElapsed = Math.max(0, animationNow - introStart);
+  const presenting = Boolean(
+    match &&
+      !presentationSkipped &&
+      introDuration > 0 &&
+      presentationElapsed < introDuration,
+  );
+  const presentationStage =
+    presentationElapsed < 4500
+      ? "walkout"
+      : presentationElapsed < 9000
+        ? "handshake"
+        : presentationElapsed < 17000
+          ? "lineups"
+          : "countdown";
+  const presentationLabel =
+    presentationStage === "walkout"
+      ? "As equipes entram em campo"
+      : presentationStage === "handshake"
+        ? "Cumprimentos entre os jogadores"
+        : presentationStage === "lineups"
+          ? "Formações iniciais"
+          : `A partida começa em ${Math.max(1, Math.ceil((introDuration - presentationElapsed) / 1000))}…`;
+  useEffect(() => {
+    if (!match || !introDuration || presentationSkipped) return;
+    let frame;
+    const update = () => {
+      const current = Date.now();
+      setAnimationNow(current);
+      if (current < introStart + introDuration)
+        frame = requestAnimationFrame(update);
+    };
+    if (Date.now() < introStart + introDuration)
+      frame = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(frame);
+  }, [match, introStart, introDuration, presentationSkipped]);
   useEffect(() => {
     if (!match) return;
     let id,
@@ -68,12 +110,22 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
     const tick = (t) => {
       const elapsed = Math.max(0, t - last);
       last = t;
+      const preMatchMs = record?.playbackPreMatchMs ?? record?.preMatchMs ?? 0;
+      const kickoffAt =
+        presentationSkipped
+          ? 0
+          : (record?.playbackIntroAt ?? record?.startedAt ?? 0) + preMatchMs;
       if (live)
         clock.current = Math.min(
           5400,
-          Math.max(0, ((Date.now() - record.startedAt) / duration) * 5400),
+          Math.max(
+            0,
+            ((Date.now() - record.startedAt - (record.preMatchMs || 0)) /
+              Math.max(1, duration - (record.preMatchMs || 0))) *
+              5400,
+          ),
         );
-      else if (playing)
+      else if (playing && Date.now() >= kickoffAt)
         clock.current = Math.min(
           5400,
           clock.current + elapsed * (5400 / newDuration) * rate,
@@ -86,19 +138,35 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
     };
     id = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(id);
-  }, [match, live, playing, rate, record]);
+  }, [match, live, playing, rate, record, duration, presentationSkipped]);
   function watch(r) {
     audio.current?.activate();
-    setRecord(r);
+    const ended = Boolean(r.id && Date.now() >= r.startedAt + durationOf(r));
+    const playback = ended
+      ? {
+          ...r,
+          playbackIntroAt: Date.now(),
+          playbackPreMatchMs: PREMATCH_MS,
+        }
+      : r;
+    setRecord(playback);
     clock.current = r.id
-      ? Math.min(
+      ? ended
+        ? 0
+        : Math.min(
           5400,
-          Math.max(0, ((Date.now() - r.startedAt) / durationOf(r)) * 5400),
+          Math.max(
+            0,
+            ((Date.now() - r.startedAt - (r.preMatchMs || 0)) /
+              Math.max(1, durationOf(r) - (r.preMatchMs || 0))) *
+              5400,
+          ),
         )
       : 0;
-    if (r.id && Date.now() >= r.startedAt + durationOf(r)) clock.current = 0;
     setTime(clock.current);
     setPlaying(true);
+    setPresentationSkipped(false);
+    setAnimationNow(Date.now());
     setError("");
   }
   function prepare() {
@@ -118,6 +186,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
       const r = {
         snapshot,
         startedAt: Date.now(),
+        preMatchMs: PREMATCH_MS,
         durationMs: newDuration,
         createdBy: user.data.id,
       };
@@ -132,6 +201,12 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
     } finally {
       setBusy(false);
     }
+  }
+  function seekMatch(value) {
+    if (presenting) setPresentationSkipped(true);
+    setSeek((v) => v + 1);
+    clock.current = Number(value);
+    setTime(clock.current);
   }
   const lineup = useMemo(
     () =>
@@ -180,6 +255,8 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
         seek={seek}
         playing={Boolean(live || playing)}
         ended={ended}
+        presentation={presenting}
+        presentationKey={introStart}
       />
       {watchOnly && (
         <>
@@ -318,6 +395,35 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
       )}
       {match && (
         <>
+          {presenting && (
+            <section
+              data-testid="prematch-presentation"
+              aria-live="polite"
+              className="card"
+              style={{ marginTop: 14, padding: 12, borderColor: "#50dfac" }}
+            >
+              <strong style={{ color: "#50dfac" }}>{presentationLabel}</strong>
+              {presentationStage === "lineups" && (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 10,
+                    marginTop: 10,
+                    textAlign: "center",
+                  }}
+                >
+                  {[match.snapshot.home, match.snapshot.away].map((team) => (
+                    <div key={team.id}>
+                      <b>{team.name}</b>
+                      <br />
+                      <span style={{ color: "#b8dacc" }}>{team.formation}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
           <div
             role="group"
             aria-label="Alternar transmissão"
@@ -362,7 +468,13 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
               }}
             >
               <strong style={{ color: "#50dfac" }}>
-                {live ? "● AO VIVO" : record.id ? "REPLAY" : "PRÉVIA"}
+                {presenting
+                  ? "APRESENTAÇÃO"
+                  : live
+                    ? "● AO VIVO"
+                    : record.id
+                      ? "REPLAY"
+                      : "PRÉVIA"}
               </strong>
               <span>
                 {match.snapshot.home.name}{" "}
@@ -371,7 +483,9 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
                 </b>{" "}
                 {match.snapshot.away.name}
               </span>
-              <b data-testid="match-clock">{minute(time)}</b>
+              <b data-testid="match-clock">
+                {presenting ? "00:00" : minute(time)}
+              </b>
             </div>
             <div
               data-testid="on-field-count"
@@ -411,9 +525,18 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
                 }
               </div>
             )}
-            <Pitch match={match} time={time} camera={camera} />
+            <Pitch
+              match={match}
+              time={time}
+              camera={camera}
+              presentation={
+                presenting
+                  ? { stage: presentationStage, elapsedMs: presentationElapsed }
+                  : null
+              }
+            />
             <p style={{ minHeight: 24, padding: "0 12px" }} aria-live="off">
-              {last?.text}
+              {presenting ? presentationLabel : last?.text}
             </p>
           </div>
           {screenMode === "stats" && (
@@ -422,7 +545,9 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
                 <strong>{match.snapshot.home.name}</strong>
                 <b data-testid="broadcast-score-stats" style={{ fontSize: 24 }}>{current.score[0]} × {current.score[1]}</b>
                 <strong>{match.snapshot.away.name}</strong>
-                <span data-testid="match-clock-stats">{minute(time)}</span>
+                <span data-testid="match-clock-stats">
+                  {presenting ? "00:00" : minute(time)}
+                </span>
               </header>
               <p style={{ color: "#b8dacc" }}>Números atualizados conforme a partida avança.</p>
               <div data-testid="corner-count" style={{ padding: "10px 12px", color: "#ffe19a", background: "#172631", borderRadius: 8 }}>
@@ -510,11 +635,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
                 max="5400"
                 value={time}
                 style={{ width: "100%" }}
-                onChange={(e) => {
-                  setSeek((v) => v + 1);
-                  clock.current = Number(e.target.value);
-                  setTime(clock.current);
-                }}
+                onChange={(e) => seekMatch(e.target.value)}
               />
             </label>
           )}
@@ -604,9 +725,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
                       <button
                         className="btn btn-ghost"
                         onClick={() => {
-                          setSeek((v) => v + 1);
-                          clock.current = e.t;
-                          setTime(e.t);
+                          seekMatch(e.t);
                           setPlaying(true);
                         }}
                       >

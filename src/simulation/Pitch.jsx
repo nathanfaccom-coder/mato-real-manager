@@ -2,11 +2,52 @@ import { actorPresentation } from "./presentation.js";
 import React, { useRef, useEffect } from "react";
 import { drawPlayer } from "./appearance.js";
 import { frameAt } from "./engine.js";
-export function Pitch({ match, time, camera = "wide" }) {
+function presentationPositions(match, presentation) {
+  const elapsed = presentation.elapsedMs;
+  const smooth = (value) => {
+    const t = Math.max(0, Math.min(1, value));
+    return t * t * (3 - 2 * t);
+  };
+  return match.people.map((player) => {
+    if (player.reserve) return [50, 32, 0];
+    const rowY = 8 + player.slot * 4.8;
+    if (presentation.stage === "walkout") {
+      const progress = smooth(elapsed / 4500),
+        target = player.side === 0 ? 43 : 57,
+        entrance = player.side === 0 ? -7 : 107;
+      return [entrance + (target - entrance) * progress, rowY, 1];
+    }
+    if (presentation.stage === "handshake") {
+      const progress = smooth((elapsed - 4500) / 4500),
+        start = player.side === 0 ? 43 : 57,
+        target = player.side === 0 ? 53 : 47;
+      return [start + (target - start) * progress, rowY, 1];
+    }
+    return [
+      player.side === 0
+        ? 4 + player.anchor.x * 42
+        : 96 - player.anchor.x * 42,
+      5 + player.anchor.y * 54,
+      1,
+    ];
+  });
+}
+
+export function Pitch({ match, time, camera = "wide", presentation = null }) {
   const ref = useRef(null);
   useEffect(() => {
     const ctx = ref.current.getContext("2d"),
-      { a, b, mix } = frameAt(match, time),
+      sampled = frameAt(match, time),
+      a = presentation
+        ? {
+            ...sampled.a,
+            positions: presentationPositions(match, presentation),
+            owner: -1,
+            ball: [50, 32],
+          }
+        : sampled.a,
+      b = presentation ? a : sampled.b,
+      mix = presentation ? 0 : sampled.mix,
       lerp = (v, w) => v + (w - v) * mix;
     const ball = a.ball.map((v, i) => lerp(v, b.ball[i]));
     const W = 960,
@@ -81,7 +122,20 @@ export function Pitch({ match, time, camera = "wide" }) {
         i,
         x: lerp(a.positions[i][0], b.positions[i][0]),
         y: lerp(a.positions[i][1], b.positions[i][1]),
-        pose: actorPresentation(match, a, i, time),
+        pose: presentation
+          ? {
+              x: a.positions[i][0],
+              y: a.positions[i][1],
+              visible: Boolean(a.positions[i][2]),
+              action:
+                presentation.stage === "walkout"
+                  ? "walk"
+                  : presentation.stage === "handshake"
+                    ? "greet"
+                    : "idle",
+              facing: p.side === 0 ? 1 : -1,
+            }
+          : actorPresentation(match, a, i, time),
       }))
       .sort((v, w) => v.y - w.y);
     for (const { p, i, x: baseX, y: baseY, pose } of people) {
@@ -212,6 +266,22 @@ export function Pitch({ match, time, camera = "wide" }) {
         Y(64) - 2,
       );
     }
+    if (presentation) {
+      const label =
+        presentation.stage === "walkout"
+          ? "OS TIMES ENTRAM EM CAMPO"
+          : presentation.stage === "handshake"
+            ? "CUMPRIMENTOS"
+            : presentation.stage === "lineups"
+              ? "FORMAÇÕES INICIAIS"
+              : `BOLA ROLANDO EM ${Math.max(1, Math.ceil((20000 - presentation.elapsedMs) / 1000))}`;
+      ctx.fillStyle = "#0b1722e8";
+      ctx.fillRect(315, 44, 330, 24);
+      ctx.fillStyle = presentation.stage === "countdown" ? "#50dfac" : "#fff";
+      ctx.font = "bold 13px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(label, 480, 61);
+    }
     const cornerKick = match.events.findLast(
       (e) =>
         e.t <= time &&
@@ -266,7 +336,7 @@ export function Pitch({ match, time, camera = "wide" }) {
     ctx.font = "bold 12px monospace";
     ctx.textAlign = "right";
     ctx.fillText("MATO REAL • TV", 935, 25);
-  }, [match, time, camera]);
+  }, [match, time, camera, presentation?.stage, presentation?.elapsedMs]);
   return (
     <canvas
       ref={ref}

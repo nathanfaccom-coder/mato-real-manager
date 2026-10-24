@@ -77,10 +77,11 @@ export function drawPlayer(
   ctx.save();
   ctx.translate(Math.round(x), Math.round(y));
   ctx.scale(scale * (pose.facing === -1 ? -1 : 1), scale);
-  if (pose.action === "tackle" || pose.action === "injury") {
+  if (pose.action === "injury") {
     ctx.translate(0, -3);
     ctx.rotate(-Math.PI / 2);
   }
+  if (pose.action === "tackle") ctx.rotate(-Math.PI / 16);
   if (pose.action === "kick") ctx.rotate(-0.13);
 
   const rect = (color, x, y, w, h) => {
@@ -183,6 +184,14 @@ export function drawPlayer(
     rect(a.skin, 6, -20, 3, 3);
     rect("#10171d", -8, -11, 4, 5);
     rect(a.sleeves === "long" ? uniform.shirt : a.skin, -7, -10, 2, 3);
+  } else if (pose.action === "throwin" || pose.action === "celebrate") {
+    const lift = pose.action === "celebrate" ? 1 : 0;
+    rect("#10171d", -10, -17, 4, 12);
+    rect("#10171d", 7, -17, 4, 12);
+    rect(a.sleeves === "long" ? uniform.shirt : a.skin, -9, -23 - lift, 2, 9);
+    rect(a.sleeves === "long" ? uniform.shirt : a.skin, 8, -23 - lift, 2, 9);
+    rect(a.skin, -10, -25 - lift, 4, 3);
+    rect(a.skin, 7, -25 - lift, 4, 3);
   } else {
     rect("#10171d", -8, -11 + step, 4, 5);
     rect(a.sleeves === "long" ? uniform.shirt : a.skin, -7, -10 + step, 2, 3);
@@ -226,10 +235,6 @@ export function drawPlayer(
   ctx.textAlign = "center";
   if (!pose.referee) ctx.fillText(String(a.number), 0.5, -9);
   if (pose.action === "throwin") {
-    rect("#10171d", -10, -31, 4, 18);
-    rect("#10171d", 7, -31, 4, 18);
-    rect(a.skin, -9, -30, 2, 16);
-    rect(a.skin, 8, -30, 2, 16);
     rect(a.skin, -8, -34, 17, 3);
     rect("#10171d", -3, -38, 8, 6);
     rect("#fff9e9", -2, -37, 6, 4);

@@ -137,6 +137,8 @@ export function Pitch({ match, time, camera = "wide", presentation = null }) {
       for (let j = 1; j < 10; j++)
         line(side ? 100 : 0, 27 + j, side ? 102.5 : -2.5, 27 + j);
     }
+    const celebration = match.events.findLast((e) => e.type === "goal" && e.t <= time && time - e.t < 15);
+    const celebrationGroup = celebration ? match.people.map((p, i) => i).filter((i) => match.people[i].side === celebration.side && i !== celebration.actor && ((i + celebration.t + match.snapshot.seed) % 5 < 2)).slice(0, 4) : [];
     const people = match.people
       .map((p, i) => ({
         p,
@@ -156,7 +158,9 @@ export function Pitch({ match, time, camera = "wide", presentation = null }) {
                     : "idle",
               facing: p.side === 0 ? 1 : -1,
             }
-          : actorPresentation(match, a, i, time),
+          : celebration && (i === celebration.actor || celebrationGroup.includes(i))
+            ? { ...actorPresentation(match, a, i, time), action: "celebrate" }
+            : actorPresentation(match, a, i, time),
       }))
       .sort((v, w) => v.y - w.y);
     for (const { p, i, x: baseX, y: baseY, pose } of people) {
@@ -301,7 +305,7 @@ export function Pitch({ match, time, camera = "wide", presentation = null }) {
                   ? "COMEÇA O SEGUNDO TEMPO"
                   : presentation.stage === "fulltime-exit"
                     ? "FIM DE JOGO"
-              : `BOLA ROLANDO EM ${Math.max(1, Math.ceil((20000 - presentation.elapsedMs) / 1000))}`;
+              : `BOLA ROLANDO EM ${Math.max(1, Math.ceil(((presentation.durationMs || 28000) - presentation.elapsedMs) / 1000))}`;
       ctx.fillStyle = "#0b1722e8";
       ctx.fillRect(315, 44, 330, 24);
       ctx.fillStyle = presentation.stage === "countdown" ? "#50dfac" : "#fff";
@@ -332,6 +336,17 @@ export function Pitch({ match, time, camera = "wide", presentation = null }) {
     ctx.fillStyle = "#17202c";
     ctx.fillRect(X(ball[0]) - 1, Y(ball[1]) - 2 - loft, 3, 3);
     ctx.restore();
+    if (celebration) {
+      ctx.fillStyle = "#06111ddd";
+      ctx.fillRect(220, 214, 520, 120);
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#fff";
+      ctx.font = "900 74px system-ui, sans-serif";
+      ctx.fillText("GOL!", 480, 286);
+      ctx.fillStyle = "#50dfac";
+      ctx.font = "bold 23px system-ui, sans-serif";
+      ctx.fillText(match.people[celebration.actor]?.name || "", 480, 319);
+    }
     if (camera === "tv") {
       const mx = 390,
         my = 488,

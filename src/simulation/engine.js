@@ -10,7 +10,8 @@ import { FORMATION_COORDINATES } from "../game/FORMATION_COORDINATES.js";
 import { appearance } from "./appearance.js";
 import { addedTimeForSeed, matchDurationSeconds } from "./timeline.js";
 import { simulateMatch as simulateV5 } from "./engine-v5.js";
-export const ENGINE_VERSION = 6;
+import { simulateMatch as simulateV6 } from "./engine-v6.js";
+export const ENGINE_VERSION = 7;
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const numeric = (v, f = 60) => (Number.isFinite(Number(v)) ? Number(v) : f);
 export const available = (p) =>
@@ -126,6 +127,8 @@ export function makeSnapshot(home, away, players, seed, lineups) {
     version: ENGINE_VERSION,
     seed: Number(seed) >>> 0,
     addedTime: addedTimeForSeed(seed),
+    kickoffSide: (Number(seed) >>> 1) & 1,
+    penaltiesOnDraw: false,
     kits: matchKits(home, away),
     home: selectTeam(home, players, lineups?.[0]),
     away: selectTeam(away, players, lineups?.[1]),
@@ -147,6 +150,7 @@ export function simulateMatch(snapshot) {
   if (snapshot.version === 3) return simulateV3(snapshot);
   if (snapshot.version === 4) return simulateV4(snapshot);
   if (snapshot.version === 5) return simulateV5(snapshot);
+  if (snapshot.version === 6) return simulateV6(snapshot);
   if (snapshot.version !== ENGINE_VERSION)
     throw Error("Este replay pertence a outra versão do simulador.");
   if (snapshot.home.lineup.length !== 11 || snapshot.away.lineup.length !== 11)
@@ -154,6 +158,7 @@ export function simulateMatch(snapshot) {
   const rand = random(snapshot.seed),
     teams = [snapshot.home, snapshot.away];
   const addedTime = snapshot.addedTime || [0, 0];
+  const kickoffSide = snapshot.kickoffSide === 1 ? 1 : 0;
   const halftimeAt = 2700 + addedTime[0] * 60;
   const durationSeconds = halftimeAt + 2700 + addedTime[1] * 60;
   const people = teams.flatMap((team, side) =>
@@ -200,7 +205,9 @@ export function simulateMatch(snapshot) {
     lastPass = null,
     period = 0,
     pendingKickoff = null,
-    pendingRestart = null;
+    pendingRestart = null,
+    pendingFreeKick = null,
+    pendingPenalty = null;
   const direction = (side) => (side === period ? 1 : -1);
   const entered = people.map((p) => !p.reserve);
   const substitutions = [0, 0];
@@ -210,7 +217,7 @@ export function simulateMatch(snapshot) {
   const keeperFor = (side) =>
     people.findIndex((p, i) => p.side === side && p.slot === 0 && active(i));
   const skill = (i, k, t) =>
-    (people[i].attributes[k] * 0.65 + people[i].overall * 0.35) *
+    (people[i].attributes[k] * 0.35 + people[i].overall * 0.65) *
     (0.75 + (0.25 * people[i].energy) / 100) *
     (1 -
       (Math.max(0, t - (people[i].enteredAt || 0)) / durationSeconds) *
@@ -289,6 +296,56 @@ export function simulateMatch(snapshot) {
     cooldown = t + 5;
     stop = t + (half ? 6 : 8);
   }
+  function setPieceTaker(side, point, t) {
+    const candidates = people
+      .map((p, i) => i)
+      .filter((i) => people[i].side === side && people[i].slot !== 0 && active(i))
+      .sort((a, b) => skill(b, "shortPass", t) - skill(a, "shortPass", t));
+    return candidates[0] ?? keeperFor(side);
+  }
+  function freeKick(t, side, point) {
+    const at = [clamp(point[0], 2, 98), clamp(point[1], 2, 62)];
+    const taker = setPieceTaker(side, at, t);
+    positions[taker] = { x: at[0], y: at[1] };
+    owner = taker;
+    ball = at;
+    flight = null;
+    pendingRestart = null;
+    pendingFreeKick = { side, taker, at };
+    stop = t + 12;
+    cooldown = stop;
+    lastPass = null;
+    event(t, "freekick", side, taker, `Tiro livre para ${teams[side].name}.`, { at });
+  }
+  function penalty(t, side, defendingSide, point, fouler) {
+    const taker = people
+      .map((p, i) => i)
+      .filter((i) => people[i].side === side && people[i].slot !== 0 && active(i))
+      .sort((a, b) => skill(b, "shot", t) - skill(a, "shot", t))[0];
+    if (taker === undefined) return freeKick(t, side, point);
+    const attackDirection = direction(side);
+    const at = [attackDirection > 0 ? 88 : 12, 32];
+    const keeper = keeperFor(defendingSide);
+    positions[taker] = { x: at[0], y: at[1] };
+    positions[keeper] = { x: attackDirection > 0 ? 98 : 2, y: 32 };
+    owner = taker;
+    ball = at;
+    flight = null;
+    pendingRestart = null;
+    pendingFreeKick = null;
+    pendingPenalty = { side, defendingSide, taker, keeper, at, fouler };
+    stop = t + 12;
+    cooldown = stop;
+    lastPass = null;
+    event(
+      t,
+      "penalty",
+      side,
+      taker,
+      `Pênalti para ${teams[side].name}. ${people[taker].name} vai cobrar.`,
+      { at, fouler, keeper },
+    );
+  }
   function awardRestart(t, point, lastTouchSide) {
     const r = boundaryRestart(point, lastTouchSide, direction(lastTouchSide));
     const candidates = people
@@ -349,8 +406,15 @@ export function simulateMatch(snapshot) {
     };
     owner = -1;
   }
-  restart(0, 0, true);
-  event(0, "kickoff", 0, null, "Bola rolando! Primeiro tempo.");
+  restart(0, kickoffSide, true);
+  pendingKickoff = kickoffSide;
+  event(
+    0,
+    "kickoff",
+    kickoffSide,
+    null,
+    `${teams[kickoffSide].name} começa com a bola após o sorteio.`,
+  );
   function record(t) {
     frames.push({
       t,
@@ -365,7 +429,8 @@ export function simulateMatch(snapshot) {
   for (let t = 1; t <= durationSeconds; t++) {
     if (t === halftimeAt) {
       period = 1;
-      restart(t, 1, true);
+      restart(t, 1 - kickoffSide, true);
+      pendingKickoff = 1 - kickoffSide;
       event(
         t,
         "halftime",
@@ -401,8 +466,95 @@ export function simulateMatch(snapshot) {
       if (active(i)) stats[i].seconds++;
     });
     if (pendingKickoff !== null && t > stop) {
-      restart(t, pendingKickoff);
+      const sideToKick = pendingKickoff;
+      if (owner < 0 || people[owner].side !== sideToKick)
+        restart(t, sideToKick, true);
+      const taker = owner;
+      const directionOfKick = direction(sideToKick);
+      const target = people
+        .map((p, i) => i)
+        .filter(
+          (i) =>
+            active(i) &&
+            i !== taker &&
+            people[i].side === sideToKick &&
+            people[i].slot !== 0,
+        )
+        .sort(
+          (a, b) =>
+            directionOfKick * (positions[a].x - 50) -
+            directionOfKick * (positions[b].x - 50) ||
+            Math.abs(positions[a].y - 32) - Math.abs(positions[b].y - 32),
+        )[0];
+      if (target !== undefined) {
+        stats[taker].passes++;
+        event(
+          t,
+          "kickoff-pass",
+          sideToKick,
+          taker,
+          `${people[taker].name} toca para ${people[target].name} na saída de bola.`,
+          { target },
+        );
+        send(t, [positions[target].x, positions[target].y], target, "pass");
+      }
       pendingKickoff = null;
+      stop = t - 1;
+      cooldown = t;
+    }
+    if (pendingPenalty && t > stop) {
+      const kick = pendingPenalty,
+        attack = skill(kick.taker, "shot", t),
+        keeperSkill = skill(kick.keeper, "gk", t),
+        goalChance = clamp(0.77 + (attack - keeperSkill) / 250, 0.55, 0.91),
+        outcome = rand() < goalChance ? "goal" : rand() < 0.82 ? "save" : "miss",
+        goalX = direction(kick.side) > 0 ? 100 : 0,
+        targetY = outcome === "goal" ? 30 + rand() * 4 : outcome === "save" ? 32 : rand() < 0.5 ? 25 : 39;
+      stats[kick.taker].shots++;
+      event(
+        t,
+        "penalty-kick",
+        kick.side,
+        kick.taker,
+        `${people[kick.taker].name} cobra o pênalti.`,
+        { outcome, keeper: kick.keeper, fouler: kick.fouler },
+      );
+      send(t, [goalX, targetY], kick.keeper, "shot", outcome);
+      pendingPenalty = null;
+      stop = t - 1;
+      cooldown = t;
+    }
+    if (pendingFreeKick && t > stop) {
+      const kick = pendingFreeKick,
+        target = people
+          .map((p, i) => i)
+          .filter(
+            (i) =>
+              i !== kick.taker &&
+              people[i].side === kick.side &&
+              people[i].slot !== 0 &&
+              active(i),
+          )
+          .sort(
+            (a, b) =>
+              Math.hypot(positions[a].x - kick.at[0], positions[a].y - kick.at[1]) -
+              Math.hypot(positions[b].x - kick.at[0], positions[b].y - kick.at[1]),
+          )[0];
+      if (target !== undefined) {
+        stats[kick.taker].passes++;
+        event(
+          t,
+          "freekick-pass",
+          kick.side,
+          kick.taker,
+          `${people[kick.taker].name} cobra a falta.`,
+          { target },
+        );
+        send(t, [positions[target].x, positions[target].y], target, "pass");
+      }
+      pendingFreeKick = null;
+      stop = t - 1;
+      cooldown = t;
     }
     if (pendingRestart && t > stop) {
       const r = pendingRestart;
@@ -491,8 +643,8 @@ export function simulateMatch(snapshot) {
             );
             const line = offsideAtPass(p, ball, opponents, dir).line;
             // Hold the line, spread into passing lanes; occasional mistiming remains possible.
-            const burst =
-              who.slot > 7 && Math.sin(t * 0.09 + i) > 0.8 ? 3 : -1.5;
+            const burstLimit = clamp(0.92 - Math.max(0, 65 - who.overall) / 200, 0.55, 0.92);
+            const burst = who.slot > 7 && Math.sin(t * 0.09 + i) > burstLimit ? 4 : -1.5;
             if (dir > 0)
               x = Math.min(x + Math.max(0, burst), Math.max(50, line + burst));
             else
@@ -659,7 +811,9 @@ export function simulateMatch(snapshot) {
           ) < 3 &&
           rand() < 0.14
         ) {
-          if (rand() < 0.03 + people[rival].attributes.aggression / 1000) {
+          if (rand() < clamp(0.045 + people[rival].attributes.aggression / 1800 + Math.max(0, 65 - people[rival].overall) / 700, 0.035, 0.16)) {
+            const foulPoint = [...ball];
+            const victimSide = people[owner].side;
             event(
               t,
               "foul",
@@ -705,8 +859,10 @@ export function simulateMatch(snapshot) {
                   `Cartão amarelo para ${people[rival].name}.`,
                 );
             }
-            stop = Math.max(stop, t + 18);
-            cooldown = stop + 3;
+            const ownBox = direction(people[rival].side) > 0 ? foulPoint[0] <= 16.5 : foulPoint[0] >= 83.5;
+            if (ownBox && foulPoint[1] >= 11 && foulPoint[1] <= 53)
+              penalty(t, victimSide, people[rival].side, foulPoint, rival);
+            else freeKick(t, victimSide, foulPoint);
           } else if (
             rand() <
             clamp(
@@ -911,6 +1067,33 @@ export function simulateMatch(snapshot) {
     null,
     `Fim de jogo: ${teams[0].name} ${score[0]} × ${score[1]} ${teams[1].name}.`,
   );
+  let penaltyShootout = null;
+  if (snapshot.penaltiesOnDraw && score[0] === score[1]) {
+    const shootoutScore = [0, 0], kicks = [];
+    const shooters = [0, 1].map((side) => people.map((p, i) => i)
+      .filter((i) => people[i].side === side && people[i].slot !== 0 && active(i))
+      .sort((a, b) => skill(b, "shot", durationSeconds) - skill(a, "shot", durationSeconds)));
+    const keepers = [keeperFor(0), keeperFor(1)];
+    for (let n = 0; n < 30; n++) {
+      const side = n % 2 === 0 ? kickoffSide : 1 - kickoffSide;
+      const sequence = Math.floor(n / 2);
+      const kicker = shooters[side][sequence % shooters[side].length];
+      const keeper = keepers[1 - side];
+      const chance = clamp(0.73 + (skill(kicker, "shot", durationSeconds) - skill(keeper, "gk", durationSeconds)) / 220, 0.48, 0.93);
+      const outcome = rand() < chance ? "goal" : "save";
+      if (outcome === "goal") shootoutScore[side]++;
+      const kick = { round: Math.floor(n / 2) + 1, side, kicker, keeper, outcome, score: [...shootoutScore] };
+      kicks.push(kick);
+      event(durationSeconds, "penalty-shootout-kick", side, kicker, `${people[kicker].name}: ${outcome === "goal" ? "gol" : "defendido"} nos pênaltis.`, kick);
+      if (n < 10) {
+        const remainingA = Math.max(0, 5 - Math.ceil((n + 1) / 2));
+        const remainingB = Math.max(0, 5 - Math.floor((n + 1) / 2));
+        if (shootoutScore[0] > shootoutScore[1] + remainingA || shootoutScore[1] > shootoutScore[0] + remainingB) break;
+      } else if (n % 2 === 1 && shootoutScore[0] !== shootoutScore[1]) break;
+    }
+    penaltyShootout = { score: shootoutScore, winner: shootoutScore[0] === shootoutScore[1] ? null : shootoutScore[0] > shootoutScore[1] ? 0 : 1, kicks };
+    event(durationSeconds, "penalty-shootout", penaltyShootout.winner, null, `Pênaltis: ${teams[0].name} ${shootoutScore[0]} × ${shootoutScore[1]} ${teams[1].name}.`, penaltyShootout);
+  }
   const ratings = stats.map((s, i) =>
     s.seconds === 0
       ? "—"
@@ -939,6 +1122,7 @@ export function simulateMatch(snapshot) {
     score,
     possession,
     snapshot,
+    penaltyShootout,
   };
 }
 export function frameAt(match, time) {
@@ -956,6 +1140,7 @@ export function highlights(match) {
     [
       "corner",
       "goal",
+      "penalty-shootout",
       "yellow",
       "red",
       "offside",

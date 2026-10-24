@@ -19,7 +19,7 @@ export function matchDurationSeconds(match) {
 export function timelineDurationMs(match) {
   if (!match?.snapshot?.addedTime) return 1800000;
   const [first = 0, second = 0] = match.snapshot.addedTime;
-  return NORMAL_HALF_MS * 2 + (first + second) * 60000 / GAME_SECONDS_PER_WALL_SECOND + HALFTIME_MS + FULLTIME_PRESENTATION_MS;
+  return NORMAL_HALF_MS * 2 + (first + second) * 60000 / GAME_SECONDS_PER_WALL_SECOND + HALFTIME_MS + FULLTIME_PRESENTATION_MS + (match.penaltyShootout?.kicks?.length ? match.penaltyShootout.kicks.length * 1800 + 3000 : 0);
 }
 
 export function timeAtElapsed(match, elapsedMs) {
@@ -49,9 +49,15 @@ export function timeAtElapsed(match, elapsedMs) {
   if (elapsed < secondExtraMs)
     return { time: secondNormalEnd + elapsed * 3 / 1000, stage: "second-stoppage", halftimeElapsed: 0 };
   elapsed -= secondExtraMs;
+  if (elapsed < FULLTIME_PRESENTATION_MS)
+    return { time: matchDurationSeconds(match), stage: "fulltime-exit", halftimeElapsed: 0, stageElapsedMs: elapsed };
+  elapsed -= FULLTIME_PRESENTATION_MS;
+  const shootoutMs = match.penaltyShootout?.kicks?.length ? match.penaltyShootout.kicks.length * 1800 + 3000 : 0;
+  if (shootoutMs && elapsed < shootoutMs)
+    return { time: matchDurationSeconds(match), stage: "penalty-shootout", halftimeElapsed: 0, stageElapsedMs: elapsed };
   return {
     time: matchDurationSeconds(match),
-    stage: elapsed < FULLTIME_PRESENTATION_MS ? "fulltime-exit" : "ended",
+    stage: "ended",
     halftimeElapsed: 0,
     stageElapsedMs: elapsed,
   };
@@ -76,6 +82,7 @@ export function elapsedAtTime(match, time) {
 
 export function formatMatchClock(time, match, stage) {
   if (stage === "halftime-exit" || stage === "halftime-entry") return "INTERVALO";
+  if (stage === "penalty-shootout") return "PÊNALTIS";
   if (stage === "fulltime-exit" || stage === "ended") return "FIM";
   if (!match?.snapshot?.addedTime) {
     const seconds = Math.floor(time);

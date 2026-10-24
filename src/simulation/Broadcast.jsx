@@ -19,9 +19,9 @@ import {
 } from "./timeline.js";
 const durationOf = (record) =>
   (record?.timelineVersion === 2
-    ? timelineDurationMs({ snapshot: record.snapshot })
+    ? record.durationMs || timelineDurationMs({ snapshot: record.snapshot })
     : record?.durationMs || 360000) + (record?.preMatchMs || 0);
-const PREMATCH_MS = 20000;
+const PREMATCH_MS = 28000;
 const minute = (t, match, stage) => formatMatchClock(t, match, stage);
 export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
   const [home, setHome] = useState(""),
@@ -40,6 +40,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
     [camera, setCamera] = useState("wide"),
     [kitTeam, setKitTeam] = useState("");
   const [screenMode, setScreenMode] = useState("live");
+  const [penaltiesOnDraw, setPenaltiesOnDraw] = useState(false);
   const audio = useRef(null);
   const surface = useRef(null),
     clock = useRef(0),
@@ -83,11 +84,11 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
       presentationElapsed < introDuration,
   );
   const introStage =
-    presentationElapsed < 6500
+    presentationElapsed < 8500
       ? "walkout"
-      : presentationElapsed < 11500
+      : presentationElapsed < 14500
         ? "handshake"
-        : presentationElapsed < 15000
+        : presentationElapsed < 24000
           ? "lineups"
           : "countdown";
   const elapsedFromStart = playbackElapsed;
@@ -171,12 +172,14 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
     setError("");
   }
   function prepare() {
-    return makeSnapshot(
+    const snapshot = makeSnapshot(
       teams.find((t) => t.id === home),
       teams.find((t) => t.id === away),
       players,
       crypto.getRandomValues(new Uint32Array(1))[0],
     );
+    snapshot.penaltiesOnDraw = penaltiesOnDraw;
+    return snapshot;
   }
   async function start(shared) {
     audio.current?.activate();
@@ -188,11 +191,11 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
         snapshot,
         startedAt: Date.now(),
         preMatchMs: PREMATCH_MS,
-        durationMs: timelineDurationMs({ snapshot }),
         timelineVersion: 2,
         createdBy: user.data.id,
       };
-      simulateMatch(snapshot);
+      const simulation = simulateMatch(snapshot);
+      r.durationMs = timelineDurationMs(simulation);
       if (shared) {
         const doc = await db.collection("friendlyBroadcasts").add(r);
         r.id = doc.id;
@@ -324,6 +327,10 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
               preenchidas com atletas disponíveis, priorizando a posição e o
               overall. Confira os 11 antes de iniciar.
             </p>
+            <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "12px 0" }}>
+              <input type="checkbox" checked={penaltiesOnDraw} onChange={(e) => setPenaltiesOnDraw(e.target.checked)} />
+              Se terminar empatado, decidir nos pênaltis
+            </label>
             {lineup.map((team, i) => (
               <details key={i}>
                 <summary>{team.name || `Escalação ${i + 1}`}</summary>
@@ -425,8 +432,14 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
                       <b>{team.name}</b>
                       <br />
                       <span style={{ color: "#b8dacc" }}>{team.formation}</span>
+                      <ol style={{ textAlign: "left", paddingLeft: 24, fontSize: 12, lineHeight: 1.45 }}>
+                        {team.lineup.map((player) => <li key={player.id}>#{player.pixelAppearance.number} {player.name} — {player.position}</li>)}
+                      </ol>
                     </div>
                   ))}
+                  <p style={{ gridColumn: "1 / -1", margin: 0, color: "#50dfac" }}>
+                    Sorteio: {match.snapshot[(match.snapshot.kickoffSide ?? 0) === 1 ? "away" : "home"].name} começa com a bola.
+                  </p>
                 </div>
               )}
             </section>
@@ -546,6 +559,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
                   ? {
                       stage: presentationStage,
                       time,
+                      durationMs: introDuration,
                       elapsedMs: presenting
                         ? presentationElapsed
                         : timeline.stageElapsedMs ?? timeline.halftimeElapsed ?? 0,
@@ -739,15 +753,15 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
                 .map((e, i) => (
                   <li key={i}>
                     {minute(e.t, match)} — {e.text}
-                    {e.type === "corner" && !live && (
+                    {(e.type === "corner" || e.type === "goal") && !live && (
                       <button
                         className="btn btn-ghost"
                         onClick={() => {
-                          seekMatch(e.t);
+                          seekMatch(Math.max(0, e.t - (e.type === "goal" ? 8 : 0)));
                           setPlaying(true);
                         }}
                       >
-                        REVER ESCANTEIO {minute(e.t, match)}
+                        {e.type === "goal" ? "REVER GOL" : "REVER ESCANTEIO"} {minute(e.t, match)}
                       </button>
                     )}
                   </li>
@@ -755,6 +769,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
             </ul>
             {ended && (
               <>
+                {match.penaltyShootout && <p><b>Decisão por pênaltis:</b> {match.snapshot.home.name} {match.penaltyShootout.score[0]} × {match.penaltyShootout.score[1]} {match.snapshot.away.name}{match.penaltyShootout.winner !== null ? ` — ${match.snapshot[match.penaltyShootout.winner === 0 ? "home" : "away"].name} venceu` : ""}</p>}
                 <p>
                   Posse:{" "}
                   {Math.round(

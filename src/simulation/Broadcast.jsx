@@ -10,12 +10,19 @@ import {
 import { MatchAudio } from "./MatchAudio.jsx";
 import { Pitch } from "./Pitch.jsx";
 import { KitEditor } from "./Editors.jsx";
+import {
+  elapsedAtTime,
+  formatMatchClock,
+  matchDurationSeconds,
+  timeAtElapsed,
+  timelineDurationMs,
+} from "./timeline.js";
 const durationOf = (record) =>
-  (record?.durationMs || 360000) + (record?.preMatchMs || 0);
-const newDuration = 1800000;
+  (record?.timelineVersion === 2
+    ? timelineDurationMs({ snapshot: record.snapshot })
+    : record?.durationMs || 360000) + (record?.preMatchMs || 0);
 const PREMATCH_MS = 20000;
-const minute = (t) =>
-  `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+const minute = (t, match, stage) => formatMatchClock(t, match, stage);
 export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
   const [home, setHome] = useState(""),
     [away, setAway] = useState(""),
@@ -25,6 +32,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
     [busy, setBusy] = useState(false),
     [time, setTime] = useState(0),
     [animationNow, setAnimationNow] = useState(Date.now()),
+    [playbackElapsed, setPlaybackElapsed] = useState(0),
     [presentationSkipped, setPresentationSkipped] = useState(false),
     [seek, setSeek] = useState(0),
     [playing, setPlaying] = useState(true),
@@ -34,7 +42,8 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
   const [screenMode, setScreenMode] = useState("live");
   const audio = useRef(null);
   const surface = useRef(null),
-    clock = useRef(0);
+    clock = useRef(0),
+    elapsedClock = useRef(0);
   const creator = canAdmin(user, "competitions") && !watchOnly;
   useEffect(
     () =>
@@ -62,7 +71,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
-  const duration = record ? durationOf(record) : newDuration;
+  const duration = record ? durationOf(record) : 1800000;
   const live = record?.id && now < record.startedAt + duration;
   const introStart = record?.playbackIntroAt ?? record?.startedAt ?? 0;
   const introDuration = record?.playbackPreMatchMs ?? record?.preMatchMs ?? 0;
@@ -73,22 +82,35 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
       introDuration > 0 &&
       presentationElapsed < introDuration,
   );
-  const presentationStage =
-    presentationElapsed < 4500
+  const introStage =
+    presentationElapsed < 6500
       ? "walkout"
-      : presentationElapsed < 9000
+      : presentationElapsed < 11500
         ? "handshake"
-        : presentationElapsed < 17000
+        : presentationElapsed < 15000
           ? "lineups"
           : "countdown";
+  const elapsedFromStart = playbackElapsed;
+  const timeline = match ? timeAtElapsed(match, elapsedFromStart) : { time: 0, stage: "playing" };
+  const presentationStage = presenting ? introStage : timeline.stage;
+  const phasePresentation = ["halftime-exit", "halftime-entry", "fulltime-exit"].includes(presentationStage);
+  const presentationActive = presenting || phasePresentation;
   const presentationLabel =
     presentationStage === "walkout"
-      ? "As equipes entram em campo"
+      ? "As equipes saem do túnel e entram em campo"
       : presentationStage === "handshake"
         ? "Cumprimentos entre os jogadores"
         : presentationStage === "lineups"
           ? "Formações iniciais"
-          : `A partida começa em ${Math.max(1, Math.ceil((introDuration - presentationElapsed) / 1000))}…`;
+          : presentationStage === "halftime-exit"
+            ? "Intervalo — os times vão para o vestiário"
+            : presentationStage === "halftime-entry"
+              ? "Segundo tempo — as equipes voltam ao campo"
+              : presentationStage === "fulltime-exit"
+                ? "Fim de jogo — jogadores deixam o campo"
+                : presentationStage === "ended"
+                  ? "Partida encerrada"
+                  : `A partida começa em ${Math.max(1, Math.ceil((introDuration - presentationElapsed) / 1000))}…`;
   useEffect(() => {
     if (!match || !introDuration || presentationSkipped) return;
     let frame;
@@ -111,34 +133,23 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
       const elapsed = Math.max(0, t - last);
       last = t;
       const preMatchMs = record?.playbackPreMatchMs ?? record?.preMatchMs ?? 0;
-      const kickoffAt =
-        presentationSkipped
-          ? 0
-          : (record?.playbackIntroAt ?? record?.startedAt ?? 0) + preMatchMs;
-      if (live)
-        clock.current = Math.min(
-          5400,
-          Math.max(
-            0,
-            ((Date.now() - record.startedAt - (record.preMatchMs || 0)) /
-              Math.max(1, duration - (record.preMatchMs || 0))) *
-              5400,
-          ),
-        );
+      const kickoffAt = (record?.playbackIntroAt ?? record?.startedAt ?? 0) + preMatchMs;
+      if (record?.id && !record?.playbackIntroAt)
+        elapsedClock.current = Math.max(0, Date.now() - record.startedAt - preMatchMs);
       else if (playing && Date.now() >= kickoffAt)
-        clock.current = Math.min(
-          5400,
-          clock.current + elapsed * (5400 / newDuration) * rate,
-        );
+        elapsedClock.current += elapsed * rate;
+      const next = timeAtElapsed(match, elapsedClock.current);
+      clock.current = next.time;
       if (t - lastDraw > 33) {
-        setTime(clock.current);
+        setPlaybackElapsed(elapsedClock.current);
+        setTime(next.time);
         lastDraw = t;
       }
       id = requestAnimationFrame(tick);
     };
     id = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(id);
-  }, [match, live, playing, rate, record, duration, presentationSkipped]);
+  }, [match, playing, rate, record, duration]);
   function watch(r) {
     audio.current?.activate();
     const ended = Boolean(r.id && Date.now() >= r.startedAt + durationOf(r));
@@ -150,19 +161,9 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
         }
       : r;
     setRecord(playback);
-    clock.current = r.id
-      ? ended
-        ? 0
-        : Math.min(
-          5400,
-          Math.max(
-            0,
-            ((Date.now() - r.startedAt - (r.preMatchMs || 0)) /
-              Math.max(1, durationOf(r) - (r.preMatchMs || 0))) *
-              5400,
-          ),
-        )
-      : 0;
+    clock.current = 0;
+    elapsedClock.current = 0;
+    setPlaybackElapsed(0);
     setTime(clock.current);
     setPlaying(true);
     setPresentationSkipped(false);
@@ -187,7 +188,8 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
         snapshot,
         startedAt: Date.now(),
         preMatchMs: PREMATCH_MS,
-        durationMs: newDuration,
+        durationMs: timelineDurationMs({ snapshot }),
+        timelineVersion: 2,
         createdBy: user.data.id,
       };
       simulateMatch(snapshot);
@@ -206,6 +208,8 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
     if (presenting) setPresentationSkipped(true);
     setSeek((v) => v + 1);
     clock.current = Number(value);
+    elapsedClock.current = elapsedAtTime(match, clock.current);
+    setPlaybackElapsed(elapsedClock.current);
     setTime(clock.current);
   }
   const lineup = useMemo(
@@ -222,10 +226,13 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
       }),
     [home, away, teams, players],
   );
-  const current = match?.frames[Math.min(5400, Math.floor(time))],
+  const durationSeconds = matchDurationSeconds(match),
+    current = match?.frames[Math.min(durationSeconds, Math.floor(time))],
     events = match?.events.filter((e) => e.t <= time) || [],
     last = events.at(-1),
-    ended = time >= 5400;
+    ended = match?.snapshot?.addedTime
+      ? timeline.stage === "ended"
+      : time >= 5400;
   const recentBroadcasts = (
     <>
       <h3>Transmissões recentes</h3>
@@ -255,7 +262,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
         seek={seek}
         playing={Boolean(live || playing)}
         ended={ended}
-        presentation={presenting}
+        presentation={presentationActive}
         presentationKey={introStart}
       />
       {watchOnly && (
@@ -484,7 +491,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
                 {match.snapshot.away.name}
               </span>
               <b data-testid="match-clock">
-                {presenting ? "00:00" : minute(time)}
+                {presenting ? "00:00" : minute(time, match, timeline.stage)}
               </b>
             </div>
             <div
@@ -525,18 +532,29 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
                 }
               </div>
             )}
+            {match.snapshot.addedTime && ["first-stoppage", "second-stoppage"].includes(timeline.stage) && (
+              <div data-testid="added-time-banner" style={{ padding: 8, background: "#f2c14e", color: "#132028", fontWeight: 900 }}>
+                ⏱️ ACRÉSCIMOS DO {timeline.stage === "first-stoppage" ? "1º" : "2º"} TEMPO: +{match.snapshot.addedTime[timeline.stage === "first-stoppage" ? 0 : 1]} MIN
+              </div>
+            )}
             <Pitch
               match={match}
               time={time}
               camera={camera}
               presentation={
-                presenting
-                  ? { stage: presentationStage, elapsedMs: presentationElapsed }
+                presentationActive
+                  ? {
+                      stage: presentationStage,
+                      time,
+                      elapsedMs: presenting
+                        ? presentationElapsed
+                        : timeline.stageElapsedMs ?? timeline.halftimeElapsed ?? 0,
+                    }
                   : null
               }
             />
             <p style={{ minHeight: 24, padding: "0 12px" }} aria-live="off">
-              {presenting ? presentationLabel : last?.text}
+              {presentationActive ? presentationLabel : last?.text}
             </p>
           </div>
           {screenMode === "stats" && (
@@ -546,7 +564,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
                 <b data-testid="broadcast-score-stats" style={{ fontSize: 24 }}>{current.score[0]} × {current.score[1]}</b>
                 <strong>{match.snapshot.away.name}</strong>
                 <span data-testid="match-clock-stats">
-                  {presenting ? "00:00" : minute(time)}
+                {presenting ? "00:00" : minute(time, match, timeline.stage)}
                 </span>
               </header>
               <p style={{ color: "#b8dacc" }}>Números atualizados conforme a partida avança.</p>
@@ -632,7 +650,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
                 aria-label="Momento da partida"
                 type="range"
                 min="0"
-                max="5400"
+                max={durationSeconds}
                 value={time}
                 style={{ width: "100%" }}
                 onChange={(e) => seekMatch(e.target.value)}
@@ -720,7 +738,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
                 .filter((e) => e.t <= time)
                 .map((e, i) => (
                   <li key={i}>
-                    {minute(e.t)} — {e.text}
+                    {minute(e.t, match)} — {e.text}
                     {e.type === "corner" && !live && (
                       <button
                         className="btn btn-ghost"
@@ -729,7 +747,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
                           setPlaying(true);
                         }}
                       >
-                        REVER ESCANTEIO {minute(e.t)}
+                        REVER ESCANTEIO {minute(e.t, match)}
                       </button>
                     )}
                   </li>

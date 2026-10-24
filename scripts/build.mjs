@@ -9,15 +9,12 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
-const result = await build();
-const emitted = new Set(result.output.map(item => item.fileName.replace(/^build\//, "")));
-// Remove obsolete chunks individually as well as clearing the directory, so
-// previously generated files cannot be copied into the next release.
-for (const folder of ["dist/build", "build"]) {
-  for (const file of await readdir(folder).catch(() => [])) {
-    if (!emitted.has(file)) await rm(`${folder}/${file}`, { force: true });
-  }
-}
+// Vite can keep old hashed bundles when emptyOutDir is disabled. Clear its
+// output directory first so the release and service-worker cache only contain
+// assets referenced by the current HTML.
+await rm("dist/build", { recursive: true, force: true });
+await mkdir("dist/build", { recursive: true });
+await build();
 await rename("dist/app.html", "dist/index.html");
 // Keep manifest paths relative to pwa/, not to Vite's hashed build/ directory.
 let html = await readFile("dist/index.html", "utf8");

@@ -8,20 +8,39 @@ function presentationPositions(match, presentation) {
     const t = Math.max(0, Math.min(1, value));
     return t * t * (3 - 2 * t);
   };
-  return match.people.map((player) => {
+  const frame = frameAt(match, presentation.time || 0).a;
+  return match.people.map((player, index) => {
     if (player.reserve) return [50, 32, 0];
-    const rowY = 8 + player.slot * 4.8;
+    const rowY = 10 + player.slot * 4.2;
+    const lineX = player.side === 0 ? 44 : 56;
     if (presentation.stage === "walkout") {
-      const progress = smooth(elapsed / 4500),
-        target = player.side === 0 ? 43 : 57,
-        entrance = player.side === 0 ? -7 : 107;
-      return [entrance + (target - entrance) * progress, rowY, 1];
+      const startDelay = player.slot * 260;
+      const progress = smooth((elapsed - startDelay) / 3400);
+      return [50 + (lineX - 50) * progress, 67 + (rowY - 67) * progress, 1];
     }
     if (presentation.stage === "handshake") {
-      const progress = smooth((elapsed - 4500) / 4500),
-        start = player.side === 0 ? 43 : 57,
-        target = player.side === 0 ? 53 : 47;
-      return [start + (target - start) * progress, rowY, 1];
+      const pairMoment = player.slot * 350;
+      const progress = smooth((elapsed - pairMoment) / 750);
+      const greetingX = player.side === 0 ? 48 : 52;
+      return [lineX + (greetingX - lineX) * progress, rowY, 1];
+    }
+    if (presentation.stage === "halftime-exit") {
+      const progress = smooth(elapsed / 7000);
+      return [lineX + (50 - lineX) * progress, rowY + (68 - rowY) * progress, elapsed < 7000 - player.slot * 220 ? 1 : 0];
+    }
+    if (presentation.stage === "halftime-entry") {
+      const progress = smooth(elapsed / 7000);
+      const target = frame.positions[index];
+      const destination = target?.[2] ? target : [player.side === 0 ? 4 + player.anchor.x * 42 : 96 - player.anchor.x * 42, 5 + player.anchor.y * 54, 1];
+      return [50 + (destination[0] - 50) * progress, 68 + (destination[1] - 68) * progress, progress > 0.04 ? 1 : 0];
+    }
+    if (presentation.stage === "fulltime-exit") {
+      const staysForPhoto = (player.slot * 7 + player.side * 13) % 4 === 0;
+      if (staysForPhoto) return [player.anchor.x * 100, player.anchor.y * 64, 1];
+      const start = frame.positions[index];
+      const origin = start?.[2] ? start : [player.anchor.x * 100, player.anchor.y * 64, 1];
+      const progress = smooth(elapsed / 8500);
+      return [origin[0] + (50 - origin[0]) * progress, origin[1] + (68 - origin[1]) * progress, progress < 0.98 ? 1 : 0];
     }
     return [
       player.side === 0
@@ -128,7 +147,7 @@ export function Pitch({ match, time, camera = "wide", presentation = null }) {
               y: a.positions[i][1],
               visible: Boolean(a.positions[i][2]),
               action:
-                presentation.stage === "walkout"
+              ["walkout", "halftime-exit", "halftime-entry", "fulltime-exit"].includes(presentation.stage)
                   ? "walk"
                   : presentation.stage === "handshake"
                     ? "greet"
@@ -274,6 +293,12 @@ export function Pitch({ match, time, camera = "wide", presentation = null }) {
             ? "CUMPRIMENTOS"
             : presentation.stage === "lineups"
               ? "FORMAÇÕES INICIAIS"
+              : presentation.stage === "halftime-exit"
+                ? "INTERVALO"
+                : presentation.stage === "halftime-entry"
+                  ? "COMEÇA O SEGUNDO TEMPO"
+                  : presentation.stage === "fulltime-exit"
+                    ? "FIM DE JOGO"
               : `BOLA ROLANDO EM ${Math.max(1, Math.ceil((20000 - presentation.elapsedMs) / 1000))}`;
       ctx.fillStyle = "#0b1722e8";
       ctx.fillRect(315, 44, 330, 24);

@@ -8,7 +8,9 @@ import { matchKits, shirtNumbers } from "./kits.js";
 import { FORMATIONS } from "../game/FORMATIONS.js";
 import { FORMATION_COORDINATES } from "../game/FORMATION_COORDINATES.js";
 import { appearance } from "./appearance.js";
-export const ENGINE_VERSION = 5;
+import { addedTimeForSeed, matchDurationSeconds } from "./timeline.js";
+import { simulateMatch as simulateV5 } from "./engine-v5.js";
+export const ENGINE_VERSION = 6;
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const numeric = (v, f = 60) => (Number.isFinite(Number(v)) ? Number(v) : f);
 export const available = (p) =>
@@ -123,6 +125,7 @@ export function makeSnapshot(home, away, players, seed, lineups) {
   return {
     version: ENGINE_VERSION,
     seed: Number(seed) >>> 0,
+    addedTime: addedTimeForSeed(seed),
     kits: matchKits(home, away),
     home: selectTeam(home, players, lineups?.[0]),
     away: selectTeam(away, players, lineups?.[1]),
@@ -143,12 +146,16 @@ export function simulateMatch(snapshot) {
   if (snapshot.version === 2) return simulateV2(snapshot);
   if (snapshot.version === 3) return simulateV3(snapshot);
   if (snapshot.version === 4) return simulateV4(snapshot);
+  if (snapshot.version === 5) return simulateV5(snapshot);
   if (snapshot.version !== ENGINE_VERSION)
     throw Error("Este replay pertence a outra versão do simulador.");
   if (snapshot.home.lineup.length !== 11 || snapshot.away.lineup.length !== 11)
     throw Error("Escalação incompleta.");
   const rand = random(snapshot.seed),
     teams = [snapshot.home, snapshot.away];
+  const addedTime = snapshot.addedTime || [0, 0];
+  const halftimeAt = 2700 + addedTime[0] * 60;
+  const durationSeconds = halftimeAt + 2700 + addedTime[1] * 60;
   const people = teams.flatMap((team, side) =>
     team.lineup.map((p, slot) => ({ ...p, side, slot })),
   );
@@ -206,7 +213,7 @@ export function simulateMatch(snapshot) {
     (people[i].attributes[k] * 0.65 + people[i].overall * 0.35) *
     (0.75 + (0.25 * people[i].energy) / 100) *
     (1 -
-      (Math.max(0, t - (people[i].enteredAt || 0)) / 5400) *
+      (Math.max(0, t - (people[i].enteredAt || 0)) / durationSeconds) *
         (1 - people[i].attributes.stamina / 100) *
         0.22);
   const event = (t, type, side, actor, text, extra = {}) =>
@@ -355,8 +362,8 @@ export function simulateMatch(snapshot) {
     });
   }
   record(0);
-  for (let t = 1; t <= 5400; t++) {
-    if (t === 2700) {
+  for (let t = 1; t <= durationSeconds; t++) {
+    if (t === halftimeAt) {
       period = 1;
       restart(t, 1, true);
       event(
@@ -898,7 +905,7 @@ export function simulateMatch(snapshot) {
     record(t);
   }
   event(
-    5400,
+    durationSeconds,
     "fulltime",
     null,
     null,
@@ -924,6 +931,7 @@ export function simulateMatch(snapshot) {
   );
   return {
     frames,
+    durationSeconds,
     events,
     stats,
     ratings,
@@ -934,11 +942,12 @@ export function simulateMatch(snapshot) {
   };
 }
 export function frameAt(match, time) {
-  const a = clamp(time, 0, 5400),
+  const last = matchDurationSeconds(match),
+    a = clamp(time, 0, last),
     index = Math.floor(a);
   return {
     a: match.frames[index],
-    b: match.frames[Math.min(5400, index + 1)],
+    b: match.frames[Math.min(last, index + 1)],
     mix: a - index,
   };
 }

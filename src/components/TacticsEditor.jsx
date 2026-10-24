@@ -9,6 +9,7 @@ export function TacticsEditor({ team, players, onSaveTactics, editorRole }) {
   );
   const [lineup, setLineup] = useState(team?.tactics?.lineup || {});
   const [selectingPos, setSelectingPos] = useState(null);
+  const [playerSort, setPlayerSort] = useState("position");
   const [notice, setNotice] = useState(() =>
     team?.tactics?.updatedAt
       ? `Última alteração feita por ${team.tactics.updatedBy || "time/técnico"}. Formação e escalação sincronizadas para ambos.`
@@ -33,6 +34,38 @@ export function TacticsEditor({ team, players, onSaveTactics, editorRole }) {
   const handleSave = () => onSaveTactics(team.id, formation, lineup, editorRole);
   const handleSetPosition = (index, playerId) =>
     setLineup((current) => ({ ...current, [index]: playerId }));
+  const positionOrder = {
+    GOL: 1,
+    ZAG: 2,
+    LD: 3,
+    LE: 4,
+    VOL: 5,
+    MC: 6,
+    MD: 7,
+    ME: 8,
+    MEI: 9,
+    PTD: 10,
+    PTE: 11,
+    SA: 12,
+    ATA: 13,
+  };
+  const availablePlayers = players
+    .filter((player) => player.teamId === team.id)
+    .filter(
+      (player) =>
+        !Object.values(lineup).includes(player.id) ||
+        lineup[selectingPos?.index] === player.id,
+    )
+    .sort((a, b) => {
+      if (playerSort === "name") return a.name.localeCompare(b.name, "pt-BR");
+      if (playerSort === "overall")
+        return (b.overall || 0) - (a.overall || 0) || a.name.localeCompare(b.name, "pt-BR");
+      return (
+        (positionOrder[a.position] || 99) - (positionOrder[b.position] || 99) ||
+        (b.overall || 0) - (a.overall || 0) ||
+        a.name.localeCompare(b.name, "pt-BR")
+      );
+    });
 
   return (
     <div className="card animate-in" style={{ padding: 10 }}>
@@ -220,6 +253,20 @@ export function TacticsEditor({ team, players, onSaveTactics, editorRole }) {
                 X
               </button>
             </div>
+            <label style={{ display: "block", marginBottom: 10, color: "#ccc", fontSize: 12 }}>
+              Ordenar jogadores
+              <select
+                className="input-field"
+                aria-label="Ordenar jogadores"
+                value={playerSort}
+                onChange={(event) => setPlayerSort(event.target.value)}
+                style={{ display: "block", marginTop: 5 }}
+              >
+                <option value="position">Posição</option>
+                <option value="overall">Overall (maior primeiro)</option>
+                <option value="name">Nome (A–Z)</option>
+              </select>
+            </label>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, overflowY: "auto" }}>
               <button
                 className="card"
@@ -231,10 +278,7 @@ export function TacticsEditor({ team, players, onSaveTactics, editorRole }) {
               >
                 <b>❌ REMOVER JOGADOR DESTA VAGA</b>
               </button>
-              {players
-                .filter((player) => player.teamId === team.id)
-                .filter((player) => !Object.values(lineup).includes(player.id) || lineup[selectingPos.index] === player.id)
-                .map((player) => (
+              {availablePlayers.map((player) => (
                   <div
                     key={player.id}
                     className="card"

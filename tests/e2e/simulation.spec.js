@@ -265,3 +265,51 @@ test("coach assigns unique shirt numbers and player cannot edit number", async (
   await form.getByRole("button", { name: "SALVAR NUMERAÇÃO" }).click();
   await expect(form.getByRole("status")).toContainText("sem repetição");
 });
+
+test("bottom navigation standardizes selections and opens watch-only replays", async ({
+  page,
+}) => {
+  await setup(page, { type: "PLAYER", data: { id: "p1" } });
+  const selections = page
+    .locator(".bottom-nav .nav-item")
+    .filter({ hasText: "SELEÇÕES" });
+  await expect(selections.locator("i")).toHaveClass(/fa-globe-americas/);
+  await page.evaluate(async () => {
+    const { makeSnapshot } = await import("/src/simulation/engine.js");
+    const d = window.__TEST_DATA__;
+    window.__MOCK_DB__.data.friendlyBroadcasts = {
+      replay: {
+        snapshot: makeSnapshot(
+          { ...d.teams.t1, id: "t1" },
+          { ...d.teams.t2, id: "t2" },
+          Object.entries(d.players).map(([id, p]) => ({ ...p, id })),
+          1,
+        ),
+        startedAt: Date.now() - 1800001,
+        durationMs: 1800000,
+      },
+    };
+  });
+  await page
+    .getByRole("button", { name: "Assistir jogos", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Assistir jogos", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "PRÉVIA LOCAL", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: /Clube Teste × Clube Rival.*REVER PARTIDA/ })
+    .click();
+  await expect(
+    page.getByLabel("Transmissão completa da partida em pixel art"),
+  ).toBeVisible();
+  await expect(page.locator(".bottom-nav .nav-item.active")).toContainText(
+    "ASSISTIR",
+  );
+  await page.screenshot({
+    path: test.info().outputPath("watch-mobile.png"),
+    fullPage: true,
+  });
+});

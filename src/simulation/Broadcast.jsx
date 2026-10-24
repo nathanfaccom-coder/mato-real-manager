@@ -14,7 +14,7 @@ const durationOf = (record) => record?.durationMs || 360000;
 const newDuration = 1800000;
 const minute = (t) =>
   `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
-export function Broadcast({ user, teams, players, onBack }) {
+export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
   const [home, setHome] = useState(""),
     [away, setAway] = useState(""),
     [record, setRecord] = useState(null),
@@ -30,7 +30,7 @@ export function Broadcast({ user, teams, players, onBack }) {
   const audio = useRef(null);
   const surface = useRef(null),
     clock = useRef(0);
-  const creator = canAdmin(user, "competitions");
+  const creator = canAdmin(user, "competitions") && !watchOnly;
   useEffect(
     () =>
       db
@@ -150,6 +150,23 @@ export function Broadcast({ user, teams, players, onBack }) {
     events = match?.events.filter((e) => e.t <= time) || [],
     last = events.at(-1),
     ended = time >= 5400;
+  const recentBroadcasts = (
+    <>
+      <h3>Transmissões recentes</h3>
+      {records.length === 0 && <p>Nenhum amistoso transmitido ainda.</p>}
+      {records.map((r) => (
+        <button
+          key={r.id}
+          className="btn btn-ghost"
+          style={{ display: "block", width: "100%", marginBottom: 8 }}
+          onClick={() => watch(r)}
+        >
+          {r.snapshot?.home?.name} × {r.snapshot?.away?.name} ·{" "}
+          {now < r.startedAt + durationOf(r) ? "AO VIVO" : "REVER PARTIDA"}
+        </button>
+      ))}
+    </>
+  );
   return (
     <section data-testid="broadcast">
       <button className="btn btn-ghost" onClick={onBack}>
@@ -163,6 +180,13 @@ export function Broadcast({ user, teams, players, onBack }) {
         playing={Boolean(live || playing)}
         ended={ended}
       />
+      {watchOnly && (
+        <>
+          <h2>Assistir jogos</h2>
+          <p>Amistosos transmitidos e replays disponíveis.</p>
+          {recentBroadcasts}
+        </>
+      )}
       <h2>
         Mato Real TV{" "}
         <small style={{ fontSize: 12, color: "#53d8a2" }}>
@@ -264,7 +288,7 @@ export function Broadcast({ user, teams, players, onBack }) {
           </div>
         </details>
       )}
-      {canAdmin(user, "teams") && (
+      {!watchOnly && canAdmin(user, "teams") && (
         <details>
           <summary>Editar uniformes de um clube</summary>
           <select
@@ -616,19 +640,7 @@ export function Broadcast({ user, teams, players, onBack }) {
           0,5× ou 0,25× para acompanhar os lances com mais calma.
         </small>
       </p>
-      <h3>Transmissões recentes</h3>
-      {records.length === 0 && <p>Nenhum amistoso transmitido ainda.</p>}
-      {records.map((r) => (
-        <button
-          key={r.id}
-          className="btn btn-ghost"
-          style={{ display: "block", width: "100%", marginBottom: 8 }}
-          onClick={() => watch(r)}
-        >
-          {r.snapshot?.home?.name} × {r.snapshot?.away?.name} ·{" "}
-          {now < r.startedAt + durationOf(r) ? "AO VIVO" : "REVER PARTIDA"}
-        </button>
-      ))}
+      {!watchOnly && recentBroadcasts}
     </section>
   );
 }

@@ -1,3 +1,4 @@
+import { simulateMatch as simulateV3 } from "./engine-v3.js";
 import { simulateMatch as simulateV2 } from "./engine-v2.js";
 import { shootingChance, boundaryRestart } from "./decisions.js";
 import { simulateMatch as simulateLegacy } from "./engine-v1.js";
@@ -6,7 +7,7 @@ import { matchKits, shirtNumbers } from "./kits.js";
 import { FORMATIONS } from "../game/FORMATIONS.js";
 import { FORMATION_COORDINATES } from "../game/FORMATION_COORDINATES.js";
 import { appearance } from "./appearance.js";
-export const ENGINE_VERSION = 3;
+export const ENGINE_VERSION = 4;
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const numeric = (v, f = 60) => (Number.isFinite(Number(v)) ? Number(v) : f);
 export const available = (p) =>
@@ -139,6 +140,7 @@ function random(seed) {
 export function simulateMatch(snapshot) {
   if (snapshot.version === 1) return simulateLegacy(snapshot);
   if (snapshot.version === 2) return simulateV2(snapshot);
+  if (snapshot.version === 3) return simulateV3(snapshot);
   if (snapshot.version !== ENGINE_VERSION)
     throw Error("Este replay pertence a outra versão do simulador.");
   if (snapshot.home.lineup.length !== 11 || snapshot.away.lineup.length !== 11)
@@ -178,6 +180,8 @@ export function simulateMatch(snapshot) {
     possession = [0, 0],
     events = [],
     frames = [];
+  let chainSide = -1,
+    passChain = 0;
   let positions = [],
     ball = [50, 32],
     owner = 9,
@@ -197,7 +201,7 @@ export function simulateMatch(snapshot) {
   const keeperFor = (side) =>
     people.findIndex((p, i) => p.side === side && p.slot === 0 && active(i));
   const skill = (i, k, t) =>
-    people[i].attributes[k] *
+    (people[i].attributes[k] * 0.65 + people[i].overall * 0.35) *
     (0.75 + (0.25 * people[i].energy) / 100) *
     (1 -
       (Math.max(0, t - (people[i].enteredAt || 0)) / 5400) *
@@ -430,6 +434,10 @@ export function simulateMatch(snapshot) {
       pendingRestart = null;
     }
     const side = owner >= 0 ? people[owner].side : (flight?.side ?? 0);
+    if (owner >= 0 && chainSide !== side) {
+      chainSide = side;
+      passChain = 0;
+    }
     if (t > stop) possession[side]++;
     if (t > stop) {
       // Every second is simulated; all 22 athletes move continuously, including off-ball support.
@@ -580,8 +588,8 @@ export function simulateMatch(snapshot) {
                 continue;
               }
               ball = [positions[owner].x, positions[owner].y];
-              cooldown = t + 4;
-              stop = t + 3;
+              cooldown = t + 13;
+              stop = t + 12;
               lastPass = null;
             }
           } else {
@@ -614,6 +622,7 @@ export function simulateMatch(snapshot) {
             owner = f.target;
             if (f.type === "pass") {
               stats[f.actor].completed++;
+              passChain++;
               lastPass = { from: f.actor, to: owner, t };
             } else {
               lastPass = null;
@@ -736,9 +745,13 @@ export function simulateMatch(snapshot) {
                   { x: dir > 0 ? 100 : 0, y: 32 },
                   rivals.map((i) => positions[i]),
                 ),
+                people[actor].overall,
+                skill(actor, "shot", t),
+                passChain,
               )
           ) {
             stats[actor].shots++;
+            passChain = 0;
             const keeper = keeperFor(1 - s);
             const openGoal =
               (ball[0] - positions[keeper].x) * dir > 1 &&
@@ -757,14 +770,21 @@ export function simulateMatch(snapshot) {
               onTarget &&
               rand() <
                 clamp(
-                  (openGoal ? 0.84 : 0.12) +
+                  (openGoal ? 0.84 : 0.075) +
                     (skill(actor, "shot", t) - skill(keeper, "gk", t)) / 180 +
-                    (15 - distance) / 200,
-                  0.06,
+                    (12 - distance) / 250,
+                  0.025,
                   0.97,
                 );
             const outcome = goal ? "goal" : onTarget ? "save" : "miss";
-            event(t, "shot", s, actor, `${people[actor].name} chuta!`);
+            event(
+              t,
+              "shot",
+              s,
+              actor,
+              `${people[actor].name} ${distance >= 23 ? "arrisca de longe" : "finaliza"}!`,
+              { distance, longRange: distance >= 23 },
+            );
             send(
               t,
               [
@@ -794,8 +814,9 @@ export function simulateMatch(snapshot) {
                 .map((i) => ({
                   i,
                   w:
-                    rand() * 8 +
-                    dir * (positions[i].x - ball[0]) * 0.45 -
+                    rand() * (14 - people[actor].overall / 10) +
+                    dir * (positions[i].x - ball[0]) * 0.45 +
+                    (distance < 30 && lastPass?.from === i ? -12 : 0) -
                     lanePressure(
                       { x: ball[0], y: ball[1] },
                       positions[i],
@@ -810,7 +831,7 @@ export function simulateMatch(snapshot) {
                         .concat([positions[keeperFor(1 - s)]]),
                       dir,
                     ).offside
-                      ? 9
+                      ? 12 + people[actor].overall / 4
                       : 0) +
                     Math.min(
                       8,
@@ -827,7 +848,18 @@ export function simulateMatch(snapshot) {
               stats[actor].passes++;
               if (
                 rand() <
-                clamp(0.62 + skill(actor, "shortPass", t) / 290, 0.6, 0.95)
+                clamp(
+                  0.48 +
+                    skill(actor, "shortPass", t) / 200 -
+                    lanePressure(
+                      { x: ball[0], y: ball[1] },
+                      positions[target],
+                      rivals.map((i) => positions[i]),
+                    ) *
+                      0.07,
+                  0.4,
+                  0.96,
+                )
               )
                 send(
                   t,

@@ -1,3 +1,11 @@
+# Atualização 2.8.0 — navegação e decisões por qualidade
+
+Seleções usa o mesmo ícone monocromático acima do texto da barra inferior. ASSISTIR abre diretamente a lista de transmissões e replays de amistosos, sem os controles de criação; MATO REAL TV continua permitindo ao ADM preparar partidas.
+
+Novos snapshots usam o motor v4; v1, v2 e v3 permanecem preservados. Habilidades efetivas combinam 65% do atributo específico e 35% do overall, depois energia/cansaço. Finalizações consideram distância, ângulo, marcação, qualidade e sequência de passes; chances próximas claras priorizam chute, enquanto chutes de longe são possíveis até 38 unidades de campo. A escolha de passe penaliza devoluções sem progresso e impedimento, com menor erro de decisão para maior overall. O resultado continua probabilístico: overall alto favorece desempenho, sem vitória garantida.
+
+O ritmo de 30 minutos permanece. Não altera atributos salvos nem campeonatos oficiais.
+
 # Correção 2.7.1 — áudio e visibilidade de escanteios
 
 O toque em iniciar/abrir a partida libera o contexto de áudio antes de operações assíncronas. Torcida sintetizada contínua durante o jogo, reação em gol, apito de início/faltas/impedimento/intervalo/fim e volumes independentes. Pausar ou silenciar interrompe o áudio; fechar a tela libera o contexto. Se o navegador bloquear, ATIVAR SOM permite tentar novamente. Não há downloads de áudio ou serviços pagos novos.

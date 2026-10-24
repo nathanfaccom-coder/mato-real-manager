@@ -7,6 +7,7 @@ import {
   simulateMatch,
   highlights,
 } from "./engine.js";
+import { MatchAudio } from "./MatchAudio.jsx";
 import { Pitch } from "./Pitch.jsx";
 import { KitEditor } from "./Editors.jsx";
 const durationOf = (record) => record?.durationMs || 360000;
@@ -21,6 +22,7 @@ export function Broadcast({ user, teams, players, onBack }) {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [time, setTime] = useState(0),
+    [seek, setSeek] = useState(0),
     [playing, setPlaying] = useState(true),
     [rate, setRate] = useState(1),
     [camera, setCamera] = useState("wide"),
@@ -147,6 +149,14 @@ export function Broadcast({ user, teams, players, onBack }) {
     ended = time >= 5400;
   return (
     <section data-testid="broadcast">
+      {match && (
+        <MatchAudio
+          match={match}
+          seek={seek}
+          time={time}
+          playing={Boolean(live || playing)}
+        />
+      )}
       <button className="btn btn-ghost" onClick={onBack}>
         ← VOLTAR AO PAINEL
       </button>
@@ -400,6 +410,7 @@ export function Broadcast({ user, teams, players, onBack }) {
                 value={time}
                 style={{ width: "100%" }}
                 onChange={(e) => {
+                  setSeek((v) => v + 1);
                   clock.current = Number(e.target.value);
                   setTime(clock.current);
                 }}

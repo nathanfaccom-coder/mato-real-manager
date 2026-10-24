@@ -672,7 +672,7 @@ export function App() {
               className="dev-credits"
               style={{ textAlign: "left", margin: 0 }}
             >
-              Desenvolvido por: Nathan Reis | v2.7.1
+              Desenvolvido por: Nathan Reis | v2.8.0
             </div>
           </div>
         </div>
@@ -773,7 +773,7 @@ export function App() {
       </div>
 
       <div className="container">
-        {screen !== "BROADCAST" && (
+        {!["BROADCAST", "WATCH_GAMES"].includes(screen) && (
           <button
             className="btn btn-green pixel-feature"
             onClick={() => setScreen("BROADCAST")}
@@ -781,8 +781,9 @@ export function App() {
             📺 MATO REAL TV — AMISTOSOS
           </button>
         )}
-        {screen === "BROADCAST" && (
+        {["BROADCAST", "WATCH_GAMES"].includes(screen) && (
           <Broadcast
+            watchOnly={screen === "WATCH_GAMES"}
             user={user}
             teams={teams}
             players={players}
@@ -1728,6 +1729,22 @@ export function App() {
             <span>INÍCIO</span>
           </div>
 
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Assistir jogos"
+            className={`nav-item pixel-feature ${screen === "WATCH_GAMES" ? "active" : ""}`}
+            onClick={() => setScreen("WATCH_GAMES")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setScreen("WATCH_GAMES");
+              }
+            }}
+          >
+            <i className="fas fa-tv" aria-hidden="true"></i>
+            <span>ASSISTIR</span>
+          </div>
           {/* 2. JOGOS (NOVO - PARA TODOS) */}
           <div
             className={`nav-item ${screen === "MATCHES" ? "active" : ""}`}
@@ -1818,7 +1835,7 @@ export function App() {
               if (e.key === "Enter") setScreen("NATIONAL_TEAMS");
             }}
           >
-            <span>🌍</span>
+            <i className="fas fa-globe-americas" aria-hidden="true"></i>
             <span>SELEÇÕES</span>
           </div>
         </div>

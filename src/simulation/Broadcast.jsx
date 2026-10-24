@@ -181,16 +181,6 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
         playing={Boolean(live || playing)}
         ended={ended}
       />
-      {match && (
-        <div role="group" aria-label="Alternar transmissão">
-          <button className={screenMode === "live" ? "btn btn-green" : "btn btn-ghost"} aria-pressed={screenMode === "live"} onClick={() => setScreenMode("live")}>
-            JOGO AO VIVO
-          </button>
-          <button className={screenMode === "stats" ? "btn btn-green" : "btn btn-ghost"} aria-pressed={screenMode === "stats"} onClick={() => setScreenMode("stats")}>
-            ESTATÍSTICAS AO VIVO
-          </button>
-        </div>
-      )}
       {watchOnly && (
         <>
           <h2>Assistir jogos</h2>
@@ -328,6 +318,28 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
       )}
       {match && (
         <>
+          <div
+            role="group"
+            aria-label="Alternar transmissão"
+            style={{ display: "flex", gap: 8, marginTop: 18 }}
+          >
+            <button
+              className={screenMode === "live" ? "btn btn-green" : "btn btn-ghost"}
+              style={{ flex: 1, minWidth: 0, marginBottom: 0 }}
+              aria-pressed={screenMode === "live"}
+              onClick={() => setScreenMode("live")}
+            >
+              JOGO AO VIVO
+            </button>
+            <button
+              className={screenMode === "stats" ? "btn btn-green" : "btn btn-ghost"}
+              style={{ flex: 1, minWidth: 0, marginBottom: 0 }}
+              aria-pressed={screenMode === "stats"}
+              onClick={() => setScreenMode("stats")}
+            >
+              ESTATÍSTICAS AO VIVO
+            </button>
+          </div>
           <div
             ref={surface}
             className="mr-broadcast-screen"

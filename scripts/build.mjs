@@ -26,7 +26,7 @@ await writeFile("dist/index.html", html);
 const builtFiles = (await readdir("dist/build"))
   .filter((file) => /\.(js|css)$/.test(file))
   .sort();
-const version = createHash("sha256").update(html).update(await readFile("scripts/pwa.js")).update(await readFile("scripts/service-worker.template.js")).digest("hex").slice(0, 12);
+const version = createHash("sha256").update(html).update(builtFiles.join("\n")).update(await readFile("scripts/pwa.js")).update(await readFile("scripts/service-worker.template.js")).digest("hex").slice(0, 12);
 const precache = [
   "./index.html",
   ...builtFiles.map((file) => "./build/" + file),

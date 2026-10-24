@@ -223,6 +223,8 @@ export function Pitch({ match, time, camera = "wide", presentation = null }) {
           "yellow",
           "red",
           "foul",
+          "freekick",
+          "penalty",
           "offside",
           "substitution",
           "injury",
@@ -256,16 +258,20 @@ export function Pitch({ match, time, camera = "wide", presentation = null }) {
         card: ["yellow", "red"].includes(stoppage?.type) ? stoppage.type : null,
       },
     );
-    if (["throwin", "corner", "goalkick"].includes(stoppage?.type)) {
+    if (["throwin", "corner", "goalkick", "freekick", "penalty"].includes(stoppage?.type)) {
       ctx.fillStyle = "#0c1b24dd";
       ctx.fillRect(X(50) - 65, Y(4), 130, 22);
       ctx.fillStyle = "#ffe19a";
       ctx.font = "bold 13px monospace";
       ctx.textAlign = "center";
       ctx.fillText(
-        { throwin: "LATERAL", corner: "ESCANTEIO", goalkick: "TIRO DE META" }[
-          stoppage.type
-        ],
+        {
+          throwin: "LATERAL",
+          corner: "ESCANTEIO",
+          goalkick: "TIRO DE META",
+          freekick: "FALTA",
+          penalty: "PÊNALTI",
+        }[stoppage.type],
         X(50),
         Y(4) + 16,
       );
@@ -338,6 +344,13 @@ export function Pitch({ match, time, camera = "wide", presentation = null }) {
     const throwLoft = throwFlight && a.owner === -1
       ? Math.sin(Math.min(1, (time - throwFlight.t) / 5) * Math.PI) * 14
       : 0;
+    const woodwork = match.events.findLast(
+      (e) => e.type === "woodwork" && e.t <= time && time - e.t < 4,
+    );
+    const woodworkLift =
+      woodwork?.kind === "crossbar"
+        ? Math.sin(Math.min(1, (time - woodwork.t) / 4) * Math.PI) * 18
+        : 0;
     ctx.strokeStyle = "#fff9";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -346,9 +359,19 @@ export function Pitch({ match, time, camera = "wide", presentation = null }) {
     ctx.fillStyle = "#0005";
     ctx.fillRect(X(ball[0]) - 3, Y(ball[1]) + 2, 8, 3);
     ctx.fillStyle = "#fff";
-    ctx.fillRect(X(ball[0]) - 3, Y(ball[1]) - 4 - loft - throwLoft, 7, 7);
+    ctx.fillRect(X(ball[0]) - 3, Y(ball[1]) - 4 - loft - throwLoft - woodworkLift, 7, 7);
     ctx.fillStyle = "#17202c";
-    ctx.fillRect(X(ball[0]) - 1, Y(ball[1]) - 2 - loft - throwLoft, 3, 3);
+    ctx.fillRect(X(ball[0]) - 1, Y(ball[1]) - 2 - loft - throwLoft - woodworkLift, 3, 3);
+    if (woodwork) {
+      ctx.fillStyle = "#ffe28a";
+      ctx.font = "bold 11px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(
+        woodwork.kind === "post" ? "NA TRAVE!" : "NO TRAVESSÃO!",
+        X(woodwork.at[0]),
+        Y(woodwork.at[1]) - 17 - woodworkLift,
+      );
+    }
     ctx.restore();
     if (celebration) {
       ctx.fillStyle = "#06111ddd";

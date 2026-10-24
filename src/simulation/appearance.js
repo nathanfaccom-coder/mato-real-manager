@@ -84,6 +84,10 @@ export function drawPlayer(
   }
   if (pose.action === "tackle") ctx.rotate(-Math.PI / 16);
   if (pose.action === "kick") ctx.rotate(-0.13);
+  if (pose.action === "save") {
+    ctx.translate(2, -2);
+    ctx.rotate(-Math.PI / 5);
+  }
 
   const rect = (color, x, y, w, h) => {
     ctx.fillStyle = color;
@@ -92,7 +96,7 @@ export function drawPlayer(
   // Original outlined arcade sprite, shared by character editor and match renderer.
   rect("#08131766", -8, 0, 17, 4);
   // Two planted feet and a subtle body bounce make the run readable at small sizes.
-  if (phase && !["tackle", "injury"].includes(pose.action))
+  if (phase && !["tackle", "injury", "save"].includes(pose.action))
     ctx.translate(0, -Math.abs(step) * 0.5);
   // Stepped silhouette: temples, ears, cheeks and tapered chin.
   rect("#10171d", -5, -30, 11, 2);
@@ -200,6 +204,13 @@ export function drawPlayer(
     rect(a.sleeves === "long" ? uniform.shirt : a.skin, 8, -14, 2, 8);
     rect(a.skin, -9, -3, 3, 3);
     rect(a.skin, 8, -8, 3, 3);
+  } else if (pose.action === "save") {
+    rect("#10171d", -12, -17, 6, 4);
+    rect("#10171d", 7, -14, 7, 4);
+    rect(a.sleeves === "long" ? uniform.shirt : a.skin, -13, -20, 7, 3);
+    rect(a.sleeves === "long" ? uniform.shirt : a.skin, 10, -18, 7, 3);
+    rect(a.skin, -15, -21, 4, 4);
+    rect(a.skin, 15, -19, 4, 4);
   } else if (pose.action === "celebrate") {
     rect("#10171d", -10, -17, 4, 12);
     rect("#10171d", 7, -17, 4, 12);

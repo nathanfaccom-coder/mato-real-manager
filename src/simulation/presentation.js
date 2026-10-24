@@ -11,7 +11,16 @@ export function actorPresentation(match, frame, i, time) {
   const contact = recent.findLast(
     (e) =>
       (e.actor === i || e.victim === i) &&
-      ["tackle", "foul", "shot", "injury", "restart"].includes(e.type) &&
+      [
+        "tackle",
+        "foul",
+        "shot",
+        "save",
+        "injury",
+        "restart",
+        "freekick-pass",
+        "freekick-shot",
+      ].includes(e.type) &&
       time - e.t < 5,
   );
   let x = position[0],
@@ -37,8 +46,13 @@ export function actorPresentation(match, frame, i, time) {
     action = "walk";
   } else if (contact)
     action =
-      contact.type === "shot" || contact.type === "restart"
+      contact.type === "shot" ||
+      contact.type === "restart" ||
+      contact.type === "freekick-pass" ||
+      contact.type === "freekick-shot"
         ? "kick"
+        : contact.type === "save"
+          ? "save"
         : contact.victim === i
           ? "injury"
           : "tackle";

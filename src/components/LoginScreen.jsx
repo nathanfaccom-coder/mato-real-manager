@@ -209,7 +209,7 @@ export const LoginScreen = ({
             NATHAN REIS
           </div>
           {/* Exibição da versão solicitada */}
-          <div className="version-badge">VERSÃO 2.9.1 — MATO REAL TV </div>
+          <div className="version-badge">VERSÃO 2.9.2 — MATO REAL TV </div>
         </div>
       </div>
       {/* --- FIM DO CABEÇALHO --- */}

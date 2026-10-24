@@ -296,16 +296,23 @@ export function simulateMatch(snapshot) {
     cooldown = t + 5;
     stop = t + (half ? 6 : 8);
   }
-  function setPieceTaker(side, point, t) {
+  function setPieceTaker(side, point, t, skillKey = "shortPass") {
     const candidates = people
       .map((p, i) => i)
       .filter((i) => people[i].side === side && people[i].slot !== 0 && active(i))
-      .sort((a, b) => skill(b, "shortPass", t) - skill(a, "shortPass", t));
+      .sort((a, b) => skill(b, skillKey, t) - skill(a, skillKey, t));
     return candidates[0] ?? keeperFor(side);
   }
   function freeKick(t, side, point) {
     const at = [clamp(point[0], 2, 98), clamp(point[1], 2, 62)];
-    const taker = setPieceTaker(side, at, t);
+    const goalDistance = direction(side) > 0 ? 100 - at[0] : at[0];
+    const directShotArea = goalDistance <= 34 && Math.abs(at[1] - 32) <= 18;
+    const taker = setPieceTaker(
+      side,
+      at,
+      t,
+      directShotArea ? "shot" : "shortPass",
+    );
     positions[taker] = { x: at[0], y: at[1] };
     owner = taker;
     ball = at;
@@ -402,7 +409,11 @@ export function simulateMatch(snapshot) {
       actor: owner,
       side: people[owner].side,
       start: t,
-      end: t + Math.max(1, Math.ceil(distance / (type === "shot" ? 22 : 13))),
+      end:
+        t +
+        (type === "out"
+          ? Math.max(2, Math.ceil(distance / 3))
+          : Math.max(1, Math.ceil(distance / (type === "shot" ? 22 : 13)))),
     };
     owner = -1;
   }
@@ -526,7 +537,74 @@ export function simulateMatch(snapshot) {
     }
     if (pendingFreeKick && t > stop) {
       const kick = pendingFreeKick,
-        target = people
+        goalDistance = direction(kick.side) > 0 ? 100 - kick.at[0] : kick.at[0],
+        keeper = keeperFor(1 - kick.side),
+        shotQuality = shootingChance(
+          kick.at,
+          positions[keeper],
+          direction(kick.side),
+          0,
+          people[kick.taker].overall,
+          skill(kick.taker, "shot", t),
+          0,
+        ),
+        directShot =
+          goalDistance <= 34 &&
+          Math.abs(kick.at[1] - 32) <= 18 &&
+          shotQuality >= 0.3 &&
+          rand() < clamp(0.45 + skill(kick.taker, "shot", t) / 250, 0.45, 0.82);
+      if (directShot) {
+        const onTarget = rand() < clamp(0.42 + skill(kick.taker, "shot", t) / 220, 0.45, 0.9);
+        const goal =
+          onTarget &&
+          rand() <
+            clamp(
+              0.055 + (skill(kick.taker, "shot", t) - skill(keeper, "gk", t)) / 190,
+              0.025,
+              0.58,
+            );
+        const woodwork = onTarget && !goal && rand() < 0.1;
+        const outcome = goal
+          ? "goal"
+          : woodwork
+            ? rand() < 0.62
+              ? "post"
+              : "crossbar"
+            : onTarget
+              ? "save"
+              : "miss";
+        const targetY =
+          outcome === "post"
+            ? rand() < 0.5
+              ? 27
+              : 37
+            : outcome === "crossbar"
+              ? 32
+              : outcome === "goal"
+                ? 29 + rand() * 6
+                : outcome === "save"
+                  ? 32
+                  : rand() < 0.5
+                    ? 23
+                    : 41;
+        stats[kick.taker].shots++;
+        event(
+          t,
+          "freekick-shot",
+          kick.side,
+          kick.taker,
+          `${people[kick.taker].name} bate direto para o gol na cobrança da falta!`,
+          { outcome, keeper },
+        );
+        send(
+          t,
+          [direction(kick.side) > 0 ? 100 : 0, targetY],
+          keeper,
+          "shot",
+          outcome,
+        );
+      } else {
+        const target = people
           .map((p, i) => i)
           .filter(
             (i) =>
@@ -540,17 +618,18 @@ export function simulateMatch(snapshot) {
               Math.hypot(positions[a].x - kick.at[0], positions[a].y - kick.at[1]) -
               Math.hypot(positions[b].x - kick.at[0], positions[b].y - kick.at[1]),
           )[0];
-      if (target !== undefined) {
-        stats[kick.taker].passes++;
-        event(
-          t,
-          "freekick-pass",
-          kick.side,
-          kick.taker,
-          `${people[kick.taker].name} cobra a falta.`,
-          { target },
-        );
-        send(t, [positions[target].x, positions[target].y], target, "pass");
+        if (target !== undefined) {
+          stats[kick.taker].passes++;
+          event(
+            t,
+            "freekick-pass",
+            kick.side,
+            kick.taker,
+            `${people[kick.taker].name} toca a bola na cobrança da falta.`,
+            { target },
+          );
+          send(t, [positions[target].x, positions[target].y], target, "pass");
+        }
       }
       pendingFreeKick = null;
       stop = t - 1;
@@ -718,6 +797,31 @@ export function simulateMatch(snapshot) {
               pendingKickoff = 1 - f.side;
               stop = t + 6;
               owner = -1;
+            } else if (["post", "crossbar"].includes(f.outcome)) {
+              const reboundAt = [
+                clamp(f.to[0] + (direction(f.side) > 0 ? -5 : 5), 3, 97),
+                clamp(f.to[1] + (rand() < 0.5 ? -7 : 7), 18, 46),
+              ];
+              event(
+                t,
+                "woodwork",
+                f.side,
+                f.actor,
+                `${people[f.actor].name} acerta ${f.outcome === "post" ? "a trave" : "o travessão"}! A bola volta para o campo.`,
+                { kind: f.outcome, at: f.to },
+              );
+              const reboundTarget = people
+                .map((p, i) => i)
+                .filter((i) => active(i) && people[i].slot !== 0)
+                .sort(
+                  (a, b) =>
+                    Math.hypot(positions[a].x - reboundAt[0], positions[a].y - reboundAt[1]) -
+                    Math.hypot(positions[b].x - reboundAt[0], positions[b].y - reboundAt[1]),
+                )[0];
+              owner = f.actor;
+              send(t, reboundAt, reboundTarget, "rebound", null, f.to);
+              stop = t - 1;
+              cooldown = t;
             } else {
               owner = keeperFor(1 - f.side);
               if (f.outcome === "save") {
@@ -737,25 +841,43 @@ export function simulateMatch(snapshot) {
                   f.actor,
                   `${people[f.actor].name} finaliza para fora.`,
                 );
-              if (f.outcome === "save" && rand() < 0.32) {
-                awardRestart(
+              if (f.outcome === "save" && rand() < 0.3) {
+                positions[owner] = { x: f.to[0], y: f.to[1] };
+                ball = [...f.to];
+                send(
                   t,
-                  [direction(f.side) > 0 ? 100 : 0, f.to[1]],
-                  1 - f.side,
+                  [f.to[0] + (direction(f.side) > 0 ? 6 : -6), f.to[1]],
+                  owner,
+                  "out",
+                  null,
+                  f.to,
                 );
-                record(t);
-                continue;
+                stop = t - 1;
+                cooldown = t;
+              } else if (f.outcome === "save") {
+                ball = [positions[owner].x, positions[owner].y];
+                cooldown = t + 13;
+                stop = t + 12;
+                lastPass = null;
               }
               if (f.outcome === "miss") {
                 awardRestart(t, f.to, f.side);
                 record(t);
                 continue;
               }
-              ball = [positions[owner].x, positions[owner].y];
-              cooldown = t + 13;
-              stop = t + 12;
-              lastPass = null;
             }
+          } else if (f.type === "rebound") {
+            owner = f.target;
+            ball = [positions[owner].x, positions[owner].y];
+            event(
+              t,
+              "rebound-control",
+              people[owner].side,
+              owner,
+              `${people[owner].name} disputa e fica com o rebote.`,
+            );
+            cooldown = t + 2;
+            lastPass = null;
           } else {
             if (f.type === "pass" && f.offside?.offside) {
               const at = [positions[f.target].x, positions[f.target].y];
@@ -944,20 +1066,41 @@ export function simulateMatch(snapshot) {
                   0.025,
                   0.97,
                 );
-            const outcome = goal ? "goal" : onTarget ? "save" : "miss";
+            const woodwork = onTarget && !goal && rand() < 0.075;
+            const outcome = goal
+              ? "goal"
+              : woodwork
+                ? rand() < 0.62
+                  ? "post"
+                  : "crossbar"
+                : onTarget
+                  ? "save"
+                  : "miss";
             event(
               t,
               "shot",
               s,
               actor,
               `${people[actor].name} ${distance >= 23 ? "arrisca de longe" : "finaliza"}!`,
-              { distance, longRange: distance >= 23 },
+                { distance, longRange: distance >= 23, outcome },
             );
             send(
               t,
               [
                 dir > 0 ? 100 : 0,
-                goal ? 29 + rand() * 6 : onTarget ? 32 : rand() < 0.5 ? 23 : 41,
+                outcome === "post"
+                  ? rand() < 0.5
+                    ? 27
+                    : 37
+                  : outcome === "crossbar"
+                    ? 32
+                    : goal
+                      ? 29 + rand() * 6
+                      : onTarget
+                        ? 32
+                        : rand() < 0.5
+                          ? 23
+                          : 41,
               ],
               keeper,
               "shot",
@@ -1143,6 +1286,8 @@ export function highlights(match) {
     [
       "corner",
       "goal",
+      "freekick",
+      "woodwork",
       "penalty-shootout",
       "yellow",
       "red",

@@ -1,3 +1,4 @@
+// 2.9.1: invalidate stale offline bundles after the last deployed entrypoint was truncated.
 const CACHE_NAME = 'matoreal-static-__VERSION__';
 const PRECACHE = __PRECACHE__;
 self.addEventListener('install', event => {

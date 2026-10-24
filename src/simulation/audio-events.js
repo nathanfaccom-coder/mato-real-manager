@@ -4,6 +4,8 @@ export function audibleEvents(events, from, to) {
     (e) =>
       e.t > from &&
       e.t <= to &&
-      ["kickoff", "halftime", "fulltime", "foul", "offside"].includes(e.type),
+      ["kickoff", "halftime", "fulltime", "foul", "offside", "goal"].includes(
+        e.type,
+      ),
   );
 }

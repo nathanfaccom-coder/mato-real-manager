@@ -54,6 +54,13 @@ export function Pitch({ match, time, camera = "wide" }) {
       ctx.lineTo(X(x2), Y(y2));
       ctx.stroke();
     };
+    for (const cx of [0, 100])
+      for (const cy of [0, 64]) {
+        ctx.fillStyle = "#f6e8c3";
+        ctx.fillRect(X(cx) - 1, Y(cy) - 23, 2, 23);
+        ctx.fillStyle = "#ffbd4a";
+        ctx.fillRect(X(cx), Y(cy) - 23, cx === 0 ? 11 : -11, 7);
+      }
     line(50, 0, 50, 64);
     ctx.beginPath();
     ctx.ellipse(X(50), Y(32), 77, 70, 0, 0, Math.PI * 2);
@@ -205,6 +212,17 @@ export function Pitch({ match, time, camera = "wide" }) {
         Y(64) - 2,
       );
     }
+    const cornerKick = match.events.findLast(
+      (e) =>
+        e.t <= time &&
+        time - e.t < 5 &&
+        e.type === "restart" &&
+        e.restartType === "corner",
+    );
+    const loft =
+      cornerKick && a.owner === -1
+        ? Math.sin(Math.min(1, (time - cornerKick.t) / 5) * Math.PI) * 26
+        : 0;
     ctx.strokeStyle = "#fff9";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -213,9 +231,9 @@ export function Pitch({ match, time, camera = "wide" }) {
     ctx.fillStyle = "#0005";
     ctx.fillRect(X(ball[0]) - 3, Y(ball[1]) + 2, 8, 3);
     ctx.fillStyle = "#fff";
-    ctx.fillRect(X(ball[0]) - 3, Y(ball[1]) - 4, 7, 7);
+    ctx.fillRect(X(ball[0]) - 3, Y(ball[1]) - 4 - loft, 7, 7);
     ctx.fillStyle = "#17202c";
-    ctx.fillRect(X(ball[0]) - 1, Y(ball[1]) - 2, 3, 3);
+    ctx.fillRect(X(ball[0]) - 1, Y(ball[1]) - 2 - loft, 3, 3);
     ctx.restore();
     if (camera === "tv") {
       const mx = 390,

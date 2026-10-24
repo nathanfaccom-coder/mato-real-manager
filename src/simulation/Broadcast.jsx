@@ -27,6 +27,7 @@ export function Broadcast({ user, teams, players, onBack }) {
     [rate, setRate] = useState(1),
     [camera, setCamera] = useState("wide"),
     [kitTeam, setKitTeam] = useState("");
+  const audio = useRef(null);
   const surface = useRef(null),
     clock = useRef(0);
   const creator = canAdmin(user, "competitions");
@@ -86,6 +87,7 @@ export function Broadcast({ user, teams, players, onBack }) {
     return () => cancelAnimationFrame(id);
   }, [match, live, playing, rate, record]);
   function watch(r) {
+    audio.current?.activate();
     setRecord(r);
     clock.current = r.id
       ? Math.min(
@@ -107,6 +109,7 @@ export function Broadcast({ user, teams, players, onBack }) {
     );
   }
   async function start(shared) {
+    audio.current?.activate();
     setBusy(true);
     setError("");
     try {
@@ -149,17 +152,17 @@ export function Broadcast({ user, teams, players, onBack }) {
     ended = time >= 5400;
   return (
     <section data-testid="broadcast">
-      {match && (
-        <MatchAudio
-          match={match}
-          seek={seek}
-          time={time}
-          playing={Boolean(live || playing)}
-        />
-      )}
       <button className="btn btn-ghost" onClick={onBack}>
         ← VOLTAR AO PAINEL
       </button>
+      <MatchAudio
+        ref={audio}
+        match={match}
+        time={time}
+        seek={seek}
+        playing={Boolean(live || playing)}
+        ended={ended}
+      />
       <h2>
         Mato Real TV{" "}
         <small style={{ fontSize: 12, color: "#53d8a2" }}>
@@ -343,6 +346,32 @@ export function Broadcast({ user, teams, players, onBack }) {
                 ? "Campo inteiro"
                 : "Câmera TV — visão geral no minimapa"}
             </div>
+            <div
+              data-testid="corner-count"
+              style={{ padding: "8px 12px", color: "#ffe19a" }}
+            >
+              🚩 Escanteios:{" "}
+              {events.filter((e) => e.type === "corner" && e.side === 0).length}{" "}
+              ×{" "}
+              {events.filter((e) => e.type === "corner" && e.side === 1).length}
+            </div>
+            {events.findLast((e) => e.type === "corner" && time - e.t < 22) && (
+              <div
+                data-testid="corner-banner"
+                style={{
+                  padding: 12,
+                  background: "#e5bd45",
+                  color: "#132028",
+                  fontWeight: 900,
+                }}
+              >
+                🚩 ESCANTEIO —{" "}
+                {
+                  events.findLast((e) => e.type === "corner" && time - e.t < 22)
+                    .text
+                }
+              </div>
+            )}
             <Pitch match={match} time={time} camera={camera} />
             <p style={{ minHeight: 24, padding: "0 12px" }} aria-live="off">
               {last?.text}
@@ -499,6 +528,19 @@ export function Broadcast({ user, teams, players, onBack }) {
                 .map((e, i) => (
                   <li key={i}>
                     {minute(e.t)} — {e.text}
+                    {e.type === "corner" && !live && (
+                      <button
+                        className="btn btn-ghost"
+                        onClick={() => {
+                          setSeek((v) => v + 1);
+                          clock.current = e.t;
+                          setTime(e.t);
+                          setPlaying(true);
+                        }}
+                      >
+                        REVER ESCANTEIO {minute(e.t)}
+                      </button>
+                    )}
                   </li>
                 ))}
             </ul>

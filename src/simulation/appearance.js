@@ -73,7 +73,8 @@ export function drawPlayer(
 ) {
   const a = appearance(custom),
     uniform = normalizeKit(typeof kit === "string" ? { shirt: kit } : kit),
-    step = phase === 0 ? 0 : Math.round(Math.sin(phase) * 2);
+    step = phase === 0 ? 0 : Math.round(Math.sin(phase) * 3),
+    armStep = phase === 0 ? 0 : Math.round(Math.sin(phase + Math.PI) * 2);
   ctx.save();
   ctx.translate(Math.round(x), Math.round(y));
   ctx.scale(scale * (pose.facing === -1 ? -1 : 1), scale);
@@ -184,7 +185,7 @@ export function drawPlayer(
     rect(a.skin, 6, -20, 3, 3);
     rect("#10171d", -8, -11, 4, 5);
     rect(a.sleeves === "long" ? uniform.shirt : a.skin, -7, -10, 2, 3);
-  } else if (pose.action === "throwin" || pose.action === "celebrate") {
+  } else if (pose.action === "throwin") {
     const lift = pose.action === "celebrate" ? 1 : 0;
     rect("#10171d", -10, -17, 4, 12);
     rect("#10171d", 7, -17, 4, 12);
@@ -192,13 +193,27 @@ export function drawPlayer(
     rect(a.sleeves === "long" ? uniform.shirt : a.skin, 8, -23 - lift, 2, 9);
     rect(a.skin, -10, -25 - lift, 4, 3);
     rect(a.skin, 7, -25 - lift, 4, 3);
+  } else if (pose.action === "throwin-release") {
+    rect("#10171d", -10, -17, 4, 9);
+    rect("#10171d", 7, -17, 4, 9);
+    rect(a.sleeves === "long" ? uniform.shirt : a.skin, -9, -11, 2, 9);
+    rect(a.sleeves === "long" ? uniform.shirt : a.skin, 8, -14, 2, 8);
+    rect(a.skin, -9, -3, 3, 3);
+    rect(a.skin, 8, -8, 3, 3);
+  } else if (pose.action === "celebrate") {
+    rect("#10171d", -10, -17, 4, 12);
+    rect("#10171d", 7, -17, 4, 12);
+    rect(a.sleeves === "long" ? uniform.shirt : a.skin, -9, -25, 2, 11);
+    rect(a.sleeves === "long" ? uniform.shirt : a.skin, 8, -25, 2, 11);
+    rect(a.skin, -10, -28, 4, 3);
+    rect(a.skin, 7, -28, 4, 3);
   } else {
-    rect("#10171d", -8, -11 + step, 4, 5);
-    rect(a.sleeves === "long" ? uniform.shirt : a.skin, -7, -10 + step, 2, 3);
-    rect(a.skin, -6, -8 + step, 2, 2);
-    rect("#10171d", 5, -11 - step, 4, 5);
-    rect(a.sleeves === "long" ? uniform.shirt : a.skin, 6, -10 - step, 2, 3);
-    rect(a.skin, 5, -8 - step, 2, 2);
+    rect("#10171d", -8, -11 + armStep, 4, 5);
+    rect(a.sleeves === "long" ? uniform.shirt : a.skin, -7, -10 + armStep, 2, 3);
+    rect(a.skin, -6, -8 + armStep, 2, 2);
+    rect("#10171d", 5, -11 - armStep, 4, 5);
+    rect(a.sleeves === "long" ? uniform.shirt : a.skin, 6, -10 - armStep, 2, 3);
+    rect(a.skin, 5, -8 - armStep, 2, 2);
   }
   if (uniform.pattern === "stripes") {
     rect(uniform.detail, -3, -15, 2, 8);
@@ -235,10 +250,9 @@ export function drawPlayer(
   ctx.textAlign = "center";
   if (!pose.referee) ctx.fillText(String(a.number), 0.5, -9);
   if (pose.action === "throwin") {
-    rect(a.skin, -8, -34, 17, 3);
-    rect("#10171d", -3, -38, 8, 6);
-    rect("#fff9e9", -2, -37, 6, 4);
-    rect("#172027", 0, -36, 2, 2);
+    rect("#10171d", -4, -34, 9, 9);
+    rect("#fff9e9", -3, -33, 7, 7);
+    rect("#172027", -1, -32, 3, 3);
   }
   if (pose.card) {
     rect(uniform.shirt, 5, -19, 3, 6);

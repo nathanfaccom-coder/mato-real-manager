@@ -42,10 +42,16 @@ export function actorPresentation(match, frame, i, time) {
         : contact.victim === i
           ? "injury"
           : "tackle";
-  const throwin = recent.findLast(
-    (e) => e.type === "throwin" && e.actor === i && time - e.t <= 15,
+  const throwin = match.events.findLast(
+    (e) => e.type === "throwin" && e.actor === i && e.t <= time,
   );
-  if (throwin && position[2]) action = "throwin";
+  const release = throwin && match.events.find(
+    (e) => e.type === "restart" && e.restartType === "throwin" && e.actor === i && e.t >= throwin.t && e.t <= time,
+  );
+  if (throwin && position[2]) {
+    if (!release) action = "throwin";
+    else if (time - release.t < 2) action = "throwin-release";
+  }
   return {
     x,
     y,

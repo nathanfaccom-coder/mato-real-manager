@@ -377,8 +377,8 @@ export function simulateMatch(snapshot) {
       { at: r.at, lastTouchSide },
     );
   }
-  function send(t, to, target, type, outcome = null) {
-    const from = [...ball],
+  function send(t, to, target, type, outcome = null, fromOverride = null) {
+    const from = fromOverride ? [...fromOverride] : [...ball],
       distance = Math.hypot(to[0] - from[0], to[1] - from[1]);
     flight = {
       from,
@@ -589,7 +589,10 @@ export function simulateMatch(snapshot) {
         `${people[owner].name} cobra ${r.type === "throwin" ? "o lateral" : r.type === "corner" ? "o escanteio" : "o tiro de meta"}.`,
         { restartType: r.type },
       );
-      send(t, [positions[target].x, positions[target].y], target, "pass");
+      const releasePoint = r.type === "throwin"
+        ? [ball[0], clamp(ball[1] - 4.5, 1, 63)]
+        : null;
+      send(t, [positions[target].x, positions[target].y], target, "pass", null, releasePoint);
       // Direct throw-ins, corners and goal kicks are exempt from offside.
       flight.offside = null;
       pendingRestart = null;

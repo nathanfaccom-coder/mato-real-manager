@@ -70,7 +70,15 @@ export function Pitch({ match, time, camera = "wide", presentation = null }) {
       b = presentation ? a : sampled.b,
       mix = presentation ? 0 : sampled.mix,
       lerp = (v, w) => v + (w - v) * mix;
-    const ball = a.ball.map((v, i) => lerp(v, b.ball[i]));
+    let ball = a.ball.map((v, i) => lerp(v, b.ball[i]));
+    const lastThrowin = match.events.findLast((e) => e.type === "throwin" && e.t <= time);
+    const throwRelease = lastThrowin && match.events.find(
+      (e) => e.type === "restart" && e.restartType === "throwin" && e.actor === lastThrowin.actor && e.t >= lastThrowin.t && e.t <= time,
+    );
+    if (!presentation && lastThrowin && !throwRelease && time - lastThrowin.t < 30) {
+      const player = a.positions[lastThrowin.actor];
+      if (player?.[2]) ball = [player[0], Math.max(0, player[1] - 4.5)];
+    }
     const W = 960,
       H = 600,
       X = (x) => 60 + x * 8.4,
@@ -324,6 +332,12 @@ export function Pitch({ match, time, camera = "wide", presentation = null }) {
       cornerKick && a.owner === -1
         ? Math.sin(Math.min(1, (time - cornerKick.t) / 5) * Math.PI) * 26
         : 0;
+    const throwFlight = match.events.findLast(
+      (e) => e.type === "restart" && e.restartType === "throwin" && e.t <= time && time - e.t < 5,
+    );
+    const throwLoft = throwFlight && a.owner === -1
+      ? Math.sin(Math.min(1, (time - throwFlight.t) / 5) * Math.PI) * 14
+      : 0;
     ctx.strokeStyle = "#fff9";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -332,9 +346,9 @@ export function Pitch({ match, time, camera = "wide", presentation = null }) {
     ctx.fillStyle = "#0005";
     ctx.fillRect(X(ball[0]) - 3, Y(ball[1]) + 2, 8, 3);
     ctx.fillStyle = "#fff";
-    ctx.fillRect(X(ball[0]) - 3, Y(ball[1]) - 4 - loft, 7, 7);
+    ctx.fillRect(X(ball[0]) - 3, Y(ball[1]) - 4 - loft - throwLoft, 7, 7);
     ctx.fillStyle = "#17202c";
-    ctx.fillRect(X(ball[0]) - 1, Y(ball[1]) - 2 - loft, 3, 3);
+    ctx.fillRect(X(ball[0]) - 1, Y(ball[1]) - 2 - loft - throwLoft, 3, 3);
     ctx.restore();
     if (celebration) {
       ctx.fillStyle = "#06111ddd";

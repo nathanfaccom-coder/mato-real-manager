@@ -1,3 +1,4 @@
+import { simulateMatch as simulateV8 } from "./engine-v8.js";
 import { simulateMatch as simulateV7 } from "./engine-v7.js";
 import { POSTURES, validCommand } from "./live-tactics.js";
 import { simulateMatch as simulateV3 } from "./engine-v3.js";
@@ -13,7 +14,7 @@ import { appearance } from "./appearance.js";
 import { addedTimeForSeed, matchDurationSeconds } from "./timeline.js";
 import { simulateMatch as simulateV5 } from "./engine-v5.js";
 import { simulateMatch as simulateV6 } from "./engine-v6.js";
-export const ENGINE_VERSION = 8;
+export const ENGINE_VERSION = 9;
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const numeric = (v, f = 60) => (Number.isFinite(Number(v)) ? Number(v) : f);
 export const available = (p) =>
@@ -153,6 +154,7 @@ export function simulateMatch(snapshot) {
   if (snapshot.version === 4) return simulateV4(snapshot);
   if (snapshot.version === 5) return simulateV5(snapshot);
   if (snapshot.version === 6) return simulateV6(snapshot);
+  if (snapshot.version === 8) return simulateV8(snapshot);
   if (snapshot.version === 7) return simulateV7(snapshot);
   if (snapshot.version !== ENGINE_VERSION)
     throw Error("Este replay pertence a outra versão do simulador.");
@@ -233,7 +235,10 @@ export function simulateMatch(snapshot) {
   const direction = (side) => (side === period ? 1 : -1);
   const entered = people.map((p) => !p.reserve);
   const substitutions = [0, 0];
-  const windows = [3600, 4200, 4800];
+  const windows = [[3600, 4200, 4800], [3600, 4200, 4800]];
+  const substitutionWindows = [0, 0], lastWindowEnd = [-1, -1];
+  const manual = side => commands.some(c => c.kind === "substitutions" && c.side === side && c.at <= currentTick);
+  let currentTick = 0;
   const active = (i) =>
     entered[i] && !stats[i].red && !stats[i].injured && !stats[i].substituted;
   const keeperFor = (side) =>
@@ -257,15 +262,18 @@ export function simulateMatch(snapshot) {
         : {}),
       ...extra,
     });
-  function substitute(t, out, injury = false) {
+  function substitute(t, out, injury = false, chosen, commandId) {
     const side = people[out].side;
-    if (substitutions[side] >= 5) return false;
+    const atHalf = t >= halftimeAt && t <= halftimeAt + 6 && pendingKickoff !== null;
+    if (substitutions[side] >= 5 || stats[out].red || stats[out].substituted || !entered[out]) return false;
+    const newWindow = !atHalf && t > lastWindowEnd[side];
+    if (newWindow && substitutionWindows[side] >= 3) return false;
     const candidates = people
       .map((p, i) => i)
       .filter(
         (i) =>
           people[i].side === side &&
-          !entered[i] &&
+          !entered[i] && !stats[i].red && !stats[i].injured &&
           (people[i].position === "GOL") === (people[out].slot === 0),
       );
     candidates.sort(
@@ -274,19 +282,26 @@ export function simulateMatch(snapshot) {
           Number(people[a].position === people[out].position) ||
         people[b].overall - people[a].overall,
     );
-    const incoming = candidates[0];
+    const incoming = chosen === undefined ? candidates[0] : candidates.find(i => i === chosen);
     if (incoming === undefined) return false;
     stats[out].substituted = true;
     entered[incoming] = true;
     substitutions[side]++;
+    if (newWindow) substitutionWindows[side]++;
+    lastWindowEnd[side] = Math.max(stop, t + 18);
     people[incoming] = {
       ...people[incoming],
       slot: people[out].slot,
+      role: people[out].role,
       anchor: { ...people[out].anchor },
       enteredAt: t,
     };
     positions[incoming] = { ...positions[out] };
     if (owner === out) owner = incoming;
+    for (const pending of [pendingRestart, pendingFreeKick, pendingPenalty]) {
+      if (pending?.taker === out) pending.taker = incoming;
+      if (pending?.keeper === out) pending.keeper = incoming;
+    }
     if (flight?.target === out) flight.target = incoming;
     lastPass = null;
     event(
@@ -295,7 +310,7 @@ export function simulateMatch(snapshot) {
       side,
       out,
       `Substituição: sai ${people[out].name}, entra ${people[incoming].name}.`,
-      { incoming, injury },
+      { incoming, injury, commandId, window: substitutionWindows[side], halftime: atHalf },
     );
     stop = Math.max(stop, t + 18);
     cooldown = stop + 3;
@@ -460,6 +475,8 @@ export function simulateMatch(snapshot) {
       period,
       formations: [...formations],
       postures: [...postures],
+      substitutions: [...substitutions],
+      substitutionWindows: [...substitutionWindows],
     });
   }
   record(0);
@@ -476,27 +493,28 @@ export function simulateMatch(snapshot) {
         "Intervalo. As equipes trocam de lado para o segundo tempo.",
       );
     }
-    // Three automatic tactical windows; injured players can also be replaced (max five).
-    if (
-      windows.length &&
-      t >= windows[0] &&
-      !flight &&
-      pendingKickoff === null &&
-      !pendingRestart && !pendingFreeKick && !pendingPenalty
-    ) {
-      windows.shift();
+    currentTick = t;
+    // Requests are consumed only while play is stopped, before the restart.
+    if (t <= stop && !flight && (pendingKickoff !== null || pendingRestart || pendingFreeKick || pendingPenalty)) {
       for (const side of [0, 1]) {
-        const candidates = people
-          .map((p, i) => i)
-          .filter(
-            (i) => people[i].side === side && people[i].slot !== 0 && active(i),
-          );
-        candidates.sort(
-          (a, b) =>
-            stats[b].seconds * (110 - people[b].attributes.stamina) -
-            stats[a].seconds * (110 - people[a].attributes.stamina),
-        );
-        if (candidates.length) substitute(t, candidates[0]);
+        if (lastWindowEnd[side] >= t - 1) lastWindowEnd[side] = Math.max(lastWindowEnd[side], stop);
+        for (const c of commands) {
+          if (c.kind !== 'substitutions' || c.side !== side || c.at > t || appliedCommands.has(c.id)) continue;
+          appliedCommands.add(c.id);
+          let count = 0;
+          for (const pair of c.changes) {
+            const out = people.findIndex(p => p.id === pair.outId && p.side === side);
+            const incoming = people.findIndex(p => p.id === pair.inId && p.side === side);
+            if (out >= 0 && incoming >= 0 && substitute(t, out, stats[out].injured, incoming, c.id)) count++;
+          }
+          event(t, 'substitutions-processed', side, null, count ? `${count} substituição(ões) confirmada(s).` : 'Troca não realizada: jogador indisponível ou limite atingido.', {commandId:c.id, count});
+        }
+        if (!manual(side) && windows[side].length && t >= windows[side][0]) {
+          windows[side].shift();
+          const candidates = people.map((p,i)=>i).filter(i=>people[i].side===side && people[i].slot!==0 && active(i));
+          candidates.sort((a,b)=>stats[b].seconds*(110-people[b].attributes.stamina)-stats[a].seconds*(110-people[a].attributes.stamina));
+          if (candidates.length) substitute(t,candidates[0]);
+        }
       }
     }
     people.forEach((p, i) => {
@@ -1001,7 +1019,7 @@ export function simulateMatch(snapshot) {
                 injured,
                 `${people[injured].name} se machuca e deixa o campo.`,
               );
-              if (!substitute(t, injured, true)) {
+              if (manual(people[injured].side) || !substitute(t, injured, true)) {
                 owner = people.findIndex(
                   (p, i) => p.side === people[injured].side && active(i),
                 );

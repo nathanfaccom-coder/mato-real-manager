@@ -11,6 +11,7 @@ export function controlsTeam(user, id) {
 }
 export function validCommand(c) {
   return c && typeof c.id === 'string' && [0,1].includes(c.side) && Number.isInteger(c.at) && c.at >= 0 &&
-    ((c.kind === 'tactics' && Object.hasOwn(FORMATIONS,c.formation) && Object.hasOwn(POSTURES,c.posture)) ||
+    ((c.kind === 'substitutions' && Array.isArray(c.changes) && c.changes.length > 0 && c.changes.length <= 5 && c.changes.every(p => p && typeof p.outId === 'string' && typeof p.inId === 'string' && p.outId !== p.inId)) ||
+     (c.kind === 'tactics' && Object.hasOwn(FORMATIONS,c.formation) && Object.hasOwn(POSTURES,c.posture)) ||
      (c.kind === 'penalty' && Number.isInteger(c.penaltyAt) && typeof c.playerId === 'string'));
 }

@@ -35,7 +35,9 @@ function presentationPositions(match, presentation) {
       return [50 + (destination[0] - 50) * progress, 68 + (destination[1] - 68) * progress, progress > 0.04 ? 1 : 0];
     }
     if (presentation.stage === "fulltime-exit") {
-      const staysForPhoto = (player.slot * 7 + player.side * 13) % 4 === 0;
+      const roll =
+        (match.snapshot.seed ^ Math.imul(index + 1, 0x9e3779b1)) >>> 0;
+      const staysForPhoto = roll % 100 < 35;
       if (staysForPhoto) return [player.anchor.x * 100, player.anchor.y * 64, 1];
       const start = frame.positions[index];
       const origin = start?.[2] ? start : [player.anchor.x * 100, player.anchor.y * 64, 1];

@@ -27,6 +27,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
     [rate, setRate] = useState(1),
     [camera, setCamera] = useState("wide"),
     [kitTeam, setKitTeam] = useState("");
+  const [screenMode, setScreenMode] = useState("live");
   const audio = useRef(null);
   const surface = useRef(null),
     clock = useRef(0);
@@ -180,6 +181,16 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
         playing={Boolean(live || playing)}
         ended={ended}
       />
+      {match && (
+        <div role="group" aria-label="Alternar transmissão">
+          <button className={screenMode === "live" ? "btn btn-green" : "btn btn-ghost"} aria-pressed={screenMode === "live"} onClick={() => setScreenMode("live")}>
+            JOGO AO VIVO
+          </button>
+          <button className={screenMode === "stats" ? "btn btn-green" : "btn btn-ghost"} aria-pressed={screenMode === "stats"} onClick={() => setScreenMode("stats")}>
+            ESTATÍSTICAS AO VIVO
+          </button>
+        </div>
+      )}
       {watchOnly && (
         <>
           <h2>Assistir jogos</h2>
@@ -325,6 +336,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
               borderRadius: 10,
               overflow: "hidden",
               marginTop: 18,
+              display: screenMode === "live" ? "block" : "none",
             }}
           >
             <div
@@ -370,15 +382,6 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
                 ? "Campo inteiro"
                 : "Câmera TV — visão geral no minimapa"}
             </div>
-            <div
-              data-testid="corner-count"
-              style={{ padding: "8px 12px", color: "#ffe19a" }}
-            >
-              🚩 Escanteios:{" "}
-              {events.filter((e) => e.type === "corner" && e.side === 0).length}{" "}
-              ×{" "}
-              {events.filter((e) => e.type === "corner" && e.side === 1).length}
-            </div>
             {events.findLast((e) => e.type === "corner" && time - e.t < 22) && (
               <div
                 data-testid="corner-banner"
@@ -401,6 +404,39 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
               {last?.text}
             </p>
           </div>
+          {screenMode === "stats" && (
+            <section data-testid="live-statistics" aria-label="Estatísticas ao vivo" className="card" style={{ marginTop: 18, padding: 16 }}>
+              <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", fontFamily: "monospace" }}>
+                <strong>{match.snapshot.home.name}</strong>
+                <b data-testid="broadcast-score-stats" style={{ fontSize: 24 }}>{current.score[0]} × {current.score[1]}</b>
+                <strong>{match.snapshot.away.name}</strong>
+                <span data-testid="match-clock-stats">{minute(time)}</span>
+              </header>
+              <p style={{ color: "#b8dacc" }}>Números atualizados conforme a partida avança.</p>
+              <div data-testid="corner-count" style={{ padding: "10px 12px", color: "#ffe19a", background: "#172631", borderRadius: 8 }}>
+                🚩 Escanteios:{" "}
+                {events.filter((e) => e.type === "corner" && e.side === 0).length}{" "}
+                ×{" "}
+                {events.filter((e) => e.type === "corner" && e.side === 1).length}
+              </div>
+              <div style={{ overflowX: "auto", marginTop: 12 }}>
+                <table style={{ width: "100%", minWidth: 320, textAlign: "center" }}>
+                  <thead><tr><th>{match.snapshot.home.name}</th><th>Indicador</th><th>{match.snapshot.away.name}</th></tr></thead>
+                  <tbody>
+                    {[
+                      ["Finalizações", (side) => events.filter((e) => e.type === "shot" && e.side === side).length],
+                      ["No alvo", (side) => events.filter((e) => (e.type === "goal" || e.type === "save") && e.side === side).length],
+                      ["Gols", (side) => events.filter((e) => e.type === "goal" && e.side === side).length],
+                      ["Defesas", (side) => events.filter((e) => e.type === "save" && e.side === side).length],
+                      ["Faltas", (side) => events.filter((e) => e.type === "foul" && e.side === side).length],
+                    ].map(([label, count]) => (
+                      <tr key={label}><td>{count(0)}</td><th scope="row">{label}</th><td>{count(1)}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
           <div
             style={{
               display: "flex",

@@ -125,9 +125,17 @@ export function Pitch({ match, time, camera = "wide" }) {
       (e) =>
         e.t <= time &&
         time - e.t < 18 &&
-        ["yellow", "red", "foul", "offside", "substitution", "injury"].includes(
-          e.type,
-        ),
+        [
+          "yellow",
+          "red",
+          "foul",
+          "offside",
+          "substitution",
+          "injury",
+          "throwin",
+          "corner",
+          "goalkick",
+        ].includes(e.type),
     );
     const rx = stoppage?.at
       ? Math.max(8, Math.min(92, stoppage.at[0] + 5))
@@ -154,6 +162,20 @@ export function Pitch({ match, time, camera = "wide" }) {
         card: ["yellow", "red"].includes(stoppage?.type) ? stoppage.type : null,
       },
     );
+    if (["throwin", "corner", "goalkick"].includes(stoppage?.type)) {
+      ctx.fillStyle = "#0c1b24dd";
+      ctx.fillRect(X(50) - 65, Y(4), 130, 22);
+      ctx.fillStyle = "#ffe19a";
+      ctx.font = "bold 13px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(
+        { throwin: "LATERAL", corner: "ESCANTEIO", goalkick: "TIRO DE META" }[
+          stoppage.type
+        ],
+        X(50),
+        Y(4) + 16,
+      );
+    }
     if (stoppage?.type === "offside") {
       ctx.strokeStyle = "#ffdb52";
       ctx.lineWidth = 3;

@@ -89,16 +89,30 @@ export function drawPlayer(
   };
   // Original outlined arcade sprite, shared by character editor and match renderer.
   rect("#08131766", -8, 0, 17, 4);
-  rect("#10171d", -6, -29, 13, 12);
-  rect("#10171d", -8, -26, 17, 7);
-  rect(a.skin, -6, -27, 13, 9);
-  rect(a.skin, -7, -25, 15, 5);
-  rect("#00000022", 4, -25, 3, 8);
-  rect("#ffffff25", -5, -26, 5, 2);
-  rect(a.skin, -2, -18, 5, 3);
+  // Two planted feet and a subtle body bounce make the run readable at small sizes.
+  if (phase && !["tackle", "injury"].includes(pose.action))
+    ctx.translate(0, -Math.abs(step) * 0.5);
+  // Stepped silhouette: temples, ears, cheeks and tapered chin.
+  rect("#10171d", -5, -30, 11, 2);
+  rect("#10171d", -7, -28, 15, 9);
+  rect("#10171d", -5, -20, 11, 3);
+  rect("#10171d", -3, -18, 7, 2);
+  rect(a.skin, -5, -28, 11, 10);
+  rect(a.skin, -6, -26, 13, 6);
+  rect(a.skin, -3, -19, 7, 2);
+  rect("#10171d", -8, -25, 2, 5);
+  rect("#10171d", 7, -25, 2, 5);
+  rect(a.skin, -7, -24, 2, 3);
+  rect(a.skin, 7, -24, 1, 3);
+  rect("#00000024", 4, -25, 2, 6);
+  rect("#00000022", -3, -18, 7, 1);
+  rect("#ffffff22", -4, -27, 4, 2);
+  rect(a.skin, -2, -17, 5, 2);
   if (a.style !== "bald") {
-    rect("#10171d", -7, -31, 15, 7);
-    rect(a.hair, -6, -30, 13, 5);
+    rect("#10171d", -5, -32, 11, 2);
+    rect("#10171d", -7, -30, 15, 5);
+    rect(a.hair, -5, -31, 11, 3);
+    rect(a.hair, -6, -29, 13, 4);
     rect(a.hair, -7, -27, 4, 4);
     rect(a.hair, 5, -27, 3, 5);
     rect("#ffffff22", -4, -30, 7, 2);
@@ -147,6 +161,8 @@ export function drawPlayer(
   }
   if (back && a.style !== "bald") rect(a.hair, -5, -26, 11, 7);
   if (!back) {
+    rect(a.hair, -4, -25, 3, 1);
+    rect(a.hair, 2, -25, 3, 1);
     rect("#fff9e9", -4, -24, 3, 3);
     rect("#fff9e9", 2, -24, 3, 3);
     rect(a.eyes, -3, -23, 2, 2);
@@ -161,8 +177,12 @@ export function drawPlayer(
   rect(uniform.shirt, -5, -15, 11, 8);
   rect(uniform.shirt, -7, -14, 3, 4);
   rect(uniform.shirt, 5, -14, 3, 4);
-  rect(a.sleeves === "long" ? uniform.shirt : a.skin, -7, -10 + step, 2, 4);
-  rect(a.sleeves === "long" ? uniform.shirt : a.skin, 6, -10 - step, 2, 4);
+  rect("#10171d", -8, -11 + step, 4, 5);
+  rect(a.sleeves === "long" ? uniform.shirt : a.skin, -7, -10 + step, 2, 3);
+  rect(a.skin, -6, -8 + step, 2, 2);
+  rect("#10171d", 5, -11 - step, 4, 5);
+  rect(a.sleeves === "long" ? uniform.shirt : a.skin, 6, -10 - step, 2, 3);
+  rect(a.skin, 5, -8 - step, 2, 2);
   if (uniform.pattern === "stripes") {
     rect(uniform.detail, -3, -15, 2, 8);
     rect(uniform.detail, 2, -15, 2, 8);
@@ -177,6 +197,10 @@ export function drawPlayer(
   rect("#00000026", 4, -14, 2, 7);
   rect(uniform.detail, -2, -15, 5, 1);
   rect(uniform.shorts, -5, -7, 11, 3);
+  rect("#ffffff22", -4, -7, 3, 1);
+  rect("#00000044", 0, -6, 1, 3);
+  rect(a.skin, -4, -4 + step, 3, 2);
+  rect(a.skin, 2, -4 - step, 3, 2);
   rect("#10171d", -6, -4, 5, 7 + step);
   rect("#10171d", 1, -4, 6, 7 - step);
   rect(uniform.socks, -4, -4, 3, 4 + step);
@@ -185,12 +209,24 @@ export function drawPlayer(
     rect(uniform.socks, 3, -5, 7, 3);
     rect(a.boots, 9, -6, 4, 4);
   }
-  rect(a.boots, -5, step, 4, 2);
-  rect(a.boots, 2, -step, 4, 2);
+  rect(a.boots, -6, step, 5, 2);
+  rect("#eee8d5", -6, step + 2, 5, 1);
+  rect(a.boots, 2, -step, 5, 2);
+  rect("#eee8d5", 2, -step + 2, 5, 1);
   ctx.fillStyle = "#fff";
   ctx.font = "bold 5px monospace";
   ctx.textAlign = "center";
   if (!pose.referee) ctx.fillText(String(a.number), 0.5, -9);
+  if (pose.action === "throwin") {
+    rect("#10171d", -10, -31, 4, 18);
+    rect("#10171d", 7, -31, 4, 18);
+    rect(a.skin, -9, -30, 2, 16);
+    rect(a.skin, 8, -30, 2, 16);
+    rect(a.skin, -8, -34, 17, 3);
+    rect("#10171d", -3, -38, 8, 6);
+    rect("#fff9e9", -2, -37, 6, 4);
+    rect("#172027", 0, -36, 2, 2);
+  }
   if (pose.card) {
     rect(uniform.shirt, 5, -19, 3, 6);
     rect(a.skin, 5, -27, 3, 8);

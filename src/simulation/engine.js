@@ -1,10 +1,12 @@
+import { simulateMatch as simulateV2 } from "./engine-v2.js";
+import { shootingChance, boundaryRestart } from "./decisions.js";
 import { simulateMatch as simulateLegacy } from "./engine-v1.js";
 import { offsideAtPass, lanePressure, assignNumbers } from "./rules.js";
 import { matchKits, shirtNumbers } from "./kits.js";
 import { FORMATIONS } from "../game/FORMATIONS.js";
 import { FORMATION_COORDINATES } from "../game/FORMATION_COORDINATES.js";
 import { appearance } from "./appearance.js";
-export const ENGINE_VERSION = 2;
+export const ENGINE_VERSION = 3;
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const numeric = (v, f = 60) => (Number.isFinite(Number(v)) ? Number(v) : f);
 export const available = (p) =>
@@ -136,6 +138,7 @@ function random(seed) {
 }
 export function simulateMatch(snapshot) {
   if (snapshot.version === 1) return simulateLegacy(snapshot);
+  if (snapshot.version === 2) return simulateV2(snapshot);
   if (snapshot.version !== ENGINE_VERSION)
     throw Error("Este replay pertence a outra versão do simulador.");
   if (snapshot.home.lineup.length !== 11 || snapshot.away.lineup.length !== 11)
@@ -183,7 +186,8 @@ export function simulateMatch(snapshot) {
     stop = 0,
     lastPass = null,
     period = 0,
-    pendingKickoff = null;
+    pendingKickoff = null,
+    pendingRestart = null;
   const direction = (side) => (side === period ? 1 : -1);
   const entered = people.map((p) => !p.reserve);
   const substitutions = [0, 0];
@@ -256,6 +260,7 @@ export function simulateMatch(snapshot) {
     return true;
   }
   function restart(t, side, half = false) {
+    pendingRestart = null;
     positions = people.map((p, i) => ({
       x: direction(p.side) > 0 ? p.anchor.x * 82 + 4 : 96 - p.anchor.x * 82,
       y: 5 + p.anchor.y * 54,
@@ -270,6 +275,37 @@ export function simulateMatch(snapshot) {
     lastPass = null;
     cooldown = t + 5;
     stop = t + (half ? 6 : 8);
+  }
+  function awardRestart(t, point, lastTouchSide) {
+    const r = boundaryRestart(point, lastTouchSide, direction(lastTouchSide));
+    const candidates = people
+      .map((p, i) => i)
+      .filter(
+        (i) =>
+          active(i) &&
+          people[i].side === r.side &&
+          (r.type === "goalkick" ? people[i].slot === 0 : people[i].slot !== 0),
+      );
+    owner = candidates.sort(
+      (a, b) =>
+        Math.hypot(positions[a].x - r.at[0], positions[a].y - r.at[1]) -
+        Math.hypot(positions[b].x - r.at[0], positions[b].y - r.at[1]),
+    )[0];
+    positions[owner] = { x: r.at[0], y: r.at[1] };
+    ball = [...r.at];
+    flight = null;
+    lastPass = null;
+    stop = t + 15;
+    cooldown = stop;
+    pendingRestart = { ...r, taker: owner };
+    event(
+      t,
+      r.type,
+      r.side,
+      owner,
+      `${r.type === "throwin" ? "Lateral" : r.type === "corner" ? "Escanteio" : "Tiro de meta"} para ${teams[r.side].name}.`,
+      { at: r.at, lastTouchSide },
+    );
   }
   function send(t, to, target, type, outcome = null) {
     const from = [...ball],
@@ -330,7 +366,8 @@ export function simulateMatch(snapshot) {
       windows.length &&
       t >= windows[0] &&
       !flight &&
-      pendingKickoff === null
+      pendingKickoff === null &&
+      !pendingRestart
     ) {
       windows.shift();
       for (const side of [0, 1]) {
@@ -354,6 +391,44 @@ export function simulateMatch(snapshot) {
       restart(t, pendingKickoff);
       pendingKickoff = null;
     }
+    if (pendingRestart && t > stop) {
+      const r = pendingRestart;
+      const target = people
+        .map((p, i) => i)
+        .filter(
+          (i) =>
+            active(i) &&
+            i !== owner &&
+            people[i].side === r.side &&
+            people[i].slot !== 0,
+        )
+        .sort((a, b) => {
+          const desired =
+            r.type === "corner"
+              ? [direction(r.side) > 0 ? 88 : 12, 32]
+              : [ball[0], 32];
+          return (
+            Math.hypot(
+              positions[a].x - desired[0],
+              positions[a].y - desired[1],
+            ) -
+            Math.hypot(positions[b].x - desired[0], positions[b].y - desired[1])
+          );
+        })[0];
+      stats[owner].passes++;
+      event(
+        t,
+        "restart",
+        r.side,
+        owner,
+        `${people[owner].name} cobra ${r.type === "throwin" ? "o lateral" : r.type === "corner" ? "o escanteio" : "o tiro de meta"}.`,
+        { restartType: r.type },
+      );
+      send(t, [positions[target].x, positions[target].y], target, "pass");
+      // Direct throw-ins, corners and goal kicks are exempt from offside.
+      flight.offside = null;
+      pendingRestart = null;
+    }
     const side = owner >= 0 ? people[owner].side : (flight?.side ?? 0);
     if (t > stop) possession[side]++;
     if (t > stop) {
@@ -375,13 +450,22 @@ export function simulateMatch(snapshot) {
         let x = dir > 0 ? 4 + who.anchor.x * 82 : 96 - who.anchor.x * 82,
           y = 5 + who.anchor.y * 54;
         if (who.slot === 0) {
-          x = dir > 0 ? 5 : 95;
-          y = clamp(32 + (ball[1] - 32) * 0.2, 25, 39);
+          const ownGoal = dir > 0 ? 0 : 100;
+          const danger =
+            who.side !== side &&
+            Math.abs(ball[0] - ownGoal) < 18 &&
+            Math.abs(ball[1] - 32) < 16;
+          x = danger
+            ? ownGoal + dir * Math.min(11, Math.abs(ball[0] - ownGoal) * 0.55)
+            : dir > 0
+              ? 5
+              : 95;
+          y = clamp(32 + (ball[1] - 32) * (danger ? 0.6 : 0.2), 25, 39);
         } else {
           x += clamp((ball[0] - 50) * 0.32, -12, 12);
           y += Math.sin(t * 0.07 + i * 2) * 3 + (ball[1] - 32) * 0.12;
           if (i === owner) {
-            x = p.x + dir * 7;
+            x = dir > 0 ? Math.min(96, p.x + 7) : Math.max(4, p.x - 7);
             y = clamp(p.y + (32 - p.y) * 0.09 + Math.sin(t * 0.21) * 2, 4, 60);
           }
           if (who.side === side && i !== owner && who.slot > 0) {
@@ -407,8 +491,13 @@ export function simulateMatch(snapshot) {
             if (Math.hypot(nearest.x - p.x, nearest.y - p.y) < 6)
               y += p.y > nearest.y ? 4 : -4;
           }
+          if (who.side !== side && i !== chaser) {
+            // Cover goal-side lanes instead of abandoning the area to chase the ball.
+            x = x * 0.55 + (ball[0] + dir * -7) * 0.45;
+            y = y * 0.75 + ball[1] * 0.25;
+          }
           if (i === chaser) {
-            x = ball[0];
+            x = ball[0] + direction(side) * 2;
             y = ball[1];
           }
           if (flight?.target === i) {
@@ -432,7 +521,9 @@ export function simulateMatch(snapshot) {
         ];
         if (t >= f.end) {
           flight = null;
-          if (f.type === "shot") {
+          if (f.type === "out") {
+            awardRestart(t, f.to, f.side);
+          } else if (f.type === "shot") {
             if (f.outcome === "goal") {
               score[f.side]++;
               stats[f.actor].goals++;
@@ -474,6 +565,20 @@ export function simulateMatch(snapshot) {
                   f.actor,
                   `${people[f.actor].name} finaliza para fora.`,
                 );
+              if (f.outcome === "save" && rand() < 0.32) {
+                awardRestart(
+                  t,
+                  [direction(f.side) > 0 ? 100 : 0, f.to[1]],
+                  1 - f.side,
+                );
+                record(t);
+                continue;
+              }
+              if (f.outcome === "miss") {
+                awardRestart(t, f.to, f.side);
+                record(t);
+                continue;
+              }
               ball = [positions[owner].x, positions[owner].y];
               cooldown = t + 4;
               stop = t + 3;
@@ -606,35 +711,57 @@ export function simulateMatch(snapshot) {
             );
           }
         }
-        if (t >= cooldown && t > stop) {
+        const ownerSide = people[owner].side;
+        const clearGoal =
+          people[owner].slot !== 0 &&
+          shootingChance(
+            ball,
+            positions[keeperFor(1 - ownerSide)],
+            direction(ownerSide),
+          ) === 1;
+        if ((t >= cooldown || clearGoal) && t > stop) {
           const actor = owner,
             s = people[actor].side,
             dir = direction(s),
             distance = dir > 0 ? 100 - ball[0] : ball[0];
           if (
             people[actor].slot !== 0 &&
-            distance < 27 &&
-            Math.abs(ball[1] - 32) < 21 &&
-            rand() < 0.06
+            rand() <
+              shootingChance(
+                ball,
+                positions[keeperFor(1 - s)],
+                dir,
+                lanePressure(
+                  { x: ball[0], y: ball[1] },
+                  { x: dir > 0 ? 100 : 0, y: 32 },
+                  rivals.map((i) => positions[i]),
+                ),
+              )
           ) {
             stats[actor].shots++;
             const keeper = keeperFor(1 - s);
+            const openGoal =
+              (ball[0] - positions[keeper].x) * dir > 1 &&
+              Math.abs(ball[1] - 32) < 12;
             const onTarget =
               rand() <
               clamp(
-                0.38 + skill(actor, "shot", t) / 230 - distance / 180,
+                0.48 +
+                  skill(actor, "shot", t) / 230 -
+                  distance / 180 +
+                  (openGoal ? 0.3 : 0),
                 0.2,
-                0.8,
+                0.97,
               );
             const goal =
               onTarget &&
               rand() <
                 clamp(
-                  0.2 +
+                  (openGoal ? 0.84 : 0.12) +
                     (skill(actor, "shot", t) - skill(keeper, "gk", t)) / 180 +
                     (15 - distance) / 200,
                   0.06,
-                  0.68,
+                  0.97,
                 );
             const outcome = goal ? "goal" : onTarget ? "save" : "miss";
             event(t, "shot", s, actor, `${people[actor].name} chuta!`);
@@ -709,6 +836,17 @@ export function simulateMatch(snapshot) {
                   "pass",
                 );
               else {
+                if (rand() < 0.28) {
+                  send(
+                    t,
+                    [positions[target].x, positions[target].y < 32 ? -1 : 65],
+                    target,
+                    "out",
+                  );
+                  lastPass = null;
+                  record(t);
+                  continue;
+                }
                 const interceptor = rival ?? target;
                 send(
                   t,

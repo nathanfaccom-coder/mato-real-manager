@@ -71,6 +71,16 @@ test("full broadcast renders, replays end and shares only isolated friendly data
     page.getByLabel("Transmissão completa da partida em pixel art"),
   ).toBeVisible();
   await expect(page.getByTestId("on-field-count")).toContainText("11 × 11");
+  await page.getByRole("button", { name: "ATIVAR APITO", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "APITO: LIGADO", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page
+    .getByRole("button", { name: "APITO: LIGADO", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "ATIVAR APITO", exact: true }),
+  ).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByTestId("on-field-count")).toContainText(
     "Campo inteiro",
   );
@@ -153,7 +163,10 @@ test("player editor uses club kit and persists appearance without changing attri
   await page.getByLabel("Cabelo", { exact: true }).selectOption("ponytail");
   await page.getByLabel("Barba", { exact: true }).selectOption("full");
   await expect(page.getByLabel("Número preferido")).toHaveCount(0);
-  await page.screenshot({ path: test.info().outputPath("editor-mobile.png"), fullPage: true });
+  await page.screenshot({
+    path: test.info().outputPath("editor-mobile.png"),
+    fullPage: true,
+  });
   await page.getByRole("button", { name: "SALVAR APARÊNCIA" }).click();
   await expect(page.getByRole("status")).toContainText("Aparência salva");
   const p = await page.evaluate(() => window.__MOCK_DB__.data.players.p1);

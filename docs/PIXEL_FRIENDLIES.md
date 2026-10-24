@@ -1,3 +1,14 @@
+# Atualização 2.7.0
+
+Motor v3 para novos amistosos. Replays v1/v2 usam os respectivos motores preservados. Ritmo de 30 minutos mantido.
+
+- Apito sintetizado localmente, sem downloads ou serviço pago. Toque em ATIVAR APITO para liberar o áudio do navegador; pode silenciar. Soa em início, intervalo, fim, faltas e impedimentos. Buscar um trecho do replay não reproduz eventos antigos.
+- Passes errados podem sair pela lateral; defesas desviadas para a linha de fundo geram escanteio; finalizações para fora geram tiro de meta. A posse pertence ao adversário do último toque. Pausa de cobrança e passe de reposição, sem impedimento direto nas três reposições.
+- Decisões de finalização usam ângulo, distância, pressão e posição do goleiro. Gol aberto em zona próxima prioriza o chute. Defensores cobrem espaços e goleiros fecham o ângulo.
+- Desenho compartilhado entre editor e jogo com rosto escalonado, orelhas, contornos de braços, detalhes nas chuteiras e balanço de corrida.
+
+As reposições e decisões continuam simplificadas; não é um motor completo das regras oficiais. Não altera energia, lesões ou resultados fora do amistoso.
+
 # Mato Real TV — versão atual 2.6.0
 
 ## Novidades 2.6.0

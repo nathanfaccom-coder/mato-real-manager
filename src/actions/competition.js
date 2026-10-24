@@ -644,17 +644,23 @@ export function createCompetitionActions(context, actions) {
     }
   };
 
-  const saveTactics = async (formation, lineup) => {
-    await db
-      .collection("teams")
-      .doc(user.data.teamId)
-      .update({
+  const saveTactics = async (teamId, formation, lineup, editorRole) => {
+    const ref = db.collection("teams").doc(teamId);
+    await db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(ref);
+      if (!snapshot.exists) throw Error("O time não foi encontrado.");
+      const revision = (snapshot.data().tactics?.revision || 0) + 1;
+      transaction.update(ref, {
         tactics: {
-          formation: formation,
-          lineup: lineup,
+          formation,
+          lineup,
+          revision,
+          updatedAt: Date.now(),
+          updatedBy: editorRole,
         },
       });
-    alert("Escalação salva na súmula!");
+    });
+    alert("Formação e escalação atualizadas e sincronizadas entre o time e o técnico.");
   };
 
   const saveMatchStats = async (

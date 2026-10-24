@@ -4,6 +4,7 @@ import { fmt } from "../game/fmt.js";
 import { getPosColor } from "../game/getPosColor.js";
 import { AttributeGrid } from "./AttributeGrid.jsx";
 import { StadiumManager } from "./StadiumManager.jsx";
+import { TacticsEditor } from "./TacticsEditor.jsx";
 
 export const TeamDashboard = ({
   team,
@@ -16,6 +17,7 @@ export const TeamDashboard = ({
   onRenewCoach,
   setModal,
   isAdmin,
+  onSaveTactics,
 }) => {
   const [tab, setTab] = useState("ELENCO");
   const [showStadiumUI, setShowStadiumUI] = useState(false);
@@ -84,9 +86,19 @@ export const TeamDashboard = ({
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 15 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 15 }}>
+        {!isVisitor && (
+          <button
+            className={`btn ${tab === "TACTICS" ? "btn-green" : "btn-ghost"}`}
+            style={{ flex: "1 1 120px", width: "auto", marginBottom: 0 }}
+            onClick={() => setTab("TACTICS")}
+          >
+            PRANCHETA TÁTICA
+          </button>
+        )}
         <button
           className={`btn ${tab === "ELENCO" ? "btn-blue" : "btn-ghost"}`}
+          style={{ flex: "1 1 100px", width: "auto", marginBottom: 0 }}
           onClick={() => setTab("ELENCO")}
         >
           ELENCO
@@ -94,6 +106,7 @@ export const TeamDashboard = ({
         {!isVisitor && (
           <button
             className="btn btn-ghost pixel-feature"
+          style={{ flex: "1 1 100px", width: "auto", marginBottom: 0 }}
             onClick={() => setTab("KITS")}
           >
             UNIFORMES
@@ -101,17 +114,29 @@ export const TeamDashboard = ({
         )}
         <button
           className={`btn ${tab === "STAFF" ? "btn-gold" : "btn-ghost"}`}
+          style={{ flex: "1 1 100px", width: "auto", marginBottom: 0 }}
           onClick={() => setTab("STAFF")}
         >
           COMISSÃO TÉCNICA
         </button>
         <button
           className={`btn ${tab === "TROFEUS" ? "btn-warning" : "btn-ghost"}`}
+          style={{ flex: "1 1 100px", width: "auto", marginBottom: 0 }}
           onClick={() => setTab("TROFEUS")}
         >
           🏆 TROFÉUS
         </button>
       </div>
+
+      {tab === "TACTICS" && !isVisitor && (
+        <TacticsEditor
+          key={team.id}
+          team={team}
+          players={players}
+          onSaveTactics={onSaveTactics}
+          editorRole="O time"
+        />
+      )}
 
       {/* --- ABA 1: ELENCO (ORDENADO) --- */}
       {tab === "KITS" && !isVisitor && <KitEditor key={team.id} team={team} />}

@@ -910,6 +910,7 @@ export function App() {
               onAdd={() =>
                 setModal({ type: "PLAYER", data: { teamId: user.data.id } })
               }
+              onSaveTactics={saveTactics}
             />
             <div
               style={{

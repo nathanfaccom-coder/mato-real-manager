@@ -1,12 +1,10 @@
 import { CoachNumbers } from "../simulation/CoachNumbers.jsx";
+import { TacticsEditor } from "./TacticsEditor.jsx";
 import React, { useState, useEffect } from "react";
 import { firebase } from "../services/firebase.js";
 import { COACH_PERKS } from "../game/COACH_PERKS.js";
 import { COACH_AFFINITIES } from "../game/COACH_AFFINITIES.js";
 import { fmt } from "../game/fmt.js";
-import { FORMATIONS } from "../game/FORMATIONS.js";
-import { FORMATION_COORDINATES } from "../game/FORMATION_COORDINATES.js";
-import { getPosColor } from "../game/getPosColor.js";
 
 export const CoachDashboard = ({
   coach,
@@ -28,13 +26,8 @@ export const CoachDashboard = ({
 }) => {
   const [tab, setTab] = useState("PRANCHETA");
   const [selectedPlayers, setSelectedPlayers] = useState([]);
-  const [selectingPos, setSelectingPos] = useState(null); // Guarda qual posição está sendo preenchida
   const [trainingType, setTrainingType] = useState("FISICO_BASE");
   const [newSalary, setNewSalary] = useState(coach.salary);
-  const [formation, setFormation] = useState(
-    team?.tactics?.formation || "4-3-3 OFENSIVO",
-  );
-  const [lineup, setLineup] = useState(team?.tactics?.lineup || {});
   const [editingOffer, setEditingOffer] = useState(null);
   const [counterVals, setCounterVals] = useState({ s: 0, c: 1, cl: 0 });
 
@@ -69,16 +62,6 @@ export const CoachDashboard = ({
       );
     // Agora chama a função global onTrain com tipo STUDY para processar no Banco de Dados
     onTrain([], "STUDY");
-  };
-
-  // --- FUNÇÃO DE ESCALAR TIME ---
-  const handleSetPosition = (index, playerId) => {
-    const newLineup = { ...lineup, [index]: playerId };
-    setLineup(newLineup);
-  };
-
-  const handleSaveTeam = () => {
-    onSaveTactics(formation, lineup);
   };
 
   // --- FUNÇÃO DE UPLOAD DA FOTO DO TÉCNICO (COMPRIMIDA) ---
@@ -418,322 +401,22 @@ export const CoachDashboard = ({
           players={players}
         />
       )}
-      {/* ABA PRANCHETA (CAMPO VISUAL COM SELEÇÃO) */}
+      {/* ABA PRANCHETA TÁTICA COMPARTILHADA COM O TIME */}
       {tab === "PRANCHETA" && (
-        <div className="animate-in">
-          {!team ? (
-            <div
-              className="card"
-              style={{
-                textAlign: "center",
-                padding: 40,
-                border: "1px dashed #666",
-              }}
-            >
-              <i
-                className="fas fa-lock"
-                style={{ fontSize: 40, color: "#444", marginBottom: 15 }}
-              ></i>
-              <p>Contrate um clube para acessar a prancheta tática.</p>
-            </div>
-          ) : (
-            <div className="card" style={{ padding: "10px" }}>
-              <div style={{ marginBottom: 15 }}>
-                <label
-                  style={{
-                    fontSize: 12,
-                    color: "gold",
-                    fontWeight: "bold",
-                    display: "block",
-                    marginBottom: 5,
-                  }}
-                >
-                  ESTRATÉGIA DE JOGO
-                </label>
-                <select
-                  className="input-field"
-                  value={formation}
-                  onChange={(e) => setFormation(e.target.value)}
-                  style={{ background: "#111", border: "1px solid gold" }}
-                >
-                  {Object.keys(FORMATIONS).map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div
-                className="football-field"
-                style={{
-                  background: "#2e7d32",
-                  position: "relative",
-                  width: "100%",
-                  height: "520px",
-                  border: "4px solid #fff",
-                  borderRadius: "15px",
-                  boxShadow: "inset 0 0 60px rgba(0,0,0,0.4)",
-                  overflow: "hidden",
-                }}
-              >
-                {/* Linhas do Campo */}
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "50%",
-                    left: 0,
-                    right: 0,
-                    height: 2,
-                    background: "rgba(255,255,255,0.5)",
-                  }}
-                ></div>
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "50%",
-                    left: "50%",
-                    transform: "translate(-50%, -50%)",
-                    width: 100,
-                    height: 100,
-                    border: "2px solid rgba(255,255,255,0.5)",
-                    borderRadius: "50%",
-                  }}
-                ></div>
-
-                {FORMATIONS[formation].map((posLabel, idx) => {
-                  const coords = FORMATION_COORDINATES[formation]
-                    ? FORMATION_COORDINATES[formation][idx]
-                    : {
-                        t: `${Math.floor(idx / 3) * 25 + 10}%`,
-                        l: `${(idx % 3) * 30 + 20}%`,
-                      };
-                  const pId = lineup[idx];
-                  const player = players.find((p) => p.id === pId);
-
-                  return (
-                    <div
-                      key={idx}
-                      className="player-slot"
-                      style={{
-                        position: "absolute",
-                        top: coords.t,
-                        left: coords.l,
-                        transform: "translate(-50%, -50%)",
-                        transition: "all 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
-                        zIndex: 10,
-                      }}
-                      onClick={() =>
-                        setSelectingPos({ label: posLabel, index: idx })
-                      }
-                    >
-                      <div
-                        className="player-photo-circle"
-                        style={{
-                          width: "46px",
-                          height: "46px",
-                          borderRadius: "50%",
-                          border: player
-                            ? "2px solid gold"
-                            : "2px dashed rgba(255,255,255,0.3)",
-                          background: player ? "#001a33" : "rgba(0,0,0,0.4)",
-                          overflow: "hidden",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          boxShadow: player
-                            ? "0 4px 10px rgba(0,0,0,0.5)"
-                            : "none",
-                        }}
-                      >
-                        {player?.face ? (
-                          <img
-                            src={player.face}
-                            style={{
-                              width: "100%",
-                              height: "100%",
-                              objectFit: "cover",
-                              objectPosition: "top",
-                            }}
-                          />
-                        ) : (
-                          <span
-                            style={{
-                              color: "#fff",
-                              fontSize: "10px",
-                              fontWeight: "900",
-                            }}
-                          >
-                            {posLabel}
-                          </span>
-                        )}
-                      </div>
-                      <div
-                        className="player-name-label"
-                        style={{
-                          background: player ? "gold" : "rgba(0,0,0,0.8)",
-                          color: player ? "#000" : "#fff",
-                          fontSize: "9px",
-                          padding: "2px 6px",
-                          borderRadius: "10px",
-                          marginTop: "4px",
-                          fontWeight: "900",
-                          whiteSpace: "nowrap",
-                          maxWidth: "80px",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {player
-                          ? player.name.split(" ")[0].toUpperCase()
-                          : "VAZIO"}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div style={{ marginTop: 15, display: "flex", gap: 10 }}>
-                <button
-                  className="btn btn-green"
-                  style={{ flex: 1, fontWeight: "900", height: 50 }}
-                  onClick={handleSaveTeam}
-                >
-                  <i className="fas fa-save"></i> SALVAR ESCALAÇÃO
-                </button>
-                <button
-                  className="btn btn-red"
-                  style={{ width: 50 }}
-                  onClick={() => {
-                    if (confirm("Limpar escalação?")) setLineup({});
-                  }}
-                >
-                  <i className="fas fa-trash"></i>
-                </button>
-              </div>
-
-              {/* MODAL SELETOR DE JOGADORES (FLUTUANTE) */}
-              {selectingPos && (
-                <div className="modal-overlay" style={{ zIndex: 9999 }}>
-                  <div className="modal-content" style={{ maxHeight: "70vh" }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        marginBottom: 15,
-                      }}
-                    >
-                      <h3 style={{ margin: 0 }}>
-                        Escalar {selectingPos.label}
-                      </h3>
-                      <button
-                        className="btn btn-red"
-                        style={{ width: "auto", padding: "5px 10px" }}
-                        onClick={() => setSelectingPos(null)}
-                      >
-                        X
-                      </button>
-                    </div>
-
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 8,
-                        overflowY: "auto",
-                      }}
-                    >
-                      <div
-                        className="card"
-                        style={{
-                          background: "#333",
-                          border: "1px dashed #666",
-                          textAlign: "center",
-                          cursor: "pointer",
-                        }}
-                        onClick={() => {
-                          handleSetPosition(selectingPos.index, null);
-                          setSelectingPos(null);
-                        }}
-                      >
-                        <b>❌ REMOVER JOGADOR DESTA VAGA</b>
-                      </div>
-
-                      {players
-                        .filter((p) => p.teamId === coach.teamId)
-                        .filter(
-                          (p) =>
-                            !Object.values(lineup).includes(p.id) ||
-                            lineup[selectingPos.index] === p.id,
-                        )
-                        .map((p) => (
-                          <div
-                            key={p.id}
-                            className="card"
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 10,
-                              cursor: "pointer",
-                              borderLeft: `4px solid ${getPosColor(p.position)}`,
-                              background:
-                                lineup[selectingPos.index] === p.id
-                                  ? "rgba(0,230,118,0.1)"
-                                  : "var(--bg-input)",
-                            }}
-                            onClick={() => {
-                              handleSetPosition(selectingPos.index, p.id);
-                              setSelectingPos(null);
-                            }}
-                          >
-                            {p.face ? (
-                              <img
-                                src={p.face}
-                                style={{
-                                  width: 35,
-                                  height: 35,
-                                  borderRadius: "50%",
-                                  objectFit: "cover",
-                                  objectPosition: "top",
-                                }}
-                              />
-                            ) : (
-                              <div
-                                style={{
-                                  width: 35,
-                                  height: 35,
-                                  borderRadius: "50%",
-                                  background: "#333",
-                                  display: "grid",
-                                  placeItems: "center",
-                                  fontSize: 12,
-                                }}
-                              >
-                                👤
-                              </div>
-                            )}
-                            <div style={{ flex: 1 }}>
-                              <b>{p.name}</b>
-                              <br />
-                              <small style={{ color: "#aaa" }}>
-                                {p.position} | OV: {p.overall}
-                              </small>
-                            </div>
-                            {lineup[selectingPos.index] === p.id && (
-                              <i
-                                className="fas fa-check-circle"
-                                style={{ color: "var(--primary)" }}
-                              ></i>
-                            )}
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        !team ? (
+          <div className="card animate-in" style={{ textAlign: "center", padding: 40, border: "1px dashed #666" }}>
+            <i className="fas fa-lock" style={{ fontSize: 40, color: "#444", marginBottom: 15 }}></i>
+            <p>Contrate um clube para acessar a prancheta tática.</p>
+          </div>
+        ) : (
+          <TacticsEditor
+            key={team.id}
+            team={team}
+            players={players}
+            onSaveTactics={onSaveTactics}
+            editorRole="O técnico"
+          />
+        )
       )}
 
       {/* ABA MOCHILA */}

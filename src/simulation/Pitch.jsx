@@ -145,6 +145,13 @@ export function Pitch({ match, time, camera = "wide", presentation = null }) {
       for (let j = 1; j < 10; j++)
         line(side ? 100 : 0, 27 + j, side ? 102.5 : -2.5, 27 + j);
     }
+    // Penalty arc: players wait beyond this 9.15-unit radius.
+    for (const right of [false,true]) {
+      ctx.beginPath();
+      const angle=Math.acos(5.5/9.15);
+      ctx.ellipse(X(right?89:11),Y(32),9.15*8.4,9.15*7.65,0,right?Math.PI-angle:-angle,right?Math.PI+angle:angle);
+      ctx.stroke();
+    }
     const celebration = match.events.findLast((e) => e.type === "goal" && e.t <= time && time - e.t < 6 && !presentation);
     const celebrationGroup = celebration ? match.people.map((p, i) => i).filter((i) => match.people[i].side === celebration.side && i !== celebration.actor && ((i + celebration.t + match.snapshot.seed) % 5 < 2)).slice(0, 4) : [];
     const people = match.people
@@ -225,6 +232,14 @@ export function Pitch({ match, time, camera = "wide", presentation = null }) {
         ctx.textAlign = "center";
         ctx.fillText(p.name.slice(0, 16), X(x), Y(y) + 16);
       }
+    }
+    if (a.penalty) {
+      const taker=match.people[a.penalty.taker];
+      ctx.fillStyle='#091b24e8';ctx.fillRect(X(50)-195,Y(2),390,29);
+      ctx.fillStyle='#ffdf76';ctx.font='bold 12px monospace';ctx.textAlign='center';
+      ctx.fillText(`${a.penalty.phase==='runup'?'COBRANÇA':'PÊNALTI • ORGANIZAÇÃO'} • ${taker.name.slice(0,25)}`,X(50),Y(2)+19);
+      ctx.strokeStyle='#ffdf76';ctx.lineWidth=2;ctx.beginPath();
+      ctx.ellipse(X(a.positions[a.penalty.taker][0]),Y(a.positions[a.penalty.taker][1])+2,11,5,0,Math.PI*2);ctx.stroke();
     }
     const stoppage = match.events.findLast(
       (e) =>

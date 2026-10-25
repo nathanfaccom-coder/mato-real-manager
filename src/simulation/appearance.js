@@ -86,7 +86,7 @@ export function drawPlayer(
   if (pose.action === "kick") ctx.rotate(-0.13);
   if (pose.action === "save") {
     ctx.translate(2, -2);
-    ctx.rotate(-Math.PI / 5);
+    ctx.rotate((pose.diveDirection || -1) * Math.PI / 5);
   }
 
   const rect = (color, x, y, w, h) => {

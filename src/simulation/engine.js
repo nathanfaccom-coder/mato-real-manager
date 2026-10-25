@@ -1,3 +1,5 @@
+import { simulateMatch as simulateV9 } from "./engine-v9.js";
+import { shotDecision, passValue, penaltyPositions } from "./individual-decisions.js";
 import { simulateMatch as simulateV8 } from "./engine-v8.js";
 import { simulateMatch as simulateV7 } from "./engine-v7.js";
 import { POSTURES, validCommand } from "./live-tactics.js";
@@ -14,7 +16,7 @@ import { appearance } from "./appearance.js";
 import { addedTimeForSeed, matchDurationSeconds } from "./timeline.js";
 import { simulateMatch as simulateV5 } from "./engine-v5.js";
 import { simulateMatch as simulateV6 } from "./engine-v6.js";
-export const ENGINE_VERSION = 9;
+export const ENGINE_VERSION = 10;
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const numeric = (v, f = 60) => (Number.isFinite(Number(v)) ? Number(v) : f);
 export const available = (p) =>
@@ -154,6 +156,7 @@ export function simulateMatch(snapshot) {
   if (snapshot.version === 4) return simulateV4(snapshot);
   if (snapshot.version === 5) return simulateV5(snapshot);
   if (snapshot.version === 6) return simulateV6(snapshot);
+  if (snapshot.version === 9) return simulateV9(snapshot);
   if (snapshot.version === 8) return simulateV8(snapshot);
   if (snapshot.version === 7) return simulateV7(snapshot);
   if (snapshot.version !== ENGINE_VERSION)
@@ -369,16 +372,15 @@ export function simulateMatch(snapshot) {
       .sort((a, b) => skill(b, "shot", t) - skill(a, "shot", t))[0];
     if (taker === undefined) return freeKick(t, side, point);
     const attackDirection = direction(side);
-    const at = [attackDirection > 0 ? 88 : 12, 32];
+    const at = [attackDirection > 0 ? 89 : 11, 32];
     const keeper = keeperFor(defendingSide);
-    positions[taker] = { x: at[0], y: at[1] };
-    positions[keeper] = { x: attackDirection > 0 ? 98 : 2, y: 32 };
+
     owner = taker;
     ball = at;
     flight = null;
     pendingRestart = null;
     pendingFreeKick = null;
-    pendingPenalty = { side, defendingSide, taker, keeper, at, fouler, awardedAt: t };
+    pendingPenalty = { side, defendingSide, taker, keeper, at, fouler, awardedAt: t, deadline: t + 30 };
     stop = t + 30;
     cooldown = stop;
     lastPass = null;
@@ -475,6 +477,7 @@ export function simulateMatch(snapshot) {
       period,
       formations: [...formations],
       postures: [...postures],
+      penalty: pendingPenalty ? {taker:pendingPenalty.taker,keeper:pendingPenalty.keeper,phase:pendingPenalty.runAt ? "runup" : "setup"} : null,
       substitutions: [...substitutions],
       substitutionWindows: [...substitutionWindows],
     });
@@ -557,23 +560,37 @@ export function simulateMatch(snapshot) {
       stop = t - 1;
       cooldown = t;
     }
-    if (pendingPenalty && t > stop) {
-      const eligible = commands.filter(c => c.kind === 'penalty' && c.side === pendingPenalty.side && c.penaltyAt === pendingPenalty.awardedAt && c.at > pendingPenalty.awardedAt && c.at <= stop);
+    if (pendingPenalty) {
+      const kick = pendingPenalty;
+      const eligible = commands.filter(c => c.kind === 'penalty' && c.side === kick.side && c.penaltyAt === kick.awardedAt && c.at > kick.awardedAt && c.at <= kick.deadline && c.at <= t);
       const choice = eligible.at(-1);
       const selected = choice ? people.findIndex((p,i) => p.id === choice.playerId && p.side === choice.side && active(i)) : -1;
-      if (selected >= 0) {
-        owner = selected;
-        pendingPenalty.taker = selected;
-        positions[selected] = {x: pendingPenalty.at[0], y:pendingPenalty.at[1]};
+      if (selected >= 0 && !kick.runAt) kick.taker = selected;
+      owner = kick.taker;
+      ball = [...kick.at];
+      const targets = penaltyPositions(people,active,kick.taker,kick.keeper,direction(kick.side));
+      if (kick.runAt) targets[kick.taker] = {x:kick.at[0],y:kick.at[1]};
+      let ready = true;
+      positions = positions.map((p,i)=>{
+        const target=targets[i];if (!target) return p;
+        const d=Math.hypot(target.x-p.x,target.y-p.y), step=Math.min(1,(kick.runAt && i===kick.taker ? .8:2.8)/(d||1));
+        if(d>.05) ready=false;
+        return {x:p.x+(target.x-p.x)*step,y:p.y+(target.y-p.y)*step};
+      });
+      if (!kick.runAt && t > kick.deadline && ready) {
+        kick.runAt=t;
+        event(t,'penalty-ready',kick.side,kick.taker,`${people[kick.taker].name} se prepara para cobrar.`,{keeper:kick.keeper});
       }
-
+      stop=Math.max(stop,t);
+    }
+    if (pendingPenalty?.runAt && t >= pendingPenalty.runAt + 5) {
       const kick = pendingPenalty,
         attack = skill(kick.taker, "shot", t),
         keeperSkill = skill(kick.keeper, "gk", t),
         goalChance = clamp(0.77 + (attack - keeperSkill) / 250, 0.55, 0.91),
         outcome = rand() < goalChance ? "goal" : rand() < 0.82 ? "save" : "miss",
         goalX = direction(kick.side) > 0 ? 100 : 0,
-        targetY = outcome === "goal" ? 30 + rand() * 4 : outcome === "save" ? 32 : rand() < 0.5 ? 25 : 39;
+        targetY = outcome === "goal" ? 30 + rand() * 4 : outcome === "save" ? 28 + rand() * 8 : rand() < 0.5 ? 25 : 39;
       stats[kick.taker].shots++;
       event(
         t,
@@ -581,9 +598,11 @@ export function simulateMatch(snapshot) {
         kick.side,
         kick.taker,
         `${people[kick.taker].name} cobra o pênalti.`,
-        { outcome, keeper: kick.keeper, fouler: kick.fouler },
+        { outcome, keeper: kick.keeper, fouler: kick.fouler, targetY, goalX },
       );
-      send(t, [goalX, targetY], kick.keeper, "shot", outcome);
+      send(t, [goalX, targetY], kick.keeper, "shot", outcome, kick.at);
+      flight.penalty = true;
+      flight.end = t + 3;
       pendingPenalty = null;
       stop = t - 1;
       cooldown = t;
@@ -758,6 +777,8 @@ export function simulateMatch(snapshot) {
       )[0];
       positions = positions.map((p, i) => {
         if (!active(i)) return p;
+        if (flight?.penalty && t === flight.start) return p;
+        if (flight?.penalty && i === flight.target) return {x:flight.to[0],y:p.y+(flight.to[1]-p.y)*.65};
         const who = people[i],
           dir = direction(who.side);
         let x = dir > 0 ? 4 + who.anchor.x * 82 : 96 - who.anchor.x * 82,
@@ -1073,35 +1094,15 @@ export function simulateMatch(snapshot) {
           }
         }
         const ownerSide = people[owner].side;
-        const clearGoal =
-          people[owner].slot !== 0 &&
-          shootingChance(
-            ball,
-            positions[keeperFor(1 - ownerSide)],
-            direction(ownerSide),
-          ) === 1;
+        const shotPressure = lanePressure({x:ball[0],y:ball[1]}, {x:direction(ownerSide)>0?100:0,y:32}, rivals.map(i=>positions[i]));
+        const chance = people[owner].slot === 0 ? 0 : shotDecision(ball,positions[keeperFor(1-ownerSide)],direction(ownerSide),shotPressure,people[owner].overall,skill(owner,'shot',t),passChain,POSTURES[postures[ownerSide]].shot);
+        const clearGoal = chance === 1;
         if ((t >= cooldown || clearGoal) && t > stop) {
           const actor = owner,
             s = people[actor].side,
             dir = direction(s),
             distance = dir > 0 ? 100 - ball[0] : ball[0];
-          if (
-            people[actor].slot !== 0 &&
-            rand() <
-              POSTURES[postures[s]].shot * shootingChance(
-                ball,
-                positions[keeperFor(1 - s)],
-                dir,
-                lanePressure(
-                  { x: ball[0], y: ball[1] },
-                  { x: dir > 0 ? 100 : 0, y: 32 },
-                  rivals.map((i) => positions[i]),
-                ),
-                people[actor].overall,
-                skill(actor, "shot", t),
-                passChain,
-              )
-          ) {
+          if (people[actor].slot !== 0 && (clearGoal || rand() < chance)) {
             stats[actor].shots++;
             passChain = 0;
             const keeper = keeperFor(1 - s);
@@ -1186,37 +1187,18 @@ export function simulateMatch(snapshot) {
               const ranked = mates
                 .map((i) => ({
                   i,
-                  w:
-                    rand() * (14 - people[actor].overall / 10) +
-                    dir * (positions[i].x - ball[0]) * 0.45 +
-                    (distance < 30 && lastPass?.from === i ? -12 : 0) -
-                    lanePressure(
-                      { x: ball[0], y: ball[1] },
-                      positions[i],
-                      rivals.map((j) => positions[j]),
-                    ) *
-                      14 -
-                    (offsideAtPass(
-                      positions[i],
-                      ball,
-                      rivals
-                        .map((j) => positions[j])
-                        .concat([positions[keeperFor(1 - s)]]),
-                      dir,
-                    ).offside
-                      ? 12 + people[actor].overall / 4
-                      : 0) +
-                    Math.min(
-                      8,
-                      ...rivals.map((j) =>
-                        Math.hypot(
-                          positions[j].x - positions[i].x,
-                          positions[j].y - positions[i].y,
-                        ),
-                      ),
-                    ),
+                  w: passValue({from:{x:ball[0],y:ball[1]},to:positions[i],dir,
+                    pressure:lanePressure({x:ball[0],y:ball[1]},positions[i],rivals.map(j=>positions[j])),
+                    space:Math.min(8,...rivals.map(j=>Math.hypot(positions[j].x-positions[i].x,positions[j].y-positions[i].y))),
+                    offside:offsideAtPass(positions[i],ball,rivals.map(j=>positions[j]).concat([positions[keeperFor(1-s)]]),dir).offside,
+                    overall:people[actor].overall,receiverShot:skill(i,'shot',t),ownChance:chance,
+                    receiverChance:shotDecision([positions[i].x,positions[i].y],positions[keeperFor(1-s)],dir,lanePressure(positions[i],{x:dir>0?100:0,y:32},rivals.map(j=>positions[j])),people[i].overall,skill(i,'shot',t),passChain),
+                    returnPass:distance<30 && lastPass?.from===i,noise:rand()})
                 }))
                 .sort((a, b) => b.w - a.w);
+              if (ranked[0].w < -5 && shotPressure < 2 && people[actor].slot !== 0) {
+                cooldown=t+2;record(t);continue;
+              }
               const target = ranked[0].i;
               stats[actor].passes++;
               if (

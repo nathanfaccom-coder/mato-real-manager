@@ -15,6 +15,7 @@ export function actorPresentation(match, frame, i, time) {
         "tackle",
         "foul",
         "shot",
+        "penalty-kick",
         "save",
         "injury",
         "restart",
@@ -47,6 +48,7 @@ export function actorPresentation(match, frame, i, time) {
   } else if (contact)
     action =
       contact.type === "shot" ||
+      contact.type === "penalty-kick" ||
       contact.type === "restart" ||
       contact.type === "freekick-pass" ||
       contact.type === "freekick-shot"
@@ -66,7 +68,11 @@ export function actorPresentation(match, frame, i, time) {
     if (!release) action = "throwin";
     else if (time - release.t < 2) action = "throwin-release";
   }
+  if (frame.penalty && position[2]) action = frame.penalty.phase === 'runup' && i === frame.penalty.taker ? 'run' : 'idle';
+  const penaltyShot = recent.findLast(e=>e.type==='penalty-kick' && e.keeper===i && time-e.t<4);
+  if (penaltyShot && position[2]) action='save';
   return {
+    diveDirection: penaltyShot ? (penaltyShot.targetY >= 32 ? 1 : -1) : undefined,
     x,
     y,
     visible,

@@ -975,18 +975,7 @@ export function App() {
                 >
                   ESCREVER NOTÍCIA
                 </button>
-                <button
-                  className="btn btn-purple"
-                  onClick={() => setModal({ type: "MATCH_PERFORMANCE" })}
-                >
-                  LANÇAR SÚMULA (XP)
-                </button>
-                <button
-                  className="btn btn-gold"
-                  onClick={() => setModal({ type: "TEAM_TABLE" })}
-                >
-                  EDITAR TABELA
-                </button>
+
               </div>
 
               {user.type === "PRESS" &&
@@ -1173,14 +1162,14 @@ export function App() {
                   onDeleteMatch={(id) => handleDeleteMatch(id)}
                   onReportMatch={(m) => {
                     if (
-                      user.type.includes("PRESS") ||
+
                       canAdmin(user, "competitions")
                     )
                       setModal({
                         type: "MATCH_PERFORMANCE",
                         data: { match: m, player: null },
                       });
-                    else alert("Apenas imprensa/admin lança súmula.");
+                    else alert("Somente administradores podem corrigir súmulas.");
                   }}
                 />
               </div>
@@ -1258,7 +1247,7 @@ export function App() {
                                 onDeleteMatch={(id) => handleDeleteMatch(id)}
                                 onReportMatch={(m) => {
                                   if (
-                                    user.type.includes("PRESS") ||
+
                                     canAdmin(user, "competitions")
                                   )
                                     setModal({
@@ -1267,7 +1256,7 @@ export function App() {
                                     });
                                   else
                                     alert(
-                                      "Apenas imprensa/admin lança súmula.",
+                                      "Somente administradores podem corrigir súmulas.",
                                     );
                                 }}
                               />
@@ -1968,7 +1957,7 @@ export function App() {
                   onWithdraw={withdrawMoney}
                 />
               )}
-              {modal.type === "MATCH_PERFORMANCE" && (
+              {modal.type === "MATCH_PERFORMANCE" && canAdmin(user, "competitions") && (
                 <MatchPerformanceForm
                   players={players}
                   teams={teams}
@@ -1976,7 +1965,7 @@ export function App() {
                   matchData={modal.data?.match}
                 />
               )}
-              {modal.type === "TEAM_TABLE" && (
+              {modal.type === "TEAM_TABLE" && canAdmin(user, "competitions") && (
                 <TeamStandingsEditor
                   teams={teams}
                   onUpdateTeamStats={updateTeamStats}
@@ -2073,7 +2062,7 @@ export function App() {
                 />
               )}
 
-              {modal.type === "MATCH_REPORT" && (
+              {modal.type === "MATCH_REPORT" && canAdmin(user, "competitions") && (
                 <MatchPerformanceForm
                   players={players}
                   teams={teams}

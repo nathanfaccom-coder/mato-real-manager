@@ -1,6 +1,6 @@
+import {evolveSeason} from '../game/progression.js';
+import {careerOf} from '../matches/policy.js';
 import { STADIUM_DB } from "../game/STADIUM_DB.js";
-import { POS_TRAINING_MAP } from "../game/POS_TRAINING_MAP.js";
-import { ATTR_LABELS } from "../game/ATTR_LABELS.js";
 import { DEFAULT_PRIZES } from "../game/DEFAULT_PRIZES.js";
 import { ESTADOS } from "../game/ESTADOS.js";
 import { firebase } from "../services/firebase.js";
@@ -391,54 +391,6 @@ export function createCompetitionActions(context, actions) {
       season: currentSeason + 1,
     });
 
-    // --- FUNÇÕES DE EVOLUÇÃO INTELIGENTE (FIFA STYLE) ---
-    const getPrimaryAttrs = (pos) => {
-      if (pos === "GOL")
-        return ["gk", "response", "jump", "longPass", "balance", "condition"];
-      if (pos.includes("ZAG"))
-        return [
-          "defense",
-          "header",
-          "balance",
-          "jump",
-          "aggression",
-          "stamina",
-        ];
-      if (pos.includes("LAT") || pos.includes("LD") || pos.includes("LE"))
-        return ["speed", "accel", "stamina", "shortPass", "dribble", "defense"];
-      if (
-        pos.includes("VOL") ||
-        pos.includes("MC") ||
-        pos === "MD" ||
-        pos === "ME"
-      )
-        return [
-          "shortPass",
-          "stamina",
-          "teamwork",
-          "defense",
-          "balance",
-          "tech",
-        ];
-      if (pos.includes("MEI") || pos.includes("MAT"))
-        return ["dribble", "shortPass", "vision", "tech", "curve", "agility"];
-      if (pos === "PTD" || pos === "PTE")
-        return ["speed", "accel", "dribble", "agility", "curve", "stamina"];
-      if (pos.includes("ATA") || pos.includes("SA") || pos.includes("PNT"))
-        return ["shot", "attack", "header", "shotPower", "balance", "speed"];
-      return ["stamina", "balance", "speed", "shortPass", "dribble", "shot"];
-    };
-
-    const getXpCost = (ovr) => {
-      if (ovr <= 50) return 50; // Sobe voando (Base)
-      if (ovr <= 60) return 80; // Sobe rápido (Iniciante)
-      if (ovr <= 70) return 150; // Normal (Profissional)
-      if (ovr <= 80) return 300; // Difícil (Estrela)
-      if (ovr <= 85) return 600; // Muito difícil (Craque)
-      if (ovr <= 90) return 1000; // Quase travado (World Class)
-      return 2000; // Lenda Absoluta
-    };
-
     // 🔥 SOLUÇÃO BUG B: JOGADORES (Evolução Inteligente e Contratos)
     players.forEach((p) => {
       let updates = {
@@ -455,128 +407,8 @@ export function createCompetitionActions(context, actions) {
         pressRatingAvg: 0,
       };
 
-      let totalXP = (p.xp || 0) + (p.pendingXP || 0);
-      const safePos = p.position || "ATA";
-      const xpCost = getXpCost(p.overall || 50);
-
-      // Permite XP negativo (regressão)
-      let isPositive = totalXP >= 0;
-      let absXP = Math.abs(totalXP);
-
-      let pointsToDistribute = Math.floor(absXP / xpCost);
-      let remainderXP = isPositive ? absXP % xpCost : -(absXP % xpCost);
-
-      if (p.attributes && pointsToDistribute !== 0) {
-        let newAttrs = { ...p.attributes };
-        const allKeys = Object.keys(ATTR_LABELS);
-        const primaryKeys = getPrimaryAttrs(safePos);
-
-        for (let i = 0; i < pointsToDistribute; i++) {
-          let targetKey;
-          // 75% de chance de upar os 6 principais da posição, 25% de upar aleatório (Simula a realidade)
-          if (Math.random() < 0.75) {
-            targetKey =
-              primaryKeys[Math.floor(Math.random() * primaryKeys.length)];
-          } else {
-            targetKey = allKeys[Math.floor(Math.random() * allKeys.length)];
-          }
-
-          // Filtros anti-bug (Zagueiro ganhando habilidade de GK ou Goleiro ganhando Chute)
-          if (
-            safePos === "GOL" &&
-            [
-              "shot",
-              "attack",
-              "dribble",
-              "curve",
-              "freeKick",
-              "weakFootAcc",
-            ].includes(targetKey)
-          )
-            targetKey = "gk";
-          if (safePos !== "GOL" && targetKey === "gk")
-            targetKey = primaryKeys[0];
-
-          // Evita atributos inexistentes
-          if (newAttrs[targetKey] === undefined) newAttrs[targetKey] = 50;
-
-          if (isPositive) {
-            if (newAttrs[targetKey] < 99) newAttrs[targetKey]++;
-          } else {
-            if (newAttrs[targetKey] > 1) newAttrs[targetKey]--;
-          }
-        }
-
-        // Cálculo realista do novo Overall baseado na Posição!
-        const ignoreList =
-          safePos === "GOL"
-            ? [
-                "shot",
-                "attack",
-                "dribble",
-                "curve",
-                "freeKick",
-                "weakFootAcc",
-                "weakFootFreq",
-              ]
-            : ["gk"];
-        let sum = 0;
-        let count = 0;
-        Object.entries(newAttrs).forEach(([key, val]) => {
-          if (!ignoreList.includes(key) && ATTR_LABELS[key]) {
-            sum += val;
-            count++;
-          }
-        });
-
-        updates.attributes = newAttrs;
-        updates.overall = count === 0 ? p.overall : Math.round(sum / count);
-        updates.xp = remainderXP;
-        updates.pendingXP = 0;
-      } else {
-        updates.xp = remainderXP;
-        updates.pendingXP = 0;
-      }
-
-      // Aplicar bônus de posição aprendida (se houver)
-      if (p.pendingPosBoosts && p.attributes) {
-        let newAttrs = updates.attributes
-          ? { ...updates.attributes }
-          : { ...p.attributes };
-        p.pendingPosBoosts.forEach((pos) => {
-          const map = POS_TRAINING_MAP[pos];
-          if (map) {
-            map.attrs.forEach((a) => {
-              if (newAttrs[a] < 99) newAttrs[a] = Math.min(99, newAttrs[a] + 3);
-            });
-          }
-        });
-        updates.attributes = newAttrs;
-
-        const safePos = p.position || "ATA";
-        const ignoreList =
-          safePos === "GOL"
-            ? [
-                "shot",
-                "attack",
-                "dribble",
-                "curve",
-                "freeKick",
-                "weakFootAcc",
-                "weakFootFreq",
-              ]
-            : ["gk"];
-        let sum = 0;
-        let count = 0;
-        Object.entries(newAttrs).forEach(([key, val]) => {
-          if (!ignoreList.includes(key)) {
-            sum += val;
-            count++;
-          }
-        });
-        updates.overall = count === 0 ? p.overall : Math.round(sum / count);
-        updates.pendingPosBoosts = firebase.firestore.FieldValue.delete();
-      }
+      Object.assign(updates, evolveSeason(p));
+      updates.career = careerOf(p);
 
       let nc = (parseInt(p.contract) || 0) - 1;
       if (nc < 0) nc = 0;

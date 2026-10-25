@@ -1,3 +1,4 @@
+import {overallFor} from '../game/progression.js';
 import { promptMoney } from '../money/promptMoney.jsx';
 import { guardedBatch } from "../services/guardedWrites.js";
 import { POS_TRAINING_MAP } from "../game/POS_TRAINING_MAP.js";
@@ -645,7 +646,7 @@ export function createPlayersActions(context, actions) {
 
     let trainedAttrs = [];
     if (type === "FISICO_BASE")
-      trainedAttrs = ["stamina", "balance", "condition", "strength"];
+      trainedAttrs = ["stamina", "balance", "condition", "balance"];
     else if (type === "VELOCIDADE")
       trainedAttrs = ["speed", "accel", "agility", "dribbleSpd"];
     else if (type === "IMPULSAO")
@@ -668,7 +669,7 @@ export function createPlayersActions(context, actions) {
     else if (type === "MENTAL")
       trainedAttrs = ["teamwork", "mentality", "response"];
     else if (type === "BOLA_PARADA")
-      trainedAttrs = ["freeKick", "curve", "header", "penalties"];
+      trainedAttrs = ["freeKick", "curve", "header", "shotTech"];
     else if (type === "GOLEIRO")
       trainedAttrs = ["gk", "response", "jump", "longPass"];
     else if (type === "STUDY") trainedAttrs = [];
@@ -743,7 +744,7 @@ export function createPlayersActions(context, actions) {
       }
 
       let newAttrs = { ...(p.attributes || {}) };
-      trainedAttrs.forEach((attr) => {
+      [...new Set(trainedAttrs)].forEach((attr) => {
         if ((newAttrs[attr] || 50) < 99) {
           if (Math.random() < xpGain / 80)
             newAttrs[attr] = (newAttrs[attr] || 50) + 1;
@@ -754,6 +755,7 @@ export function createPlayersActions(context, actions) {
         xp: (p.xp || 0) + xpGain,
         energy: newEnergy,
         attributes: newAttrs,
+        overall: overallFor(p.position, newAttrs, p.overall),
       };
 
       // --- LÓGICA DE APRENDER NOVA POSIÇÃO ---
@@ -905,7 +907,7 @@ export function createPlayersActions(context, actions) {
 
     let trainedAttrs = [];
     if (type === "FISICO_BASE")
-      trainedAttrs = ["stamina", "balance", "condition", "strength"];
+      trainedAttrs = ["stamina", "balance", "condition", "balance"];
     else if (type === "VELOCIDADE")
       trainedAttrs = ["speed", "accel", "agility", "dribbleSpd"];
     else if (type === "IMPULSAO")
@@ -928,7 +930,7 @@ export function createPlayersActions(context, actions) {
     else if (type === "MENTAL")
       trainedAttrs = ["teamwork", "mentality", "response"];
     else if (type === "BOLA_PARADA")
-      trainedAttrs = ["freeKick", "curve", "header", "penalties"];
+      trainedAttrs = ["freeKick", "curve", "header", "shotTech"];
     else if (type === "GOLEIRO")
       trainedAttrs = ["gk", "response", "jump", "longPass"];
 
@@ -949,7 +951,7 @@ export function createPlayersActions(context, actions) {
 
     let newAttrs = { ...(player.attributes || {}) };
     let evolved = false;
-    trainedAttrs.forEach((attr) => {
+    [...new Set(trainedAttrs)].forEach((attr) => {
       if ((newAttrs[attr] || 50) < 99 && Math.random() < 0.15) {
         newAttrs[attr] = (newAttrs[attr] || 50) + 1;
         evolved = true;
@@ -961,6 +963,7 @@ export function createPlayersActions(context, actions) {
       xp: (player.xp || 0) + xpGain,
       energy: newEnergy,
       attributes: newAttrs,
+      overall: overallFor(player.position, newAttrs, player.overall),
     });
 
     // ESCREVE NO DIÁRIO DO CLUBE

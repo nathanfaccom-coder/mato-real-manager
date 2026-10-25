@@ -47,7 +47,10 @@ export const MODAL_PERMISSIONS = {
   PRIZES: "finance",
 };
 export function allowAdminModal(user, modal) {
-  if (!isSubAdmin(user) || !modal) return true;
+  if (!modal) return true;
+  if (['MATCH_PERFORMANCE','MATCH_REPORT','TEAM_TABLE','STATS','TEAM_STANDINGS'].includes(modal.type))
+    return canAdmin(user, 'competitions');
+  if (!isSubAdmin(user)) return true;
   if (["VIEW_LINEUP", "VIEW_PLAYER"].includes(modal.type)) return true;
   return canAdmin(user, MODAL_PERMISSIONS[modal.type]);
 }
@@ -72,12 +75,12 @@ export function guardAdminActions(
   user,
   notify = (message) => alert(message),
 ) {
-  if (!isSubAdmin(user)) return actions;
+  const protectedActions = new Set(['saveMatchStats','updateTeamStats','handleSaveMatch','handleDeleteMatch','generateFixtures']);
   return Object.fromEntries(
     Object.entries(actions).map(([name, fn]) => [
       name,
       (...args) => {
-        if (!canAdmin(user, ACTION_PERMISSIONS[name])) {
+        if ((isSubAdmin(user) || protectedActions.has(name)) && !canAdmin(user, ACTION_PERMISSIONS[name])) {
           notify("Você não tem permissão para esta função.");
           return;
         }

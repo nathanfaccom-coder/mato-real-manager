@@ -181,8 +181,8 @@ export const LoginScreen = ({
                 
                 @media (max-width: 768px) {
                     .logos-wrapper { gap: 10px; }
-                    .side-logo { height: 40px; }
-                    .main-logo { height: 75px; }
+                    .side-logo { height: 40px; max-width: 25%; min-width: 0; }
+                    .main-logo { height: 75px; max-width: 42%; min-width: 0; }
                     .game-title { font-size: 34px; }
                 }
             `}</style>
@@ -209,53 +209,65 @@ export const LoginScreen = ({
             NATHAN REIS
           </div>
           {/* Exibição da versão solicitada */}
-          <div className="version-badge">VERSÃO 2.9.7 — MATO REAL TV </div>
+          <div className="version-badge">VERSÃO 2.9.8 — MATO REAL TV </div>
         </div>
       </div>
       {/* --- FIM DO CABEÇALHO --- */}
 
-      <div className="login-tabs">
-        <div
+      <nav className="login-tabs" aria-label="Acesso e cadastros">
+        <button
+          type="button"
           className={`tab ${tab === "LOGIN" ? "active" : ""}`}
+          aria-pressed={tab === "LOGIN"}
           onClick={() => setTab("LOGIN")}
         >
           ENTRAR
-        </div>
-        <div
+        </button>
+        <button
+          type="button"
           className={`tab ${tab === "CREATE" ? "active" : ""}`}
+          aria-pressed={tab === "CREATE"}
           onClick={() => setTab("CREATE")}
         >
           CRIAR TIME
-        </div>
-        <div
+        </button>
+        <button
+          type="button"
           className={`tab ${tab === "PRESS" ? "active" : ""}`}
+          aria-pressed={tab === "PRESS"}
           onClick={() => setTab("PRESS")}
         >
           IMPRENSA
-        </div>
-        <div
+        </button>
+        <button
+          type="button"
           className={`tab ${tab === "COMPANY" ? "active" : ""}`}
+          aria-pressed={tab === "COMPANY"}
           onClick={() => setTab("COMPANY")}
         >
           EMPRESAS
-        </div>
-        <div
+        </button>
+        <button
+          type="button"
           className={`tab ${tab === "COACH" ? "active" : ""}`}
+          aria-pressed={tab === "COACH"}
           onClick={() => setTab("COACH")}
         >
           COMISSÃO
-        </div>
-        <div
+        </button>
+        <button
+          type="button"
           className={`tab ${tab === "NEW_PLAYER" ? "active" : ""}`}
+          aria-pressed={tab === "NEW_PLAYER"}
           onClick={() => setTab("NEW_PLAYER")}
         >
           JOGADOR
-        </div>
-      </div>
+        </button>
+      </nav>
 
       {tab === "LOGIN" && (
         <div>
-          <div className="login-tab-buttons">
+          <div className="login-tab-buttons" role="group" aria-label="Tipo de conta">
             <button
               className={`btn ${subTab === "TEAM" ? "btn-green" : "btn-ghost"}`}
               style={{ width: "auto" }}

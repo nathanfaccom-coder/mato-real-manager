@@ -841,3 +841,63 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Roboto
     margin-bottom: 5px;
     font-size: 12px;
 }
+
+/* All entry points remain visible without horizontal scrolling on phones. */
+.login-wrapper, .login-wrapper * { box-sizing: border-box; }
+.login-wrapper { min-width: 0; max-width: 100%; }
+.login-wrapper .login-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    border: 0;
+    padding: 0;
+}
+.login-wrapper .login-tabs .tab {
+    min-width: 0;
+    min-height: 48px;
+    padding: 12px 8px;
+    border: 1px solid #334139;
+    border-radius: 10px;
+    background: #18221d;
+    color: #c6d5cd;
+    font-size: 13px;
+    line-height: 1.35;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.login-wrapper .login-tabs .tab.active {
+    background: #00e676;
+    border-color: #00e676;
+    color: #082414;
+    box-shadow: 0 3px 12px #00e67620;
+}
+.login-wrapper .login-tabs .tab:focus-visible,
+.login-wrapper .login-tab-buttons button:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 2px;
+}
+.login-wrapper .login-tab-buttons {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid #293c31;
+    border-radius: 12px;
+    background: #101b15;
+}
+.login-wrapper .login-tab-buttons .btn {
+    min-width: 0;
+    min-height: 44px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+    .login-wrapper .login-tabs,
+    .login-wrapper .login-tab-buttons {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .login-wrapper .login-header-container { margin-bottom: 22px; }
+    .login-wrapper .game-title { font-size: clamp(26px, 8.5vw, 34px); }
+    .login-wrapper .dev-credits-sub { letter-spacing: 1px; font-size: 10px; }
+    .login-wrapper .login-tab-buttons .btn { padding: 10px 6px !important; }
+}

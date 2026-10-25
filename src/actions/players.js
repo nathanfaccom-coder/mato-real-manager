@@ -1,3 +1,4 @@
+import { promptMoney } from '../money/promptMoney.jsx';
 import { guardedBatch } from "../services/guardedWrites.js";
 import { POS_TRAINING_MAP } from "../game/POS_TRAINING_MAP.js";
 import { INJURIES_DB } from "../game/INJURIES_DB.js";
@@ -51,7 +52,7 @@ export function createPlayersActions(context, actions) {
 
     // PEDIR AUMENTO
     if (action === "RAISE") {
-      const ask = prompt("Qual o novo salário semanal desejado?", coach.salary);
+      const ask = await promptMoney("Qual o novo salário semanal desejado?", coach.salary);
       if (!ask) return;
       const val = parseFloat(ask);
       if (val <= coach.salary)
@@ -500,7 +501,7 @@ export function createPlayersActions(context, actions) {
     await db
       .collection("users")
       .doc(user.data.id)
-      .update({ salary: parseInt(newVal) });
+      .update({ salary: parseFloat(newVal) });
     alert("Valor de mercado atualizado!");
   };
 

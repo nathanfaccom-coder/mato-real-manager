@@ -1,3 +1,4 @@
+import { MoneyInput } from '../money/MoneyInput.jsx';
 import React, { useState, useEffect } from "react";
 import { getSalaryLimits } from "../game/getSalaryLimits.js";
 import { getRecommendedPrice } from "../game/getRecommendedPrice.js";
@@ -143,9 +144,9 @@ export const TeamRequestPlayerModal = ({ team, onClose, onSubmit }) => {
             <div style={{ fontSize: 9, color: "cyan", marginBottom: 5 }}>
               Permitido: {fmt(limits.minSal)} a {fmt(limits.maxSal)}
             </div>
-            <input
+            <MoneyInput
               className="input-field"
-              type="number"
+
               value={f.salary}
               onChange={(e) => setF({ ...f, salary: e.target.value })}
             />
@@ -155,9 +156,9 @@ export const TeamRequestPlayerModal = ({ team, onClose, onSubmit }) => {
             <div style={{ fontSize: 9, color: "cyan", marginBottom: 5 }}>
               Sugerido: {fmt(recPrice)}
             </div>
-            <input
+            <MoneyInput
               className="input-field"
-              type="number"
+
               value={f.value}
               onChange={(e) => setF({ ...f, value: e.target.value })}
             />

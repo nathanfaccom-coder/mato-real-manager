@@ -1,3 +1,4 @@
+import { MoneyInput } from '../money/MoneyInput.jsx';
 import React, { useState, useEffect } from "react";
 import { firebase } from "../services/firebase.js";
 import { fmt } from "../game/fmt.js";
@@ -263,10 +264,10 @@ export const TournamentManagerModal = ({
               <label style={{ color: "var(--primary)", fontWeight: "bold" }}>
                 💰 Prêmio Base do Campeão (₣)
               </label>
-              <input
+              <MoneyInput
                 className="input-field"
-                type="number"
-                placeholder="Ex: 5000000"
+
+                placeholder="Ex: 100.000"
                 value={f.prize}
                 onChange={(e) => setF({ ...f, prize: e.target.value })}
                 style={{ marginBottom: 5 }}

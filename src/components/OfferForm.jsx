@@ -1,3 +1,4 @@
+import { MoneyInput } from '../money/MoneyInput.jsx';
 import React, { useState, useEffect } from "react";
 import { getSalaryLimits } from "../game/getSalaryLimits.js";
 import { PlayerCard } from "./PlayerCard.jsx";
@@ -175,9 +176,9 @@ export const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                 ? "Taxa de Empréstimo (₣)"
                 : "Taxa de Transferência (₣)"}
             </label>
-            <input
+            <MoneyInput
               className="input-field"
-              type="number"
+
               value={v}
               onChange={(e) => setV(e.target.value)}
             />
@@ -239,9 +240,9 @@ export const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                     <label style={{ fontSize: "11px" }}>
                       Valor da Opção (₣)
                     </label>
-                    <input
+                    <MoneyInput
                       className="input-field"
-                      type="number"
+
                       value={meta.buyOpt}
                       onChange={(e) =>
                         setMeta({ ...meta, buyOpt: parseFloat(e.target.value) })
@@ -419,9 +420,9 @@ export const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
             >
               💰 Luvas / Bônus de Assinatura (₣)
             </label>
-            <input
+            <MoneyInput
               className="input-field"
-              type="number"
+
               value={meta.signingBonus}
               onChange={(e) =>
                 setMeta({ ...meta, signingBonus: parseFloat(e.target.value) })
@@ -438,9 +439,9 @@ export const OfferForm = ({ target, myPlayers, onSend, setModal, user }) => {
                 {fmt(limits.minSal)} - {fmt(limits.maxSal)}
               </span>
             </div>
-            <input
+            <MoneyInput
               className="input-field"
-              type="number"
+
               value={sal}
               onChange={(e) => setSal(e.target.value)}
             />

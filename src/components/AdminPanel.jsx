@@ -1,3 +1,5 @@
+import { promptMoney } from '../money/promptMoney.jsx';
+import { MoneyInput } from '../money/MoneyInput.jsx';
 import { BotRosterManager } from "../admin/BotRosterManager.jsx";
 import { canAdmin, isMainAdmin } from "../admin/permissions.js";
 import { SubAdminManager } from "../admin/SubAdminManager.jsx";
@@ -196,7 +198,7 @@ export const AdminPanel = ({
     );
     if (!target) return;
 
-    const amountStr = prompt("💰 QUAL O VALOR DO BÔNUS? (Ex: 10000)");
+    const amountStr = await promptMoney("💰 QUAL O VALOR DO BÔNUS? (Ex: 10.000)");
     if (!amountStr) return;
     const amount = parseFloat(amountStr);
     if (isNaN(amount) || amount <= 0) return alert("Valor inválido");
@@ -496,7 +498,7 @@ export const AdminPanel = ({
                     className="btn btn-green"
                     style={{ fontSize: 10, width: "auto", padding: "5px 8px" }}
                     onClick={async () => {
-                      const n = prompt("Novo Saldo:", c.balance);
+                      const n = await promptMoney("Novo Saldo:", c.balance, {allowNegative:true});
                       if (n)
                         await firebase
                           .firestore()
@@ -906,7 +908,7 @@ export const AdminPanel = ({
               >
                 <b>{t.name} (PENDENTE)</b>
                 <div style={{ display: "flex", gap: 5, marginTop: 5 }}>
-                  <input
+                  <MoneyInput allowNegative
                     className="input-field"
                     style={{ width: 100, marginBottom: 0 }}
                     defaultValue={t.balance}
@@ -1011,8 +1013,8 @@ export const AdminPanel = ({
                         <button
                           className="btn btn-green"
                           style={{ width: "auto", fontSize: 10 }}
-                          onClick={() => {
-                            const n = prompt("Novo Saldo:", t.balance);
+                          onClick={async () => {
+                            const n = await promptMoney("Novo Saldo:", t.balance, {allowNegative:true});
                             if (n) onUpdateBal(t.id, parseFloat(n) || 0);
                           }}
                         >
@@ -1654,8 +1656,8 @@ export const AdminPanel = ({
                   <button
                     className="btn btn-green"
                     style={{ width: "auto" }}
-                    onClick={() => {
-                      const n = prompt("Novo Saldo da Empresa:", c.balance);
+                    onClick={async () => {
+                      const n = await promptMoney("Novo Saldo da Empresa:", c.balance, {allowNegative:true});
                       if (n !== null) onUpdateCompBal(c.id, parseFloat(n) || 0);
                     }}
                   >

@@ -70,18 +70,18 @@ export const PlayerCard = ({ player, teamName, teamLogo, onFaceUpload }) => {
                 .fut-gold { background: linear-gradient(135deg, #f9d976 0%, #e9b646 50%, #c4952d 100%); color: #4a3600; border: 2px solid #ffe699; }
                 .fut-silver { background: linear-gradient(135deg, #e0e0e0 0%, #bdbdbd 50%, #9e9e9e 100%); color: #222; border: 2px solid #f5f5f5; }
                 .fut-bronze { background: linear-gradient(135deg, #d29d71 0%, #b87333 50%, #8c531b 100%); color: #3e2004; border: 2px solid #eab890; }
-                
+
                 .fut-top { display: flex; justify-content: space-between; align-items: flex-start; }
                 .fut-top-left { text-align: center; }
                 .fut-ovr { font-size: 32px; font-weight: 900; line-height: 1; }
                 .fut-pos { font-size: 14px; font-weight: bold; }
                 .fut-logo { width: 30px; height: 30px; object-fit: contain; }
-                
+
                 .fut-img-container { text-align: center; margin-top: -10px; position: relative; z-index: 2; }
                 .fut-img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(255,255,255,0.5); box-shadow: 0 5px 15px rgba(0,0,0,0.4); background: #333; }
-                
+
                 .fut-name { text-align: center; font-size: 18px; font-weight: 900; margin-top: 10px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 1px; }
-                
+
                 .fut-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 15px; font-size: 13px; margin-top: 12px; padding: 0 20px; }
                 .fut-stat-row { display: flex; justify-content: center; align-items: center; font-weight: bold; }
                 .fut-stat-val { font-weight: 900; font-size: 16px; width: 28px; text-align: right; margin-right: 6px; }

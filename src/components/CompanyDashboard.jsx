@@ -1,3 +1,4 @@
+import { MoneyInput } from '../money/MoneyInput.jsx';
 import React, { useState, useEffect } from "react";
 import { firebase, db } from "../services/firebase.js";
 import { PROD_CATS } from "../game/PROD_CATS.js";
@@ -632,9 +633,9 @@ export const CompanyDashboard = ({
               disabled={editP.id}
             />
             <label>Preço de Venda (₣)</label>
-            <input
+            <MoneyInput
               className="input-field"
-              type="number"
+
               value={editP.price}
               onChange={(e) => setEditP({ ...editP, price: e.target.value })}
             />

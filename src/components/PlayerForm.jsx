@@ -1,3 +1,4 @@
+import { MoneyInput } from '../money/MoneyInput.jsx';
 import React, { useState, useEffect } from "react";
 import { getSalaryLimits } from "../game/getSalaryLimits.js";
 import { fmt } from "../game/fmt.js";
@@ -141,9 +142,9 @@ export const PlayerForm = ({
                 {fmt(getRecommendedPrice(f.overall, f.position))}
               </b>
             </div>
-            <input
+            <MoneyInput
               className="input-field"
-              type="number"
+
               value={f.value}
               onChange={(e) => setF({ ...f, value: e.target.value })}
             />

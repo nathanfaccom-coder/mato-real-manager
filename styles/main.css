@@ -901,3 +901,22 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Roboto
     .login-wrapper .dev-credits-sub { letter-spacing: 1px; font-size: 10px; }
     .login-wrapper .login-tab-buttons .btn { padding: 10px 6px !important; }
 }
+
+.app-header { gap: 10px; }
+.header-identity { flex: 1 1 42%; min-width: 0; }
+.header-identity > div { min-width: 0; overflow-wrap: anywhere; }
+.header-identity img { flex-shrink: 0; }
+.header-actions { flex: 1 1 58%; min-width: 0; justify-content: flex-end; gap: 10px !important; }
+.header-actions > :not(.header-balance) { flex-shrink: 0; margin-left: 0 !important; }
+.header-balance { min-width: 0; flex: 1 1 150px; max-width: 230px; text-align: right; color: var(--primary); font-weight: 800; }
+.header-balance span { display: inline-block; white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (max-width: 380px) {
+ .app-header { padding: 12px 10px; gap: 8px; }
+ .header-actions { gap: 7px !important; }
+ .header-identity .dev-credits { font-size: 9px; }
+}
+.money-dialog { box-sizing: border-box; width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow-y: auto; padding: 22px; border: 1px solid #3d6650; border-radius: 16px; background: #17241d; color: #fff; }
+.money-dialog::backdrop { background: #000b; }
+.money-dialog h3 { margin-top: 0; }
+.money-dialog p { overflow-wrap: anywhere; }
+.money-hint { color: #afc9ba; font-size: 12px; line-height: 1.5; }

@@ -1,3 +1,6 @@
+import { HeaderBalance } from './money/HeaderBalance.jsx';
+import { promptMoney } from './money/promptMoney.jsx';
+import { MoneyInput } from './money/MoneyInput.jsx';
 import {
   canAdmin,
   isMainAdmin,
@@ -648,8 +651,8 @@ export function App() {
     );
   return (
     <div>
-      <div className="header">
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div className="header app-header">
+        <div className="header-identity" style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {user.type === "USER" && user.data.logo && (
             <img
               src={user.data.logo}
@@ -672,12 +675,12 @@ export function App() {
               className="dev-credits"
               style={{ textAlign: "left", margin: 0 }}
             >
-              Desenvolvido por: Nathan Reis | v2.9.10
+              Desenvolvido por: Nathan Reis | v2.9.11
             </div>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 15, alignItems: "center" }}>
+        <div className="header-actions" style={{ display: "flex", gap: 15, alignItems: "center" }}>
           {/* ÍCONE DE NOTIFICAÇÃO (SINO) */}
           {["USER", "PLAYER", "COACH", "DOCTOR", "SCOUT", "ASSISTANT"].includes(
             user.type,
@@ -738,15 +741,7 @@ export function App() {
             "SCOUT",
             "ASSISTANT",
           ].includes(user.type) && (
-            <div
-              style={{
-                color: "var(--primary)",
-                fontWeight: "bold",
-                marginLeft: 10,
-              }}
-            >
-              {fmt(user.data.balance)}
-            </div>
+            <HeaderBalance value={user.data.balance} />
           )}
 
           {/* CONFIGURAÇÕES */}
@@ -1420,8 +1415,8 @@ export function App() {
                   <div style={{ display: "flex", gap: 5, marginTop: 5 }}>
                     <button
                       className="btn btn-purple"
-                      onClick={() => {
-                        const v = prompt("Valor Semanal pedido (₣):");
+                      onClick={async () => {
+                        const v = await promptMoney("Valor Semanal pedido (₣):");
                         if (v) requestSponsorship(c.id, v);
                       }}
                     >
@@ -2703,9 +2698,9 @@ export function App() {
                 <div className="modal-content">
                   <h3>Negociar com {modal.data.name}</h3>
                   <label>Salário Semanal (₣)</label>
-                  <input
+                  <MoneyInput
                     className="input-field"
-                    type="number"
+
                     id="c_salary"
                     defaultValue={modal.data.salary}
                   />
@@ -2718,9 +2713,9 @@ export function App() {
                   </select>
 
                   <label>Multa Rescisória (₣)</label>
-                  <input
+                  <MoneyInput
                     className="input-field"
-                    type="number"
+
                     id="c_clause"
                     defaultValue={modal.data.salary * 10}
                   />

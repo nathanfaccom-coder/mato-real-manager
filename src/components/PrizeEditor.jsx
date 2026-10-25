@@ -1,3 +1,4 @@
+import { MoneyInput } from '../money/MoneyInput.jsx';
 import React, { useState, useEffect } from "react";
 
 export const PrizeEditor = ({ initialData, onSave, onClose }) => {
@@ -6,7 +7,7 @@ export const PrizeEditor = ({ initialData, onSave, onClose }) => {
   const updateVal = (serie, field, val) => {
     setPrizes((prev) => ({
       ...prev,
-      [serie]: { ...prev[serie], [field]: parseInt(val) || 0 },
+      [serie]: { ...prev[serie], [field]: parseFloat(val) || 0 },
     }));
   };
 
@@ -25,9 +26,9 @@ export const PrizeEditor = ({ initialData, onSave, onClose }) => {
         {fields.map((f) => (
           <div key={f.key}>
             <label style={{ fontSize: 10 }}>{f.label}</label>
-            <input
+            <MoneyInput
               className="input-field"
-              type="number"
+
               value={prizes[serie][f.key]}
               onChange={(e) => updateVal(serie, f.key, e.target.value)}
               style={{ marginBottom: 0 }}

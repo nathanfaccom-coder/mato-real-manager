@@ -1,3 +1,4 @@
+import { MoneyInput } from '../money/MoneyInput.jsx';
 import { AppearanceEditor } from "../simulation/Editors.jsx";
 import { NationalitySelect } from "../national/NationalitySelect.jsx";
 import React, { useState, useEffect } from "react";
@@ -173,7 +174,7 @@ export const LoginScreen = ({
                     border: 1px solid rgba(0, 230, 118, 0.3);
                     margin-top: 5px;
                 }
-                
+
                 @media (max-width: 768px) {
                     .logos-wrapper { gap: 10px; }
                     .main-logo { height: 120px; max-width: 100%; min-width: 0; }
@@ -198,7 +199,7 @@ export const LoginScreen = ({
             Desenvolvido por Nathan Reis
           </div>
           {/* Exibição da versão solicitada */}
-          <div className="version-badge">VERSÃO 2.9.10 — MATO REAL TV </div>
+          <div className="version-badge">VERSÃO 2.9.11 — MATO REAL TV </div>
         </div>
       </div>
       {/* --- FIM DO CABEÇALHO --- */}
@@ -818,9 +819,9 @@ export const LoginScreen = ({
           />
 
           {/* Lógica de Saldo Travado para Várzea */}
-          <input
+          <MoneyInput
             className={`input-field ${f.s === "VARZEA" ? "login-varzea-balance" : ""}`}
-            type="number"
+
             placeholder="Saldo Inicial"
             value={f.s === "VARZEA" ? 200000 : f.b}
             onChange={(e) => setF({ ...f, b: e.target.value })}

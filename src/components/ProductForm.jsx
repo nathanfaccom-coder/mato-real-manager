@@ -1,3 +1,4 @@
+import { MoneyInput } from '../money/MoneyInput.jsx';
 import React, { useState, useEffect } from "react";
 import { firebase, db } from "../services/firebase.js";
 import { fmt } from "../game/fmt.js";
@@ -248,8 +249,8 @@ export const ProductForm = ({ initial, onSave, onDelete, user }) => {
         </div>
 
         <label>Preço de Venda (₣)</label>
-        <input
-          type="number"
+        <MoneyInput
+
           className="input-field"
           value={p.price}
           onChange={(e) => setP({ ...p, price: e.target.value })}

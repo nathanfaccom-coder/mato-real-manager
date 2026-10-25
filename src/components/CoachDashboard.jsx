@@ -1,3 +1,4 @@
+import { MoneyInput } from '../money/MoneyInput.jsx';
 import { CoachNumbers } from "../simulation/CoachNumbers.jsx";
 import { TacticsEditor } from "./TacticsEditor.jsx";
 import React, { useState, useEffect } from "react";
@@ -705,9 +706,9 @@ export const CoachDashboard = ({
                           }}
                         >
                           <label style={{ fontSize: 10 }}>Salário (₣)</label>
-                          <input
+                          <MoneyInput
                             className="input-field"
-                            type="number"
+
                             value={counterVals.s}
                             onChange={(e) =>
                               setCounterVals({
@@ -736,9 +737,9 @@ export const CoachDashboard = ({
                           </select>
 
                           <label style={{ fontSize: 10 }}>Multa (₣)</label>
-                          <input
+                          <MoneyInput
                             className="input-field"
-                            type="number"
+
                             value={counterVals.cl}
                             onChange={(e) =>
                               setCounterVals({
@@ -848,9 +849,9 @@ export const CoachDashboard = ({
             <h3>💰 Atualizar Pretensão Salarial</h3>
             {coach.level >= 2 ? (
               <div style={{ display: "flex", gap: 10 }}>
-                <input
+                <MoneyInput
                   className="input-field"
-                  type="number"
+
                   value={newSalary}
                   onChange={(e) => setNewSalary(e.target.value)}
                 />

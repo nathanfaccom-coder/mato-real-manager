@@ -1,3 +1,4 @@
+import { promptMoney } from '../money/promptMoney.jsx';
 import React, { useState, useEffect } from "react";
 import { db } from "../services/firebase.js";
 import { getRecommendedPrice } from "../game/getRecommendedPrice.js";
@@ -365,9 +366,9 @@ export const Market = ({
             <button
               className="btn btn-purple"
               style={{ width: "100%", marginBottom: 0, padding: "8px" }}
-              onClick={() => {
+              onClick={async () => {
                 const limits = getPersonalSponsorLimits(p.overall);
-                const val = prompt(
+                const val = await promptMoney(
                   `Patrocínio Pessoal para ${p.name}\n\nSeu Saldo: ${fmt(user.data.balance)}\nFaixa Permitida: ${fmt(limits.min)} a ${fmt(limits.max)} por semana.\n\nDigite o valor semanal oferecido:`,
                 );
                 if (val) {

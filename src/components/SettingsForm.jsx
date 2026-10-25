@@ -1,3 +1,5 @@
+import { promptMoney } from '../money/promptMoney.jsx';
+import { MoneyInput } from '../money/MoneyInput.jsx';
 import React, { useState, useEffect } from "react";
 import { SERIES } from "../game/SERIES.js";
 import { ESTADOS } from "../game/ESTADOS.js";
@@ -160,9 +162,9 @@ export const SettingsForm = ({
 
       {isAdmin && <label>Saldo (ADM)</label>}
       {isAdmin && (
-        <input
+        <MoneyInput allowNegative
           className="input-field"
-          type="number"
+
           value={form.balance}
           onChange={(e) =>
             setF({ ...form, balance: parseFloat(e.target.value) || 0 })
@@ -229,8 +231,9 @@ export const SettingsForm = ({
         >
           <button
             className="btn btn-green"
-            onClick={() => {
-              const v = prompt("Valor");
+            onClick={async () => {
+              const v = await promptMoney("Valor");
+              if (v === null) return;
               const m = prompt("Motivo");
               if (v) onReq("INJECTION", v, m);
             }}
@@ -239,8 +242,9 @@ export const SettingsForm = ({
           </button>
           <button
             className="btn btn-gold"
-            onClick={() => {
-              const v = prompt("Valor");
+            onClick={async () => {
+              const v = await promptMoney("Valor");
+              if (v === null) return;
               const m = prompt("Empresa");
               if (v) onReq("SPONSORSHIP", v, m);
             }}
@@ -251,8 +255,8 @@ export const SettingsForm = ({
         <button
           className="btn btn-red"
           style={{ marginTop: 10 }}
-          onClick={() => {
-            const v = prompt("Valor a retirar:");
+          onClick={async () => {
+            const v = await promptMoney("Valor a retirar:");
             if (v) {
               const m = prompt("Motivo:");
               if (m) onWithdraw(v, m);

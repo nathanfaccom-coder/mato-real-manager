@@ -1,3 +1,5 @@
+import { promptMoney } from '../money/promptMoney.jsx';
+import { MoneyInput } from '../money/MoneyInput.jsx';
 import { guardedUpdate, guardedBatch } from "../services/guardedWrites.js";
 import React, { useState, useEffect } from "react";
 import { firebase } from "../services/firebase.js";
@@ -724,12 +726,12 @@ export const PublicServices = ({
                           cursor: isLight ? "not-allowed" : "pointer",
                         }}
                         disabled={isLight}
-                        onClick={() => {
+                        onClick={async () => {
                           if (isLight)
                             return alert(
                               "Lesões leves e clínicas precisam apenas de repouso natural.",
                             );
-                          const v = prompt(
+                          const v = await promptMoney(
                             `Quanto desejas doar para ${p.name}?`,
                           );
                           if (v && !isNaN(v)) onDonate(p, parseFloat(v));
@@ -948,10 +950,10 @@ export const PublicServices = ({
                       </select>
 
                       <label>Valor da Transferência (₣)</label>
-                      <input
+                      <MoneyInput
                         className="input-field"
-                        type="number"
-                        placeholder="Ex: 5000"
+
+                        placeholder="Ex: 100.000"
                         value={pixAmount}
                         onChange={(e) => setPixAmount(e.target.value)}
                       />

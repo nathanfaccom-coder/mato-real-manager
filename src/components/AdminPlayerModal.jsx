@@ -1,3 +1,4 @@
+import { MoneyInput } from '../money/MoneyInput.jsx';
 import { NationalitySelect } from "../national/NationalitySelect.jsx";
 import React, { useState, useEffect } from "react";
 import { firebase } from "../services/firebase.js";
@@ -220,9 +221,9 @@ export const AdminPlayerModal = ({ player, teams, onClose }) => {
             >
               <div>
                 <label style={{ fontSize: 10 }}>💰 Saldo em Conta</label>
-                <input
+                <MoneyInput allowNegative
                   className="input-field"
-                  type="number"
+
                   value={formData.balance}
                   onChange={(e) =>
                     setFormData({ ...formData, balance: e.target.value })
@@ -231,9 +232,9 @@ export const AdminPlayerModal = ({ player, teams, onClose }) => {
               </div>
               <div>
                 <label style={{ fontSize: 10 }}>💵 Salário Semanal</label>
-                <input
+                <MoneyInput
                   className="input-field"
-                  type="number"
+
                   value={formData.salary}
                   onChange={(e) =>
                     setFormData({ ...formData, salary: e.target.value })
@@ -242,9 +243,9 @@ export const AdminPlayerModal = ({ player, teams, onClose }) => {
               </div>
               <div>
                 <label style={{ fontSize: 10 }}>🏷️ Valor de Passe</label>
-                <input
+                <MoneyInput
                   className="input-field"
-                  type="number"
+
                   value={formData.value}
                   onChange={(e) =>
                     setFormData({ ...formData, value: e.target.value })
@@ -253,9 +254,9 @@ export const AdminPlayerModal = ({ player, teams, onClose }) => {
               </div>
               <div>
                 <label style={{ fontSize: 10 }}>🔒 Multa Rescisória</label>
-                <input
+                <MoneyInput
                   className="input-field"
-                  type="number"
+
                   value={formData.clause}
                   onChange={(e) =>
                     setFormData({ ...formData, clause: e.target.value })

@@ -1,3 +1,4 @@
+import { MoneyInput } from '../money/MoneyInput.jsx';
 import React, { useState, useEffect } from "react";
 import { firebase } from "../services/firebase.js";
 import { STADIUM_DB } from "../game/STADIUM_DB.js";
@@ -612,9 +613,9 @@ export const StadiumManager = ({ team, players, onClose }) => {
                       disabled={editP.stock > 0}
                       style={{ marginBottom: 5 }}
                     />
-                    <input
+                    <MoneyInput
                       className="input-field"
-                      type="number"
+
                       placeholder="Preço de Venda (₣)"
                       value={editP.price}
                       onChange={(e) =>

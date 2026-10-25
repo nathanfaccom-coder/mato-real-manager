@@ -133,14 +133,9 @@ export const LoginScreen = ({
                     width: 100%;
                     max-width: 600px;
                 }
-                .side-logo {
-                    height: 70px;
-                    width: auto;
-                    object-fit: contain;
-                    filter: drop-shadow(0 0 10px rgba(255,255,255,0.1));
-                }
                 .main-logo {
-                    height: 120px;
+                    height: 160px;
+                    max-width: 100%;
                     width: auto;
                     object-fit: contain;
                     filter: drop-shadow(0 0 20px rgba(0, 230, 118, 0.5));
@@ -181,8 +176,7 @@ export const LoginScreen = ({
                 
                 @media (max-width: 768px) {
                     .logos-wrapper { gap: 10px; }
-                    .side-logo { height: 40px; max-width: 25%; min-width: 0; }
-                    .main-logo { height: 75px; max-width: 42%; min-width: 0; }
+                    .main-logo { height: 120px; max-width: 100%; min-width: 0; }
                     .game-title { font-size: 34px; }
                 }
             `}</style>
@@ -190,26 +184,21 @@ export const LoginScreen = ({
       {/* --- CABEÇALHO COM IMAGENS E VERSÃO --- */}
       <div className="login-header-container animate-in">
         <div className="logos-wrapper">
-          {/* Imagens agora perfeitamente alinhadas pelo Flexbox */}
-          <img src="assets/img1.webp" alt="Sponsor 1" className="side-logo" />
           <img
             src="assets/img2.jpg"
-            alt="Brasão Central"
+            alt="Bandeira Mato Real"
             className="main-logo"
           />
-          <img src="assets/img3.jpg" alt="Sponsor 2" className="side-logo" />
         </div>
 
         <h1 className="game-title">MATO REAL</h1>
 
         <div className="dev-info-row">
           <div className="dev-credits-sub">
-            FUT PIXEL{" "}
-            <span style={{ color: "#00E676", margin: "0 5px" }}>•</span> POR
-            NATHAN REIS
+            Desenvolvido: Nathan Reis
           </div>
           {/* Exibição da versão solicitada */}
-          <div className="version-badge">VERSÃO 2.9.8 — MATO REAL TV </div>
+          <div className="version-badge">VERSÃO 2.9.9 — MATO REAL TV </div>
         </div>
       </div>
       {/* --- FIM DO CABEÇALHO --- */}

@@ -195,10 +195,10 @@ export const LoginScreen = ({
 
         <div className="dev-info-row">
           <div className="dev-credits-sub">
-            Desenvolvido: Nathan Reis
+            Desenvolvido por Nathan Reis
           </div>
           {/* Exibição da versão solicitada */}
-          <div className="version-badge">VERSÃO 2.9.9 — MATO REAL TV </div>
+          <div className="version-badge">VERSÃO 2.9.10 — MATO REAL TV </div>
         </div>
       </div>
       {/* --- FIM DO CABEÇALHO --- */}

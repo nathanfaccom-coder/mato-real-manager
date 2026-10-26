@@ -3,6 +3,38 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Free hosting direction — user approved 2026-10-26
+
+Nathan declined enabling Blaze and approved testing Supabase Free for the server
+while retaining GitHub Pages and existing Firebase data. Do NOT enable billing or
+migrate game data based on the previous Firebase-only deployment plan.
+
+- Supabase plugin discovered and suggested; not yet installed/connected at this
+  checkpoint. No Supabase project selected, created or deployed. Check connection
+  state before asking again. Do not reuse a paid organization without explicit
+  cost confirmation; the scope is a free feasibility test.
+- Installed Deno 2.9.6 in the scratch npm cache and executed the existing JS engine.
+- Added scripts/benchmark-match-runtime.mjs: 30 seeds, 40-player rosters, 120 tactics
+  commands per match, summary report generation. Both Node and Deno passed locally.
+- Reduced server memory by adding an optional summaryOnly mode to engine v10.
+  It retains every 30th frame (exactly the samples already used by energy policy).
+  The viewer default continues to keep all frames; old engine versions unchanged.
+  Worker opts into this mode. Regression test compares scores, stats, events,
+  ratings, possession, shootouts, XP and fatigue against full replay on 8 seeds.
+- docs/free-runtime-benchmark.json records measurements and limitations. Deno
+  observed max CPU ~441ms, sampled heap ~55MiB and RSS ~195MiB. This is LOCAL, not
+  hosted Edge performance, and excludes auth/Firestore/network/retry overhead.
+- Full unit suite now 103 passed. Frontend Vite build checked separately.
+- Next: connect Supabase, verify a genuinely Free project, deploy an authenticated
+  synthetic-only probe, examine hosted CPU/memory/logs before porting the Firestore
+  adapter and scheduling. No Firebase secrets should be placed in source/client.
+- Supabase docs checked: Free 500k function invocations/month; 2s CPU/request,
+  256MB memory, 150s wall time. Cron can invoke Edge functions without viewers.
+  Free projects can pause after inactivity. Keep reads within Firestore free quotas
+  too. Do not promise unlimited free service or exact hosted completion timing.
+- Original outstanding items below still apply: legacy auth migration, protected
+  rules, commands, national teams, corrections, sanctions, finances, UI integration.
+
 ## Implemented and locally tested
 
 - Shared match policy: official XP, 10% friendly XP capped at 10 positive XP per

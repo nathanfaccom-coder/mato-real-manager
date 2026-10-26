@@ -12,7 +12,7 @@ export async function finalizeDueMatch(db,matchId,now=Date.now()) {
  if(!['OFFICIAL','FRIENDLY'].includes(run.kind))throw Error('Tipo de partida persistente inválido.');
  if(run.kind==='OFFICIAL'&&(!run.fixtureId||!run.competitionId))throw Error('Partida oficial sem vínculo competitivo.');
  // Commands must have been validated and frozen by the server at their deadlines.
- const match=simulateMatch({...run.snapshot,commands:run.commands||[]});
+ const match=simulateMatch({...run.snapshot,commands:run.commands||[]},{summaryOnly:true});
  const report=reportFromSimulation(match,run.kind);
  const fixture=run.fixtureId?{id:run.fixtureId,homeId:run.snapshot.home.id,awayId:run.snapshot.away.id}:null;
  const result=await settleMatch(db,{matchId,report,finishedAt:run.endsAt,seasonId:run.seasonId,competitionId:run.competitionId||null,fixture});

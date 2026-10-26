@@ -75,7 +75,7 @@ export function reportFromSimulation(match,kind) {
   const result=own===other?'DRAW':own>other?'WIN':'LOSS';
   // Weight intensity by actual frames while this athlete is on the pitch.
   let intensitySum=0, samples=0;
-  for(let t=0;t<(match.frames?.length||0);t+=30){
+  for(let t=0;t<(match.frames?.length||0);t+=match.frameStride===30?1:30){
    const f=match.frames[t];if(!f.positions?.[i]?.[2])continue;
    intensitySum+=({neutral:1,offensive:1.1,allAttack:1.2,defensive:.95,allDefense:.9}[f.postures?.[person.side]]||1);samples++;
   }

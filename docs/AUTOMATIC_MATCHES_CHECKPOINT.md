@@ -3,6 +3,27 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Server command and HTTP boundaries — 2026-10-26
+
+- server/match-commands.js accepts only verified Firebase UID plus allowlisted
+  payload. It reads server-owned authAccounts bindings, verifies active club or
+  current coach employment, derives side/time from the run, deduplicates requests,
+  restricts roster IDs, limits 120 commands/run and one command/side/second.
+  Engine still resolves actual lineup/substitution eligibility and penalty windows.
+- server/match-http.js is a default-disabled Fetch handler for start/command.
+  Requires injected Firebase Admin Auth verifyIdToken(token,true) (revocation),
+  allowlisted CORS, POST/JSON, bounded 8KiB streamed body, no request UID trust.
+  Dependencies are injected; no actual Admin SDK credential deployment yet.
+- 113 unit tests passed, including denied forged identities/timestamps, press,
+  inactive accounts, coach transfer, opponent substitutions and revoked sessions.
+  These do NOT replace a real Firebase Auth / Firestore emulator integration test.
+- Neither module deployed/activated. authAccounts migration and rules protecting
+  bindings/run/config/player data are prerequisites. Existing client passwords
+  remain the critical blocker; do not silently bind identities from client claims.
+- Supabase connector exposes no secret-management tool in this session. Need a
+  supported secure server credential provisioning path before wiring Firebase
+  Admin SDK in Supabase; never request service-account private keys in chat.
+
 ## Hosted Supabase feasibility verified — 2026-10-26
 
 - Connected account: Mato real; organization ipanxehbabmyrzfilael (Mato Real),

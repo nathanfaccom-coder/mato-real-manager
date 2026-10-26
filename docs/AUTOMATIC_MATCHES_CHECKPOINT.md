@@ -29,22 +29,57 @@ Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 - Legacy extraction contract test excludes the newly added progression module,
   whose behavior is covered by dedicated tests.
 
+## Firebase inspection and follow-up (2026-10-25, Brazil)
+
+- Firebase plugin installation confirmed. CLI authentication succeeded and project
+  access verified. No further installation request is necessary.
+- Inspected production through the official Firebase MCP server running via CLI.
+  Active project is `gerenciador-de-times-matoreal`, matching src/services/firebase.js.
+- Database `(default)` is STANDARD / FIRESTORE_NATIVE, location `nam5`.
+- MCP environment reports billing disabled. Cloud Functions listing returned 403
+  SERVICE_DISABLED for cloudfunctions.googleapis.com. No services or billing were
+  enabled. Production Functions deployment requires Blaze; a billing decision is
+  required before proceeding with that deployment architecture.
+- Retrieved actual deployed Firestore rules: they match the transitional rules
+  in this repository. Public read/write outside adminProfiles is CONFIRMED, not
+  merely inferred from source. Do not deploy automatic settlement under these rules.
+- Added defensive report validation (types, bounds, valid aggregate document IDs,
+  correction reason and revision). This is not a substitute for trusted event
+  derivation, authentication or fixture membership validation.
+- Corrected fatigue revisions to track actual energy deducted at zero and refund
+  only that amount, bounded by current capacity. Added regression tests for low
+  starting energy, repeated corrections and intervening recovery.
+- Added server-only `startMatch`: verified caller UID contract, active competition
+  ADM checks, default-disabled activation gate, server-built snapshots/seed/time,
+  official fixture + competition + current season validation, deterministic official
+  run IDs, friendly idempotency keys and team/player participation locks.
+  Existing public fixtures are deliberately NOT automatically trusted; they need
+  serverVerified metadata from a protected ADM migration/API still to implement.
+- Official settlement optionally commits fixture score/status and isolated
+  competition standings in the SAME transaction as player rewards and the result
+  ledger. Corrections reverse only the old match contribution. Legacy team table
+  UI is not switched to this collection yet; disciplinary/financial effects remain.
+- Worker releases only its own participant locks after successful settlement.
+  Retry remains safe if a crash occurs between settlement and lock cleanup.
+- Full unit suite: 102 passed. These are in-memory/unit tests, NOT Firestore security
+  emulator verification. No production writes or feature activation performed.
+
 ## Critical deployment blocker
 
 Only admins currently use Firebase Auth. Other accounts compare legacy credentials
-in public Firestore documents. Repository rules intentionally allow public writes
-except adminProfiles. Effective deployed rules still need inspection.
+in public Firestore documents. Deployed rules allow public writes except
+adminProfiles, confirmed by the read-only inspection above.
 
-The Firebase plugin was found and suggested but is NOT yet confirmed connected.
-Install/connect it to project `gerenciador-de-times-matoreal`. Do not ask for secret
-keys in chat. Do not publish client-only automatic XP as though it were secure.
+Firebase access is now working through the CLI/MCP. Do not ask for secret keys in
+chat. Do not publish client-only automatic XP as though it were secure. Billing
+activation and legacy authentication migration remain unresolved.
 
 ## Next steps (not completed)
 
 1. Inspect actual Firebase authentication, rules, billing/functions support and
    existing deployment. Plan compatible authenticated identities for clubs,
    players and staff; protect credentials and sensitive progression writes.
-2. Deploy server-owned match creation/classification, snapshots/seed, commands
+2. Deploy the tested server-owned match creation/classification adapter, snapshots/seed, commands
    with author/time validation and participant locks. Official creation must
    validate a real ADM fixture/competition and use a deterministic unique run ID.
    Never trust a client report, XP, kind, timestamp or supplied snapshot.
@@ -57,9 +92,10 @@ keys in chat. Do not publish client-only automatic XP as though it were secure.
 6. Add ADM manual match entry/correction endpoint with strict report validation,
    revision checks, reason, minute limits, score consistency and position notes.
    Settlement helper is for trusted server callers only; not a public API.
-7. Atomically reconcile fixture scores, club standings, per-competition cards/
-   suspensions, financial effects and trophies. These are not handled by the
-   current settlement helper yet. Existing manual writes must be replaced.
+7. Connect legacy table UI to the new atomic fixture/competition standings path.
+   Add per-competition cards/suspensions, financial effects and trophies; these
+   are not handled by the current settlement helper. Existing manual writes must
+   be replaced. Add authenticated ADM fixture approval/correction endpoints.
 8. Finalize fatigue integration with engine performance, prorrogação (the engine
    currently adds stoppage time and shootouts, not a new extra-time phase), avoid
    double spending and define correction policy after clamped depletion/recovery.

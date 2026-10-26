@@ -16,6 +16,7 @@ export function memoryDB(seed = {}) {
   const db = {
     values,
     collection: (name) => ({
+      where: (field,op,value) => ({query:{name,field,op,value}}),
       doc: (id) => document(name + "/" + (id || "new" + ++counter)),
       get: async () => ({
         docs: [...values.keys()]
@@ -30,6 +31,11 @@ export function memoryDB(seed = {}) {
         const result = await fn({
           get: async (r) => {
             if (wrote) throw Error("Read after write");
+            if(r.query){
+              const {name,field,op,value}=r.query;
+              if(op!=='in')throw Error('Unsupported query');
+              return {docs:[...values.keys()].filter(k=>k.startsWith(name+'/')&&value.includes(values.get(k)[field])).map(k=>snap(document(k)))};
+            }
             return snap(r);
           },
           set: (r, v) => {

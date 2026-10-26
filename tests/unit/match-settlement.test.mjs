@@ -56,3 +56,46 @@ test('two matches processed concurrently share one allowance',async()=>{
  const db=seed();await Promise.all([settleMatch(db,args('a')),settleMatch(db,args('b'))]);
  assert.equal(db.values.get('players/p').pendingXP,10);
 });
+test('correction refunds only fatigue actually deducted at the zero floor',async()=>{
+ const db=seed();db.values.get('players/p').energy=5;
+ await settleMatch(db,args('a'));
+ assert.equal(db.values.get('players/p').energy,0);
+ assert.equal(db.values.get('matchResults/a').rows.p.energyApplied,5);
+ await settleMatch(db,{...args('a',report(row(80,1,0))),reason:'Participação corrigida',expectedRevision:1});
+ assert.equal(db.values.get('players/p').energy,5);
+ await settleMatch(db,{...args('a'),reason:'Participação restaurada',expectedRevision:2});
+ await settleMatch(db,{...args('a',report(row(80,1,0))),reason:'Participação corrigida',expectedRevision:3});
+ assert.equal(db.values.get('players/p').energy,5);
+});
+test('fatigue refund respects subsequent recovery and the maximum energy',async()=>{
+ const db=seed();await settleMatch(db,args('a'));
+ db.values.get('players/p').energy=95;
+ await settleMatch(db,{...args('a',report(row(80,1,0))),reason:'Participação corrigida',expectedRevision:1});
+ assert.equal(db.values.get('players/p').energy,100);
+});
+test('invalid financial-style numeric strings, nonfinite XP and malformed participation abort without writes',async()=>{
+ const changes=[r=>r.rows.p.baseXP=NaN,r=>r.rows.p.energy=-1,r=>r.rows.p.stats.goals='2',r=>r.rows.p.stats.seconds=0,r=>r.rows.p.stats.ratingSum=11,r=>r.kind='UNKNOWN',r=>r.score=[-1,0]];
+ for(const change of changes){const db=seed(),r=report();change(r);await assert.rejects(settleMatch(db,args('bad',r)));assert.equal(db.values.size,1);}
+});
+test('invalid aggregate IDs and empty correction reasons are rejected',async()=>{
+ for(const patch of [{seasonId:'../s1'},{competitionId:'a/b'},{reason:' '},{expectedRevision:-1}]){
+  const db=seed();await assert.rejects(settleMatch(db,{...args('bad'),...patch}));assert.equal(db.values.size,1);
+ }
+});
+test('official score correction reverses the previous table contribution without another appearance',async()=>{
+ const db=seed(),fixture={id:'f1',homeId:'h',awayId:'a'};
+ db.values.set('matches/f1',{...fixture,runId:'game',competitionId:'cup',seasonId:'s1'});
+ const options={...args('game',report(row(),'OFFICIAL')),competitionId:'cup',fixture};
+ await settleMatch(db,options);
+ assert.equal(db.values.get('competitionStandings/cup_s1_h').pts,3);
+ const correction={...report(row(),'OFFICIAL'),score:[0,2]};
+ await settleMatch(db,{...options,report:correction,reason:'Placar corrigido',expectedRevision:1});
+ const home=db.values.get('competitionStandings/cup_s1_h'),away=db.values.get('competitionStandings/cup_s1_a');
+ assert.deepEqual(home,{teamId:'h',seasonId:'s1',competitionId:'cup',played:1,pts:0,wins:0,draws:0,losses:1,gf:0,ga:2});
+ assert.equal(away.pts,3);assert.equal(db.values.get('players/p').career.official.appearances,1);
+ assert.equal(db.values.get('matches/f1').resultRevision,2);
+});
+test('missing official fixture aborts player rewards and ledger atomically',async()=>{
+ const db=seed();await assert.rejects(settleMatch(db,{...args('game',report(row(),'OFFICIAL')),competitionId:'cup',fixture:{id:'gone',homeId:'h',awayId:'a'}}));
+ assert.equal(db.values.size,1);
+});

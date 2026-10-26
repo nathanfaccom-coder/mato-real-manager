@@ -14,12 +14,16 @@ export async function finalizeDueMatch(db,matchId,now=Date.now()) {
  // Commands must have been validated and frozen by the server at their deadlines.
  const match=simulateMatch({...run.snapshot,commands:run.commands||[]});
  const report=reportFromSimulation(match,run.kind);
- const result=await settleMatch(db,{matchId,report,finishedAt:run.endsAt,seasonId:run.seasonId,competitionId:run.competitionId||null});
+ const fixture=run.fixtureId?{id:run.fixtureId,homeId:run.snapshot.home.id,awayId:run.snapshot.away.id}:null;
+ const result=await settleMatch(db,{matchId,report,finishedAt:run.endsAt,seasonId:run.seasonId,competitionId:run.competitionId||null,fixture});
  // A crash between settlement and this marker is safe: the ledger deduplicates.
  await db.runTransaction(async tx=>{
   const current=await tx.get(ref);
   if(current.data().status==='FINISHED')return;
+  const locks=(run.lockIds||[]).map(id=>db.collection('matchParticipantLocks').doc(id));
+  const lockDocs=await Promise.all(locks.map(ref=>tx.get(ref)));
   tx.update(ref,{status:'FINISHED',score:report.score,settledAt:now});
+  locks.forEach((ref,i)=>{if(lockDocs[i].exists&&lockDocs[i].data().matchId===matchId)tx.delete(ref);});
  });
  return result;
 }

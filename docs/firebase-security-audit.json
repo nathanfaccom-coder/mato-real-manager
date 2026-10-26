@@ -1,0 +1,24 @@
+{
+  "score": 1,
+  "summary": "Read-only inspection of the deployed rules for gerenciador-de-times-matoreal on 2026-10-25 (America/Sao_Paulo): adminProfiles is protected, but all other top-level collections permit public reads and writes. No production rules were changed.",
+  "findings": [
+    {
+      "check": "Authority Source / Identity-Level Security",
+      "severity": "critical",
+      "issue": "The recursive fallback allows unauthenticated create, update and delete outside adminProfiles, including players, matches and any new settlement ledgers. Frontend role checks cannot enforce the requested journal restriction.",
+      "recommendation": "Migrate legacy identities and affected actions to authenticated server endpoints; explicitly exclude protected collections from the permissive fallback before activating automatic results. Test unauthorized writes in the Firestore emulator."
+    },
+    {
+      "check": "Business Logic vs. Rules",
+      "severity": "major",
+      "issue": "Only ADM accounts currently use Firebase Auth. Replacing all public writes with auth-required rules immediately would break existing player, team and staff flows.",
+      "recommendation": "Stage a compatible authentication migration and server ownership of progression, standings, fixtures and disciplinary data before tightening the production rules."
+    },
+    {
+      "check": "Update Bypass / Type Safety / Storage Abuse",
+      "severity": "critical",
+      "issue": "Public collections have no create/update schema, size or immutable-field checks. Users can bypass both validation and ownership for game data.",
+      "recommendation": "Specify schemas and bounded fields per collection, enforce ownership for permitted client edits, and reserve XP, career statistics and match effects for validated server operations."
+    }
+  ]
+}

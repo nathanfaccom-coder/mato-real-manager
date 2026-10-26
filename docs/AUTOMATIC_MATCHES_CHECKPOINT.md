@@ -3,16 +3,31 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Hosted Supabase feasibility verified — 2026-10-26
+
+- Connected account: Mato real; organization ipanxehbabmyrzfilael (Mato Real),
+  confirmed Free. Existing project pyqmrzpgjepazitrjwpc, ACTIVE_HEALTHY, us-east-1.
+- Deployed isolated match-runtime-probe using a random 256-bit header credential,
+  SHA-256 digest and one-hour expiry; no Firebase credentials or database access.
+- Six hosted seeds (1,2,3,10,20,30), 40 players, 120 tactics commands each passed.
+  Entire generated report exactly matched the local engine, including XP/fatigue.
+  Hosted handler wall time 153–235ms. This is NOT CPU or peak memory measurement.
+- Unauthenticated call rejected with 401. After tests replaced the probe with a
+  disabled 410 handler and restored platform JWT verification (deployment v2).
+- Evidence: docs/hosted-runtime-probe.json. No game data, schema, billing, Firebase
+  rules or published frontend changed. Production still 2.9.11.
+- Next: authenticated server integration and Firebase access adapter, then scheduling,
+  safe auth/rules migration, remaining domain effects and end-to-end validation.
+  The hosted simulation test alone does NOT establish production readiness.
+
 ## Free hosting direction — user approved 2026-10-26
 
 Nathan declined enabling Blaze and approved testing Supabase Free for the server
 while retaining GitHub Pages and existing Firebase data. Do NOT enable billing or
 migrate game data based on the previous Firebase-only deployment plan.
 
-- Supabase plugin discovered and suggested; not yet installed/connected at this
-  checkpoint. No Supabase project selected, created or deployed. Check connection
-  state before asking again. Do not reuse a paid organization without explicit
-  cost confirmation; the scope is a free feasibility test.
+- Previous checkpoint before connection is superseded by hosted verification above.
+  Never enable billing; current scope remains the Free plan.
 - Installed Deno 2.9.6 in the scratch npm cache and executed the existing JS engine.
 - Added scripts/benchmark-match-runtime.mjs: 30 seeds, 40-player rosters, 120 tactics
   commands per match, summary report generation. Both Node and Deno passed locally.

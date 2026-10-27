@@ -27,3 +27,20 @@ test('verified identity cannot be replaced with a client-supplied administrator 
  assert.equal(response.status,400);assert.equal(db.values.size,0);
  assert.equal((await handler(req(JSON.stringify({requestId:'one',homeId:'h',awayId:'a'})))).status,400);
 });
+
+test('account changes require recent authentication before reading or writing the database',async()=>{
+ for(const route of ['account-bind','account-state'])for(const auth_time of [undefined,NaN,Date.now()/1000-301,Date.now()/1000+60]){
+  const handler=createMatchHandler({enabled:true,auth:{verifyIdToken:async()=>({uid:'u',auth_time})}});
+  const response=await handler(new Request(`https://example.test/matches/${route}`,{method:'POST',headers:{authorization:'Bearer token','content-type':'application/json'},body:'{}'}));
+  assert.equal(response.status,401);
+ }
+});
+test('session endpoint uses only verified uid and rejects client-selected identity or role',async()=>{
+ const db=memoryDB({'serverConfig/accountMigration':{enabled:true,schemaVersion:1},'authAccounts/u':{active:true,type:'TEAM',entityId:'h',revision:1},'accountEntityOwners/teams_h':{uid:'u',type:'TEAM',entityId:'h'},'teams/h':{status:'ACTIVE',password:'legacy-secret'}});
+ const handler=createMatchHandler({db,enabled:true,auth:{verifyIdToken:async()=>({uid:'u'})}});
+ const session=body=>handler(new Request('https://example.test/matches/session',{method:'POST',headers:{authorization:'Bearer token','content-type':'application/json'},body:JSON.stringify(body)}));
+ const good=await session({});assert.equal(good.status,200);assert.deepEqual(await good.json(),{type:'USER',entityId:'h',revision:1});
+ for(const body of [{uid:'other'},{type:'ADMIN'},{entityId:'other'}])assert.equal((await session(body)).status,400);
+ db.values.get('authAccounts/u').active=false;
+ assert.equal((await session({})).status,400);
+});

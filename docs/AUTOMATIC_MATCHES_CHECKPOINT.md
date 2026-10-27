@@ -3,6 +3,36 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Verified identity bindings — 2026-10-27
+
+- Added server/account-bindings.js and authenticated HTTP routes account-bind,
+  account-state, session. Main owner only can bind a verified, enabled Auth email
+  identity to an active game entity; administrative identities and bots excluded.
+  Account changes additionally require token auth_time within five minutes.
+- Transactions enforce one identity per entity and one entity per identity,
+  idempotent binding, revision-checked activation changes and append-only audit
+  records. Disabled bindings reserve ownership; retrying bind cannot reactivate.
+  Session resolves only the verified caller and cross-checks the ownership lock,
+  active boolean, revision, current entity status and current staff role.
+- No legacy password is proof of ownership. No passwords, emails or tokens are
+  copied into bindings/audits or returned by session. Malformed roles, spoofed
+  identity/role payloads and stale owner authentication are tested.
+- All 125 unit tests passed. Real Firebase Auth + Firestore emulator integration
+  passed again: verified identity binding, session resolution, immediate binding
+  revocation, concurrent settlement, exact XP/energy, scheduler retry and disabled
+  Auth token rejection. This does NOT verify deployed application rules.
+- Default-disabled. Additional serverConfig/accountMigration enabled/schemaVersion
+  gate is required. No real migration, server secret provisioning, rules/index
+  deployment, live match endpoint, cron or client activation performed.
+- Browser App.jsx still restores non-admin accounts from a localStorage hint and
+  reads public legacy profiles. Next migration step: use Firebase identity and
+  trusted session resolution for login/restore; add a reviewed owner binding UI;
+  protect all affected collections and replace legacy writes before activation.
+  Do not simply enable the gate or wire rewards while public writes remain.
+- Supabase connection works; do not ask user to reconnect it. Its available tools
+  lack server-secret provisioning. A prior browser authentication attempt timed
+  out; no authenticated browser or deployed Firebase credential is confirmed.
+
 ## Official SDK, scheduler and emulator verification — 2026-10-27
 
 - Added server/firebase-runtime.js using pinned firebase-admin 14.5.0 and official
@@ -168,9 +198,10 @@ Only admins currently use Firebase Auth. Other accounts compare legacy credentia
 in public Firestore documents. Deployed rules allow public writes except
 adminProfiles, confirmed by the read-only inspection above.
 
-Firebase access is now working through the CLI/MCP. Do not ask for secret keys in
-chat. Do not publish client-only automatic XP as though it were secure. Billing
-activation and legacy authentication migration remain unresolved.
+Firebase inspection previously worked through the CLI/MCP. Do not ask for secret
+keys in chat. Do not publish client-only automatic XP as though it were secure.
+User rejected paid Firebase/Blaze: keep the Supabase Free approach. Hosted server
+credential provisioning and legacy authentication migration remain unresolved.
 
 ## Next steps (not completed)
 

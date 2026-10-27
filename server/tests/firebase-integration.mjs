@@ -23,6 +23,7 @@ try {
  const batch=db.batch();
  batch.set(db.doc('serverConfig/matchAutomation'),{enabled:true,schemaVersion:1});
  batch.set(db.doc('config/system'),{season:1});
+ batch.set(db.doc('serverConfig/accountMigration'),{enabled:true,schemaVersion:1});
  for(const team of ['h','a']){
   batch.set(db.doc(`teams/${team}`),{name:team,status:'ACTIVE'});
   roles.forEach((position,i)=>batch.set(db.doc(`players/${team}${i}`),{name:`P${i}`,position,teamId:team,overall:60,energy:100}));
@@ -33,6 +34,17 @@ try {
  const signed=await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=fake`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:customToken,returnSecureToken:true})});
  assert.equal(signed.status,200);const {idToken}=await signed.json();
  const handle=createMatchHandler({db,auth,enabled:true});
+ await auth.createUser({uid:'club-owner',email:'club@example.test',emailVerified:true});
+ const bindRequest=new Request('https://example.test/account-bind',{method:'POST',headers:{Authorization:`Bearer ${idToken}`,'Content-Type':'application/json'},body:JSON.stringify({uid:'club-owner',type:'TEAM',entityId:'h'})});
+ const bound=await handle(bindRequest);assert.equal(bound.status,200,await bound.clone().text());
+ const clubSignIn=await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=fake`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:await auth.createCustomToken('club-owner'),returnSecureToken:true})});
+ const {idToken:clubToken}=await clubSignIn.json();
+ const sessionRequest=()=>new Request('https://example.test/session',{method:'POST',headers:{Authorization:`Bearer ${clubToken}`,'Content-Type':'application/json'},body:'{}'});
+ assert.deepEqual(await (await handle(sessionRequest())).json(),{type:'USER',entityId:'h',revision:1});
+ const disableRequest=new Request('https://example.test/account-state',{method:'POST',headers:{Authorization:`Bearer ${idToken}`,'Content-Type':'application/json'},body:JSON.stringify({uid:'club-owner',active:false,expectedRevision:1,reason:'Test revocation'})});
+ assert.equal((await handle(disableRequest)).status,200);
+ assert.equal((await handle(sessionRequest())).status,400);
+ console.log('PASS: owner binds verified identity, session resolves only own profile, binding revocation blocks session immediately.');
  const request=(requestId='one')=>new Request('https://example.test/start',{method:'POST',headers:{Authorization:`Bearer ${idToken}`,'Content-Type':'application/json'},body:JSON.stringify({requestId,homeId:'h',awayId:'a'})});
  const started=await handle(request());
  assert.equal(started.status,200,await started.clone().text());

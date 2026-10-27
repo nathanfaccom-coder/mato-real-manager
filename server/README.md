@@ -20,7 +20,9 @@ an emulator-only convention; it is never used by firebase-runtime.js. The
 `tests/deny-all.rules` fixture is NOT a production ruleset. The test checks actual
 Auth tokens, disabled users, REST transactions, simultaneous settlement, exact
 XP/energy, retry backoff, and lock cleanup. It does not validate the legacy
-application's security rules or account migration.
+application's security rules. It also checks owner-authorized binding of a verified
+Auth identity, server-resolved session and immediate binding revocation; it does
+not perform a production account migration.
 
 ## Deployment entry point
 
@@ -44,7 +46,27 @@ verification, not a public unauthenticated write API.
 
 - `POST .../start`: Firebase bearer token; server derives fixture classification.
 - `POST .../command`: Firebase bearer token; server derives controller and clock.
+- `POST .../session`: Firebase bearer token and empty JSON object; returns only
+  the linked game type, entity ID and binding revision. Never accepts a requested
+  UID or role and never returns legacy passwords.
+- `POST .../account-bind`: main owner bearer token with authentication within
+  five minutes; body `{uid,type,entityId}`. Target Auth identity must have verified
+  email, be enabled and not be administrative. Requires active existing entity.
+- `POST .../account-state`: same owner/recent-auth requirement; body
+  `{uid,active,expectedRevision,reason}`. Disabling reserves ownership; retries
+  cannot silently reactivate or transfer a binding.
 - `POST .../finalize`: `x-worker-key`; processes at most one due job per call.
+
+Account routes also require `serverConfig/accountMigration` with
+`enabled: true, schemaVersion: 1`. Keep it absent/disabled until production rules
+protect `authAccounts`, `accountEntityOwners`, `accountBindingAudit` and
+`serverConfig` against all client writes. The global environment switch also
+remains disabled. Binding is explicit owner review, never proof by an old game
+password. Allowed game types are TEAM, PLAYER, COMPANY, PRESS, PRESS_WORKER,
+COACH, DOCTOR, SCOUT and ASSISTANT. TEAM resolves to the legacy UI type USER.
+These routes are server groundwork; the browser still uses legacy non-admin
+login and is not yet switched to this session endpoint. Do not enable the new
+backend while those public-write rules remain deployed.
 
 The scheduler uses a 180-second lease and retries with 30-second exponential
 backoff capped at one hour. A permanent failure remains inspectable in

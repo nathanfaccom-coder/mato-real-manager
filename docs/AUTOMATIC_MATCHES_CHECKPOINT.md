@@ -3,6 +3,28 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Client identity integration — 2026-10-27
+
+- Added services/trusted-session.js (injected SDK/network for testing) and
+  game-auth.js (Firebase compat adapter). Non-admin login, App session restore
+  and login form now have a build-time opt-in secure path. Default stays off.
+- VITE_SECURE_GAME_LOGIN=true requires the exact planned Mato Real Supabase
+  match-api URL; no URL/localStorage/public-document toggle. The API is NOT live.
+  Firebase handles email/password; API receives only ID token + empty JSON.
+  Trusted role/entity/revision resolve the profile with source:server, excluding
+  its legacy password. No client role/ID claim or fallback to legacy credentials.
+- Restore waits for Firebase Auth initialization, ignores localStorage identity,
+  rejects an account switch/logout during the request. Token change and returning
+  to the tab trigger revalidation. Network failure blocks access; denied binding
+  returns to login. Existing ADM and visitor entry points remain separate.
+- 131 unit tests passed including token use, no credential leakage to match API,
+  rejected role/path/revision, revoked/disabled backend, and logout race. Builds
+  validated with migration flag both on and off; no real user login or hosted
+  end-to-end migration tested. Production remains unchanged at 2.9.11.
+- NEXT: secure registration/verification/recovery + password settings, owner
+  binding UI, compatible protected data access/rules, then full match flows.
+  Legacy signup still exists. Do NOT enable migration build in production yet.
+
 ## Verified identity bindings — 2026-10-27
 
 - Added server/account-bindings.js and authenticated HTTP routes account-bind,

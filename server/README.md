@@ -64,9 +64,31 @@ protect `authAccounts`, `accountEntityOwners`, `accountBindingAudit` and
 remains disabled. Binding is explicit owner review, never proof by an old game
 password. Allowed game types are TEAM, PLAYER, COMPANY, PRESS, PRESS_WORKER,
 COACH, DOCTOR, SCOUT and ASSISTANT. TEAM resolves to the legacy UI type USER.
-These routes are server groundwork; the browser still uses legacy non-admin
-login and is not yet switched to this session endpoint. Do not enable the new
-backend while those public-write rules remain deployed.
+The browser has an opt-in migration path for this session endpoint, disabled in
+normal builds. Do not enable it or the new backend while public-write rules
+remain deployed.
+
+## Client migration build (not ready for production)
+
+`VITE_SECURE_GAME_LOGIN=true` selects email/password Firebase Auth for non-admin
+login and server-confirmed session restore. It requires `VITE_MATCH_API_URL` to
+equal `https://pyqmrzpgjepazitrjwpc.supabase.co/functions/v1/match-api`. This endpoint
+is planned, not deployed. Missing/wrong configuration fails closed; there is no
+fallback to legacy passwords or localStorage authorization. The ordinary build
+does not set either variable and preserves the existing login.
+
+The client requests only its own session using a Firebase ID token, refuses HTTP
+redirects, uses a 20-second timeout and reads the returned profile from the
+server (not offline Firestore cache). Profile passwords are excluded from that
+result. It revalidates when the Auth token changes or the tab becomes visible;
+all server mutations must independently verify authorization on every request.
+This is not continuous polling or immediate push revocation of visible UI.
+
+Before enabling: replace legacy signup/password settings, provide identity
+registration/email verification/recovery, owner binding UI, protect profile reads
+and writes and finish the match integration. Existing signup forms are still
+legacy and must not be used as a secure migration flow. No production account
+has been migrated by these changes.
 
 The scheduler uses a 180-second lease and retries with 30-second exponential
 backoff capped at one hour. A permanent failure remains inspectable in

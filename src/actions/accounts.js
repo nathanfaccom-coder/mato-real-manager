@@ -1,4 +1,5 @@
 import { appearance } from "../simulation/appearance.js";
+import { secureGameLogin, loginGameAccount } from "../services/game-auth.js";
 import { loginAdministrator, adminAuth } from "../admin/auth.js";
 import { assertNation } from "../national/rules.js";
 import { COMPANY_TYPES } from "../game/COMPANY_TYPES.js";
@@ -27,6 +28,15 @@ export function createAccountsActions(context, actions) {
   const login = async (loginId, loginPass, type) => {
     setLoading(true);
     try {
+      if (secureGameLogin) {
+        const account = await loginGameAccount(loginId, loginPass);
+        setUser(account);
+        saveSession(account);
+        setScreen(
+          restoreScreen(account.type, readNavigation(account, "screen")),
+        );
+        return;
+      }
       await adminAuth.signOut();
       let foundUser = null;
       let foundType = "";
@@ -192,8 +202,9 @@ export function createAccountsActions(context, actions) {
     } catch (error) {
       console.error(error);
       alert("Erro no login: " + error.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const loginAdmin = async (login, password) => {

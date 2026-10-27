@@ -8,6 +8,13 @@ import {
   allowAdminModal,
 } from "./admin/permissions.js";
 import { adminAuth, observeAdmin } from "./admin/auth.js";
+import {
+  secureGameLogin,
+  initialAuthUser,
+  resolveGameAccountSession,
+} from "./services/game-auth.js";
+import { SessionRejected } from "./services/trusted-session.js";
+import { OWNER_UID } from "./admin/permissions.js";
 import { createGameActions } from "./actions/index.js";
 
 import { useCollection } from "./hooks/useCollection.js";
@@ -260,11 +267,86 @@ export function App() {
     );
   }, [user?.type, user?.data?.id]);
 
+  useEffect(() => {
+    if (
+      !secureGameLogin ||
+      !user ||
+      !Object.hasOwn(ACCOUNT_COLLECTION, user.type)
+    )
+      return;
+    let active = true,
+      request = 0;
+    const check = async (identity) => {
+      const current = ++request;
+      try {
+        const account = await resolveGameAccountSession(identity);
+        if (!active || current !== request) return;
+        if (
+          !account ||
+          account.type !== user.type ||
+          account.data.id !== user.data.id
+        )
+          throw new SessionRejected("O vínculo da conta mudou.");
+      } catch (error) {
+        if (!active || current !== request) return;
+        clearSession();
+        setUser(null);
+        setModalState(null);
+        if (!(error instanceof SessionRejected)) setRestoreError(true);
+      }
+    };
+    const unsubscribe = adminAuth.onIdTokenChanged(check);
+    const visible = () => {
+      if (document.visibilityState === "visible") check(adminAuth.currentUser);
+    };
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      active = false;
+      unsubscribe();
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, [user?.type, user?.data?.id]);
+
   // --- NOVO: PERSISTÊNCIA DE SESSÃO (LEMBRAR ONDE PAREI) ---
 
   // 1. Ao abrir o app, tenta recuperar o login e a tela salva
   useEffect(() => {
     let active = true;
+    if (secureGameLogin) {
+      initialAuthUser()
+        .then(async (identity) => {
+          // Administrative login keeps its existing explicit entry point.
+          if (!identity || identity.uid === OWNER_UID) return null;
+          return resolveGameAccountSession(identity);
+        })
+        .then((restored) => {
+          if (!active) return;
+          if (!restored) {
+            clearSession();
+            return;
+          }
+          setUser(restored);
+          saveSession(restored);
+          setScreen(
+            restoreScreen(restored.type, readNavigation(restored, "screen")),
+          );
+          const tab = readNavigation(restored, "matchesTab", "LIGAS");
+          setMatchesTab(
+            ["LIGAS", "ESTADUAIS", "COPAS"].includes(tab) ? tab : "LIGAS",
+          );
+        })
+        .catch((error) => {
+          if (!active) return;
+          clearSession();
+          if (!(error instanceof SessionRejected)) setRestoreError(true);
+        })
+        .finally(() => {
+          if (active) setRestoring(false);
+        });
+      return () => {
+        active = false;
+      };
+    }
     const session = readSession();
     if (session) {
       db.collection(ACCOUNT_COLLECTION[session.type])

@@ -37,10 +37,16 @@ try {
  assert.equal(signed.status,200);const {idToken}=await signed.json();
  const handle=createMatchHandler({db,auth,enabled:true});
  await auth.createUser({uid:'club-owner',email:'club@example.test',emailVerified:true});
+ const reviewRequest=(token,payload)=>new Request('https://example.test/account-review',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(payload)});
+ const preview=await handle(reviewRequest(idToken,{uid:'club-owner',type:'TEAM',entityId:'h'}));assert.equal(preview.status,200);
+ const previewBody=await preview.json();assert.equal(previewBody.email,'club@example.test');assert.equal(previewBody.canBind,true);assert.equal(previewBody.profile.name,'h');
  const bindRequest=new Request('https://example.test/account-bind',{method:'POST',headers:{Authorization:`Bearer ${idToken}`,'Content-Type':'application/json'},body:JSON.stringify({uid:'club-owner',type:'TEAM',entityId:'h'})});
  const bound=await handle(bindRequest);assert.equal(bound.status,200,await bound.clone().text());
  const clubSignIn=await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=fake`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:await auth.createCustomToken('club-owner'),returnSecureToken:true})});
  const {idToken:clubToken}=await clubSignIn.json();
+ const deniedPreview=await handle(reviewRequest(clubToken,{uid:'club-owner'}));assert.equal(deniedPreview.status,400);assert.equal((await deniedPreview.text()).includes('club@example.test'),false);
+ const boundPreview=await handle(reviewRequest(idToken,{uid:'club-owner'}));assert.equal((await boundPreview.json()).binding.revision,1);
+ console.log('PASS: owner-only review exposes sanitized target and current binding; player review denied without email disclosure.');
  const sessionRequest=()=>new Request('https://example.test/session',{method:'POST',headers:{Authorization:`Bearer ${clubToken}`,'Content-Type':'application/json'},body:'{}'});
  assert.deepEqual(await (await handle(sessionRequest())).json(),{type:'USER',entityId:'h',revision:1});
  const disableRequest=new Request('https://example.test/account-state',{method:'POST',headers:{Authorization:`Bearer ${idToken}`,'Content-Type':'application/json'},body:JSON.stringify({uid:'club-owner',active:false,expectedRevision:1,reason:'Test revocation'})});

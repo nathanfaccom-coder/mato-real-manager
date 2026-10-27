@@ -12,6 +12,39 @@ async function gate(tx,db){
 }
 function eligible(type,profile){return profile?.status==='ACTIVE'&&(type!=='PLAYER'||!profile.isBot)&&(GAME_ACCOUNTS[type]!=='users'||profile.type===type);}
 
+// Owner-only preview; returns no credentials or arbitrary profile fields.
+export async function reviewGameAccount(db,auth,actor,input){
+ requireOwner(actor);only(input,['uid','type','entityId']);
+ const {uid}=input;
+ if(!validDocumentId(uid)||uid===OWNER_UID)throw Error('Conta inválida.');
+ const explicit=own(input,'type')||own(input,'entityId');
+ if(explicit&&(typeof input.type!=='string'||!own(GAME_ACCOUNTS,input.type)||!validDocumentId(input.entityId)))throw Error('Perfil inválido.');
+ const identity=await auth.getUser(uid);
+ return db.runTransaction(async tx=>{
+  await gate(tx,db);
+  const admin=await tx.get(db.collection('adminProfiles').doc(uid));
+  if(admin.exists)throw Error('Identidade administrativa não permitida.');
+  const doc=await tx.get(db.collection('authAccounts').doc(uid));
+  const old=doc.exists?doc.data():null;
+  if(old&&(typeof old.type!=='string'||!own(GAME_ACCOUNTS,old.type)||!validDocumentId(old.entityId)||typeof old.active!=='boolean'||!Number.isSafeInteger(old.revision)||old.revision<1))throw Error('Vínculo inválido.');
+  const binding=old?{type:old.type,entityId:old.entityId,active:old.active,revision:old.revision}:null;
+  const target=explicit?input:binding;
+  let profile=null;
+  if(target){
+   const {type,entityId}=target;
+   const entity=await tx.get(db.collection(GAME_ACCOUNTS[type]).doc(entityId));
+   const owner=await tx.get(db.collection('accountEntityOwners').doc(`${GAME_ACCOUNTS[type]}_${entityId}`));
+   const available=old
+    ? owner.exists&&owner.data().uid===uid&&owner.data().type===type&&owner.data().entityId===entityId
+    : !owner.exists;
+   profile={type,entityId,name:entity.exists?String(entity.data().name||entityId).slice(0,160):entityId,eligible:entity.exists&&eligible(type,entity.data()),available};
+  }
+  const ready=identity.emailVerified===true&&!identity.disabled&&!!identity.email;
+  return {uid,email:identity.email||null,emailVerified:identity.emailVerified===true,disabled:identity.disabled===true,binding,profile,
+   canBind:!!(ready&&profile?.eligible&&profile.available&&!binding)};
+ });
+}
+
 // Owner explicitly links an independently authenticated, verified email identity.
 // Never claim an existing game account by checking its exposed legacy password.
 // No passwords/emails/tokens are written into public game documents or audit logs.
@@ -44,16 +77,28 @@ export async function bindGameAccount(db,auth,actor,input,{now=Date.now()}={}){
  });
 }
 
-export async function setGameAccountActive(db,actor,input,{now=Date.now()}={}){
+export async function setGameAccountActive(db,actor,input,{now=Date.now(),auth}={}){
  requireOwner(actor);only(input,['uid','active','expectedRevision','reason']);
  const {uid,active,expectedRevision,reason}=input;
  if(!validDocumentId(uid)||typeof active!=='boolean'||!Number.isSafeInteger(expectedRevision)||expectedRevision<1||typeof reason!=='string'||reason.trim().length<3||reason.length>500)throw Error('Revisão ou motivo inválido.');
+ if(active){
+  if(!auth)throw Error('Verificação da identidade indisponível.');
+  const identity=await auth.getUser(uid);
+  if(identity.disabled||identity.emailVerified!==true||!identity.email)throw Error('Identidade indisponível para reativação.');
+ }
  return db.runTransaction(async tx=>{
   await gate(tx,db);
   const ref=db.collection('authAccounts').doc(uid),doc=await tx.get(ref);
   if(!doc.exists)throw Error('Vínculo não encontrado.');
   const binding=doc.data();
   if(binding.revision!==expectedRevision)throw Error('Vínculo mudou. Recarregue antes de continuar.');
+  if(active){
+   if(typeof binding.type!=='string'||!own(GAME_ACCOUNTS,binding.type)||!validDocumentId(binding.entityId))throw Error('Vínculo inválido.');
+   const entity=await tx.get(db.collection(GAME_ACCOUNTS[binding.type]).doc(binding.entityId));
+   const owner=await tx.get(db.collection('accountEntityOwners').doc(`${GAME_ACCOUNTS[binding.type]}_${binding.entityId}`));
+   const admin=await tx.get(db.collection('adminProfiles').doc(uid));
+   if(uid===OWNER_UID||admin.exists||!entity.exists||!eligible(binding.type,entity.data())||!owner.exists||owner.data().uid!==uid||owner.data().type!==binding.type||owner.data().entityId!==binding.entityId)throw Error('Perfil ou vínculo indisponível para reativação.');
+  }
   if(binding.active===active)return {uid,revision:binding.revision,duplicate:true};
   const revision=binding.revision+1;
   tx.update(ref,{active,revision,updatedAt:now});

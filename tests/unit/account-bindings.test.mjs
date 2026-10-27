@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {memoryDB} from '../helpers/memory-db.mjs';
-import {bindGameAccount,setGameAccountActive,resolveGameAccount} from '../../server/account-bindings.js';
+import {bindGameAccount,setGameAccountActive,resolveGameAccount,reviewGameAccount} from '../../server/account-bindings.js';
 import {OWNER_UID} from '../../src/admin/permissions.js';
 const auth={getUser:async()=>({email:'verified@example.test',emailVerified:true,disabled:false})};
 const input={uid:'u',type:'TEAM',entityId:'h'};
@@ -35,9 +35,9 @@ test('disable is revision-checked, reserves ownership and immediately blocks ses
  assert.equal((await setGameAccountActive(db,OWNER_UID,{uid:'u',active:false,expectedRevision:1,reason:'Lost access'})).revision,2);
  await assert.rejects(resolveGameAccount(db,'u'));
  await assert.rejects(bindGameAccount(db,auth,OWNER_UID,{...input,uid:'other'}));
- await assert.rejects(setGameAccountActive(db,OWNER_UID,{uid:'u',active:true,expectedRevision:1,reason:'Restore access'}));
+ await assert.rejects(setGameAccountActive(db,OWNER_UID,{uid:'u',active:true,expectedRevision:1,reason:'Restore access'},{auth}));
  assert.equal((await bindGameAccount(db,auth,OWNER_UID,input)).active,false);
- await setGameAccountActive(db,OWNER_UID,{uid:'u',active:true,expectedRevision:2,reason:'Verified identity'});
+ await setGameAccountActive(db,OWNER_UID,{uid:'u',active:true,expectedRevision:2,reason:'Verified identity'},{auth});
  assert.equal((await resolveGameAccount(db,'u')).revision,3);
 });
 test('staff role and account status checked against current profile; client role escalation is rejected',async()=>{
@@ -59,4 +59,51 @@ test('malformed roles and inconsistent ownership fail closed',async()=>{
   const db=fixture();await bindGameAccount(db,auth,OWNER_UID,input);mutate(db);
   await assert.rejects(resolveGameAccount(db,'u'));
  }
+});
+
+test('owner review returns explicit identity and selected profile without legacy secrets or writes',async()=>{
+ const db=fixture();const before=structuredClone([...db.values]);
+ const result=await reviewGameAccount(db,auth,OWNER_UID,input);
+ assert.equal(result.email,'verified@example.test');assert.equal(result.canBind,true);
+ assert.deepEqual(result.profile,{type:'TEAM',entityId:'h',name:'Club',eligible:true,available:true});
+ assert.equal(JSON.stringify(result).includes('legacy-secret'),false);assert.deepEqual([...db.values],before);
+ for(const actor of ['press','club','subadmin'])await assert.rejects(reviewGameAccount(db,auth,actor,input));
+});
+test('lookup resolves existing binding and reserves disabled profile without exposing another owner',async()=>{
+ const db=fixture();await bindGameAccount(db,auth,OWNER_UID,input);
+ await setGameAccountActive(db,OWNER_UID,{uid:'u',active:false,expectedRevision:1,reason:'Lost access'});
+ const result=await reviewGameAccount(db,auth,OWNER_UID,{uid:'u'});
+ assert.deepEqual(result.binding,{type:'TEAM',entityId:'h',active:false,revision:2});assert.equal(result.canBind,false);
+ const other=await reviewGameAccount(db,auth,OWNER_UID,{...input,uid:'other'});
+ assert.equal(other.profile.available,false);assert.equal(other.canBind,false);assert.equal(other.binding,null);
+ assert.equal(Object.hasOwn(other.profile,'uid'),false);
+});
+test('review does not offer unverified, disabled, inactive or administrative targets',async()=>{
+ for(const identity of [{emailVerified:false,email:'u@example.test'},{emailVerified:true,email:'u@example.test',disabled:true}]){
+  assert.equal((await reviewGameAccount(fixture(),{getUser:async()=>identity},OWNER_UID,input)).canBind,false);
+ }
+ const db=fixture();db.values.get('teams/h').status='BLOCKED';assert.equal((await reviewGameAccount(db,auth,OWNER_UID,input)).canBind,false);
+ db.values.set('adminProfiles/u',{active:false});await assert.rejects(reviewGameAccount(db,auth,OWNER_UID,input));
+ for(const payload of [{uid:'u',type:'TEAM'},{uid:'u',entityId:'h'},{...input,password:'guess'},{...input,type:['TEAM']}])await assert.rejects(reviewGameAccount(fixture(),auth,OWNER_UID,payload));
+});
+
+test('reactivation checks current Auth identity, profile and ownership atomically without audit on rejection',async()=>{
+ const enable={uid:'u',active:true,expectedRevision:2,reason:'Verified identity'};
+ for(const change of [
+  db=>db.values.get('teams/h').status='BLOCKED',
+  db=>db.values.delete('accountEntityOwners/teams_h'),
+  db=>db.values.get('accountEntityOwners/teams_h').uid='other',
+  db=>db.values.set('adminProfiles/u',{active:true})
+ ]){
+  const db=fixture();await bindGameAccount(db,auth,OWNER_UID,input);
+  await setGameAccountActive(db,OWNER_UID,{...enable,active:false,expectedRevision:1});change(db);
+  await assert.rejects(setGameAccountActive(db,OWNER_UID,enable,{auth}));
+  assert.equal(db.values.get('authAccounts/u').active,false);
+  assert.equal(db.values.get('authAccounts/u').revision,2);
+  assert.equal(db.values.has('accountBindingAudit/u_3'),false);
+ }
+ const db=fixture();await bindGameAccount(db,auth,OWNER_UID,input);
+ await setGameAccountActive(db,OWNER_UID,{...enable,active:false,expectedRevision:1});
+ for(const identity of [{emailVerified:false,email:'u@test.example'},{emailVerified:true,disabled:true,email:'u@test.example'}])await assert.rejects(setGameAccountActive(db,OWNER_UID,enable,{auth:{getUser:async()=>identity}}));
+ await assert.rejects(setGameAccountActive(db,OWNER_UID,enable));
 });

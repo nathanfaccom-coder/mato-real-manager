@@ -3,6 +3,8 @@ import { MoneyInput } from '../money/MoneyInput.jsx';
 import { BotRosterManager } from "../admin/BotRosterManager.jsx";
 import { canAdmin, isMainAdmin } from "../admin/permissions.js";
 import { SubAdminManager } from "../admin/SubAdminManager.jsx";
+import {AccountBindingManager} from '../admin/AccountBindingManager.jsx';
+import {secureGameLogin} from '../services/game-auth.js';
 import React, { useState, useEffect } from "react";
 import { firebase } from "../services/firebase.js";
 import { getProdCost } from "../game/getProdCost.js";
@@ -58,7 +60,7 @@ export const AdminPanel = ({
     CALENDAR: "calendar",
   };
   const allowedTab = (id) =>
-    ["DASH", "SUBADM"].includes(id)
+    ["DASH", "SUBADM", "BINDINGS"].includes(id)
       ? isMainAdmin(user)
       : canAdmin(user, permissionForTab[id]);
   const [tab, setTab] = useState(() =>
@@ -294,6 +296,8 @@ export const AdminPanel = ({
         CAMPEONATOS E PARTIDAS
       </button>
       {tab === "SUBADM" && isMainAdmin(user) && <SubAdminManager user={user} />}
+      {secureGameLogin&&isMainAdmin(user)&&<button className="btn btn-blue" onClick={()=>setTab('BINDINGS')}>VÍNCULOS DE ACESSO</button>}
+      {secureGameLogin&&tab==='BINDINGS'&&isMainAdmin(user)&&<AccountBindingManager {...{user,teams,players,companies,papers,journalists,coaches}}/>}
       {tab === "NONE" && (
         <p>
           Seu acesso não tem permissões de administração. Peça ao ADM principal

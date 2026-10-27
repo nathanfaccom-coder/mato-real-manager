@@ -3,6 +3,34 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Main-owner binding manager — 2026-10-27
+
+- Added gated admin/AccountBindingManager.jsx in AdminPanel, main owner only.
+  Reauthentication, UID lookup, active profile selection, sanitized server review,
+  explicit bind confirmation and revision-checked disable/reactivate with reason.
+  Editing selection discards review; requests disable the form; passwords clear
+  after use. No reassignment or identity transfer flow, no direct binding writes.
+- New POST account-review requires verified main owner + auth_time <=5 minutes
+  and account migration gate. Returns target Auth email/status, binding metadata,
+  selected profile name/eligibility/availability only. No legacy credentials or
+  other owner's identity. Unverified/disabled/inactive/claimed targets cannot bind.
+- Reactivation now rechecks real Auth user verified/enabled/email and transaction
+  checks current profile eligibility, owner lock and non-administrative identity.
+  Missing/mismatched ownership never offers an available profile or enables it.
+- account-client.js sends refreshed Firebase token, allowlisted payload, no
+  redirects, timeout and no-store; rejects changed owner session and stale auth.
+  API remains authoritative even if UI state is forged.
+- 145 unit tests passed. Both default and secure-enabled builds passed. Real
+  Firebase emulators passed full integration including owner review, non-owner
+  denial without email disclosure, identity lifecycle, binding/revocation and
+  match settlement/retries. Browser interaction/visual QA of new panel not run.
+- No deployment, real migration, real messages or live credentials changed.
+  Next: secure new-profile creation/password settings and comprehensive protected
+  data access/rules, then remaining match integration. Still NOT production-ready.
+- To avoid lost global caches, local CLI15.34.1 now exists at scratch/firebase-cli
+  and FIREBASE_EMULATORS_PATH points to scratch/firebase-emulators. Java21 remains
+  scratch/java21. These are temporary runtime tools, not repository artifacts.
+
 ## Identity lifecycle UI — 2026-10-27
 
 - Added services/identity-access.js and SecureAccessForm.jsx to the disabled

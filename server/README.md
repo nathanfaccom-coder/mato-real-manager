@@ -55,7 +55,23 @@ verification, not a public unauthenticated write API.
 - `POST .../account-state`: same owner/recent-auth requirement; body
   `{uid,active,expectedRevision,reason}`. Disabling reserves ownership; retries
   cannot silently reactivate or transfer a binding.
+  Reactivation rechecks enabled/verified Auth identity, current active profile,
+  ownership lock and exclusion of administrative identities on the server.
 - `POST .../finalize`: `x-worker-key`; processes at most one due job per call.
+- `POST .../account-review`: same owner/recent-auth requirement as mutations;
+  `{uid}` loads an existing binding or `{uid,type,entityId}` previews a candidate.
+  Returns target Auth email/verified/disabled status, sanitized binding and
+  profile name/eligibility/availability. No passwords or other owner's UID.
+  This read endpoint requires the account migration gate and never writes data.
+
+The gated AdminPanel now includes VÍNCULOS DE ACESSO for the main owner only.
+The owner reauthenticates, enters the target UID and either reviews its current
+binding or selects an existing active profile. Only a returned eligible preview
+offers binding confirmation. Disable/reactivate requires a reason and sends the
+reviewed revision; edits to UID/type/profile discard the preview. Backend checks
+remain authoritative even if the browser is modified. Review is not a claim of
+profile ownership: the owner must independently verify the requester. No silent
+reassignment/transfer feature is provided.
 
 Account routes also require `serverConfig/accountMigration` with
 `enabled: true, schemaVersion: 1`. Keep it absent/disabled until production rules
@@ -99,8 +115,8 @@ replacement before rollout; this is currently an existing-profile migration
 path. The default build preserves old registration behavior. No live emails or
 production identities were created during testing.
 
-Before enabling: migrate password settings/new-profile registration, add owner
-binding UI, protect profile reads/writes and finish the match integration. The
+Before enabling: migrate password settings/new-profile registration, protect
+profile reads/writes and finish the match integration. The
 Auth emulator test now exercises real client SDK registration, verification
 action code, password reset and rejection of the previous password. This does
 not validate live email delivery, provider configuration or deployed rules.

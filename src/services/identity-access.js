@@ -1,5 +1,10 @@
 // Auth-only operations on an isolated Firebase app. No game profile writes,
 // claims, bindings or legacy passwords are read by this module.
+export function recoverCurrentIdentityPassword(auth,recover){
+  const identity=auth.currentUser;
+  if(!identity?.email)throw Error('Entre na sua conta para recuperar a senha.');
+  return recover(identity.email);
+}
 export function createIdentityAccess({ createApp }) {
   const emailValue = (value) => {
     const email = typeof value === "string" ? value.trim() : "";

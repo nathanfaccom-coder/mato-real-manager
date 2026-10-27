@@ -12,6 +12,7 @@ import {
   secureGameLogin,
   initialAuthUser,
   resolveGameAccountSession,
+  requestOwnPasswordReset,
 } from "./services/game-auth.js";
 import { SessionRejected } from "./services/trusted-session.js";
 import { OWNER_UID } from "./admin/permissions.js";
@@ -1638,6 +1639,11 @@ export function App() {
               sales={sales || []}
               onAction={handlePlayerActions}
               onUpdatePassword={async (newP) => {
+                if(secureGameLogin){
+                  try{alert(await requestOwnPasswordReset());}
+                  catch{alert('Não foi possível enviar a recuperação. Tente novamente.');}
+                  return;
+                }
                 await db
                   .collection("players")
                   .doc(user.data.id)

@@ -140,3 +140,25 @@ protects against replay even when a worker crashes after commit.
 
 No real credentials, data migration, production rules or live cron were changed
 by the local integration tests.
+
+## Partial server namespace Rules test
+
+From repository root, with Java 21+:
+
+```sh
+node scripts/security-inventory.mjs security-audit.local.json
+npx -y firebase-tools@15.34.1 emulators:exec --only auth,firestore --project demo-mato-real --config firebase.boundary-emulator.json 'node server/tests/server-boundary.mjs'
+```
+
+The detailed inventory is local/untracked; the reviewed findings are in
+`docs/SECURITY_AUDIT.json`. `firebase/firestore-server-boundary.rules` is a
+PROTOTYPE, not deployed and not a complete game policy. It closes direct client
+access to twelve server namespaces while retaining the current legacy policy.
+The test verifies 336 denied attempts, including principal and descendants, and
+also explicitly proves that legacy team reads and balance forgery still succeed.
+That remaining critical vulnerability blocks activation. Protecting new ledgers
+alone does not protect the player attributes, fixtures and finances they depend on.
+
+In secure-login builds, player password controls now send recovery to the current
+Auth email; the ADM cannot display or overwrite another user's password. Default
+build still preserves legacy behavior pending the full migration.

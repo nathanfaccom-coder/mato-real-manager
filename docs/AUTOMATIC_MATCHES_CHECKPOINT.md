@@ -3,6 +3,35 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Partial Rules boundary and credential controls — 2026-10-27
+
+- Ran AST inventory across 160 source/server files (1306 candidate operations,
+  including non-Firestore methods). scripts/security-inventory.mjs reproduces it;
+  detailed security-audit.local.json intentionally untracked. Reviewed collection
+  names, dynamic mappings and all where/orderBy/limit candidates. See audit below.
+- docs/SECURITY_AUDIT.json scores the existing transition policy CRITICAL (1/5).
+  Public legacy profile/financial writes and credentials remain; client UI checks
+  and secure Auth do not fix that. Do not activate automatic rewards yet.
+- firebase/firestore-server-boundary.rules is a limited, undeployed prototype:
+  excludes 12 new server-owned root namespaces at all depths from the legacy
+  recursive grant, preserving existing adminProfiles constraints. It does NOT
+  protect legacy teams/players/calendar/economy and must NOT be presented as a
+  complete production policy. Original transition Rules file unchanged.
+- Root firebase.boundary-emulator.json + server/tests/server-boundary.mjs compile
+  and test that candidate in demo-mato-real only. 336 get/list/create/update/
+  delete/descendant attacks denied across unauthenticated, ordinary/subADM,
+  press-named and principal identities. SDK writes and existing admin boundary
+  retained. Test deliberately demonstrates that legacy balance forgery still
+  succeeds; this is a documented outstanding critical issue, not a hidden pass.
+- Secure-login mode now replaces player password field updates with recovery
+  to the current Firebase Auth email; admin password display/change is blocked
+  in this mode. Legacy/default flow unchanged until migration. 147 unit tests
+  passed; default and secure-enabled builds passed. No live emails/deployment.
+- Next: migrate secure creation of game profiles, split public/private documents,
+  move financial/XP/calendar mutations behind trusted APIs or strict validated
+  rules, and test complete permissions before any activation. Hosted credentials
+  and final match UI/national/disciplinary/financial flows remain outstanding.
+
 ## Main-owner binding manager — 2026-10-27
 
 - Added gated admin/AccountBindingManager.jsx in AdminPanel, main owner only.

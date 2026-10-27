@@ -88,6 +88,7 @@ export const AdminPanel = ({
   const fedSpons = (sps || []).filter((s) => s.companyId === "FEDERACAO");
 
   const managePassword = async (collection, docId, currentPass, name) => {
+    if(secureGameLogin)return alert('As senhas agora são gerenciadas pelo próprio titular, em Recuperar senha na tela de acesso. Use VÍNCULOS DE ACESSO para conferir ou bloquear o vínculo.');
     if (!isMainAdmin(user))
       return alert(
         "Somente o ADM principal pode alterar senhas de outras contas.",

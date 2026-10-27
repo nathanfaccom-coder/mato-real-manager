@@ -1,7 +1,7 @@
 import { adminAuth } from "../admin/auth.js";
 import { db, firebase } from "./firebase.js";
 import { createTrustedSession } from "./trusted-session.js";
-import { createIdentityAccess } from "./identity-access.js";
+import { createIdentityAccess,recoverCurrentIdentityPassword } from "./identity-access.js";
 import { createAccountAdminClient } from "../admin/account-client.js";
 import { OWNER_UID } from "../admin/permissions.js";
 
@@ -50,6 +50,10 @@ export const registerGameIdentity = (email, password) =>
 export const verifyGameEmail = (email, password) =>
   identityAccess.verify(email, password);
 export const recoverGamePassword = (email) => identityAccess.recover(email);
+export function requestOwnPasswordReset(){
+  requireConfigured();
+  return recoverCurrentIdentityPassword(adminAuth,identityAccess.recover);
+}
 export function loginGameAccount(email, password) {
   return client().login(email, password);
 }

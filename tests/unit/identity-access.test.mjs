@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createIdentityAccess } from "../../src/services/identity-access.js";
+import { createIdentityAccess,recoverCurrentIdentityPassword } from "../../src/services/identity-access.js";
 function fixture({
   verified = false,
   sendError = null,
@@ -122,4 +122,15 @@ test("invalid registration input causes no Auth side effects", async () => {
   ])
     await assert.rejects(f.service.register(email, password));
   assert.equal(f.calls.length, 0);
+});
+
+test('profile password recovery uses current Auth email only and never a selected game profile',async()=>{
+ const calls=[];const auth={currentUser:{uid:'verified',email:'owner@example.test'}};
+ assert.equal(await recoverCurrentIdentityPassword(auth,async email=>{calls.push(email);return 'sent';}), 'sent');
+ assert.deepEqual(calls,['owner@example.test']);
+});
+test('signed-out or email-less profile cannot request current-account recovery',()=>{
+ let calls=0;
+ for(const currentUser of [null,{uid:'u'}])assert.throws(()=>recoverCurrentIdentityPassword({currentUser},()=>calls++));
+ assert.equal(calls,0);
 });

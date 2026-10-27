@@ -1,3 +1,4 @@
+import {secureGameLogin} from '../services/game-auth.js';
 import {MatchCareer} from './MatchCareer.jsx';
 import {xpCost as getXpCostDisplay} from '../game/progression.js';
 import { AppearanceEditor } from "../simulation/Editors.jsx";
@@ -19,6 +20,7 @@ export const PlayerDashboard = ({
   setModal,
 }) => {
   const [newPass, setNewPass] = useState("");
+  const [passwordBusy,setPasswordBusy]=useState(false);
   const [tab, setTab] = useState("PERFIL");
   const [trainType, setTrainType] = useState("FISICO_BASE");
 
@@ -567,6 +569,10 @@ export const PlayerDashboard = ({
 
           <div className="card">
             <h4>🔐 Segurança</h4>
+            {secureGameLogin ? <>
+              <p>Receba no e-mail da sua conta as instruções para redefinir a senha.</p>
+              <button className="btn btn-purple" disabled={passwordBusy} onClick={async()=>{setPasswordBusy(true);try{await onUpdatePassword();}finally{setPasswordBusy(false);}}}>RECUPERAR SENHA POR E-MAIL</button>
+            </> :
             <div style={{ display: "flex", gap: 5 }}>
               <input
                 className="input-field"
@@ -588,6 +594,7 @@ export const PlayerDashboard = ({
                 ALTERAR
               </button>
             </div>
+            }
           </div>
         </div>
       )}

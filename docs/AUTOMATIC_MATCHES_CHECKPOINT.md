@@ -3,6 +3,29 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Identity lifecycle UI — 2026-10-27
+
+- Added services/identity-access.js and SecureAccessForm.jsx to the disabled
+  migration path: Auth-only register, verification resend/status and recovery.
+  Uses isolated Firebase app with persistence NONE and cleanup, Portuguese
+  language, 12..128-character new passwords. No Firestore writes, automatic
+  binding, game account creation or legacy credential validation in this flow.
+- Verification send failure preserves the new identity and offers resend rather
+  than losing the account. Reset response does not reveal whether email exists.
+  UID displayed for explicit Federation review; never a password/token.
+- Secure migration mode hides old signup tabs and guards six legacy creation
+  actions. Default production behavior unchanged. Secure creation of new game
+  profiles and migration of legacy password controls remain pending.
+- 137 unit tests passed. Real Auth emulator using Firebase client SDK passed
+  registration -> confirmation action -> verified status -> reset action -> old
+  password rejected/new accepted, with isolated apps disposed. Existing server
+  integration (binding, sessions, settlement, retry, revocation) also passed.
+  No real email was sent and no production identity was created. Build with
+  secure flag enabled passed; default build also checked before commit.
+- Next: owner binding UI, secured profile creation/settings, complete protected
+  database access and rules before enabling the feature. Hosted secret/API/cron
+  deployment and full match integration remain pending; not a release.
+
 ## Client identity integration — 2026-10-27
 
 - Added services/trusted-session.js (injected SDK/network for testing) and

@@ -84,11 +84,26 @@ result. It revalidates when the Auth token changes or the tab becomes visible;
 all server mutations must independently verify authorization on every request.
 This is not continuous polling or immediate push revocation of visible UI.
 
-Before enabling: replace legacy signup/password settings, provide identity
-registration/email verification/recovery, owner binding UI, protect profile reads
-and writes and finish the match integration. Existing signup forms are still
-legacy and must not be used as a secure migration flow. No production account
-has been migrated by these changes.
+The migration login now offers Auth-only identity registration, verification
+resend/status and password recovery. Each runs in a separate app with persistence
+NONE; it never creates a game profile, writes a binding or replaces a primary
+session. The UID shown to the user is only an identifier for owner review, not
+proof of profile ownership. Delivery failure after registration preserves the
+identity so verification can be retried. Recovery uses a generic result for
+unknown/known addresses. UI prevents repeat submissions while a request runs;
+provider quota/rate limits still apply.
+
+The migration build hides legacy registration tabs and guards all six legacy
+registration actions. Creating new game profiles still requires a secure
+replacement before rollout; this is currently an existing-profile migration
+path. The default build preserves old registration behavior. No live emails or
+production identities were created during testing.
+
+Before enabling: migrate password settings/new-profile registration, add owner
+binding UI, protect profile reads/writes and finish the match integration. The
+Auth emulator test now exercises real client SDK registration, verification
+action code, password reset and rejection of the previous password. This does
+not validate live email delivery, provider configuration or deployed rules.
 
 The scheduler uses a 180-second lease and retries with 30-second exponential
 backoff capped at one hour. A permanent failure remains inspectable in

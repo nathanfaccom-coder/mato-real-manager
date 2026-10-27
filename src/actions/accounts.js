@@ -216,6 +216,7 @@ export function createAccountsActions(context, actions) {
   };
 
   const createTeam = async (name, bal, serie, pass, logo, estado) => {
+    if (secureGameLogin) return alert("Novos perfis estão em migração. Prepare seu acesso por e-mail e procure a Federação.");
     if (!estado) return alert("Escolha um Estado!");
     if (teams.find((t) => t.name.toLowerCase() === name.toLowerCase()))
       return alert("Nome em uso!");
@@ -235,6 +236,7 @@ export function createAccountsActions(context, actions) {
   };
 
   const createPlayerAccount = async (data) => {
+    if (secureGameLogin) return alert("Novos perfis estão em migração. Prepare seu acesso por e-mail e procure a Federação.");
     try {
       assertNation(data.nationality);
     } catch (error) {
@@ -289,6 +291,7 @@ export function createAccountsActions(context, actions) {
   };
 
   const createStaff = async (data) => {
+    if (secureGameLogin) return alert("Novos perfis estão em migração. Prepare seu acesso por e-mail e procure a Federação.");
     if (!data.name || !data.password || !data.role)
       return alert("Preencha todos os campos obrigatórios!");
     setLoading(true);
@@ -336,6 +339,7 @@ export function createAccountsActions(context, actions) {
   };
 
   const createNewspaper = async (name, pass, owner) => {
+    if (secureGameLogin) return alert("Novos perfis estão em migração. Prepare seu acesso por e-mail e procure a Federação.");
     await db
       .collection("newspapers")
       .add({ name, password: pass, ownerName: owner, status: "PENDING" });
@@ -343,6 +347,7 @@ export function createAccountsActions(context, actions) {
   };
 
   const createJournalist = async (name, pass, paperId) => {
+    if (secureGameLogin) return alert("Novos perfis estão em migração. Prepare seu acesso por e-mail e procure a Federação.");
     await db
       .collection("journalists")
       .add({ name, password: pass, newspaperId: paperId, status: "PENDING" });
@@ -350,6 +355,7 @@ export function createAccountsActions(context, actions) {
   };
 
   const createCompany = async (f) => {
+    if (secureGameLogin) return alert("Novos perfis estão em migração. Prepare seu acesso por e-mail e procure a Federação.");
     if (!f.n || !f.p) return alert("Preencha tudo!");
     await db.collection("companies").add({
       name: f.n,

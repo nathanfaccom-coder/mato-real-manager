@@ -1,3 +1,4 @@
+import {verifyIdentityLifecycle} from './identity-lifecycle.mjs';
 import {OAuth2Client} from 'google-auth-library';
 import {generateKeyPairSync} from 'node:crypto';
 import assert from 'node:assert/strict';
@@ -19,6 +20,7 @@ const app=initializeApp({projectId,credential}),db=initializeFirestore(app,{pref
 const emulatorAuth=new OAuth2Client();emulatorAuth.setCredentials({access_token:'owner'});
 db.settings({authClient:emulatorAuth});
 try {
+ await verifyIdentityLifecycle(auth);
  const roles=['GOL','LD','ZAG','ZAG','LE','VOL','MC','MEI','PTD','ATA','PTE'];
  const batch=db.batch();
  batch.set(db.doc('serverConfig/matchAutomation'),{enabled:true,schemaVersion:1});

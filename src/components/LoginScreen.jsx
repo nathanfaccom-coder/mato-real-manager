@@ -1,3 +1,4 @@
+import {SecureAccessForm} from "./SecureAccessForm.jsx";
 import {secureGameLogin} from "../services/game-auth.js";
 import { MoneyInput } from '../money/MoneyInput.jsx';
 import { AppearanceEditor } from "../simulation/Editors.jsx";
@@ -29,8 +30,6 @@ export const LoginScreen = ({
   onCreatePlayer,
   config,
 }) => {
-  const [accountEmail,setAccountEmail]=useState("");
-  const [accountPassword,setAccountPassword]=useState("");
   const [adminOpen, setAdminOpen] = useState(false);
   const [adminLogin, setAdminLogin] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
@@ -216,6 +215,7 @@ export const LoginScreen = ({
         >
           ENTRAR
         </button>
+        {!secureGameLogin && <>
         <button
           type="button"
           className={`tab ${tab === "CREATE" ? "active" : ""}`}
@@ -256,54 +256,12 @@ export const LoginScreen = ({
         >
           JOGADOR
         </button>
+        </>}
       </nav>
 
       {tab === "LOGIN" && (
         <div>
-          {secureGameLogin && (
-            <form
-              className="card"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                try {
-                  await onLogin(accountEmail, accountPassword);
-                } finally {
-                  setAccountPassword("");
-                }
-              }}
-            >
-              <h2>Entrar na sua conta</h2>
-              <p>
-                Use o e-mail confirmado e vinculado ao seu perfil pela
-                Federação.
-              </p>
-              <label>
-                E-mail
-                <input
-                  className="input-field"
-                  type="email"
-                  autoComplete="username"
-                  required
-                  value={accountEmail}
-                  onChange={(e) => setAccountEmail(e.target.value)}
-                />
-              </label>
-              <label>
-                Senha
-                <input
-                  className="input-field"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={accountPassword}
-                  onChange={(e) => setAccountPassword(e.target.value)}
-                />
-              </label>
-              <button className="btn btn-green" type="submit">
-                ENTRAR
-              </button>
-            </form>
-          )}
+          {secureGameLogin && <SecureAccessForm onLogin={onLogin}/>}
           {!secureGameLogin && <>
           <div className="login-tab-buttons" role="group" aria-label="Tipo de conta">
             <button

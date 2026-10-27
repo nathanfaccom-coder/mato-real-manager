@@ -60,7 +60,7 @@ export async function startMatch(db,uid,input,{now=Date.now(),seed=randomInt(0,0
   if(lockDocs.some(d=>d.exists))throw Error('Clube ou jogador ainda participa de outra partida.');
   const preMatchMs=28000,durationMs=timelineDurationMs({snapshot});
   const endsAt=now+preMatchMs+durationMs;
-  const run={status:'RUNNING',kind:official?'OFFICIAL':'FRIENDLY',fixtureId:official?input.fixtureId:null,competitionId:fixture?.competitionId||null,seasonId,snapshot,commands:[],startedAt:now,preMatchMs,durationMs,timelineVersion:2,endsAt,createdBy:uid,participantIds,lockIds};
+  const run={status:'RUNNING',kind:official?'OFFICIAL':'FRIENDLY',fixtureId:official?input.fixtureId:null,competitionId:fixture?.competitionId||null,seasonId,snapshot,commands:[],startedAt:now,preMatchMs,durationMs,timelineVersion:2,endsAt,nextAttemptAt:endsAt,createdBy:uid,participantIds,lockIds};
   tx.set(ref,run);
   for(const lock of locks)tx.set(lock,{matchId,createdAt:now});
   if(official)tx.update(db.collection('matches').doc(input.fixtureId),{status:'RUNNING',runId:matchId});

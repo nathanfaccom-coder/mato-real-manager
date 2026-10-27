@@ -3,6 +3,36 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Official SDK, scheduler and emulator verification — 2026-10-27
+
+- Added server/firebase-runtime.js using pinned firebase-admin 14.5.0 and official
+  preferRest transport. Enforces Mato Real project and rejects emulator vars.
+  server/package-lock.json pins the server dependency tree separately from client.
+- server/supabase-entry.js wires Firebase-verified start/command and secret-protected
+  finalize. Fail-closed until MATO_REAL_MATCHES_ENABLED=true plus Firestore gate.
+  No real service-account secret provisioned and no live API/cron deployed.
+- server/match-scheduler.js handles one due game/request with 180s lease, retry
+  backoff 30s..1h, queue fairness. New runs include nextAttemptAt. Index candidate
+  server/firestore.indexes.json not deployed. Three scheduler unit tests passed.
+- Full root unit suite: 116 passed. Real Firebase Auth + Firestore emulators
+  (CLI15.34.1, Firestore1.22.0, Java21) integration PASSED with official REST SDK:
+  authenticated HTTP start, idempotent retry, simultaneous finalization without
+  duplicate XP/energy, audit/locks, transient scheduler failure/recovery, and
+  rejection after disabling the Auth user. Test uses demo-mato-real only.
+- server/tests/deny-all.rules is ONLY a local test fixture, NOT application rules.
+  It verifies that client REST calls cannot write test data even with an admin
+  user token; server IAM/admin credentials are separate. Production legacy rules
+  remain unchanged and insecure. Auth migration still required.
+- Local Deno registry downloads failed due network connection refusal. Instead,
+  hosted match-sdk-probe imported firebase-admin14.5.0 and initialized Firestore
+  + Auth on Supabase successfully (HTTP200 authorized,401 without token). Zero
+  database requests and no Firebase credentials used in that probe. Replaced it
+  with disabled410 handler and verify_jwt=true (version2) afterwards.
+- Hosted SDK INIT is verified; hosted Firestore RPC, credential exchange and
+  combined simulation/SDK memory peak are NOT yet verified.
+- See server/README.md for reproducible tests, required server-secret names and
+  activation prerequisites. Never paste service-account private keys into chat.
+
 ## Server command and HTTP boundaries — 2026-10-26
 
 - server/match-commands.js accepts only verified Firebase UID plus allowlisted

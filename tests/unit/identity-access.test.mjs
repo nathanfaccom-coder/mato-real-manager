@@ -11,6 +11,7 @@ function fixture({
   const calls = [];
   const user = {
     uid: "new-identity",
+    getIdToken:async force=>{calls.push(["token",force]);return "id-token";},
     emailVerified: verified,
     reload: async () => calls.push(["reload"]),
     sendEmailVerification: async () => {
@@ -133,4 +134,14 @@ test('signed-out or email-less profile cannot request current-account recovery',
  let calls=0;
  for(const currentUser of [null,{uid:'u'}])assert.throws(()=>recoverCurrentIdentityPassword({currentUser},()=>calls++));
  assert.equal(calls,0);
+});
+
+test('application authentication passes only a fresh token to the operation and cleans up',async()=>{
+ const f=fixture({verified:true});let received;
+ const result=await f.service.withVerifiedIdentity('user@example.test','secret',async token=>{received=token;return {status:'PENDING'};});
+ assert.equal(received,'id-token');assert.equal(result.status,'PENDING');assert.ok(f.calls.some(c=>c[0]==='token'&&c[1]===true));assert.deepEqual(f.calls.slice(-2),[['signout'],['deleteApp']]);
+});
+test('unverified identity cannot invoke registration operation',async()=>{
+ const f=fixture();let called=false;await assert.rejects(f.service.withVerifiedIdentity('user@example.test','secret',async()=>{called=true;}));
+ assert.equal(called,false);assert.deepEqual(f.calls.slice(-2),[['signout'],['deleteApp']]);
 });

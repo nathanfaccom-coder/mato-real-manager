@@ -1,7 +1,10 @@
 import { adminAuth } from "../admin/auth.js";
 import { db, firebase } from "./firebase.js";
 import { createTrustedSession } from "./trusted-session.js";
-import { createIdentityAccess,recoverCurrentIdentityPassword } from "./identity-access.js";
+import {
+  createIdentityAccess,
+  recoverCurrentIdentityPassword,
+} from "./identity-access.js";
 import { createAccountAdminClient } from "../admin/account-client.js";
 import { OWNER_UID } from "../admin/permissions.js";
 
@@ -26,6 +29,9 @@ function bindingClient() {
 export const reviewAccountBinding = (input) => bindingClient().review(input);
 export const bindAccountIdentity = (input) => bindingClient().bind(input);
 export const changeAccountBinding = (input) => bindingClient().state(input);
+export const reviewPlayerApplication = (input) =>
+  bindingClient().application(input);
+export const decidePlayerApplication = (input) => bindingClient().decide(input);
 export async function reauthenticateBindingOwner(password) {
   requireConfigured();
   const identity = adminAuth.currentUser;
@@ -50,9 +56,35 @@ export const registerGameIdentity = (email, password) =>
 export const verifyGameEmail = (email, password) =>
   identityAccess.verify(email, password);
 export const recoverGamePassword = (email) => identityAccess.recover(email);
-export function requestOwnPasswordReset(){
+async function applicationRequest(email, password, route, payload) {
   requireConfigured();
-  return recoverCurrentIdentityPassword(adminAuth,identityAccess.recover);
+  return identityAccess.withVerifiedIdentity(email, password, async (token) => {
+    const response = await fetch(`${endpoint}/${route}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      credentials: "omit",
+      redirect: "error",
+      cache: "no-store",
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!response.ok)
+      throw Error(
+        "Não foi possível processar a inscrição. Confira a confirmação do e-mail e consulte a situação atual.",
+      );
+    return response.json();
+  });
+}
+export const submitNewPlayer = (email, password, profile) =>
+  applicationRequest(email, password, "player-apply", profile);
+export const consultNewPlayer = (email, password) =>
+  applicationRequest(email, password, "player-application", {});
+export function requestOwnPasswordReset() {
+  requireConfigured();
+  return recoverCurrentIdentityPassword(adminAuth, identityAccess.recover);
 }
 export function loginGameAccount(email, password) {
   return client().login(email, password);

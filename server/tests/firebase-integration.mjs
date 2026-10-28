@@ -1,3 +1,4 @@
+import {verifyPlayerRegistration} from './player-registration.mjs';
 import {verifyIdentityLifecycle} from './identity-lifecycle.mjs';
 import {OAuth2Client} from 'google-auth-library';
 import {generateKeyPairSync} from 'node:crypto';
@@ -36,6 +37,7 @@ try {
  const signed=await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=fake`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:customToken,returnSecureToken:true})});
  assert.equal(signed.status,200);const {idToken}=await signed.json();
  const handle=createMatchHandler({db,auth,enabled:true});
+ await verifyPlayerRegistration({db,auth,handle,ownerToken:idToken});
  await auth.createUser({uid:'club-owner',email:'club@example.test',emailVerified:true});
  const reviewRequest=(token,payload)=>new Request('https://example.test/account-review',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(payload)});
  const preview=await handle(reviewRequest(idToken,{uid:'club-owner',type:'TEAM',entityId:'h'}));assert.equal(preview.status,200);

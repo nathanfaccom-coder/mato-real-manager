@@ -3,6 +3,40 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Private player registration and atomic approval — 2026-10-27
+
+- Added server/player-registration.js: verified/enabled non-admin identity submits
+  strictly allowlisted name/nation/position/Instagram/appearance/revision. Private
+  playerApplications keyed by UID; no public player or binding until approval.
+  Both accountMigration and new playerRegistration server gates required (off).
+- Main owner reviews and approves/rejects with recent authentication, revision
+  and reason. Approval transaction creates the player, binding, ownership lock
+  and audits together. Line OVR45/GK60, balance0, pendingXP0, energy100 and other
+  existing initial defaults derived by server. No client money/XP/attributes.
+  Instagram remains private; no email/password/UID copied to public player.
+- Duplicate submission/approval cannot create extra players or reroll attributes.
+  Comparison canonicalizes profile keys to tolerate Firestore map ordering.
+  Rejection allows corrected resubmission at current revision. Binding/profile
+  collisions and disabled/unverified identities abort without partial writes.
+- Gated login offers SecurePlayerRegistration; own submission/status uses an
+  isolated nonpersistent verified Auth session. Admin binding tab now includes
+  PlayerApplicationManager. Existing-profile binding remains independent; new
+  registration cannot take over existing accounts. Other profile types pending.
+- API routes player-apply, player-application, player-application-review and
+  player-application-decide added. Private subject lookup rejects client UID;
+  owner review/decision require the existing five-minute auth_time check.
+- 157 unit tests passed; real Auth/Firestore emulator tests passed including
+  submission retry, unauthorized fields/reads, simultaneous approval and trusted
+  resulting player session. Both build modes passed. No browser visual test or
+  live registration/email/production data change was performed.
+- Added playerApplications/playerApplicationAudit to the limited Rules prototype.
+  392 namespace attacks denied on 14 namespaces; deliberate legacy balance
+  forgery still succeeds. Audit stays CRITICAL. AST inventory now163 files/1353
+  operation candidates. Rules remain undeployed and insufficient for activation.
+- Next: secure remaining profile creation and migrate public/private legacy data
+  and economics/calendar mutations, then full match UI/discipline/finance/national
+  integration and hosted credentials/API/cron. Do not ship this draft yet.
+
 ## Partial Rules boundary and credential controls — 2026-10-27
 
 - Ran AST inventory across 160 source/server files (1306 candidate operations,

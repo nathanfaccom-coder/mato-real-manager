@@ -1,4 +1,5 @@
 import {SecureAccessForm} from "./SecureAccessForm.jsx";
+import {SecurePlayerRegistration} from './SecurePlayerRegistration.jsx';
 import {secureGameLogin} from "../services/game-auth.js";
 import { MoneyInput } from '../money/MoneyInput.jsx';
 import { AppearanceEditor } from "../simulation/Editors.jsx";
@@ -207,6 +208,7 @@ export const LoginScreen = ({
       {/* --- FIM DO CABEÇALHO --- */}
 
       <nav className="login-tabs" aria-label="Acesso e cadastros">
+        {secureGameLogin&&<button className={`tab ${tab==='SECURE_PLAYER'?'active':''}`} aria-pressed={tab==='SECURE_PLAYER'} onClick={()=>setTab('SECURE_PLAYER')}>NOVO JOGADOR</button>}
         <button
           type="button"
           className={`tab ${tab === "LOGIN" ? "active" : ""}`}
@@ -792,6 +794,8 @@ export const LoginScreen = ({
           </div>
         </div>
       )}
+
+      {secureGameLogin&&tab==='SECURE_PLAYER'&&<SecurePlayerRegistration/>}
 
       {tab === "CREATE" && (
         <div>

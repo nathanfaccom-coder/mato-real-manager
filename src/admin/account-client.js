@@ -45,5 +45,13 @@ export function createAccountAdminClient({
       request("account-bind", { uid, type, entityId }),
     state: ({ uid, active, expectedRevision, reason }) =>
       request("account-state", { uid, active, expectedRevision, reason }),
+    application: ({ uid }) => request("player-application-review", { uid }),
+    decide: ({ uid, approve, expectedRevision, reason }) =>
+      request("player-application-decide", {
+        uid,
+        approve,
+        expectedRevision,
+        reason,
+      }),
   };
 }

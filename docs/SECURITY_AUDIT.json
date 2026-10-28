@@ -1,13 +1,13 @@
 {
   "score": 1,
-  "summary": "CRÍTICO: a política de transição mantém o jogo legado publicamente gravável. O novo protótipo protege apenas 12 namespaces de servidor e não está publicado. Não ativar partidas/XP nem migração com essa política parcial.",
+  "summary": "CRÍTICO: a política de transição mantém o jogo legado publicamente gravável. O novo protótipo protege apenas 14 namespaces de servidor e não está publicado. Não ativar partidas/XP nem migração com essa política parcial.",
   "scope": {
     "sourceRules": "firebase/firestore-subadmins-transition.rules",
     "candidateRules": "firebase/firestore-server-boundary.rules",
     "liveInspectedThisTurn": false,
     "productionChanged": false,
-    "filesScanned": 160,
-    "operationCandidates": 1306,
+    "filesScanned": 163,
+    "operationCandidates": 1353,
     "inventoryCaveat": "Inventário AST inclui candidatos Map/Auth e não prova fluxo de dados. Consultas dinâmicas exigem revisão do chamador. Resultado detalhado em security-audit.local.json não rastreado."
   },
   "findings": [
@@ -47,7 +47,7 @@
   "prototypeValidation": {
     "status": "PASS para o limite restrito; FAIL para segurança global do jogo",
     "test": "server/tests/server-boundary.mjs",
-    "clientAttemptsDenied": 336,
+    "clientAttemptsDenied": 392,
     "identities": [
       "sem autenticação",
       "subADM de times",
@@ -66,7 +66,9 @@
       "friendlyDailyXP",
       "playerSeasons",
       "playerCompetitions",
-      "competitionStandings"
+      "competitionStandings",
+      "playerApplications",
+      "playerApplicationAudit"
     ],
     "attacks": [
       "get privado",
@@ -87,10 +89,26 @@
     "queryCompatibility": "Consultas legadas where/orderBy/limit mantêm a política antiga; queries de namespaces reservados são somente servidor. Nenhuma Rules nova foi publicada."
   },
   "nextSteps": [
-    "Migrar criação de perfis sem senhas legadas",
+    "Migrar criação de times, comissão, empresas e imprensa; cadastro seguro de jogadores implementado mas ainda desativado",
     "Separar dados públicos e privados",
     "Proteger calendário, atletas e economia com validação e transações",
     "Testar consultas e ações de cada papel com política completa",
     "Provisionar segredo de servidor e validar hospedagem antes de habilitar flags"
-  ]
+  ],
+  "playerRegistrationValidation": {
+    "status": "Tested in emulators; disabled/not deployed",
+    "privateFields": [
+      "Instagram kept only in playerApplications"
+    ],
+    "checks": [
+      "verified Auth identity",
+      "one application per identity",
+      "server-derived player attributes and economy",
+      "revision-checked rejection/resubmission",
+      "concurrent approval deduplicated",
+      "atomic player + binding + ownership + audits",
+      "public profile has no email/password/Instagram",
+      "map ordering independent replay"
+    ]
+  }
 }

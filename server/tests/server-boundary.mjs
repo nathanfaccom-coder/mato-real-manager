@@ -15,7 +15,7 @@ const app=initializeApp({projectId,credential}),db=initializeFirestore(app,{pref
 // Only local emulators: REST auth must carry the emulator's owner token.
 const emulatorAuth=new OAuth2Client();emulatorAuth.setCredentials({access_token:'owner'});
 db.settings({authClient:emulatorAuth});
-const protectedCollections=['authAccounts','accountEntityOwners','accountBindingAudit','serverConfig','matchRuns','matchResults','matchResultAudit','matchParticipantLocks','friendlyDailyXP','playerSeasons','playerCompetitions','competitionStandings'];
+const protectedCollections=['authAccounts','accountEntityOwners','accountBindingAudit','serverConfig','matchRuns','matchResults','matchResultAudit','matchParticipantLocks','friendlyDailyXP','playerSeasons','playerCompetitions','competitionStandings','playerApplications','playerApplicationAudit'];
 try{
  const base=`http://${process.env.FIRESTORE_EMULATOR_HOST}/v1/projects/${projectId}/databases/(default)/documents`;
  const tokens=[null];

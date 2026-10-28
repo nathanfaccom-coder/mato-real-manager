@@ -1,8 +1,9 @@
 // Auth-only operations on an isolated Firebase app. No game profile writes,
 // claims, bindings or legacy passwords are read by this module.
-export function recoverCurrentIdentityPassword(auth,recover){
-  const identity=auth.currentUser;
-  if(!identity?.email)throw Error('Entre na sua conta para recuperar a senha.');
+export function recoverCurrentIdentityPassword(auth, recover) {
+  const identity = auth.currentUser;
+  if (!identity?.email)
+    throw Error("Entre na sua conta para recuperar a senha.");
   return recover(identity.email);
 }
 export function createIdentityAccess({ createApp }) {
@@ -73,7 +74,17 @@ export function createIdentityAccess({ createApp }) {
     // Same UI result for absent and existing accounts.
     return "Se houver uma conta para esse e-mail, você receberá as instruções para redefinir a senha.";
   }
-  return { register, verify, recover };
+  async function withVerifiedIdentity(email, password, operation) {
+    email = emailValue(email);
+    return isolated(async (auth) => {
+      const { user } = await auth.signInWithEmailAndPassword(email, password);
+      await user.reload();
+      if (user.emailVerified !== true)
+        throw Error("Confirme seu e-mail antes de enviar a inscrição.");
+      return operation(await user.getIdToken(true));
+    });
+  }
+  return { register, verify, recover, withVerifiedIdentity };
 }
 export function identityErrorMessage(error) {
   if (error?.code === "auth/email-already-in-use")

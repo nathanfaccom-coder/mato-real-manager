@@ -58,6 +58,30 @@ verification, not a public unauthenticated write API.
   Reactivation rechecks enabled/verified Auth identity, current active profile,
   ownership lock and exclusion of administrative identities on the server.
 - `POST .../finalize`: `x-worker-key`; processes at most one due job per call.
+- `POST .../player-apply`: verified/enabled Firebase identity; strict profile
+  fields name/nationality/position/instagram/pixelAppearance/expectedRevision.
+  Creates one private pending application per UID, never a public player.
+- `POST .../player-application`: Firebase identity and empty JSON; own status only.
+- `POST .../player-application-review`: recent main-owner authentication, `{uid}`;
+  private application data for Federation review.
+- `POST .../player-application-decide`: recent main-owner authentication;
+  `{uid,approve,expectedRevision,reason}`. Atomic approval creates a player with
+  server-derived attributes/economy plus identity binding/ownership/audits.
+  Rejection permits a corrected resubmission at the current revision. Replayed
+  submissions/decisions do not create new profiles or reroll attributes.
+
+Player applications additionally require serverConfig/playerRegistration with
+enabled true and schemaVersion 1, AND the accountMigration gate. Instagram stays
+in playerApplications (private), not the public player document. Approval checks
+the current Auth identity again. New players retain existing initial rules:
+overall 45 for outfield / 60 goalkeeper, balance 0, salary 1500, value 40000,
+FREE team, energy 100 and pendingXP 0. No client UID, role, stats or money accepted.
+
+Secure-login builds offer NOVO JOGADOR on the login screen and player application
+review below the owner's binding manager. Submission uses a separate nonpersistent
+Auth session; it does not replace the current logged-in account. Other profile
+types still need their secure registration migration. Existing-profile binding
+continues to require explicit independent review; registration cannot claim one.
 - `POST .../account-review`: same owner/recent-auth requirement as mutations;
   `{uid}` loads an existing binding or `{uid,type,entityId}` previews a candidate.
   Returns target Auth email/verified/disabled status, sanitized binding and
@@ -110,12 +134,12 @@ unknown/known addresses. UI prevents repeat submissions while a request runs;
 provider quota/rate limits still apply.
 
 The migration build hides legacy registration tabs and guards all six legacy
-registration actions. Creating new game profiles still requires a secure
-replacement before rollout; this is currently an existing-profile migration
-path. The default build preserves old registration behavior. No live emails or
+registration actions. Player registration now has the private application flow
+above; teams, staff, companies and press still need secure replacements before
+rollout. The default build preserves old registration behavior. No live emails or
 production identities were created during testing.
 
-Before enabling: migrate password settings/new-profile registration, protect
+Before enabling: migrate remaining profile registration, protect
 profile reads/writes and finish the match integration. The
 Auth emulator test now exercises real client SDK registration, verification
 action code, password reset and rejection of the previous password. This does
@@ -153,8 +177,8 @@ npx -y firebase-tools@15.34.1 emulators:exec --only auth,firestore --project dem
 The detailed inventory is local/untracked; the reviewed findings are in
 `docs/SECURITY_AUDIT.json`. `firebase/firestore-server-boundary.rules` is a
 PROTOTYPE, not deployed and not a complete game policy. It closes direct client
-access to twelve server namespaces while retaining the current legacy policy.
-The test verifies 336 denied attempts, including principal and descendants, and
+access to fourteen server namespaces while retaining the current legacy policy.
+The test verifies 392 denied attempts, including principal and descendants, and
 also explicitly proves that legacy team reads and balance forgery still succeed.
 That remaining critical vulnerability blocks activation. Protecting new ledgers
 alone does not protect the player attributes, fixtures and finances they depend on.

@@ -16,7 +16,9 @@ export async function submitMatchCommand(db,uid,input,{now=Date.now()}={}) {
   if(!gate.exists||gate.data().enabled!==true||gate.data().schemaVersion!==1)throw Error('Integração automática ainda não liberada.');
   const identity=await tx.get(db.collection('authAccounts').doc(uid));
   const account=identity.exists?identity.data():null;
-  if(!account?.active||!['TEAM','COACH'].includes(account.type)||!validDocumentId(account.entityId))throw Error('Conta sem autorização para comandar clubes.');
+  if(account?.active!==true||!Number.isSafeInteger(account.revision)||account.revision<1||!['TEAM','COACH'].includes(account.type)||!validDocumentId(account.entityId))throw Error('Conta sem autorização para comandar clubes.');
+  const owner=await tx.get(db.collection('accountEntityOwners').doc(`${account.type==='TEAM'?'teams':'users'}_${account.entityId}`));
+  if(!owner.exists||owner.data().uid!==uid||owner.data().type!==account.type||owner.data().entityId!==account.entityId)throw Error('Vínculo de controle indisponível.');
   const profile=await tx.get(db.collection(account.type==='TEAM'?'teams':'users').doc(account.entityId));
   if(!profile.exists||profile.data().status!=='ACTIVE'||(account.type==='COACH'&&profile.data().type!=='COACH'))throw Error('Conta indisponível.');
   const teamId=account.type==='TEAM'?account.entityId:profile.data().teamId;

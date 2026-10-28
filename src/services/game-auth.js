@@ -1,3 +1,4 @@
+import {createMatchClient} from './match-client.js';
 import { adminAuth } from "../admin/auth.js";
 import { db, firebase } from "./firebase.js";
 import { createTrustedSession } from "./trusted-session.js";
@@ -99,4 +100,9 @@ export function initialAuthUser() {
       resolve(user);
     }, reject);
   });
+}
+
+export function matchApi() {
+  requireConfigured();
+  return createMatchClient({auth:adminAuth,endpoint});
 }

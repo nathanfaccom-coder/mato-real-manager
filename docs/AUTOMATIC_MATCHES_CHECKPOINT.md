@@ -3,6 +3,36 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Server-backed broadcasts and match viewing — 2026-10-28
+
+- Added authenticated POST match-view and match-list (fixed newest 10) under
+  the existing off-by-default automation gate. Whitelisted sporting projections
+  omit UIDs, account details, audit reasons, worker metadata and locks. Commands
+  have stable hashed public IDs; snapshots whitelist players/attributes/appearance.
+- Result is shown only when both the finished run and result ledger exist.
+  Sporting simulation parity tested after projection; list omits rosters/seed.
+- In secure-login builds Broadcast creates shared friendlies through start API,
+  reads/replays server snapshots and polls the selected match every 15 seconds
+  while visible, stopping after confirmed settlement. Recent list refresh is manual.
+  Local previews remain nonpersistent. No client settlement or XP grant exists.
+- LiveCoach uses the command API for server games; pending uncertain requests reuse
+  their idempotency key. Server checks strict boolean active, valid binding revision
+  and matching account ownership lock in addition to current employment.
+- MatchCenter can start official matches or open existing runs in Broadcast.
+  Approval remains required server-side. Non-ADM no longer see manual report action
+  even in legacy mode. Secure mode still needs the ADM corrections UI/API.
+- 171 unit tests passed; real Auth/Firestore emulator passed including private
+  projection, bounded listing and official/friendly settlement. Both build modes
+  compiled (latest enabled build after integration). No live services activated.
+- Browser interaction harness tests/transmission-ui.mjs prepared with isolated API
+  fixtures and blocked external traffic. Chromium launch is blocked in this runtime
+  by socket() Operation not permitted; the browser test has NOT passed. Do not
+  describe this as visually validated. Run it in a browser-enabled environment.
+- Firebase CLI remains unauthenticated. Supabase credentials/API/cron, complete
+  public/private data migration, source-data Rules, remaining signup types,
+  national/financial/disciplinary integration and ADM correction/approval UI remain
+  release blockers. Production is still 2.9.11; keep feature disabled.
+
 ## Protected official-fixture approval — 2026-10-28
 
 - Added POST fixture-approve: recent Firebase authentication and strict active
@@ -372,8 +402,8 @@ credential provisioning and legacy authentication migration remain unresolved.
 3. Add reliable scheduled/task finalization calling the worker. Protect matchRuns,
    results, audits and daily budgets. Include pending writes/retry handling.
 4. Integrate Broadcast/MatchCenter: official fixture start, friendly start, preview
-   with zero persistence, viewing existing run/result, server commands. Current
-   Broadcast is still the old friendlyBroadcasts flow and grants no new rewards.
+   with zero persistence, viewing existing run/result, server commands. The secure-login build now uses the server API for club broadcasts;
+   default build remains legacy. National fixtures and complete ADM UI remain.
 5. Integrate national fixtures and results into the same trusted pipeline.
 6. Add ADM manual match entry/correction endpoint with strict report validation,
    revision checks, reason, minute limits, score consistency and position notes.

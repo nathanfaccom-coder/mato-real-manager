@@ -102,6 +102,16 @@ try {
  assert.equal((await db.doc(`matchResults/${officialId}`).get()).data().kind,'OFFICIAL');
  assert.equal((await db.doc('matches/official-test').get()).data().status,'FINISHED');
  console.log('PASS: forged official marker denied, private approval atomic and idempotent, changed fixture denied, approved game settled.');
+ const viewResponse=await handle(apiRequest('match-view',{matchId:officialId},clubToken));
+ assert.equal(viewResponse.status,200);
+ const view=await viewResponse.json();assert.equal(view.serverOwned,true);assert.equal(view.result.kind,'OFFICIAL');
+ assert.deepEqual(view.result.score,(await db.doc(`matchResults/${officialId}`).get()).data().score);
+ assert.equal(view.createdBy,undefined);assert.equal(view.result.actor,undefined);assert.equal(view.result.reason,undefined);
+ const listing=await handle(apiRequest('match-list',{},clubToken));assert.equal(listing.status,200);
+ const summaries=(await listing.json()).matches;assert.ok(summaries.some(m=>m.id===officialId));assert.ok(summaries.length<=10);
+ assert.ok(summaries.every(m=>m.snapshot.seed===undefined&&m.commands===undefined));
+ assert.equal((await handle(apiRequest('match-list',{limit:1000},clubToken))).status,400);
+ console.log('PASS: authenticated match projections and bounded listing return confirmed results without private metadata.');
  await auth.updateUser(OWNER_UID,{disabled:true});
  assert.equal((await handle(request())).status,401);
  console.log('PASS: real Auth emulator token, REST SDK transactions, retry deduplication, simultaneous settlement, exact XP/energy, lock release, deny-all fixture, disabled-user rejection.');

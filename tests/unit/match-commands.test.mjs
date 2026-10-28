@@ -4,7 +4,8 @@ import {memoryDB} from '../helpers/memory-db.mjs';
 import {submitMatchCommand} from '../../server/match-commands.js';
 function fixture(){return memoryDB({
  'serverConfig/matchAutomation':{enabled:true,schemaVersion:1},
- 'authAccounts/u':{active:true,type:'TEAM',entityId:'h'},
+ 'authAccounts/u':{active:true,type:'TEAM',entityId:'h',revision:1},
+ 'accountEntityOwners/teams_h':{uid:'u',type:'TEAM',entityId:'h'},
  'teams/h':{status:'ACTIVE'},
  'matchRuns/m':{status:'RUNNING',startedAt:1000,preMatchMs:28000,endsAt:2000000,commands:[],snapshot:{addedTime:[0,0],home:{id:'h',lineup:[{id:'h1'}],bench:[{id:'h2'}]},away:{id:'a',lineup:[{id:'a1'}],bench:[]}}}
 });}
@@ -29,7 +30,7 @@ test('unauthenticated, press, inactive and unrelated club accounts are denied',a
  await assert.rejects(submitMatchCommand(fixture(),null,input,{now:30000}));
 });
 test('coach authorization follows current employment, not client claims',async()=>{
- const db=fixture();db.values.set('authAccounts/u',{active:true,type:'COACH',entityId:'c'});db.values.set('users/c',{status:'ACTIVE',type:'COACH',teamId:'h'});
+ const db=fixture();db.values.set('accountEntityOwners/users_c',{uid:'u',type:'COACH',entityId:'c'});db.values.set('authAccounts/u',{active:true,type:'COACH',entityId:'c',revision:1});db.values.set('users/c',{status:'ACTIVE',type:'COACH',teamId:'h'});
  await submitMatchCommand(db,'u',input,{now:30000});
  db.values.set('users/c',{status:'ACTIVE',type:'COACH',teamId:'other'});
  await assert.rejects(submitMatchCommand(db,'u',{...input,requestId:'two'},{now:40000}),/não controla/);
@@ -46,4 +47,10 @@ test('substitution rejects opponents, duplicated players and extra fields',async
  for(const changes of [[{outId:'h1',inId:'a1'}],[{outId:'h1',inId:'h2'},{outId:'h1',inId:'h2'}],[{outId:'h1',inId:'h2',at:0}]])await assert.rejects(submitMatchCommand(fixture(),'u',{matchId:'m',requestId:'sub',kind:'substitutions',changes},{now:30000}));
  const db=fixture();await submitMatchCommand(db,'u',{matchId:'m',requestId:'sub',kind:'substitutions',changes:[{outId:'h1',inId:'h2'}]},{now:30000});
  assert.equal(db.values.get('matchRuns/m').commands.length,1);
+});
+
+test('commands require boolean active, revision and matching server-owned identity lock',async()=>{
+ for(const mutate of [db=>db.values.get('authAccounts/u').active='true',db=>delete db.values.get('authAccounts/u').revision,db=>db.values.delete('accountEntityOwners/teams_h'),db=>db.values.get('accountEntityOwners/teams_h').uid='other']){
+  const db=fixture();mutate(db);await assert.rejects(submitMatchCommand(db,'u',input,{now:30000}));assert.equal(db.values.get('matchRuns/m').commands.length,0);
+ }
 });

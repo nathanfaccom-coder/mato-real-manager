@@ -10,6 +10,7 @@ import {
 import { adminAuth, observeAdmin } from "./admin/auth.js";
 import {
   secureGameLogin,
+  matchApi,
   initialAuthUser,
   resolveGameAccountSession,
   requestOwnPasswordReset,
@@ -234,6 +235,12 @@ export function App() {
   const [coaches, setCoaches] = useState([]);
   const [hallOfFame, setHallOfFame] = useState([]);
   const [matches, setMatches] = useState([]);
+  const [automaticMatchId,setAutomaticMatchId]=useState(null);
+  async function openAutomaticMatch(fixture) {
+    const matchId=fixture.runId || (await matchApi().start({requestId:crypto.randomUUID(),fixtureId:fixture.id})).matchId;
+    setAutomaticMatchId(matchId);
+    setScreen('BROADCAST');
+  }
   const [posts, setPosts] = useState([]);
   const [screen, setScreen] = useState("HOME");
   const [matchesTab, setMatchesTab] = useState("LIGAS");
@@ -854,13 +861,14 @@ export function App() {
         {!["BROADCAST", "WATCH_GAMES"].includes(screen) && (
           <button
             className="btn btn-green pixel-feature"
-            onClick={() => setScreen("BROADCAST")}
+            onClick={() => {setAutomaticMatchId(null);setScreen("BROADCAST");}}
           >
-            📺 MATO REAL TV — AMISTOSOS
+            📺 MATO REAL TV — {secureGameLogin ? 'JOGOS' : 'AMISTOSOS'}
           </button>
         )}
         {["BROADCAST", "WATCH_GAMES"].includes(screen) && (
           <Broadcast
+            initialMatchId={automaticMatchId}
             watchOnly={screen === "WATCH_GAMES"}
             user={user}
             teams={teams}
@@ -1222,6 +1230,8 @@ export function App() {
                 </div>
                 <hr style={{ borderColor: "#333", margin: "20px 0" }} />
                 <MatchCenter
+                  automaticMatches={secureGameLogin}
+                  onAutomaticMatch={openAutomaticMatch}
                   matches={matches}
                   teams={teams}
                   isAdmin={canAdmin(user, "competitions")}
@@ -1314,6 +1324,8 @@ export function App() {
                           ) : (
                             <div style={{ marginTop: 10 }}>
                               <MatchCenter
+                                automaticMatches={secureGameLogin}
+                                onAutomaticMatch={openAutomaticMatch}
                                 matches={matches.filter(
                                   (m) => m.isEstadual && m.estado === estado,
                                 )}

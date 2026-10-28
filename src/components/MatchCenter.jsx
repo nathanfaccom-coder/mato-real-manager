@@ -10,7 +10,16 @@ export const MatchCenter = ({
   onEditMatch,
   onDeleteMatch,
   onCreateMatch,
+  automaticMatches = false,
+  onAutomaticMatch,
 }) => {
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState('');
+  async function openAutomatic(m){
+    if(busy)return;
+    setBusy(true);setError('');
+    try{await onAutomaticMatch(m);}catch(e){setError(e.message);}finally{setBusy(false);}
+  }
   const [serie, setSerie] = useState("A");
   const [round, setRound] = useState(1);
 
@@ -72,6 +81,7 @@ export const MatchCenter = ({
         </select>
       </div>
 
+      {error && <p role="alert">{error}</p>}
       {games.length === 0 && (
         <div
           className="card"
@@ -192,7 +202,12 @@ export const MatchCenter = ({
             </div>
           </div>
 
-          {m.status !== "FINISHED" && (
+          {automaticMatches ? (
+            m.runId || (isAdmin && m.status==='PENDING') ?
+              <button className="btn btn-green" disabled={busy} onClick={()=>openAutomatic(m)}>
+                {m.runId?'ASSISTIR PARTIDA':'INICIAR JOGO OFICIAL'}
+              </button> : null
+          ) : isAdmin && m.status !== "FINISHED" && (
             <button className="btn btn-green" onClick={() => onReportMatch(m)}>
               📝 LANÇAR SÚMULA
             </button>

@@ -50,6 +50,10 @@ verification, not a public unauthenticated write API.
   approval plus revision audit under `serverConfig/fixture_{id}` atomically.
   Retries are idempotent; changed identities invalidate approval; no changes after
   a run starts. Public `serverVerified` alone never authorizes official XP.
+- `POST .../match-view`: Firebase identity, `{matchId}`; whitelisted replay,
+  sporting metadata and confirmed result. No authors, worker errors or audit data.
+- `POST .../match-list`: Firebase identity, `{}`; newest ten sporting summaries,
+  no client limit/query, no rosters/seed. Both reads require the automation gate.
 - `POST .../start`: Firebase bearer token; server derives fixture classification.
 - `POST .../command`: Firebase bearer token; server derives controller and clock.
 - `POST .../session`: Firebase bearer token and empty JSON object; returns only
@@ -192,3 +196,16 @@ alone does not protect the player attributes, fixtures and finances they depend 
 In secure-login builds, player password controls now send recovery to the current
 Auth email; the ADM cannot display or overwrite another user's password. Default
 build still preserves legacy behavior pending the full migration.
+
+## Broadcast integration (gated)
+
+Secure-login builds use the API for shared friendly creation, official fixture
+start, replay loading and coach commands. The selected match polls every 15 seconds
+only while visible and until settlement; recent listings refresh on demand. Local
+previews do not persist. UI separates simulated full-time from confirmed server
+results. Start/command retries retain an uncertain request's idempotency key.
+
+`node tests/transmission-ui.mjs` is an isolated mobile browser harness with mock
+API and no external traffic; requires working Playwright Chromium. It has not run
+successfully in the current runtime because Chromium socket creation is denied.
+This does not replace full end-to-end testing with a real staging backend.

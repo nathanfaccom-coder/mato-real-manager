@@ -3,6 +3,28 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## ADM fixture review and approval panel — 2026-10-28
+
+- Added recently authenticated, competitions-ADM-only POST fixture-review. It
+  reads the current fixture, approval revision, competition, season, clubs and run
+  in a transaction, returning names/identifiers, eligibility and specific blockers.
+  It omits credentials, audit actor/reason and arbitrary legacy fields.
+- Central de Jogos in the gated build now offers CONFERIR / APROVAR CALENDÁRIO.
+  Panel reauthenticates the current ADM, clears the password, loads the server
+  review and sends only reviewed sporting IDs, revision, decision and reason.
+  Approval/revocation reloads the review; failures discard it. Server rejects
+  changed pairing, stale revision and started games regardless of UI state.
+- Both owner and active competitions sub-ADM use their own Firebase identity;
+  no owner-only binding permission is reused or widened. Legacy invalid calendars
+  display blockers and cannot be silently upgraded by this panel.
+- 176 unit tests passed; real Auth/Firestore integration passed including owner
+  review and ordinary-user denial. Default and enabled frontend builds passed.
+  Browser harness extended for panel interaction but remains UNEXECUTED because
+  Chromium cannot create its required socket in this environment.
+- No live data, rules, identities or release changed. Full migration/security,
+  credentials/deployment, remaining profile registration, ADM result corrections,
+  national/financial/disciplinary integration and browser QA still block release.
+
 ## Server-backed broadcasts and match viewing — 2026-10-28
 
 - Added authenticated POST match-view and match-list (fixed newest 10) under

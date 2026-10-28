@@ -44,6 +44,9 @@ The Edge platform's `verify_jwt` must be false for this specific entrypoint:
 while `finalize` verifies the separate scheduler secret. This is custom
 verification, not a public unauthenticated write API.
 
+- `POST .../fixture-review`: recently authenticated competitions ADM, `{fixtureId}`;
+  authoritative fixture IDs/names, current approval revision, eligibility and
+  blockers. Does not expose passwords, audit metadata or arbitrary profile fields.
 - `POST .../fixture-approve`: recently authenticated competitions ADM;
   `{fixtureId,homeId,awayId,competitionId,seasonId,approved,expectedRevision,reason}`.
   Explicit reviewed identities must match a current pending fixture. Stores private
@@ -209,3 +212,10 @@ results. Start/command retries retain an uncertain request's idempotency key.
 API and no external traffic; requires working Playwright Chromium. It has not run
 successfully in the current runtime because Chromium socket creation is denied.
 This does not replace full end-to-end testing with a real staging backend.
+
+The gated Central de Jogos offers fixture review/approval. The current ADM
+reauthenticates, reviews server-returned clubs/competition/season, and enters a
+reason before approving or revoking. Decisions carry the reviewed revision and
+sporting identifiers; the server rejects stale data. Invalid legacy calendar
+records display blockers and still need an explicit migration. The panel does
+not grant account ownership privileges or create missing competitions.

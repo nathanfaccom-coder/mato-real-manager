@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {memoryDB} from '../helpers/memory-db.mjs';
-import {approveFixture,fixtureMatchesApproval} from '../../server/fixture-approval.js';
+import {approveFixture,fixtureMatchesApproval,reviewFixture} from '../../server/fixture-approval.js';
 import {OWNER_UID} from '../../src/admin/permissions.js';
 const input={fixtureId:'f1',homeId:'h',awayId:'a',competitionId:'cup',seasonId:'season_1',approved:true,expectedRevision:0,reason:'Calendário conferido'};
 function seed(){return memoryDB({
@@ -52,4 +52,39 @@ test('approval rejects injected identity, classification, reward and invalid rev
  for(const patch of [{uid:OWNER_UID},{kind:'OFFICIAL'},{xp:9000},{expectedRevision:-1},{expectedRevision:0.5},{approved:1},{reason:' '},{homeId:'a'}]){
   await assert.rejects(approveFixture(seed(),OWNER_UID,{...input,...patch}));
  }
+});
+
+test('review reads authoritative identities and exposes eligibility without private fields',async()=>{
+ const db=seed();db.values.get('teams/h').password='secret';db.values.get('teams/h').name='Casa';
+ db.values.get('competitions/cup').name='Copa';
+ const before=structuredClone([...db.values]),review=await reviewFixture(db,OWNER_UID,{fixtureId:'f1'});
+ assert.equal(review.homeName,'Casa');assert.equal(review.competitionName,'Copa');assert.equal(review.expectedRevision,0);
+ assert.equal(review.canApprove,true);assert.equal(review.canRevoke,false);assert.deepEqual(review.problems,[]);
+ assert.equal(JSON.stringify(review).includes('secret'),false);assert.deepEqual([...db.values],before);
+ await approveFixture(db,OWNER_UID,input);
+ const approved=await reviewFixture(db,OWNER_UID,{fixtureId:'f1'});
+ assert.equal(approved.approved,true);assert.equal(approved.canRevoke,true);assert.equal(approved.expectedRevision,1);
+ assert.equal(approved.actor,undefined);assert.equal(approved.reason,undefined);
+});
+test('review cannot disclose calendar to press, inactive ADM or forged input',async()=>{
+ const db=seed();
+ for(const uid of ['press',null])await assert.rejects(reviewFixture(db,uid,{fixtureId:'f1'}));
+ await assert.rejects(reviewFixture(db,OWNER_UID,{fixtureId:'f1',uid:OWNER_UID}));
+ db.values.get('serverConfig/matchAutomation').enabled=false;
+ await assert.rejects(reviewFixture(db,OWNER_UID,{fixtureId:'f1'}));
+});
+test('review explains invalid legacy identifiers, inactive clubs and started games without enabling approval',async()=>{
+ for(const [path,patch] of [['matches/f1',{competitionId:null,seasonId:null}],['teams/h',{status:'INACTIVE'}],['competitions/cup',{active:false}],['config/system',{season:2}],['matchRuns/official_f1',{status:'RUNNING'}]]){
+  const db=seed();db.values.set(path,{...db.values.get(path),...patch});
+  const review=await reviewFixture(db,OWNER_UID,{fixtureId:'f1'});
+  assert.equal(review.canApprove,false);assert.ok(review.problems.length>0);
+ }
+});
+test('review does not authorize stale pairing or approval revision',async()=>{
+ const db=seed(),review=await reviewFixture(db,OWNER_UID,{fixtureId:'f1'});
+ db.values.get('matches/f1').homeId='changed';
+ await assert.rejects(approveFixture(db,OWNER_UID,{...input,homeId:review.homeId,expectedRevision:review.expectedRevision}));
+ assert.equal(db.values.has('serverConfig/fixture_f1'),false);
+ db.values.get('matches/f1').homeId='h';await approveFixture(db,OWNER_UID,input);
+ await assert.rejects(approveFixture(db,OWNER_UID,{...input,approved:false,expectedRevision:review.expectedRevision}));
 });

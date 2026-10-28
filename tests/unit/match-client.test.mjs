@@ -17,3 +17,12 @@ test('client rejects absent identity, expired session and account switch during 
  await assert.rejects(createMatchClient({auth,endpoint:'https://example.test',fetchImpl:async()=>new Response('',{status:401})}).read('m'),/expirada/);
  await assert.rejects(createMatchClient({auth,endpoint:'https://example.test',fetchImpl:async()=>{auth.currentUser=null;return Response.json({id:'m'});}}).read('m'),/sessão mudou/);
 });
+
+test('calendar review and decision force refreshed tokens and discard client privileges',async()=>{
+ const calls=[],refresh=[];const auth={currentUser:{getIdToken:async force=>{refresh.push(force);return 'fresh';}}};
+ const client=createMatchClient({auth,endpoint:'https://example.test',fetchImpl:async(url,opts)=>{calls.push(JSON.parse(opts.body));return Response.json({});}});
+ await client.reviewFixture('f1');
+ await client.approveFixture({fixtureId:'f1',homeId:'h',awayId:'a',competitionId:'cup',seasonId:'season_1',approved:true,expectedRevision:2,reason:'Revisado',uid:'forged',canApprove:true});
+ assert.deepEqual(refresh,[true,true]);assert.deepEqual(calls[0],{fixtureId:'f1'});
+ assert.equal(calls[1].uid,undefined);assert.equal(calls[1].canApprove,undefined);assert.equal(calls[1].expectedRevision,2);
+});

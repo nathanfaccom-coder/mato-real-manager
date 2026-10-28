@@ -106,3 +106,12 @@ export function matchApi() {
   requireConfigured();
   return createMatchClient({auth:adminAuth,endpoint});
 }
+
+export async function reauthenticateMatchAdministrator(password) {
+  requireConfigured();
+  const identity=adminAuth.currentUser;
+  if(!identity?.email)throw Error('Entre com sua conta de ADM.');
+  await identity.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(identity.email,password));
+  if(adminAuth.currentUser!==identity)throw Error('A sessão mudou. Entre novamente.');
+  await identity.getIdToken(true);
+}

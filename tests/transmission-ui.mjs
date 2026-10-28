@@ -13,13 +13,17 @@ record.result={score:[2,1],revision:1,rows:{}};
 const harness=`import React from 'react';
 import {Broadcast} from './simulation/Broadcast.jsx';
 import {MatchCenter} from './components/MatchCenter.jsx';
+import {FixtureApprovalPanel} from './admin/FixtureApprovalPanel.jsx';
 const mode=new URLSearchParams(location.search).get('mode');
 const teams=${JSON.stringify(teams)},players=${JSON.stringify(players)};
-export function App(){return mode==='center'?React.createElement(MatchCenter,{matches:[{id:'f1',homeName:'Casa',awayName:'Fora',serie:'A',round:1,status:'PENDING'}],teams,isAdmin:false,onReportMatch:()=>{throw Error('press must not report')}}):React.createElement(Broadcast,{user:{type:'ADMIN',data:{id:'NEXLYzsJfLPsTxzp3LKHKwaPhEZ2'}},teams,players,onBack:()=>{}});}`;
+export function App(){return mode==='approval'?React.createElement(FixtureApprovalPanel,{fixtureId:'f1',onClose:()=>{}}):mode==='center'?React.createElement(MatchCenter,{matches:[{id:'f1',homeName:'Casa',awayName:'Fora',serie:'A',round:1,status:'PENDING'}],teams,isAdmin:false,onReportMatch:()=>{throw Error('press must not report')}}):React.createElement(Broadcast,{user:{type:'ADMIN',data:{id:'NEXLYzsJfLPsTxzp3LKHKwaPhEZ2'}},teams,players,onBack:()=>{}});}`;
 const api=`export const secureGameLogin=true;
+export const reauthenticateMatchAdministrator=async()=>{};
 const record=${JSON.stringify(record)};
 window.__calls=[];
 export const matchApi=()=>({
+reviewFixture:async()=>({fixtureId:'f1',homeId:'h',awayId:'a',homeName:'Casa',awayName:'Fora',competitionId:'cup',competitionName:'Copa',seasonId:'season_1',expectedRevision:0,approved:false,canApprove:true,canRevoke:false,problems:[]}),
+approveFixture:async(input)=>{window.__calls.push({route:'approve',input});return {revision:1};},
 list:async()=>({matches:[record]}),
 read:async(id)=>{window.__calls.push({route:'read',id});return record;},
 start:async(input)=>{window.__calls.push({route:'start',input});return {matchId:record.id};},
@@ -53,6 +57,16 @@ try {
  const call=await page.evaluate(()=>window.__calls.find(c=>c.route==='start').input);
  assert.equal(call.homeId,'h');assert.equal(call.awayId,'a');assert.ok(call.requestId);
  assert.equal(call.snapshot,undefined);assert.equal(call.kind,undefined);
+ await page.goto(url+'?mode=approval');
+ await page.getByLabel('Confirme sua senha de ADM').fill('local-test-password');
+ await page.getByRole('button',{name:'CONFIRMAR IDENTIDADE E CONFERIR'}).click();
+ await page.getByText('Este calendário não tem aprovação válida.',{exact:true}).waitFor();
+ await page.getByLabel('Motivo da decisão').fill('Calendário revisado');
+ await page.getByRole('button',{name:'APROVAR CALENDÁRIO',exact:true}).click();
+ await page.waitForFunction(()=>window.__calls.some(c=>c.route==='approve'));
+ const approval=await page.evaluate(()=>window.__calls.find(c=>c.route==='approve').input);
+ assert.equal(approval.homeId,'h');assert.equal(approval.fixtureId,'f1');assert.equal(approval.expectedRevision,0);
+ assert.equal(await page.getByLabel('Confirme sua senha de ADM').inputValue(),'');
  assert.deepEqual(errors,[]);
  console.log('PASS: mobile broadcast replay renders, server result shown, friendly creation uses API, press has no report button.');
 }finally{await browser?.close();await server.close();}

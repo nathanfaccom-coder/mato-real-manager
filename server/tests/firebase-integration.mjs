@@ -88,6 +88,11 @@ try {
  assert.equal((await handle(officialStart())).status,400);
  const approval={fixtureId:'official-test',homeId:'h',awayId:'a',competitionId:'cup',seasonId:'season_1',approved:true,expectedRevision:0,reason:'Reviewed fixture'};
  assert.equal((await handle(apiRequest('fixture-approve',approval,clubToken))).status,400);
+ assert.equal((await handle(apiRequest('fixture-review',{fixtureId:'official-test'},clubToken))).status,400);
+ const fixtureReviewResponse=await handle(apiRequest('fixture-review',{fixtureId:'official-test'}));
+ assert.equal(fixtureReviewResponse.status,200);
+ const fixtureReview=await fixtureReviewResponse.json();
+ assert.equal(fixtureReview.canApprove,true);assert.equal(fixtureReview.expectedRevision,0);assert.equal(fixtureReview.homeId,'h');
  const approvals=await Promise.all([handle(apiRequest('fixture-approve',approval)),handle(apiRequest('fixture-approve',approval))]);
  assert.ok(approvals.every(r=>r.status===200));
  assert.equal((await db.doc('serverConfig/fixture_official-test').get()).data().revision,1);

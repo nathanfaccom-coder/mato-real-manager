@@ -3,6 +3,27 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Protected official-fixture approval — 2026-10-28
+
+- Added POST fixture-approve: recent Firebase authentication and strict active
+  competitions ADM authorization; explicit fixture/clubs/competition/season,
+  revision, approve/revoke and reason. Requires existing automation gate.
+- Approval and revision audit live under serverConfig/fixture_{id}, already a
+  server-only namespace in the candidate Rules. Transaction verifies current
+  fixture, active clubs/competition and season. Started games cannot be altered.
+- Official start now requires this protected approval and exact sporting identity;
+  a forged legacy serverVerified flag alone is rejected. Changing participants,
+  competition or season invalidates approval. Concurrent retries create one audit.
+- Fixed ADM authorization to reject truthy nonboolean active and string permissions.
+- 163 unit tests passed; Auth/Firestore emulator passed including forged marker,
+  unauthorized approval, concurrent approval, changed fixture, and full official
+  settlement. Existing friendly/account/registration checks also passed.
+- No approval UI, live rules, migration or activation shipped in this step.
+  Full source-data protection and remaining integration blockers above still apply.
+- Publication inspection: Supabase connection works; only the two retired probe
+  functions exist, no match-api. Firebase CLI failed authentication. Reauthentication
+  and secure service credentials are required, but are NOT the only release blockers.
+
 ## Private player registration and atomic approval — 2026-10-27
 
 - Added server/player-registration.js: verified/enabled non-admin identity submits

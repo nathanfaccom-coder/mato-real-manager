@@ -1,3 +1,4 @@
+import {approveFixture} from '../../server/fixture-approval.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {memoryDB} from '../helpers/memory-db.mjs';
@@ -44,6 +45,8 @@ test('official status requires an approved fixture and active competition of cur
  const request={requestId:'start',fixtureId:'f1'};
  await assert.rejects(startMatch(db,OWNER_UID,request),/validado/);
  fixture.serverVerified=true;db.values.set('matches/f1',fixture);
+ await assert.rejects(startMatch(db,OWNER_UID,request),/aprovação válida/);
+ await approveFixture(db,OWNER_UID,{fixtureId:'f1',homeId:'h',awayId:'a',competitionId:'leagueA',seasonId:'season_1',approved:true,expectedRevision:0,reason:'Calendário conferido'});
  const result=await startMatch(db,OWNER_UID,request,{now:1000,seed:5});
  assert.equal(result.matchId,'official_f1');assert.equal(db.values.get('matchRuns/official_f1').kind,'OFFICIAL');
  assert.equal(db.values.get('matches/f1').status,'RUNNING');
@@ -57,6 +60,7 @@ test('start-to-finish official game settles fixture and standings and releases l
  const db=seed();
  db.values.set('matches/f1',{homeId:'h',awayId:'a',status:'PENDING',played:false,serverVerified:true,competitionId:'leagueA',seasonId:'season_1'});
  db.values.set('competitions/leagueA',{active:true,seasonId:'season_1'});
+ await approveFixture(db,OWNER_UID,{fixtureId:'f1',homeId:'h',awayId:'a',competitionId:'leagueA',seasonId:'season_1',approved:true,expectedRevision:0,reason:'Calendário conferido'});
  const {matchId}=await startMatch(db,OWNER_UID,{requestId:'one',fixtureId:'f1'},{now:1000,seed:5});
  await finalizeDueMatch(db,matchId,db.values.get(`matchRuns/${matchId}`).endsAt);
  const result=db.values.get(`matchResults/${matchId}`),fixture=db.values.get('matches/f1');

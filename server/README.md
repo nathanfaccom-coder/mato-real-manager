@@ -44,6 +44,12 @@ The Edge platform's `verify_jwt` must be false for this specific entrypoint:
 while `finalize` verifies the separate scheduler secret. This is custom
 verification, not a public unauthenticated write API.
 
+- `POST .../fixture-approve`: recently authenticated competitions ADM;
+  `{fixtureId,homeId,awayId,competitionId,seasonId,approved,expectedRevision,reason}`.
+  Explicit reviewed identities must match a current pending fixture. Stores private
+  approval plus revision audit under `serverConfig/fixture_{id}` atomically.
+  Retries are idempotent; changed identities invalidate approval; no changes after
+  a run starts. Public `serverVerified` alone never authorizes official XP.
 - `POST .../start`: Firebase bearer token; server derives fixture classification.
 - `POST .../command`: Firebase bearer token; server derives controller and clock.
 - `POST .../session`: Firebase bearer token and empty JSON object; returns only

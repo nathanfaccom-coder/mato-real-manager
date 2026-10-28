@@ -1,16 +1,9 @@
 import {randomInt} from 'node:crypto';
-import {OWNER_UID} from '../src/admin/permissions.js';
+import {requireMatchAdmin} from './match-admin.js';
+import {fixtureMatchesApproval} from './fixture-approval.js';
 import {makeSnapshot} from '../src/simulation/engine.js';
 import {timelineDurationMs} from '../src/simulation/timeline.js';
 import {validDocumentId} from '../src/matches/validate.js';
-
-export async function requireMatchAdmin(tx,db,uid) {
- if(!validDocumentId(uid))throw Error('Entre na sua conta.');
- if(uid===OWNER_UID)return;
- const snap=await tx.get(db.collection('adminProfiles').doc(uid));
- const p=snap.exists?snap.data():null;
- if(!p?.active||!p.permissions?.includes('competitions'))throw Error('Apenas ADM de competições podem registrar partidas.');
-}
 
 // Called only with a Firebase-verified uid; never pass request.data.uid here.
 // Activation must follow auth migration + protected rules deployment.
@@ -37,6 +30,8 @@ export async function startMatch(db,uid,input,{now=Date.now(),seed=randomInt(0,0
    fixture=doc.exists?doc.data():null;
    // Legacy public fixtures cannot silently become XP-bearing official games.
    if(!fixture||fixture.serverVerified!==true||fixture.played||fixture.status!=='PENDING'||!validDocumentId(fixture.competitionId)||!validDocumentId(fixture.seasonId))throw Error('Partida oficial precisa de calendário validado pelo ADM.');
+   const approval=await tx.get(db.collection('serverConfig').doc('fixture_'+input.fixtureId));
+   if(!approval.exists||!fixtureMatchesApproval(fixture,approval.data()))throw Error('Calendário sem aprovação válida do servidor.');
    const comp=await tx.get(db.collection('competitions').doc(fixture.competitionId));
    if(!comp.exists||comp.data().active!==true||comp.data().seasonId!==fixture.seasonId)throw Error('Competição inativa ou temporada incorreta.');
   }

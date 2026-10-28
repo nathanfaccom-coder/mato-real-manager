@@ -209,8 +209,8 @@ previews do not persist. UI separates simulated full-time from confirmed server
 results. Start/command retries retain an uncertain request's idempotency key.
 
 `node tests/transmission-ui.mjs` is an isolated mobile browser harness with mock
-API and no external traffic; requires working Playwright Chromium. It has not run
-successfully in the current runtime because Chromium socket creation is denied.
+API and no external traffic; requires working Playwright Chromium. It now passes locally with Chromium Headless Shell; full Chrome could not
+start because its singleton socket was denied.
 This does not replace full end-to-end testing with a real staging backend.
 
 The gated Central de Jogos offers fixture review/approval. The current ADM

@@ -3,6 +3,27 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Release validation repairs — 2026-10-28
+
+- Inspected failed GitHub E2E run 40677698255: most visual comparisons used an
+  obsolete monolithic pre-2.9.11 baseline; national tests demanded version 2.9.1;
+  replay whistle test exposed a real seek/presentation pause defect.
+- Local/replay clock now advances immediately after seeking past presentation;
+  live shared match timing remains server/wall-clock anchored. Browser harness
+  verifies seeking to 20:00 during intro and advancing within five seconds.
+- Visual reference is pinned to published production commit c1bf386 (2.9.11),
+  extracted into a separate source tree. Entry point explicitly targets that tree,
+  not current source. Removed one-sided visual hiding; 1% threshold unchanged.
+  National login version expectation matches published 2.9.11.
+- Downloaded Chromium Headless Shell (not full Chrome): browser harness now PASSES
+  locally at 390x844 for replay/result, API creation, absent non-ADM report action,
+  approval panel and replay seek. Earlier full-Chrome socket failure is overcome.
+  This is an isolated fixture test, not live backend end-to-end validation.
+- 176 unit tests pass. Added harness to GitHub CI even when main E2E fails, so
+  browser evidence is collected there too. Full updated E2E run remains pending.
+- No production release or activation. Migration/credentials/remaining gameplay
+  integration blockers remain as previously documented.
+
 ## ADM fixture review and approval panel — 2026-10-28
 
 - Added recently authenticated, competitions-ADM-only POST fixture-review. It

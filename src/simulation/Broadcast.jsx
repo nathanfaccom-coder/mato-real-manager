@@ -177,7 +177,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false, ini
       const kickoffAt = (record?.playbackIntroAt ?? record?.startedAt ?? 0) + preMatchMs;
       if (record?.id && !record?.playbackIntroAt)
         elapsedClock.current = Math.max(0, Date.now() - record.startedAt - preMatchMs);
-      else if (playing && Date.now() >= kickoffAt)
+      else if (playing && (presentationSkipped || Date.now() >= kickoffAt))
         elapsedClock.current += elapsed * rate;
       const next = timeAtElapsed(match, elapsedClock.current);
       clock.current = next.time;
@@ -190,7 +190,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false, ini
     };
     id = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(id);
-  }, [match, playing, rate, record, duration]);
+  }, [match, playing, rate, record, duration, presentationSkipped]);
   function watch(r) {
     audio.current?.activate();
     const ended = Boolean(r.id && Date.now() >= r.startedAt + durationOf(r));

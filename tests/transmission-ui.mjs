@@ -49,6 +49,11 @@ try {
  await page.getByText('Resultado registrado: 2 × 1. XP e cansaço aplicados.',{exact:true}).waitFor();
  assert.equal(await page.locator('canvas').count()>0,true);
  assert.equal(await page.evaluate(()=>window.__calls[0].route),'read');
+ await page.getByRole('button',{name:'PAUSAR',exact:true}).click();
+ await page.getByLabel('Momento da partida',{exact:true}).fill('1200');
+ await page.getByRole('button',{name:'CONTINUAR',exact:true}).click();
+ await page.waitForFunction(()=>/^20:0[1-9]$/.test(document.querySelector('[data-testid="match-clock"]')?.textContent||''),null,{timeout:5000});
+
  await page.getByText('Preparar amistoso',{exact:true}).click();
  await page.getByLabel('Mandante',{exact:true}).selectOption('h');
  await page.getByLabel('Visitante',{exact:true}).selectOption('a');

@@ -79,7 +79,7 @@ for (const [name, user, screen] of cases)
     await prepare(old, user, screen);
     const oldErrors = [];
     old.on("pageerror", (e) => oldErrors.push(e.message));
-    await old.goto("/tests/.baseline/index.html");
+    await old.goto("/tests/.baseline/app.html");
     await ready(old);
     await old
       .locator(".version-badge")
@@ -104,9 +104,6 @@ for (const [name, user, screen] of cases)
       .evaluateAll((nodes) =>
         nodes.forEach((n) => (n.textContent = "VERSÃO (comparação visual)")),
       );
-    await page.addStyleTag({
-      content: ".pixel-feature, .national-career { display: none !important; }",
-    });
     const after = PNG.sync.read(
       await page.screenshot({ animations: "disabled" }),
     );

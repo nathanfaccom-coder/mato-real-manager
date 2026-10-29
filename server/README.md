@@ -3,7 +3,19 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
-## Administrator result corrections (server implemented; UI pending)
+## Administrator result corrections (gated; not deployed)
+
+`POST .../match-correction-review` requires recent ADM authentication and accepts
+only matchId. It returns the current revision, sporting facts, participant names
+and eligibility, without audit identity/reason or credentials. Closed-season
+records can be reviewed but cannot be corrected.
+
+The gated MatchCenter and completed Broadcast now open MatchCorrectionPanel for
+competition administrators. It reauthenticates, clears the entered password,
+loads server facts and submits a required reason with the reviewed revision.
+Participant fields are grouped in expandable cards for mobile use. Failed or
+conflicting requests discard the form; explicit reload is required before retry.
+The client allowlist strips names, minutes, sides and XP from correction requests.
 
 `POST .../match-correct` requires a recently authenticated competition ADM and the
 existing matchAutomation gate. Input: matchId, expectedRevision (at least 1),
@@ -19,7 +31,7 @@ revision, ledger, player/career aggregates, official table, run score and audit
 commit in one transaction. Concurrent requests at the same revision apply once;
 a stale retry must reload. Participation and fatigue stay unchanged. This route
 does not yet support creating a manual match, changing participation/minutes or
-correcting a closed season. The UI and production deployment remain pending.
+correcting a closed season. Production deployment remains pending.
 
 ## Install and verify
 

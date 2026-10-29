@@ -3,6 +3,27 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## ADM correction interface validated — 2026-10-29
+
+- Added recent-auth ADM match-correction-review, returning only reviewed sporting
+  facts, participant names, revision and eligibility. It does not expose audit
+  actor/reason or credentials. Closed seasons are visible but correction disabled.
+- Gated MatchCenter and finished Broadcast now offer the mobile correction panel
+  to competition administrators. It clears the password after reauthentication,
+  requires a reason, submits the reviewed revision and strips XP/minutes/identity
+  fields. Errors/conflicts discard the form; reload is required before retry.
+- 184 unit tests and real local Auth/Firestore integration pass. GitHub validation
+  run 40970979790 for 018c45dd49d7fca54d66bc0180262a0d4405708c passes: build,
+  compiled-app smoke, all 42 E2E cases and mobile transmission/correction harness.
+  Harness checks 390px layout, password clearing, payload, refreshed revision and
+  rejection/reload after a conflicting correction. All data is isolated fixtures.
+- Approximate progress now 65% complete / 35% remaining, effort estimate only.
+  Natan requests an updated percentage in future progress reports; change it only
+  for meaningful completed work, and distinguish tests from live release readiness.
+- Production remains 2.9.11. Manual new-match entry, changed participation/minutes,
+  closed-season policy and the earlier security/migration/deployment/gameplay
+  blockers are still outstanding. No production gates or data changed.
+
 ## ADM result correction server — 2026-10-29
 
 - Added recent-auth competition-ADM-only match-correct route. It accepts sporting

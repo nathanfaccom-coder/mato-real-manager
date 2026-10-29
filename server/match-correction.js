@@ -7,6 +7,29 @@ const fields=['goals','assists','tackles','saves','yellows','reds','rating'];
 const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const integer=(value,max)=>Number.isSafeInteger(value)&&value>=0&&value<=max;
 
+export async function reviewCorrection(db,uid,input) {
+ if(!object(input)||Object.keys(input).some(k=>k!=='matchId')||!validDocumentId(input.matchId))throw Error('Pedido inválido.');
+ return db.runTransaction(async tx=>{
+  await requireMatchAdmin(tx,db,uid);
+  const gate=(await tx.get(db.collection('serverConfig').doc('matchAutomation'))).data();
+  if(gate?.enabled!==true||gate?.schemaVersion!==1)throw Error('Integração desativada.');
+  const run=(await tx.get(db.collection('matchRuns').doc(input.matchId))).data();
+  const old=(await tx.get(db.collection('matchResults').doc(input.matchId))).data();
+  const season=(await tx.get(db.collection('config').doc('system'))).data()?.season;
+  if(!run||run.status!=='FINISHED'||!old||!['OFFICIAL','FRIENDLY'].includes(old.kind))throw Error('Partida ainda não registrada.');
+  const names=new Map([run.snapshot?.home,run.snapshot?.away].flatMap(t=>[...(t?.lineup||[]),...(t?.bench||[])]).map(p=>[p.id,p.name]));
+  const players={},goals=[0,0];
+  for(const [id,row] of Object.entries(old.rows)){
+   if(![0,1].includes(row.side)||row.stats?.appearances!==1)throw Error('Participação incompatível.');
+   const s=row.stats;goals[row.side]+=s.goals;
+   players[id]={name:typeof names.get(id)==='string'?names.get(id):id,side:row.side,seconds:s.seconds,...Object.fromEntries(fields.filter(k=>k!=='rating').map(k=>[k,s[k]])),rating:s.ratingSum};
+  }
+  const ownGoals=old.ownGoals||old.score.map((n,side)=>n-goals[side]);
+  const canCorrect=Number.isSafeInteger(season)&&season>0&&old.seasonId===`season_${season}`&&run.seasonId===old.seasonId&&run.kind===old.kind&&(run.competitionId||null)===(old.competitionId||null)&&ownGoals.every(n=>integer(n,100));
+  return {matchId:input.matchId,expectedRevision:old.revision,kind:old.kind,seasonId:old.seasonId,homeName:run.snapshot?.home?.name||'Mandante',awayName:run.snapshot?.away?.name||'Visitante',score:old.score,ownGoals,players,canCorrect,problem:canCorrect?'':'Esta partida não pode ser corrigida nesta temporada ou exige revisão dos registros.'};
+ });
+}
+
 // Correction of recorded sporting facts only. Participation, classification,
 // season, sides and fatigue remain those recorded by the trusted match worker.
 export function correctedReport(old,input) {

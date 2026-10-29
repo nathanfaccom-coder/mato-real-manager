@@ -1,4 +1,5 @@
 import {FixtureApprovalPanel} from '../admin/FixtureApprovalPanel.jsx';
+import {MatchCorrectionPanel} from '../admin/MatchCorrectionPanel.jsx';
 import React, { useState, useEffect } from "react";
 import { SERIES } from "../game/SERIES.js";
 import { MatchTeamLogo } from "./MatchTeamLogo.jsx";
@@ -15,6 +16,7 @@ export const MatchCenter = ({
   onAutomaticMatch,
 }) => {
   const [approvalId,setApprovalId]=useState(null);
+  const [correctionId,setCorrectionId]=useState(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   async function openAutomatic(m){
@@ -84,6 +86,7 @@ export const MatchCenter = ({
       </div>
 
       {automaticMatches && isAdmin && approvalId && <FixtureApprovalPanel key={approvalId} fixtureId={approvalId} onClose={()=>setApprovalId(null)}/>}
+      {automaticMatches && isAdmin && correctionId && <MatchCorrectionPanel key={correctionId} matchId={correctionId} onClose={()=>setCorrectionId(null)}/>}
       {error && <p role="alert">{error}</p>}
       {games.length === 0 && (
         <div
@@ -206,6 +209,7 @@ export const MatchCenter = ({
           </div>
 
           {automaticMatches && isAdmin && !m.runId && m.status==='PENDING' && <button className="btn btn-blue" disabled={busy} onClick={()=>setApprovalId(m.id)}>CONFERIR / APROVAR CALENDÁRIO</button>}
+          {automaticMatches && isAdmin && m.runId && m.status==='FINISHED' && <button className="btn btn-blue" onClick={()=>{setApprovalId(null);setCorrectionId(m.runId);}}>CORRIGIR SÚMULA</button>}
           {automaticMatches ? (
             m.runId || (isAdmin && m.status==='PENDING') ?
               <button className="btn btn-green" disabled={busy} onClick={()=>openAutomatic(m)}>

@@ -26,3 +26,12 @@ test('calendar review and decision force refreshed tokens and discard client pri
  assert.deepEqual(refresh,[true,true]);assert.deepEqual(calls[0],{fixtureId:'f1'});
  assert.equal(calls[1].uid,undefined);assert.equal(calls[1].canApprove,undefined);assert.equal(calls[1].expectedRevision,2);
 });
+
+test('correction requests refresh identity and strip XP, participation and private fields',async()=>{
+ const calls=[],refresh=[];const auth={currentUser:{getIdToken:async force=>{refresh.push(force);return 'fresh';}}};
+ const client=createMatchClient({auth,endpoint:'https://example.test',fetchImpl:async(url,opts)=>{calls.push(JSON.parse(opts.body));return Response.json({});}});
+ await client.reviewCorrection('m');
+ await client.correct({matchId:'m',expectedRevision:2,reason:'Revisado',score:[0,0],ownGoals:[0,0],uid:'forged',players:{p:{name:'private',side:1,seconds:9999,xp:999,goals:0,assists:0,tackles:0,saves:0,yellows:0,reds:0,rating:6}}});
+ assert.deepEqual(refresh,[true,true]);assert.deepEqual(calls[0],{matchId:'m'});
+ assert.deepEqual(calls[1].players.p,{goals:0,assists:0,tackles:0,saves:0,yellows:0,reds:0,rating:6});assert.equal(calls[1].uid,undefined);
+});

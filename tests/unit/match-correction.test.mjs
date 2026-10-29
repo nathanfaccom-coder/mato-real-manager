@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {memoryDB} from '../helpers/memory-db.mjs';
-import {correctMatch} from '../../server/match-correction.js';
+import {correctMatch,reviewCorrection} from '../../server/match-correction.js';
 import {settleMatch} from '../../src/matches/settle.js';
 import {emptyStats,matchXP} from '../../src/matches/policy.js';
 import {OWNER_UID} from '../../src/admin/permissions.js';
@@ -51,4 +51,16 @@ test('disabled gate, unfinished match and season rollover reject corrections ato
  for(const [path,patch] of [['serverConfig/matchAutomation',{enabled:false}],['matchRuns/m',{status:'RUNNING'}],['config/system',{season:2}],['matchRuns/m',{kind:'FRIENDLY'}]]){
   const db=await seed();Object.assign(db.values.get(path),patch);const before=structuredClone([...db.values]);await assert.rejects(correctMatch(db,OWNER_UID,input()));assert.deepEqual([...db.values],before);
  }
+});
+
+test('correction review is administrator-only, sanitized, read-only and blocks closed seasons',async()=>{
+ const db=await seed();db.values.get('matchRuns/m').snapshot={home:{name:'Casa',password:'private',lineup:[{id:'h',name:'Atleta'}]},away:{name:'Fora',lineup:[{id:'a',name:'Visitante'}]}};
+ db.values.get('matchResults/m').reason='private reason';
+ const before=structuredClone([...db.values]);
+ await assert.rejects(reviewCorrection(db,'press',{matchId:'m'}));
+ const review=await reviewCorrection(db,OWNER_UID,{matchId:'m'});
+ assert.equal(review.canCorrect,true);assert.equal(review.players.h.name,'Atleta');assert.deepEqual(review.ownGoals,[0,0]);assert.equal(review.expectedRevision,1);
+ assert.equal(JSON.stringify(review).includes('private'),false);assert.equal(review.players.h.baseXP,undefined);assert.deepEqual([...db.values],before);
+ db.values.get('config/system').season=2;assert.equal((await reviewCorrection(db,OWNER_UID,{matchId:'m'})).canCorrect,false);
+ await assert.rejects(reviewCorrection(db,OWNER_UID,{matchId:'m',uid:OWNER_UID}));
 });

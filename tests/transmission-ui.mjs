@@ -14,14 +14,18 @@ const harness=`import React from 'react';
 import {Broadcast} from './simulation/Broadcast.jsx';
 import {MatchCenter} from './components/MatchCenter.jsx';
 import {FixtureApprovalPanel} from './admin/FixtureApprovalPanel.jsx';
+import {MatchCorrectionPanel} from './admin/MatchCorrectionPanel.jsx';
 const mode=new URLSearchParams(location.search).get('mode');
 const teams=${JSON.stringify(teams)},players=${JSON.stringify(players)};
-export function App(){return mode==='approval'?React.createElement(FixtureApprovalPanel,{fixtureId:'f1',onClose:()=>{}}):mode==='center'?React.createElement(MatchCenter,{matches:[{id:'f1',homeName:'Casa',awayName:'Fora',serie:'A',round:1,status:'PENDING'}],teams,isAdmin:false,onReportMatch:()=>{throw Error('press must not report')}}):React.createElement(Broadcast,{user:{type:'ADMIN',data:{id:'NEXLYzsJfLPsTxzp3LKHKwaPhEZ2'}},teams,players,onBack:()=>{}});}`;
+export function App(){return mode==='correction'?React.createElement(MatchCorrectionPanel,{matchId:'official_f1',onClose:()=>{}}):mode==='approval'?React.createElement(FixtureApprovalPanel,{fixtureId:'f1',onClose:()=>{}}):mode==='center'?React.createElement(MatchCenter,{matches:[{id:'f1',homeName:'Casa',awayName:'Fora',serie:'A',round:1,status:'PENDING'}],teams,isAdmin:false,onReportMatch:()=>{throw Error('press must not report')}}):React.createElement(Broadcast,{user:{type:'ADMIN',data:{id:'NEXLYzsJfLPsTxzp3LKHKwaPhEZ2'}},teams,players,onBack:()=>{}});}`;
 const api=`export const secureGameLogin=true;
 export const reauthenticateMatchAdministrator=async()=>{};
 const record=${JSON.stringify(record)};
 window.__calls=[];
+let revision=1;
 export const matchApi=()=>({
+reviewCorrection:async()=>({matchId:'official_f1',expectedRevision:revision,kind:'OFFICIAL',seasonId:'season_1',homeName:'Casa',awayName:'Fora',score:[0,0],ownGoals:[0,0],canCorrect:true,players:{h0:{name:'Atleta Casa',side:0,seconds:5400,goals:0,assists:0,tackles:0,saves:0,yellows:0,reds:0,rating:6}}}),
+correct:async(input)=>{window.__calls.push({route:'correct',input});if(window.__rejectCorrection)throw Error('Resultado mudou');revision++;return {revision};},
 reviewFixture:async()=>({fixtureId:'f1',homeId:'h',awayId:'a',homeName:'Casa',awayName:'Fora',competitionId:'cup',competitionName:'Copa',seasonId:'season_1',expectedRevision:0,approved:false,canApprove:true,canRevoke:false,problems:[]}),
 approveFixture:async(input)=>{window.__calls.push({route:'approve',input});return {revision:1};},
 list:async()=>({matches:[record]}),
@@ -72,6 +76,30 @@ try {
  const approval=await page.evaluate(()=>window.__calls.find(c=>c.route==='approve').input);
  assert.equal(approval.homeId,'h');assert.equal(approval.fixtureId,'f1');assert.equal(approval.expectedRevision,0);
  assert.equal(await page.getByLabel('Confirme sua senha de ADM').inputValue(),'');
+ await page.goto(url+'?mode=correction');
+ await page.getByLabel('Confirme sua senha de ADM').fill('local-test-password');
+ await page.getByRole('button',{name:'CONFIRMAR IDENTIDADE E CARREGAR SÚMULA'}).click();
+ await page.getByText('Oficial · season_1 · Revisão 1',{exact:true}).waitFor();
+ assert.equal(await page.getByLabel('Confirme sua senha de ADM').inputValue(),'');
+ assert.equal(await page.getByRole('button',{name:'SALVAR CORREÇÃO'}).isDisabled(),true);
+ await page.locator('summary').filter({hasText:'Atleta Casa'}).click();
+ await page.getByLabel('Placar mandante',{exact:true}).fill('1');
+ await page.getByLabel('Gols — Atleta Casa (h0)',{exact:true}).fill('1');
+ await page.getByLabel('Nota — Atleta Casa (h0)',{exact:true}).fill('7.5');
+ await page.getByLabel('Motivo da correção').fill('Gol conferido');
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=390),true);
+ await page.getByRole('button',{name:'SALVAR CORREÇÃO'}).click();
+ await page.getByText('Oficial · season_1 · Revisão 2',{exact:true}).waitFor();
+ const correction=await page.evaluate(()=>window.__calls.find(c=>c.route==='correct').input);
+ assert.equal(correction.expectedRevision,1);assert.equal(correction.players.h0.goals,1);assert.equal(correction.players.h0.rating,7.5);assert.equal(correction.players.h0.seconds,undefined);assert.equal(correction.players.h0.xp,undefined);
+ await page.evaluate(()=>{window.__rejectCorrection=true;});
+ await page.getByLabel('Motivo da correção').fill('Nova conferência');
+ await page.getByRole('button',{name:'SALVAR CORREÇÃO'}).click();
+ await page.getByRole('alert').filter({hasText:'Resultado mudou'}).waitFor();
+ assert.equal(await page.getByRole('button',{name:'SALVAR CORREÇÃO'}).count(),0);
+ await page.getByRole('button',{name:'RECARREGAR SÚMULA'}).click();
+ await page.getByText('Oficial · season_1 · Revisão 2',{exact:true}).waitFor();
+ assert.equal(await page.getByLabel('Motivo da correção').inputValue(),'');
  assert.deepEqual(errors,[]);
- console.log('PASS: mobile broadcast replay renders, server result shown, friendly creation uses API, press has no report button.');
+ console.log('PASS: mobile broadcast replay renders, server result shown, friendly creation uses API, press has no report button; mobile ADM correction clears password, sends sporting facts and reloads after conflict.');
 }finally{await browser?.close();await server.close();}

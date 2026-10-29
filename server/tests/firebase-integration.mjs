@@ -121,6 +121,8 @@ try {
  const correction={matchId:officialId,expectedRevision:1,reason:'Conferência de súmula no emulador',score:[0,0],ownGoals:[0,0],players:Object.fromEntries(Object.entries(recorded.rows).map(([id,row])=>[id,{goals:0,assists:0,tackles:row.stats.tackles,saves:row.stats.saves,yellows:0,reds:0,rating:6}]))};
  const energyBefore=Object.fromEntries(await Promise.all(Object.keys(recorded.rows).map(async id=>[id,(await db.doc(`players/${id}`).get()).data().energy])));
  assert.equal((await handle(apiRequest('match-correct',correction,clubToken))).status,400);
+ assert.equal((await handle(apiRequest('match-correction-review',{matchId:officialId},clubToken))).status,400);
+ const correctionReview=await handle(apiRequest('match-correction-review',{matchId:officialId}));assert.equal(correctionReview.status,200);const reviewed=await correctionReview.json();assert.equal(reviewed.expectedRevision,1);assert.equal(reviewed.canCorrect,true);assert.equal(reviewed.players[Object.keys(reviewed.players)[0]].baseXP,undefined);
  const corrections=await Promise.all([handle(apiRequest('match-correct',correction)),handle(apiRequest('match-correct',correction))]);
  assert.deepEqual(corrections.map(r=>r.status).sort(),[200,400]);
  const corrected=(await db.doc(`matchResults/${officialId}`).get()).data();assert.equal(corrected.revision,2);assert.deepEqual(corrected.score,[0,0]);

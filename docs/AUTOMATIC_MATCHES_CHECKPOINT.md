@@ -3,6 +3,25 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## ADM result correction server — 2026-10-29
+
+- Added recent-auth competition-ADM-only match-correct route. It accepts sporting
+  facts, revision and reason; rejects XP/minutes/side/identity injection and changed
+  participants. Score must equal player goals plus explicit credited own goals.
+- Authorization, active gate/current season, finished run, expected revision,
+  ledger, career/XP aggregates, official standings, run score and audit share a
+  single transaction. Fatigue and original participation are preserved. Concurrent
+  corrections at the same revision apply once; stale callers must reload.
+- 182 unit tests pass. Real local Auth/Firestore emulator integration passes,
+  including club denial, concurrent ADM correction, preserved energy, updated
+  career/fixture revision and audit identity. No production data was touched.
+- UI, manual match entry, minutes/participant correction and closed-season policy
+  remain pending. This completes the server path for correcting recorded sporting
+  facts, not the entire ADM workflow. Existing release blockers below still apply.
+- User-facing remaining-work estimate: approximately 40% (rough effort estimate,
+  not a measured task count or a delivery date). Do not infer deployment readiness
+  from green isolated tests. Production is still 2.9.11 with activation disabled.
+
 ## Release validation complete — 2026-10-29
 
 - GitHub validation run 40969076362 succeeded for fa0949f21c8981893b5a2faba9ca714a9041f2ab:

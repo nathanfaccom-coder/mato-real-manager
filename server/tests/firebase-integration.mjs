@@ -117,6 +117,20 @@ try {
  assert.ok(summaries.every(m=>m.snapshot.seed===undefined&&m.commands===undefined));
  assert.equal((await handle(apiRequest('match-list',{limit:1000},clubToken))).status,400);
  console.log('PASS: authenticated match projections and bounded listing return confirmed results without private metadata.');
+ const recorded=(await db.doc(`matchResults/${officialId}`).get()).data();
+ const correction={matchId:officialId,expectedRevision:1,reason:'Conferência de súmula no emulador',score:[0,0],ownGoals:[0,0],players:Object.fromEntries(Object.entries(recorded.rows).map(([id,row])=>[id,{goals:0,assists:0,tackles:row.stats.tackles,saves:row.stats.saves,yellows:0,reds:0,rating:6}]))};
+ const energyBefore=Object.fromEntries(await Promise.all(Object.keys(recorded.rows).map(async id=>[id,(await db.doc(`players/${id}`).get()).data().energy])));
+ assert.equal((await handle(apiRequest('match-correct',correction,clubToken))).status,400);
+ const corrections=await Promise.all([handle(apiRequest('match-correct',correction)),handle(apiRequest('match-correct',correction))]);
+ assert.deepEqual(corrections.map(r=>r.status).sort(),[200,400]);
+ const corrected=(await db.doc(`matchResults/${officialId}`).get()).data();assert.equal(corrected.revision,2);assert.deepEqual(corrected.score,[0,0]);
+ assert.deepEqual((await db.doc(`matchRuns/${officialId}`).get()).data().score,[0,0]);
+ assert.equal((await db.doc('matches/official-test').get()).data().resultRevision,2);
+ assert.equal((await db.doc(`matchResultAudit/${officialId}_2`).get()).data().actor,OWNER_UID);
+ for(const id of Object.keys(recorded.rows)){
+  const p=(await db.doc(`players/${id}`).get()).data();assert.equal(p.energy,energyBefore[id]);assert.equal(p.career.official.appearances,1);assert.equal(p.career.official.goals,0);
+ }
+ console.log('PASS: recent ADM correction is atomic under concurrent requests; club denied, career/score/revision updated, fatigue preserved.');
  await auth.updateUser(OWNER_UID,{disabled:true});
  assert.equal((await handle(request())).status,401);
  console.log('PASS: real Auth emulator token, REST SDK transactions, retry deduplication, simultaneous settlement, exact XP/energy, lock release, deny-all fixture, disabled-user rejection.');

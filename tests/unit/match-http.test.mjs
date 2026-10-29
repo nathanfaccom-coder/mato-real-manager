@@ -29,7 +29,7 @@ test('verified identity cannot be replaced with a client-supplied administrator 
 });
 
 test('account changes require recent authentication before reading or writing the database',async()=>{
- for(const route of ['fixture-review','fixture-approve','account-bind','account-state','account-review','player-application-review','player-application-decide'])for(const auth_time of [undefined,NaN,Date.now()/1000-301,Date.now()/1000+60]){
+ for(const route of ['match-correct','fixture-review','fixture-approve','account-bind','account-state','account-review','player-application-review','player-application-decide'])for(const auth_time of [undefined,NaN,Date.now()/1000-301,Date.now()/1000+60]){
   const handler=createMatchHandler({enabled:true,auth:{verifyIdToken:async()=>({uid:'u',auth_time})}});
   const response=await handler(new Request(`https://example.test/matches/${route}`,{method:'POST',headers:{authorization:'Bearer token','content-type':'application/json'},body:'{}'}));
   assert.equal(response.status,401);

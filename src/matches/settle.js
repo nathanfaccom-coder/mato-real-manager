@@ -4,7 +4,11 @@ import {tableResult,reviseTable} from './standings.js';
 // SERVER ONLY: caller must authenticate and derive report from a server snapshot.
 // No browser imports this module. One Firestore transaction commits the ledger,
 // athletes, season/competition aggregates and daily allowances together.
-export async function settleMatch(db,{matchId,report,finishedAt,seasonId,competitionId=null,fixture=null,actor='SYSTEM',reason=null,expectedRevision=0}) {
+export async function settleMatch(db,args) {
+ return db.runTransaction(tx=>settleMatchInTransaction(db,tx,args));
+}
+// Trusted server composition only: authorization and settlement share one transaction.
+export async function settleMatchInTransaction(db,tx,{matchId,report,finishedAt,seasonId,competitionId=null,fixture=null,actor='SYSTEM',reason=null,expectedRevision=0}) {
  if(!validDocumentId(matchId))throw Error('Identificador inválido.');
  if(!Number.isFinite(finishedAt)||!validDocumentId(seasonId)||(competitionId!==null&&!validDocumentId(competitionId)))throw Error('Data/temporada inválida.');
  validateReport(report);
@@ -13,7 +17,6 @@ export async function settleMatch(db,{matchId,report,finishedAt,seasonId,competi
  if(fixture && (report.kind!=='OFFICIAL'||!competitionId||!['id','homeId','awayId'].every(k=>validDocumentId(fixture[k]))||fixture.homeId===fixture.awayId))throw Error('Vínculo da partida inválido.');
  if(report.kind==='TEST')return {ignored:true};
  const ref=db.collection('matchResults').doc(matchId);
- return db.runTransaction(async tx=>{
   const previous=await tx.get(ref), old=previous.exists?previous.data():null;
   if(old && !reason)return {duplicate:true,revision:old.revision};
   if(old && old.revision!==expectedRevision)throw Error('Resultado mudou. Recarregue antes de corrigir.');
@@ -77,5 +80,4 @@ export async function settleMatch(db,{matchId,report,finishedAt,seasonId,competi
   tx.set(ref,result);
   tx.set(db.collection('matchResultAudit').doc(`${matchId}_${revision}`),{...result,changedAt:finishedAt});
   return {revision};
- });
 }

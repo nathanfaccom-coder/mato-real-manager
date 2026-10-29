@@ -3,6 +3,24 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Administrator result corrections (server implemented; UI pending)
+
+`POST .../match-correct` requires a recently authenticated competition ADM and the
+existing matchAutomation gate. Input: matchId, expectedRevision (at least 1),
+reason, score [home,away], ownGoals [creditedHome,creditedAway], and players keyed
+by the exact recorded participant IDs. Each player supplies goals, assists,
+tackles, saves, yellows, reds and rating (0–10, one decimal). Extra fields fail.
+Player goals plus own goals must equal the scoreboard; assists cannot exceed
+player goals. Two yellows require a red. The server derives XP; it never accepts
+client XP, fatigue, minutes, sides, classification or season.
+
+Only FINISHED server runs in the current season can be corrected. Authorization,
+revision, ledger, player/career aggregates, official table, run score and audit
+commit in one transaction. Concurrent requests at the same revision apply once;
+a stale retry must reload. Participation and fatigue stay unchanged. This route
+does not yet support creating a manual match, changing participation/minutes or
+correcting a closed season. The UI and production deployment remain pending.
+
 ## Install and verify
 
 Requires Node >=22 and Java >=21 for current Firebase emulators:

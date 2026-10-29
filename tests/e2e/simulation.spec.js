@@ -159,8 +159,8 @@ test("full broadcast renders, replays end and shares only isolated friendly data
   });
   await page.getByLabel("Momento da partida", { exact: true }).fill("5400");
   await expect(
-    page.getByText("Notas experimentais, sem efeito no overall.", {
-      exact: false,
+    page.getByTestId("player-ratings").getByText("Notas de 0 a 10, referentes apenas a este amistoso.", {
+      exact: true,
     }),
   ).toBeVisible();
   expect(

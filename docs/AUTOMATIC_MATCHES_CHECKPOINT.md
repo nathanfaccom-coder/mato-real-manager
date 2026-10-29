@@ -3,6 +3,25 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Release validation complete — 2026-10-29
+
+- GitHub validation run 40969076362 succeeded for fa0949f21c8981893b5a2faba9ca714a9041f2ab:
+  176 unit tests, build, compiled-app smoke test, all 42 E2E tests and the isolated
+  transmission/fixture-approval browser harness passed.
+- Press and journalist tests explicitly require the removal of LANÇAR SÚMULA (XP)
+  and EDITAR TABELA while preserving ESCREVER NOTÍCIA. Only those two approved
+  removals are applied to the pinned production visual reference; the 1% pixel
+  threshold and all remaining screen comparisons are unchanged.
+- Broadcast regression now seeks to the actual timeline maximum and plays through
+  the final presentation before checking ratings. The obsolete fixed 90-minute
+  seek and fixed 30-minute wall duration ignored added time. It still asserts
+  player ratings fit the mobile screen, local preview performs no database writes,
+  and legacy shared broadcast writes only its isolated expected collection.
+- This validates isolated fixtures, NOT live authenticated backend deployment.
+  Production remains 2.9.11. No gates, rules, credentials or live data changed.
+  Legacy source-data security, hosted credentials/scheduler, account migration and
+  remaining gameplay integration listed below still block activation/publication.
+
 ## Release validation repairs — 2026-10-28
 
 - Inspected failed GitHub E2E run 40677698255: most visual comparisons used an

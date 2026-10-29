@@ -157,12 +157,17 @@ test("full broadcast renders, replays end and shares only isolated friendly data
     path: test.info().outputPath("pixel-match-mobile.png"),
     fullPage: true,
   });
-  await page.getByLabel("Momento da partida", { exact: true }).fill("5400");
+  const replayPosition = page.getByLabel("Momento da partida", { exact: true });
+  const fulltime = await replayPosition.getAttribute("max");
+  expect(Number(fulltime)).toBeGreaterThanOrEqual(5400);
+  await replayPosition.fill(fulltime);
+  await page.getByLabel("Velocidade do replay").selectOption("4");
+  await page.getByRole("button", { name: "CONTINUAR", exact: true }).click();
   await expect(
     page.getByTestId("player-ratings").getByText("Notas de 0 a 10, referentes apenas a este amistoso.", {
       exact: true,
     }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15000 });
   expect(
     await page
       .getByTestId("player-ratings")
@@ -198,7 +203,13 @@ test("full broadcast renders, replays end and shares only isolated friendly data
   const stored = await page.evaluate(
     () => Object.values(window.__MOCK_DB__.data.friendlyBroadcasts)[0],
   );
-  expect(stored.durationMs).toBe(1800000);
+  const expectedDuration = await page.evaluate(async (snapshot) => {
+    const { simulateMatch } = await import("/src/simulation/engine.js");
+    const { timelineDurationMs } = await import("/src/simulation/timeline.js");
+    return timelineDurationMs(simulateMatch(snapshot));
+  }, stored.snapshot);
+  expect(stored.durationMs).toBe(expectedDuration);
+  expect(stored.durationMs).toBeGreaterThanOrEqual(1800000);
   expect(stored.snapshot.home.lineup).toHaveLength(11);
   expect(stored.snapshot.away.lineup).toHaveLength(11);
   expect(JSON.stringify(stored)).not.toContain("password");

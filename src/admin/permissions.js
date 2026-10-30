@@ -74,12 +74,19 @@ export function guardAdminActions(
   actions,
   user,
   notify = (message) => alert(message),
+  { automaticMatches = false } = {},
 ) {
   const protectedActions = new Set(['saveMatchStats','updateTeamStats','handleSaveMatch','handleDeleteMatch','generateFixtures']);
   return Object.fromEntries(
     Object.entries(actions).map(([name, fn]) => [
       name,
       (...args) => {
+        // Rollout safeguard, not database authorization. These legacy writers
+        // bypass the server result ledger and must never run in automatic mode.
+        if (automaticMatches && ['saveMatchStats','updateTeamStats'].includes(name)) {
+          notify('Use a súmula registrada na Central de Jogos para corrigir resultados. O jogo atualiza XP e classificação pelo servidor.');
+          return;
+        }
         if ((isSubAdmin(user) || protectedActions.has(name)) && !canAdmin(user, ACTION_PERMISSIONS[name])) {
           notify("Você não tem permissão para esta função.");
           return;

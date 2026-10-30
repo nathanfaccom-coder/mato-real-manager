@@ -662,6 +662,7 @@ export function App() {
     sendChatMessage,
     toggleFollow,
   } = createGameActions({
+    automaticMatches: secureGameLogin,
     setLoading,
     teams,
     players,
@@ -2057,7 +2058,14 @@ export function App() {
                   onWithdraw={withdrawMoney}
                 />
               )}
-              {modal.type === "MATCH_PERFORMANCE" && canAdmin(user, "competitions") && (
+              {secureGameLogin && ['MATCH_PERFORMANCE','MATCH_REPORT','TEAM_TABLE'].includes(modal.type) && canAdmin(user,'competitions') && (
+                <div className="card" role="status">
+                  <h3>Resultados registrados pelo jogo</h3>
+                  <p>Abra a partida encerrada na Central de Jogos ou na transmissão e selecione CORRIGIR SÚMULA. O jogo recalcula o XP e a classificação a partir do resultado corrigido.</p>
+                  <button className="btn btn-blue" onClick={()=>{setModal(null);setScreen('MATCHES');}}>ABRIR CENTRAL DE JOGOS</button>
+                </div>
+              )}
+              {modal.type === "MATCH_PERFORMANCE" && !secureGameLogin && canAdmin(user, "competitions") && (
                 <MatchPerformanceForm
                   players={players}
                   teams={teams}
@@ -2065,7 +2073,7 @@ export function App() {
                   matchData={modal.data?.match}
                 />
               )}
-              {modal.type === "TEAM_TABLE" && canAdmin(user, "competitions") && (
+              {modal.type === "TEAM_TABLE" && !secureGameLogin && canAdmin(user, "competitions") && (
                 <TeamStandingsEditor
                   teams={teams}
                   onUpdateTeamStats={updateTeamStats}
@@ -2162,7 +2170,7 @@ export function App() {
                 />
               )}
 
-              {modal.type === "MATCH_REPORT" && canAdmin(user, "competitions") && (
+              {modal.type === "MATCH_REPORT" && !secureGameLogin && canAdmin(user, "competitions") && (
                 <MatchPerformanceForm
                   players={players}
                   teams={teams}

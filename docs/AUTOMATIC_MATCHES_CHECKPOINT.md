@@ -3,6 +3,20 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Legacy progression path inventory and rollout guard — 2026-10-30
+
+- Verified GitHub run 41049873412 succeeded for 0f7705eef8a200747e2a0c15186a9aef8d00b204:
+  all unit/E2E/build/smoke/mobile-harness checks passed for the prior summary fixes.
+- Automatic mode now blocks legacy saveMatchStats/updateTeamStats action wrappers,
+  including the owner. Legacy result/table modals show navigation to the recorded
+  server correction flow. Ordinary production behavior stays unchanged.
+- Audited direct progression mutation paths and recorded concrete remaining work
+  in PROGRESSION_WRITE_MIGRATION.md. Client guards do NOT enforce database security;
+  protected source-data rules, identity migration and server-side replacement of
+  weekly/season/training/recovery/item/national mutations remain release blockers.
+- Remaining-work estimate stays 32% / completion 68%: this closes an accidental
+  double-accounting path in the gated client, not the underlying migration.
+
 ## Confirmed match summary and fatigue integration — 2026-10-30
 
 - RecordedMatchSummary displays committed score/revision, player notes, goals,

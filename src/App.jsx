@@ -1149,6 +1149,8 @@ export function App() {
                 </h2>
                 <div style={{ marginBottom: 20 }}>
                   <LeagueTable
+                      automaticMatches={secureGameLogin}
+                      matches={matches}
                     teams={teams}
                     serie="A"
                     onInspectTeam={(t) =>
@@ -1171,6 +1173,8 @@ export function App() {
                   </summary>
                   <div style={{ display: "grid", gap: 20 }}>
                     <LeagueTable
+                      automaticMatches={secureGameLogin}
+                      matches={matches}
                       teams={teams}
                       serie="B"
                       onInspectTeam={(t) =>
@@ -1178,6 +1182,8 @@ export function App() {
                       }
                     />
                     <LeagueTable
+                      automaticMatches={secureGameLogin}
+                      matches={matches}
                       teams={teams}
                       serie="C"
                       onInspectTeam={(t) =>
@@ -1185,6 +1191,8 @@ export function App() {
                       }
                     />
                     <LeagueTable
+                      automaticMatches={secureGameLogin}
+                      matches={matches}
                       teams={teams}
                       serie="D"
                       onInspectTeam={(t) =>
@@ -1221,6 +1229,8 @@ export function App() {
                     }}
                   >
                     <LeagueTable
+                      automaticMatches={secureGameLogin}
+                      matches={matches}
                       teams={teams}
                       serie="VARZEA"
                       onInspectTeam={(t) =>
@@ -1306,6 +1316,8 @@ export function App() {
                       </summary>
                       <div style={{ padding: "10px 0" }}>
                         <LeagueTable
+                      automaticMatches={secureGameLogin}
+                      matches={matches}
                           teams={teams}
                           serie="ESTADUAL"
                           estado={estado}

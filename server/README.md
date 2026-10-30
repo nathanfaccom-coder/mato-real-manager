@@ -3,6 +3,24 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Competition standings (gated; not deployed)
+
+`POST .../competition-standings` accepts competitionId and seasonId from an
+authenticated viewer. The transaction checks the activation gate and competition
+season, reads at most 65 aggregate documents and rejects more than 64 teams rather
+than truncating the standings. It exposes only club name/ID, points, matches,
+wins/draws/losses, goals and shared rank. No legacy team.stats, credentials or audit
+metadata are returned. Friendly matches never contribute to this collection.
+
+Optional competition.teamIds supplies enrolled zero-match clubs; otherwise the UI
+explicitly shows only clubs with registered results. Ties use existing points,
+wins and goal difference; tied clubs share the rank (ID order is display-only).
+An index candidate is included but has not been deployed. The gated league/state
+tables resolve competition/season from linked calendar fixtures and offer manual
+refresh. Missing links do not silently fall back to legacy totals. Completed
+official broadcasts also expose standings and refresh after result correction.
+Custom knockout/bracket UI and the protected calendar migration remain pending.
+
 ## Administrator result corrections (gated; not deployed)
 
 `POST .../match-correction-review` requires recent ADM authentication and accepts

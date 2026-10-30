@@ -13,11 +13,12 @@ export function memoryDB(seed = {}) {
     id: path.split("/").at(-1),
     get: async () => snap(document(path)),
   });
+  const filtered=(name,filters=[],count=Infinity)=>({query:{name,filters,count},where:(field,op,value)=>filtered(name,[...filters,{field,op,value}],count),limit:n=>filtered(name,filters,n)});
   const db = {
     values,
     collection: (name) => ({
       orderBy: (field,direction) => ({limit:count=>({query:{name,field,direction,count}})}),
-      where: (field,op,value) => ({query:{name,field,op,value}}),
+      where: (field,op,value) => filtered(name,[{field,op,value}]),
       doc: (id) => document(name + "/" + (id || "new" + ++counter)),
       get: async () => ({
         docs: [...values.keys()]
@@ -33,6 +34,11 @@ export function memoryDB(seed = {}) {
           get: async (r) => {
             if (wrote) throw Error("Read after write");
             if(r.query){
+              if(r.query.filters){
+                const {name,filters,count}=r.query;
+                if(filters.some(f=>!['==','in'].includes(f.op)))throw Error('Unsupported query');
+                return {docs:[...values.keys()].filter(k=>k.startsWith(name+'/')&&k.split('/').length===2&&filters.every(f=>f.op==='=='?values.get(k)[f.field]===f.value:f.value.includes(values.get(k)[f.field]))).slice(0,count).map(k=>snap(document(k)))};
+              }
               const {name,field,op,value,direction,count}=r.query;
               if(direction)return {docs:[...values.keys()].filter(k=>k.startsWith(name+'/')&&k.split('/').length===2).sort((a,b)=>(values.get(a)[field]-values.get(b)[field])*(direction==='desc'?-1:1)).slice(0,count).map(k=>snap(document(k)))};
               if(op!=='in')throw Error('Unsupported query');

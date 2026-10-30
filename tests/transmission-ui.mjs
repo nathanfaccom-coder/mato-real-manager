@@ -15,15 +15,17 @@ import {Broadcast} from './simulation/Broadcast.jsx';
 import {MatchCenter} from './components/MatchCenter.jsx';
 import {FixtureApprovalPanel} from './admin/FixtureApprovalPanel.jsx';
 import {MatchCorrectionPanel} from './admin/MatchCorrectionPanel.jsx';
+import {CompetitionStandings} from './matches/CompetitionStandings.jsx';
 const mode=new URLSearchParams(location.search).get('mode');
 const teams=${JSON.stringify(teams)},players=${JSON.stringify(players)};
-export function App(){return mode==='correction'?React.createElement(MatchCorrectionPanel,{matchId:'official_f1',onClose:()=>{}}):mode==='approval'?React.createElement(FixtureApprovalPanel,{fixtureId:'f1',onClose:()=>{}}):mode==='center'?React.createElement(MatchCenter,{matches:[{id:'f1',homeName:'Casa',awayName:'Fora',serie:'A',round:1,status:'PENDING'}],teams,isAdmin:false,onReportMatch:()=>{throw Error('press must not report')}}):React.createElement(Broadcast,{user:{type:'ADMIN',data:{id:'NEXLYzsJfLPsTxzp3LKHKwaPhEZ2'}},teams,players,onBack:()=>{}});}`;
+export function App(){return mode==='standings'?React.createElement(CompetitionStandings,{competitionId:'cup',seasonId:'season_1'}):mode==='correction'?React.createElement(MatchCorrectionPanel,{matchId:'official_f1',onClose:()=>{}}):mode==='approval'?React.createElement(FixtureApprovalPanel,{fixtureId:'f1',onClose:()=>{}}):mode==='center'?React.createElement(MatchCenter,{matches:[{id:'f1',homeName:'Casa',awayName:'Fora',serie:'A',round:1,status:'PENDING'}],teams,isAdmin:false,onReportMatch:()=>{throw Error('press must not report')}}):React.createElement(Broadcast,{user:{type:'ADMIN',data:{id:'NEXLYzsJfLPsTxzp3LKHKwaPhEZ2'}},teams,players,onBack:()=>{}});}`;
 const api=`export const secureGameLogin=true;
 export const reauthenticateMatchAdministrator=async()=>{};
 const record=${JSON.stringify(record)};
 window.__calls=[];
 let revision=1;
 export const matchApi=()=>({
+standings:async(input)=>{window.__calls.push({route:'standings',input});if(window.__standingsError)throw Error('Conexão indisponível');return {name:'Campeonato registrado',registeredTeamsIncluded:true,rows:[{teamId:'h',name:'Casa',position:1,pts:window.__standingsCorrected?1:3,played:1,wins:window.__standingsCorrected?0:1,gf:2,ga:window.__standingsCorrected?2:0}]};},
 reviewCorrection:async()=>({matchId:'official_f1',expectedRevision:revision,kind:'OFFICIAL',seasonId:'season_1',homeName:'Casa',awayName:'Fora',score:[0,0],ownGoals:[0,0],canCorrect:true,players:{h0:{name:'Atleta Casa',side:0,seconds:5400,goals:0,assists:0,tackles:0,saves:0,yellows:0,reds:0,rating:6}}}),
 correct:async(input)=>{window.__calls.push({route:'correct',input});if(window.__rejectCorrection)throw Error('Resultado mudou');revision++;return {revision};},
 reviewFixture:async()=>({fixtureId:'f1',homeId:'h',awayId:'a',homeName:'Casa',awayName:'Fora',competitionId:'cup',competitionName:'Copa',seasonId:'season_1',expectedRevision:0,approved:false,canApprove:true,canRevoke:false,problems:[]}),
@@ -110,6 +112,21 @@ try {
  await page.getByRole('button',{name:'RECARREGAR SÚMULA'}).click();
  await page.getByText('Oficial · season_1 · Revisão 2',{exact:true}).waitFor();
  assert.equal(await page.getByLabel('Motivo da correção').inputValue(),'');
+ await page.goto(url+'?mode=standings');
+ await page.getByText('Campeonato registrado',{exact:true}).waitFor();
+ const row=page.getByRole('row').filter({hasText:'Casa'});
+ assert.equal(await row.locator('td').nth(1).textContent(),'3');
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=390),true);
+ const standingsCall=await page.evaluate(()=>window.__calls.find(c=>c.route==='standings').input);
+ assert.deepEqual(standingsCall,{competitionId:'cup',seasonId:'season_1'});
+ await page.evaluate(()=>{window.__standingsCorrected=true;});
+ await page.getByRole('button',{name:'ATUALIZAR CLASSIFICAÇÃO'}).click();
+ await page.waitForFunction(()=>document.querySelector('tbody tr td:nth-child(2)')?.textContent==='1');
+ assert.equal(await row.locator('td').nth(2).textContent(),'1');
+ await page.evaluate(()=>{window.__standingsError=true;});
+ await page.getByRole('button',{name:'ATUALIZAR CLASSIFICAÇÃO'}).click();
+ await page.getByRole('alert').filter({hasText:'Conexão indisponível'}).waitFor();
+ assert.equal(await page.getByRole('table').count(),0);
  assert.deepEqual(errors,[]);
- console.log('PASS: mobile broadcast replay renders, server result shown, friendly creation uses API, press has no report button; recorded XP/fatigue/ratings refresh from server; mobile ADM correction clears password, sends sporting facts and reloads after conflict.');
+ console.log('PASS: mobile broadcast replay renders, server result shown, friendly creation uses API, press has no report button; recorded XP/fatigue/ratings refresh from server; mobile standings refresh without stale results on failure; mobile ADM correction clears password, sends sporting facts and reloads after conflict.');
 }finally{await browser?.close();await server.close();}

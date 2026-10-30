@@ -3,6 +3,28 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Authoritative league/state standings connected — 2026-10-30
+
+- Added authenticated, bounded competition-standings projection from server-owned
+  aggregates, isolated by competition/season. It never reads legacy team.stats and
+  omits private fields. Counter consistency is checked; oversized tables fail
+  rather than silently truncating. Index candidate added, not deployed.
+- Optional competition.teamIds includes clubs with zero matches. Without it, UI
+  explicitly shows clubs with registered results only. Points/wins/goal-difference
+  ties share rank; ID ordering does not claim a sporting tie-breaker.
+- Gated league/state tables use linked calendar competitions, separate state
+  fixtures from national leagues and do not fall back to old totals when links are
+  missing. Completed official broadcasts expose the same standings; correction
+  revision remounts/refetches them. Custom knockout brackets still need integration.
+- 194 unit tests pass; local browser harness verifies mobile rendering, corrected
+  points with one played match, and clearing stale rows on network failure.
+  Auth/Firestore emulator confirms authenticated standings after actual official
+  settlement/correction with no duplicate appearances. Build passes. GitHub full
+  validation will run on the pushed commit; no live deployment occurred.
+- Estimated progress now 72% complete / 28% remaining. Security, account migration,
+  server credentials/scheduler, weekly/season/training/recovery/item and national
+  match integration remain blockers. Production remains 2.9.11.
+
 ## Legacy progression path inventory and rollout guard — 2026-10-30
 
 - Verified GitHub run 41049873412 succeeded for 0f7705eef8a200747e2a0c15186a9aef8d00b204:

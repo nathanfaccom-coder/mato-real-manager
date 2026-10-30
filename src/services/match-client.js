@@ -12,6 +12,7 @@ export function createMatchClient({auth,endpoint,fetchImpl=fetch}) {
   return result;
  }
  return {
+  standings:({competitionId,seasonId})=>request('competition-standings',{competitionId,seasonId}),
   reviewCorrection:matchId=>request('match-correction-review',{matchId}),
   correct:({matchId,expectedRevision,reason,score,ownGoals,players})=>request('match-correct',{matchId,expectedRevision,reason,score,ownGoals,players:Object.fromEntries(Object.entries(players).map(([id,{goals,assists,tackles,saves,yellows,reds,rating}])=>[id,{goals,assists,tackles,saves,yellows,reds,rating}]))}),
   reviewFixture:fixtureId=>request('fixture-review',{fixtureId}),

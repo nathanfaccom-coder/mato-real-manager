@@ -1,6 +1,7 @@
 import {secureGameLogin,matchApi} from '../services/game-auth.js';
 import {MatchCorrectionPanel} from '../admin/MatchCorrectionPanel.jsx';
 import {RecordedMatchSummary} from '../matches/RecordedMatchSummary.jsx';
+import {CompetitionStandings} from '../matches/CompetitionStandings.jsx';
 import { LiveCoach } from "./LiveCoach.jsx";
 import { LineupPresentation } from './LineupPresentation.jsx';
 import React, { useState, useMemo, useEffect, useRef } from "react";
@@ -319,6 +320,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false, ini
       </div>}
       {record?.serverOwned && record.result && <>
         <RecordedMatchSummary record={record}/>
+        {record.kind==='OFFICIAL'&&record.competitionId&&record.seasonId&&<details><summary>CLASSIFICAÇÃO DA COMPETIÇÃO</summary><CompetitionStandings key={`${record.id}_${record.result.revision}`} competitionId={record.competitionId} seasonId={record.seasonId}/></details>}
         <button className="btn btn-ghost" disabled={busy} onClick={async()=>{
           setBusy(true);setError('');
           try{const fresh=await matchApi().read(record.id);setRecord(current=>current?.id===fresh.id?{...current,...fresh}:current);}catch(e){setError(e.message);}finally{setBusy(false);}

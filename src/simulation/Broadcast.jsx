@@ -321,11 +321,11 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false, ini
         <RecordedMatchSummary record={record}/>
         <button className="btn btn-ghost" disabled={busy} onClick={async()=>{
           setBusy(true);setError('');
-          try{const fresh=await matchApi().read(record.id);setRecord(current=>current?.id===fresh.id?fresh:current);}catch(e){setError(e.message);}finally{setBusy(false);}
+          try{const fresh=await matchApi().read(record.id);setRecord(current=>current?.id===fresh.id?{...current,...fresh}:current);}catch(e){setError(e.message);}finally{setBusy(false);}
         }}>ATUALIZAR SÚMULA REGISTRADA</button>
       </>}
       {secureGameLogin && record?.result && canAdmin(user,'competitions') && <button className="btn btn-blue" onClick={()=>setCorrectionId(record.id)}>CORRIGIR SÚMULA</button>}
-      {secureGameLogin && correctionId && canAdmin(user,'competitions') && <MatchCorrectionPanel key={correctionId} matchId={correctionId} onClose={()=>setCorrectionId(null)} onSaved={async()=>{const fresh=await matchApi().read(correctionId);setRecord(current=>current?.id===fresh.id?fresh:current);}}/>}
+      {secureGameLogin && correctionId && canAdmin(user,'competitions') && <MatchCorrectionPanel key={correctionId} matchId={correctionId} onClose={()=>setCorrectionId(null)} onSaved={async()=>{const fresh=await matchApi().read(correctionId);setRecord(current=>current?.id===fresh.id?{...current,...fresh}:current);}}/>}
       <MatchAudio
         ref={audio}
         match={match}
@@ -711,7 +711,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false, ini
                 min="0"
                 max={durationSeconds}
                 value={time}
-                style={{ width: "100%" }}
+                style={{ width: "100%", margin: 0, boxSizing: "border-box", display: "block" }}
                 onChange={(e) => seekMatch(e.target.value)}
               />
             </label>

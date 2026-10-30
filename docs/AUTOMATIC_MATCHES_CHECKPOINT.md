@@ -3,6 +3,28 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Confirmed match summary and fatigue integration — 2026-10-30
+
+- RecordedMatchSummary displays committed score/revision, player notes, goals,
+  assists, cards, XP (including penalties) and actual energy deducted. Replay
+  simulation ratings are no longer presented as the authoritative final report
+  for server-owned games. Explicit refresh loads later ADM corrections.
+- Energy display is the deduction from this match, not a fabricated current energy
+  balance. Friendly XP explanation states the displayed values include daily caps.
+- Verified existing engine behavior: settled energy carries into the next snapshot,
+  affects play, and below 25 excludes selection. Replaying does not deduct energy.
+  No engine-version or simulation formula changes were needed.
+- 186 unit tests passed. GitHub run 40980146044 passed build/smoke and all 42 E2E
+  cases but revealed mobile overflow in the extended harness. Fixed native range
+  input margins (4px overflow) and result refresh discarding replay presentation
+  state, including after ADM corrections. Full isolated mobile harness now passes
+  locally with Chromium Headless Shell, including refreshed notes and replay seek.
+- Latest small replay/layout fixes await their new GitHub run; do not label the
+  earlier run green. No production deployment or backend activation occurred.
+- Approximate progress: 68% complete / 32% remaining (effort estimate, not measured
+  task completion). Security/migration/deployment and remaining gameplay blockers
+  remain; production is still 2.9.11.
+
 ## ADM correction interface validated — 2026-10-29
 
 - Added recent-auth ADM match-correction-review, returning only reviewed sporting

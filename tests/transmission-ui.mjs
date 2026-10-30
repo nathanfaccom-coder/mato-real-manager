@@ -57,7 +57,7 @@ try {
  await recorded.getByText('Energia descontada: 5 pontos',{exact:true}).waitFor();
  assert.equal(await recorded.getByLabel('Nota registrada de Atleta 0',{exact:true}).textContent(),'8,7');
  assert.equal(await recorded.getByText(/Revisão 2/).count(),1);
- assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=390),true);
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=390),true,JSON.stringify(await page.evaluate(()=>[...document.querySelectorAll('body *')].map(n=>({tag:n.tagName,cls:n.className,text:n.textContent.slice(0,50),right:n.getBoundingClientRect().right,width:n.getBoundingClientRect().width})).filter(n=>n.right>391).slice(-20))));
  await page.evaluate(()=>{window.__updatedResult=true;});
  await page.getByRole('button',{name:'ATUALIZAR SÚMULA REGISTRADA'}).click();
  await recorded.getByText(/Revisão 3/).waitFor();
@@ -97,7 +97,7 @@ try {
  await page.getByLabel('Gols — Atleta Casa (h0)',{exact:true}).fill('1');
  await page.getByLabel('Nota — Atleta Casa (h0)',{exact:true}).fill('7.5');
  await page.getByLabel('Motivo da correção').fill('Gol conferido');
- assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=390),true);
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=390),true,JSON.stringify(await page.evaluate(()=>[...document.querySelectorAll('body *')].map(n=>({tag:n.tagName,cls:n.className,text:n.textContent.slice(0,50),right:n.getBoundingClientRect().right,width:n.getBoundingClientRect().width})).filter(n=>n.right>391).slice(-20))));
  await page.getByRole('button',{name:'SALVAR CORREÇÃO'}).click();
  await page.getByText('Oficial · season_1 · Revisão 2',{exact:true}).waitFor();
  const correction=await page.evaluate(()=>window.__calls.find(c=>c.route==='correct').input);

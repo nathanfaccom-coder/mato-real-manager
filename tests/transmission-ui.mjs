@@ -9,7 +9,7 @@ const teams=[{id:'h',name:'Casa',status:'ACTIVE'},{id:'a',name:'Fora',status:'AC
 const players=teams.flatMap(t=>roles.map((position,i)=>({id:t.id+i,teamId:t.id,name:'Atleta '+i,position,overall:60,energy:100})));
 const snapshot=makeSnapshot(...teams,players,42);
 const record=publicMatch({snapshot,status:'FINISHED',kind:'OFFICIAL',commands:[],startedAt:1,preMatchMs:28000,durationMs:1800000,endsAt:1800001,timelineVersion:2},'official_f1',{detail:true});
-record.result={score:[2,1],revision:1,rows:{}};
+record.result={kind:'OFFICIAL',score:[2,1],revision:2,rows:{h0:{xp:-3,energyApplied:5,stats:{appearances:1,seconds:5400,goals:2,assists:0,tackles:1,saves:4,yellows:1,reds:0,ratingSum:8.7,ratingCount:1}}}};
 const harness=`import React from 'react';
 import {Broadcast} from './simulation/Broadcast.jsx';
 import {MatchCenter} from './components/MatchCenter.jsx';
@@ -29,7 +29,7 @@ correct:async(input)=>{window.__calls.push({route:'correct',input});if(window.__
 reviewFixture:async()=>({fixtureId:'f1',homeId:'h',awayId:'a',homeName:'Casa',awayName:'Fora',competitionId:'cup',competitionName:'Copa',seasonId:'season_1',expectedRevision:0,approved:false,canApprove:true,canRevoke:false,problems:[]}),
 approveFixture:async(input)=>{window.__calls.push({route:'approve',input});return {revision:1};},
 list:async()=>({matches:[record]}),
-read:async(id)=>{window.__calls.push({route:'read',id});return record;},
+read:async(id)=>{window.__calls.push({route:'read',id});if(window.__updatedResult){record.result.revision=3;record.result.rows.h0.stats.ratingSum=9.1;}return record;},
 start:async(input)=>{window.__calls.push({route:'start',input});return {matchId:record.id};},
 command:async(input)=>{window.__calls.push({route:'command',input});return {ok:true};}
 });`;
@@ -52,6 +52,16 @@ try {
  await page.getByRole('button',{name:/Casa × Fora/}).click();
  await page.getByText('Resultado registrado: 2 × 1. XP e cansaço aplicados.',{exact:true}).waitFor();
  assert.equal(await page.locator('canvas').count()>0,true);
+ const recorded=page.getByTestId('recorded-match-summary');
+ await recorded.getByText('XP aplicado: -3',{exact:true}).waitFor();
+ await recorded.getByText('Energia descontada: 5 pontos',{exact:true}).waitFor();
+ assert.equal(await recorded.getByLabel('Nota registrada de Atleta 0',{exact:true}).textContent(),'8,7');
+ assert.equal(await recorded.getByText(/Revisão 2/).count(),1);
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=390),true);
+ await page.evaluate(()=>{window.__updatedResult=true;});
+ await page.getByRole('button',{name:'ATUALIZAR SÚMULA REGISTRADA'}).click();
+ await recorded.getByText(/Revisão 3/).waitFor();
+ assert.equal(await recorded.getByLabel('Nota registrada de Atleta 0',{exact:true}).textContent(),'9,1');
  assert.equal(await page.evaluate(()=>window.__calls[0].route),'read');
  await page.getByRole('button',{name:'PAUSAR',exact:true}).click();
  await page.getByLabel('Momento da partida',{exact:true}).fill('1200');
@@ -101,5 +111,5 @@ try {
  await page.getByText('Oficial · season_1 · Revisão 2',{exact:true}).waitFor();
  assert.equal(await page.getByLabel('Motivo da correção').inputValue(),'');
  assert.deepEqual(errors,[]);
- console.log('PASS: mobile broadcast replay renders, server result shown, friendly creation uses API, press has no report button; mobile ADM correction clears password, sends sporting facts and reloads after conflict.');
+ console.log('PASS: mobile broadcast replay renders, server result shown, friendly creation uses API, press has no report button; recorded XP/fatigue/ratings refresh from server; mobile ADM correction clears password, sends sporting facts and reloads after conflict.');
 }finally{await browser?.close();await server.close();}

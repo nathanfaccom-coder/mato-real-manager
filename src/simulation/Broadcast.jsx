@@ -1,5 +1,6 @@
 import {secureGameLogin,matchApi} from '../services/game-auth.js';
 import {MatchCorrectionPanel} from '../admin/MatchCorrectionPanel.jsx';
+import {RecordedMatchSummary} from '../matches/RecordedMatchSummary.jsx';
 import { LiveCoach } from "./LiveCoach.jsx";
 import { LineupPresentation } from './LineupPresentation.jsx';
 import React, { useState, useMemo, useEffect, useRef } from "react";
@@ -316,6 +317,13 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false, ini
         <strong>{record.kind==='OFFICIAL'?'Jogo oficial':'Amistoso'}</strong>
         <p>{record.result ? `Resultado registrado: ${record.result.score[0]} × ${record.result.score[1]}. XP e cansaço aplicados.` : now>=record.endsAt ? 'Partida encerrada. Aguardando o registro do resultado pelo jogo.' : 'Partida em andamento. Resultado e recompensas serão registrados ao final.'}</p>
       </div>}
+      {record?.serverOwned && record.result && <>
+        <RecordedMatchSummary record={record}/>
+        <button className="btn btn-ghost" disabled={busy} onClick={async()=>{
+          setBusy(true);setError('');
+          try{const fresh=await matchApi().read(record.id);setRecord(current=>current?.id===fresh.id?fresh:current);}catch(e){setError(e.message);}finally{setBusy(false);}
+        }}>ATUALIZAR SÚMULA REGISTRADA</button>
+      </>}
       {secureGameLogin && record?.result && canAdmin(user,'competitions') && <button className="btn btn-blue" onClick={()=>setCorrectionId(record.id)}>CORRIGIR SÚMULA</button>}
       {secureGameLogin && correctionId && canAdmin(user,'competitions') && <MatchCorrectionPanel key={correctionId} matchId={correctionId} onClose={()=>setCorrectionId(null)} onSaved={async()=>{const fresh=await matchApi().read(correctionId);setRecord(current=>current?.id===fresh.id?fresh:current);}}/>}
       <MatchAudio
@@ -713,7 +721,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false, ini
               <small>{n}</small>
             </p>
           ))}
-          {ended && (
+          {ended && !record?.serverOwned && (
             <section
               data-testid="player-ratings"
               aria-label="Notas dos jogadores"

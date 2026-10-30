@@ -8,6 +8,15 @@ import {
   allowAdminModal,
 } from "./admin/permissions.js";
 import { adminAuth, observeAdmin } from "./admin/auth.js";
+import {
+  secureGameLogin,
+  matchApi,
+  initialAuthUser,
+  resolveGameAccountSession,
+  requestOwnPasswordReset,
+} from "./services/game-auth.js";
+import { SessionRejected } from "./services/trusted-session.js";
+import { OWNER_UID } from "./admin/permissions.js";
 import { createGameActions } from "./actions/index.js";
 
 import { useCollection } from "./hooks/useCollection.js";
@@ -226,6 +235,12 @@ export function App() {
   const [coaches, setCoaches] = useState([]);
   const [hallOfFame, setHallOfFame] = useState([]);
   const [matches, setMatches] = useState([]);
+  const [automaticMatchId,setAutomaticMatchId]=useState(null);
+  async function openAutomaticMatch(fixture) {
+    const matchId=fixture.runId || (await matchApi().start({requestId:crypto.randomUUID(),fixtureId:fixture.id})).matchId;
+    setAutomaticMatchId(matchId);
+    setScreen('BROADCAST');
+  }
   const [posts, setPosts] = useState([]);
   const [screen, setScreen] = useState("HOME");
   const [matchesTab, setMatchesTab] = useState("LIGAS");
@@ -260,11 +275,86 @@ export function App() {
     );
   }, [user?.type, user?.data?.id]);
 
+  useEffect(() => {
+    if (
+      !secureGameLogin ||
+      !user ||
+      !Object.hasOwn(ACCOUNT_COLLECTION, user.type)
+    )
+      return;
+    let active = true,
+      request = 0;
+    const check = async (identity) => {
+      const current = ++request;
+      try {
+        const account = await resolveGameAccountSession(identity);
+        if (!active || current !== request) return;
+        if (
+          !account ||
+          account.type !== user.type ||
+          account.data.id !== user.data.id
+        )
+          throw new SessionRejected("O vínculo da conta mudou.");
+      } catch (error) {
+        if (!active || current !== request) return;
+        clearSession();
+        setUser(null);
+        setModalState(null);
+        if (!(error instanceof SessionRejected)) setRestoreError(true);
+      }
+    };
+    const unsubscribe = adminAuth.onIdTokenChanged(check);
+    const visible = () => {
+      if (document.visibilityState === "visible") check(adminAuth.currentUser);
+    };
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      active = false;
+      unsubscribe();
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, [user?.type, user?.data?.id]);
+
   // --- NOVO: PERSISTÊNCIA DE SESSÃO (LEMBRAR ONDE PAREI) ---
 
   // 1. Ao abrir o app, tenta recuperar o login e a tela salva
   useEffect(() => {
     let active = true;
+    if (secureGameLogin) {
+      initialAuthUser()
+        .then(async (identity) => {
+          // Administrative login keeps its existing explicit entry point.
+          if (!identity || identity.uid === OWNER_UID) return null;
+          return resolveGameAccountSession(identity);
+        })
+        .then((restored) => {
+          if (!active) return;
+          if (!restored) {
+            clearSession();
+            return;
+          }
+          setUser(restored);
+          saveSession(restored);
+          setScreen(
+            restoreScreen(restored.type, readNavigation(restored, "screen")),
+          );
+          const tab = readNavigation(restored, "matchesTab", "LIGAS");
+          setMatchesTab(
+            ["LIGAS", "ESTADUAIS", "COPAS"].includes(tab) ? tab : "LIGAS",
+          );
+        })
+        .catch((error) => {
+          if (!active) return;
+          clearSession();
+          if (!(error instanceof SessionRejected)) setRestoreError(true);
+        })
+        .finally(() => {
+          if (active) setRestoring(false);
+        });
+      return () => {
+        active = false;
+      };
+    }
     const session = readSession();
     if (session) {
       db.collection(ACCOUNT_COLLECTION[session.type])
@@ -572,6 +662,7 @@ export function App() {
     sendChatMessage,
     toggleFollow,
   } = createGameActions({
+    automaticMatches: secureGameLogin,
     setLoading,
     teams,
     players,
@@ -771,13 +862,14 @@ export function App() {
         {!["BROADCAST", "WATCH_GAMES"].includes(screen) && (
           <button
             className="btn btn-green pixel-feature"
-            onClick={() => setScreen("BROADCAST")}
+            onClick={() => {setAutomaticMatchId(null);setScreen("BROADCAST");}}
           >
-            📺 MATO REAL TV — AMISTOSOS
+            📺 MATO REAL TV — {secureGameLogin ? 'JOGOS' : 'AMISTOSOS'}
           </button>
         )}
         {["BROADCAST", "WATCH_GAMES"].includes(screen) && (
           <Broadcast
+            initialMatchId={automaticMatchId}
             watchOnly={screen === "WATCH_GAMES"}
             user={user}
             teams={teams}
@@ -975,18 +1067,7 @@ export function App() {
                 >
                   ESCREVER NOTÍCIA
                 </button>
-                <button
-                  className="btn btn-purple"
-                  onClick={() => setModal({ type: "MATCH_PERFORMANCE" })}
-                >
-                  LANÇAR SÚMULA (XP)
-                </button>
-                <button
-                  className="btn btn-gold"
-                  onClick={() => setModal({ type: "TEAM_TABLE" })}
-                >
-                  EDITAR TABELA
-                </button>
+
               </div>
 
               {user.type === "PRESS" &&
@@ -1068,6 +1149,8 @@ export function App() {
                 </h2>
                 <div style={{ marginBottom: 20 }}>
                   <LeagueTable
+                      automaticMatches={secureGameLogin}
+                      matches={matches}
                     teams={teams}
                     serie="A"
                     onInspectTeam={(t) =>
@@ -1090,6 +1173,8 @@ export function App() {
                   </summary>
                   <div style={{ display: "grid", gap: 20 }}>
                     <LeagueTable
+                      automaticMatches={secureGameLogin}
+                      matches={matches}
                       teams={teams}
                       serie="B"
                       onInspectTeam={(t) =>
@@ -1097,6 +1182,8 @@ export function App() {
                       }
                     />
                     <LeagueTable
+                      automaticMatches={secureGameLogin}
+                      matches={matches}
                       teams={teams}
                       serie="C"
                       onInspectTeam={(t) =>
@@ -1104,6 +1191,8 @@ export function App() {
                       }
                     />
                     <LeagueTable
+                      automaticMatches={secureGameLogin}
+                      matches={matches}
                       teams={teams}
                       serie="D"
                       onInspectTeam={(t) =>
@@ -1140,6 +1229,8 @@ export function App() {
                     }}
                   >
                     <LeagueTable
+                      automaticMatches={secureGameLogin}
+                      matches={matches}
                       teams={teams}
                       serie="VARZEA"
                       onInspectTeam={(t) =>
@@ -1150,6 +1241,8 @@ export function App() {
                 </div>
                 <hr style={{ borderColor: "#333", margin: "20px 0" }} />
                 <MatchCenter
+                  automaticMatches={secureGameLogin}
+                  onAutomaticMatch={openAutomaticMatch}
                   matches={matches}
                   teams={teams}
                   isAdmin={canAdmin(user, "competitions")}
@@ -1173,14 +1266,14 @@ export function App() {
                   onDeleteMatch={(id) => handleDeleteMatch(id)}
                   onReportMatch={(m) => {
                     if (
-                      user.type.includes("PRESS") ||
+
                       canAdmin(user, "competitions")
                     )
                       setModal({
                         type: "MATCH_PERFORMANCE",
                         data: { match: m, player: null },
                       });
-                    else alert("Apenas imprensa/admin lança súmula.");
+                    else alert("Somente administradores podem corrigir súmulas.");
                   }}
                 />
               </div>
@@ -1223,6 +1316,8 @@ export function App() {
                       </summary>
                       <div style={{ padding: "10px 0" }}>
                         <LeagueTable
+                      automaticMatches={secureGameLogin}
+                      matches={matches}
                           teams={teams}
                           serie="ESTADUAL"
                           estado={estado}
@@ -1242,6 +1337,8 @@ export function App() {
                           ) : (
                             <div style={{ marginTop: 10 }}>
                               <MatchCenter
+                                automaticMatches={secureGameLogin}
+                                onAutomaticMatch={openAutomaticMatch}
                                 matches={matches.filter(
                                   (m) => m.isEstadual && m.estado === estado,
                                 )}
@@ -1258,7 +1355,7 @@ export function App() {
                                 onDeleteMatch={(id) => handleDeleteMatch(id)}
                                 onReportMatch={(m) => {
                                   if (
-                                    user.type.includes("PRESS") ||
+
                                     canAdmin(user, "competitions")
                                   )
                                     setModal({
@@ -1267,7 +1364,7 @@ export function App() {
                                     });
                                   else
                                     alert(
-                                      "Apenas imprensa/admin lança súmula.",
+                                      "Somente administradores podem corrigir súmulas.",
                                     );
                                 }}
                               />
@@ -1567,6 +1664,11 @@ export function App() {
               sales={sales || []}
               onAction={handlePlayerActions}
               onUpdatePassword={async (newP) => {
+                if(secureGameLogin){
+                  try{alert(await requestOwnPasswordReset());}
+                  catch{alert('Não foi possível enviar a recuperação. Tente novamente.');}
+                  return;
+                }
                 await db
                   .collection("players")
                   .doc(user.data.id)
@@ -1968,7 +2070,14 @@ export function App() {
                   onWithdraw={withdrawMoney}
                 />
               )}
-              {modal.type === "MATCH_PERFORMANCE" && (
+              {secureGameLogin && ['MATCH_PERFORMANCE','MATCH_REPORT','TEAM_TABLE'].includes(modal.type) && canAdmin(user,'competitions') && (
+                <div className="card" role="status">
+                  <h3>Resultados registrados pelo jogo</h3>
+                  <p>Abra a partida encerrada na Central de Jogos ou na transmissão e selecione CORRIGIR SÚMULA. O jogo recalcula o XP e a classificação a partir do resultado corrigido.</p>
+                  <button className="btn btn-blue" onClick={()=>{setModal(null);setScreen('MATCHES');}}>ABRIR CENTRAL DE JOGOS</button>
+                </div>
+              )}
+              {modal.type === "MATCH_PERFORMANCE" && !secureGameLogin && canAdmin(user, "competitions") && (
                 <MatchPerformanceForm
                   players={players}
                   teams={teams}
@@ -1976,7 +2085,7 @@ export function App() {
                   matchData={modal.data?.match}
                 />
               )}
-              {modal.type === "TEAM_TABLE" && (
+              {modal.type === "TEAM_TABLE" && !secureGameLogin && canAdmin(user, "competitions") && (
                 <TeamStandingsEditor
                   teams={teams}
                   onUpdateTeamStats={updateTeamStats}
@@ -2073,7 +2182,7 @@ export function App() {
                 />
               )}
 
-              {modal.type === "MATCH_REPORT" && (
+              {modal.type === "MATCH_REPORT" && !secureGameLogin && canAdmin(user, "competitions") && (
                 <MatchPerformanceForm
                   players={players}
                   teams={teams}

@@ -1,0 +1,11 @@
+{
+  "name": "mato-real-match-server",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "firebase-admin": "14.5.0"
+  },
+  "devDependencies": {
+    "google-auth-library": "11.3.1"
+  }
+}

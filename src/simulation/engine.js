@@ -149,7 +149,7 @@ function random(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-export function simulateMatch(snapshot) {
+export function simulateMatch(snapshot, {summaryOnly = false} = {}) {
   if (snapshot.version === 1) return simulateLegacy(snapshot);
   if (snapshot.version === 2) return simulateV2(snapshot);
   if (snapshot.version === 3) return simulateV3(snapshot);
@@ -468,6 +468,9 @@ export function simulateMatch(snapshot) {
     `${teams[kickoffSide].name} começa com a bola após o sorteio.`,
   );
   function record(t) {
+    // Server settlement needs only the same 30-second fatigue samples used by
+    // reportFromSimulation. Replay clients retain every frame by default.
+    if (summaryOnly && t % 30 !== 0) return;
     frames.push({
       t,
       ball: [...ball],
@@ -1304,6 +1307,7 @@ export function simulateMatch(snapshot) {
   );
   return {
     frames,
+    frameStride: summaryOnly ? 30 : 1,
     durationSeconds,
     events,
     stats,

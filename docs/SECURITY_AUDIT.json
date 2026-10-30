@@ -1,0 +1,114 @@
+{
+  "score": 1,
+  "summary": "CRÍTICO: a política de transição mantém o jogo legado publicamente gravável. O novo protótipo protege apenas 14 namespaces de servidor e não está publicado. Não ativar partidas/XP nem migração com essa política parcial.",
+  "scope": {
+    "sourceRules": "firebase/firestore-subadmins-transition.rules",
+    "candidateRules": "firebase/firestore-server-boundary.rules",
+    "liveInspectedThisTurn": false,
+    "productionChanged": false,
+    "filesScanned": 163,
+    "operationCandidates": 1353,
+    "inventoryCaveat": "Inventário AST inclui candidatos Map/Auth e não prova fluxo de dados. Consultas dinâmicas exigem revisão do chamador. Resultado detalhado em security-audit.local.json não rastreado."
+  },
+  "findings": [
+    {
+      "check": "Unauthorized read/write; authority source; update bypass",
+      "severity": "critical",
+      "issue": "A regra recursiva permite leitura/criação/alteração/exclusão sem autenticação fora de adminProfiles. Inclui saldo, XP, contratos e credenciais antigas.",
+      "evidence": "No emulador, GET teams/legacy e PATCH balance sem token retornaram 200 também no protótipo parcial.",
+      "recommendation": "Migrar autorização e operações econômicas para endpoints confiáveis, validar campos e negar as gravações diretas antes da ativação."
+    },
+    {
+      "check": "Mixed content / PII exposure",
+      "severity": "critical",
+      "issue": "Perfis públicos combinam dados de jogo com password e dados pessoais; regras não podem esconder um campo do documento.",
+      "evidence": "src/actions/accounts.js grava password em teams/players/users/companies/newspapers/journalists; assinaturas carregam documentos completos.",
+      "recommendation": "Migrar identidades para Firebase Auth, remover credenciais antigas após migração validada e separar projeções públicas de dados privados."
+    },
+    {
+      "check": "Business logic vs rules",
+      "severity": "critical",
+      "issue": "A simulação depende de players, teams, matches, competitions e config ainda mutáveis por clientes. Proteger apenas os registros novos não garante resultados íntegros.",
+      "recommendation": "Proteger origem de escalação/atributos, calendário e classificação oficial antes de habilitar finalização e XP."
+    },
+    {
+      "check": "Storage abuse / type safety / schema pollution",
+      "severity": "major",
+      "issue": "As coleções legadas não limitam formatos, campos, listas e valores; apenas adminProfiles tem validador.",
+      "recommendation": "Definir schemas por domínio e validar create/update e transições, incluindo limites e propriedade."
+    },
+    {
+      "check": "Field-level vs identity-level security",
+      "severity": "critical",
+      "issue": "A maioria dos controles de autorização reside no cliente e pode ser contornada. Login seguro e botões ocultos não substituem Rules ou validação de servidor.",
+      "recommendation": "Usar UID verificado, vínculo protegido, papel atual e allowlists de operação no servidor."
+    }
+  ],
+  "prototypeValidation": {
+    "status": "PASS para o limite restrito; FAIL para segurança global do jogo",
+    "test": "server/tests/server-boundary.mjs",
+    "clientAttemptsDenied": 392,
+    "identities": [
+      "sem autenticação",
+      "subADM de times",
+      "imprensa",
+      "ADM principal"
+    ],
+    "protectedCollections": [
+      "authAccounts",
+      "accountEntityOwners",
+      "accountBindingAudit",
+      "serverConfig",
+      "matchRuns",
+      "matchResults",
+      "matchResultAudit",
+      "matchParticipantLocks",
+      "friendlyDailyXP",
+      "playerSeasons",
+      "playerCompetitions",
+      "competitionStandings",
+      "playerApplications",
+      "playerApplicationAudit"
+    ],
+    "attacks": [
+      "get privado",
+      "list público/autenticado",
+      "create com role forjado",
+      "update com tipo inválido e string grande",
+      "delete",
+      "leitura de subcoleção",
+      "gravação descendente com ownerId de terceiro"
+    ],
+    "additionalChecks": [
+      "Admin SDK ainda grava via IAM",
+      "subADM lê próprio adminProfiles mas não altera",
+      "list anônimo de adminProfiles negado",
+      "leitura e falsificação de saldo legadas explicitamente confirmadas como permitidas"
+    ],
+    "syntax": "Protótipo carregado e compilado pelo emulador Firestore 1.22.0.",
+    "queryCompatibility": "Consultas legadas where/orderBy/limit mantêm a política antiga; queries de namespaces reservados são somente servidor. Nenhuma Rules nova foi publicada."
+  },
+  "nextSteps": [
+    "Migrar criação de times, comissão, empresas e imprensa; cadastro seguro de jogadores implementado mas ainda desativado",
+    "Separar dados públicos e privados",
+    "Proteger calendário, atletas e economia com validação e transações",
+    "Testar consultas e ações de cada papel com política completa",
+    "Provisionar segredo de servidor e validar hospedagem antes de habilitar flags"
+  ],
+  "playerRegistrationValidation": {
+    "status": "Tested in emulators; disabled/not deployed",
+    "privateFields": [
+      "Instagram kept only in playerApplications"
+    ],
+    "checks": [
+      "verified Auth identity",
+      "one application per identity",
+      "server-derived player attributes and economy",
+      "revision-checked rejection/resubmission",
+      "concurrent approval deduplicated",
+      "atomic player + binding + ownership + audits",
+      "public profile has no email/password/Instagram",
+      "map ordering independent replay"
+    ]
+  }
+}

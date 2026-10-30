@@ -79,8 +79,17 @@ for (const [name, user, screen] of cases)
     await prepare(old, user, screen);
     const oldErrors = [];
     old.on("pageerror", (e) => oldErrors.push(e.message));
-    await old.goto("/tests/.baseline/index.html");
+    await old.goto("/tests/.baseline/app.html");
     await ready(old);
+    if (screen === "PRESS_DASH") {
+      // Approved product change: only these two obsolete press actions are
+      // removed from the production reference. All remaining pixels still count.
+      for (const name of ["LANÇAR SÚMULA (XP)", "EDITAR TABELA"]) {
+        const action = old.getByRole("button", { name, exact: true });
+        await expect(action).toHaveCount(1);
+        await action.evaluate((node) => node.remove());
+      }
+    }
     await old
       .locator(".version-badge")
       .evaluateAll((nodes) =>
@@ -95,6 +104,11 @@ for (const [name, user, screen] of cases)
     page.on("pageerror", (e) => errors.push(e.message));
     await page.goto("/app.html");
     await ready(page);
+    if (screen === "PRESS_DASH") {
+      await expect(page.getByRole("button", { name: "LANÇAR SÚMULA (XP)", exact: true })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "EDITAR TABELA", exact: true })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "ESCREVER NOTÍCIA", exact: true })).toBeVisible();
+    }
     expect(errors).toEqual([]);
     await expect(
       page.getByText("Ocorreu um erro!", { exact: true }),
@@ -104,9 +118,6 @@ for (const [name, user, screen] of cases)
       .evaluateAll((nodes) =>
         nodes.forEach((n) => (n.textContent = "VERSÃO (comparação visual)")),
       );
-    await page.addStyleTag({
-      content: ".pixel-feature, .national-career { display: none !important; }",
-    });
     const after = PNG.sync.read(
       await page.screenshot({ animations: "disabled" }),
     );

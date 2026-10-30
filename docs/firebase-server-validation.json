@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-27",
+  "unitTestsPassed": 116,
+  "emulatorIntegration": "passed",
+  "emulatorProject": "demo-mato-real",
+  "firestoreTransport": "official SDK REST",
+  "sdkVersion": "14.5.0",
+  "hostedSdkInitialization": "passed",
+  "hostedSdkUnauthorizedStatus": 401,
+  "hostedSdkAuthorizedStatus": 200,
+  "hostedSdkDatabaseRequests": 0,
+  "productionActivated": false,
+  "limitations": ["Hosted Firestore RPC and combined memory peak unverified", "Production identity migration and database rules pending", "No server credentials or live cron configured"]
+}

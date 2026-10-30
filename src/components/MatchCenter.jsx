@@ -1,3 +1,5 @@
+import {FixtureApprovalPanel} from '../admin/FixtureApprovalPanel.jsx';
+import {MatchCorrectionPanel} from '../admin/MatchCorrectionPanel.jsx';
 import React, { useState, useEffect } from "react";
 import { SERIES } from "../game/SERIES.js";
 import { MatchTeamLogo } from "./MatchTeamLogo.jsx";
@@ -10,7 +12,18 @@ export const MatchCenter = ({
   onEditMatch,
   onDeleteMatch,
   onCreateMatch,
+  automaticMatches = false,
+  onAutomaticMatch,
 }) => {
+  const [approvalId,setApprovalId]=useState(null);
+  const [correctionId,setCorrectionId]=useState(null);
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState('');
+  async function openAutomatic(m){
+    if(busy)return;
+    setBusy(true);setError('');
+    try{await onAutomaticMatch(m);}catch(e){setError(e.message);}finally{setBusy(false);}
+  }
   const [serie, setSerie] = useState("A");
   const [round, setRound] = useState(1);
 
@@ -72,6 +85,9 @@ export const MatchCenter = ({
         </select>
       </div>
 
+      {automaticMatches && isAdmin && approvalId && <FixtureApprovalPanel key={approvalId} fixtureId={approvalId} onClose={()=>setApprovalId(null)}/>}
+      {automaticMatches && isAdmin && correctionId && <MatchCorrectionPanel key={correctionId} matchId={correctionId} onClose={()=>setCorrectionId(null)}/>}
+      {error && <p role="alert">{error}</p>}
       {games.length === 0 && (
         <div
           className="card"
@@ -192,7 +208,14 @@ export const MatchCenter = ({
             </div>
           </div>
 
-          {m.status !== "FINISHED" && (
+          {automaticMatches && isAdmin && !m.runId && m.status==='PENDING' && <button className="btn btn-blue" disabled={busy} onClick={()=>setApprovalId(m.id)}>CONFERIR / APROVAR CALENDÁRIO</button>}
+          {automaticMatches && isAdmin && m.runId && m.status==='FINISHED' && <button className="btn btn-blue" onClick={()=>{setApprovalId(null);setCorrectionId(m.runId);}}>CORRIGIR SÚMULA</button>}
+          {automaticMatches ? (
+            m.runId || (isAdmin && m.status==='PENDING') ?
+              <button className="btn btn-green" disabled={busy} onClick={()=>openAutomatic(m)}>
+                {m.runId?'ASSISTIR PARTIDA':'INICIAR JOGO OFICIAL'}
+              </button> : null
+          ) : isAdmin && m.status !== "FINISHED" && (
             <button className="btn btn-green" onClick={() => onReportMatch(m)}>
               📝 LANÇAR SÚMULA
             </button>

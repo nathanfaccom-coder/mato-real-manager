@@ -12,6 +12,7 @@ export function createMatchClient({auth,endpoint,fetchImpl=fetch}) {
   return result;
  }
  return {
+  study:({requestId})=>request('staff-study',{requestId}),
   recover:({requestId,playerIds})=>request('staff-recovery',{requestId,playerIds}),
   standings:({competitionId,seasonId})=>request('competition-standings',{competitionId,seasonId}),
   reviewCorrection:matchId=>request('match-correction-review',{matchId}),

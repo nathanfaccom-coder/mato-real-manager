@@ -29,7 +29,8 @@ those candidates include reads and non-Firestore methods, not 1,452 vulnerabilit
   public path can overwrite those same player fields.
 - Do not solve this by deleting training, items, weekly payments or season finance.
   Port and verify their behavior before denying their legacy mutations.
-- AssistantDashboard.handleStudy and assistant perk selection still mutate staff
-  progression directly; the recovery API does not close those paths.
-- Next implementation priority: staff study/perks, coach/solo training and items,
+- AssistantDashboard.handleStudy now uses an authenticated receipt-backed study
+  transaction in secure mode (unit/emulator/mobile tested). Assistant perk choice,
+  inventory and employment still mutate source fields; protection remains pending.
+- Next implementation priority: staff perk offers/choice, coach/solo training and items,
   weekly/season jobs and national match integration.

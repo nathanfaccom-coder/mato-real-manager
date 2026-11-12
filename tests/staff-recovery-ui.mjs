@@ -17,6 +17,7 @@ export function App(){
 let browser;
 const server=await createServer({server:{host:'127.0.0.1',port:0,open:false},plugins:[{name:'isolated-recovery',enforce:'pre',transform(code,id){
  if(id.endsWith('/src/App.jsx'))return harness;
+ if(id.endsWith('/src/services/game-auth.js'))return `export const secureGameLogin=true;export const matchApi=()=>({study:async input=>{window.__studies=window.__studies||[];window.__studies.push(input);await new Promise(r=>setTimeout(r,100));if(window.__studies.length===1)throw Error('Resposta de estudo perdida');return {gain:12,cost:20,level:3,leveledUp:true};}});`;
  if(id.endsWith('/src/services/firebase.js'))return `const deny=()=>{window.__writes=(window.__writes||0)+1;throw Error('Unexpected database access');};export const db=new Proxy({},{get:()=>deny});export const firebase={firestore:deny};`;
 }}]});
 try{
@@ -35,7 +36,13 @@ try{
  await button.click();assert.match((await page.evaluate(()=>window.__alerts)).at(-1),/Selecione/);
  await page.evaluate(()=>Promise.all([window.__recover(['p']),window.__recover(['p'])]));
  assert.equal((await page.evaluate(()=>window.__calls)).length,3);
+ await page.getByRole('button',{name:'ESTUDAR',exact:true}).click();
+ await page.getByRole('button',{name:/ASSISTIR VÍDEOS/}).click();
+ await page.waitForFunction(()=>window.__alerts.some(a=>a.includes('Resposta de estudo perdida')));
+ await page.getByRole('button',{name:/ASSISTIR VÍDEOS/}).click();
+ await page.waitForFunction(()=>window.__alerts.some(a=>a.includes('Estudo confirmado')));
+ const studies=await page.evaluate(()=>window.__studies);assert.equal(studies.length,2);assert.deepEqual(studies[0],studies[1]);
  assert.equal(await page.evaluate(()=>window.__writes||0),0);assert.deepEqual(errors,[]);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=390),true);
- console.log('PASS: mobile recovery uses API only, preserves selection/request ID after lost response, clears confirmed selection, prevents duplicate clicks.');
+ console.log('PASS: mobile recovery and study use API only, preserve request IDs after lost responses, recovery selection clears only on confirmation, duplicate clicks prevented.');
 }finally{await browser?.close();await server.close();}

@@ -34,5 +34,15 @@ export async function verifyStaffRecovery({db,auth,handle,ownerToken}) {
  assert.equal((await db.doc('users/recovery-staff').get()).data().xp,40);
  await db.doc('authAccounts/recovery-user').update({active:false});
  assert.equal((await request()).status,400);
+ await db.doc('authAccounts/recovery-user').update({active:true});
+ await db.doc('users/recovery-staff').update({energy:20,xp:190,level:2});
+ const study=()=>handle(new Request('https://example.test/staff-study',{method:'POST',headers:{Authorization:`Bearer ${idToken}`,'Content-Type':'application/json'},body:JSON.stringify({requestId:'study-once'})}));
+ const studies=await Promise.all([study(),study()]);
+ for(const r of studies)assert.equal(r.status,200,await r.clone().text());
+ const studyResults=await Promise.all(studies.map(r=>r.json()));
+ assert.deepEqual(studyResults.map(r=>r.duplicate).sort(),[false,true]);assert.equal(studyResults[0].gain,studyResults[1].gain);
+ const studied=(await db.doc('users/recovery-staff').get()).data();
+ assert.equal(studied.energy,0);assert.equal(studied.level,3);assert.equal(studied.pendingPerks,1);assert.equal(studied.xp,studyResults[0].gain-10);
+ console.log('PASS: real-token study concurrent retry charges once, stable XP, level and perk committed together.');
  console.log('PASS: authenticated recovery, role/forged reward/participant lock denial, concurrent retry receipt, atomic cost and XP, no overspend, revoked binding denial.');
 }

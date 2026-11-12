@@ -41,7 +41,7 @@ export async function recoverPlayers(db, uid, input, {now=Date.now(), draw=rando
   }
   const currentEnergy=staff.energy??100;
   let xp=staff.xp??0,level=staff.level??1,pendingPerks=staff.pendingPerks??0;
-  if(!energy(currentEnergy)||!integer(xp)||!integer(level)||level<1||level>30||!integer(pendingPerks))throw Error('Auxiliar inválido.');
+  if(!energy(currentEnergy)||!integer(xp)||!integer(level)||level<1||!integer(pendingPerks))throw Error('Auxiliar inválido.');
   const has=id=>Array.isArray(staff.perks)&&staff.perks.some(p=>p?.id===id);
   const eligible=players.some(p=>!(p.recoveryLeft>0));
   const cost=eligible?(has('COFFEE_LOVER')?10:20):0;

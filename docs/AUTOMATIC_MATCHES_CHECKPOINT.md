@@ -3,6 +3,35 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Assistant study migration and CI runner repair — 2026-11-12
+
+- Confirmed remote c502ffb and clean local tree before work; no concurrent change.
+  Its GitHub runs 43300875247/43300866754 failed at browser installation, not
+  unit/build: ubuntu-latest became Ubuntu 26.04 unsupported by pinned Playwright
+  1.51.1. Pinned validation runner to Ubuntu 24.04. New remote CI still must run;
+  do not describe the prior runs as passing full browser validation.
+- Gated staff-study accepts only requestId and verifies current ASSISTANT binding,
+  ownership and active profile. It checks club match lock when employed, derives
+  random 10–24 XP, charges 20 energy, updates level/perk and stores a private
+  serverConfig/study_{uid}/operations receipt in one transaction. Retries return
+  the same award; study and recovery compete for current staff energy atomically.
+- Preserved existing study mechanics including unemployed assistants and study
+  advancement beyond level 30. Fixed recovery's newly introduced rejection of
+  assistants above 30: they can recover players without gaining another level
+  from recovery, matching the legacy rule. Added regression coverage.
+- Secure AssistantDashboard study calls API only, retains uncertain request ID,
+  prevents concurrent clicks and reports confirmed server XP/level. Default mode
+  retains legacy study. Perk selection, inventory, employment and other training
+  remain unported; no source-field protection or production activation claimed.
+- Validation: 205 unit tests pass; full real Auth/Firestore emulator suite passes,
+  including concurrent study cost/XP/level/perk settlement. Mobile harness tests
+  study failed-response retry with the same ID and zero database access, alongside
+  recovery. Secure build passes. Main remains c1bf386 / version 2.9.11.
+- Estimate remains 72% / 28%, approximate. Next: authoritative perk offers/choice
+  (current random three-choice UI and generic direct writer are untrusted),
+  training/items, weekly/season/national flows, source-data/account migration and
+  backend credentials/index/scheduler/deployment. No live data/rules changed.
+
 ## Assistant recovery transaction validated — 2026-11-12
 
 - Recovered the repository from remote 6ec92300d79548b203e2219ca75ea9630c678e86

@@ -1,3 +1,4 @@
+import {matchApi,secureGameLogin} from '../services/game-auth.js';
 import React, { useState, useEffect } from "react";
 import { firebase } from "../services/firebase.js";
 import { ASSISTANT_PERKS } from "../game/ASSISTANT_PERKS.js";
@@ -46,7 +47,23 @@ export const AssistantDashboard = ({
     else alert("Máximo de 5 jogadores na banheira de gelo!");
   };
 
+  const studyRequest = React.useRef(null);
   const handleStudy = async () => {
+    if (secureGameLogin) {
+      if (studyRequest.current?.busy) return;
+      if (studyRequest.current?.staffId !== assistant.id)
+        studyRequest.current = {staffId: assistant.id, requestId: crypto.randomUUID()};
+      const pending = studyRequest.current;
+      pending.busy = true;
+      try {
+        const result = await matchApi().study({requestId: pending.requestId});
+        studyRequest.current = null;
+        alert(`📚 Estudo confirmado: +${result.gain} XP, -${result.cost}⚡.${result.leveledUp ? ` Nível ${result.level} alcançado!` : ""}`);
+      } catch (error) {
+        alert(`${error.message} Tente novamente para consultar o mesmo estudo sem duplicar o custo.`);
+      } finally { pending.busy = false; }
+      return;
+    }
     if (energy < 20) return alert("Você está exausto! Tome um energético.");
     let xpGain = Math.floor(Math.random() * 15) + 10;
 

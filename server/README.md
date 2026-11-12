@@ -3,6 +3,19 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Assistant study (gated; not deployed)
+
+`POST .../staff-study` accepts only `{requestId}`. The verified ASSISTANT must have
+an active binding, matching ownership and active profile. Employed assistants
+cannot study while their club has a match lock; unemployed assistants may study.
+The server derives 10–24 XP and charges 20 energy, preserving the existing single
+level-up and perk-every-third-level rules, including study beyond level 30.
+Staff progression and the private serverConfig/study_{uid}/operations receipt
+commit atomically; retries return the original award, concurrent recovery/study
+cannot overspend. The secure dashboard retains uncertain request IDs and does
+not write study rewards directly. Default login mode retains legacy behavior.
+Perk choice and protection of legacy source fields are still release blockers.
+
 ## Assistant recovery (gated; not deployed)
 
 `POST .../staff-recovery` accepts only `{requestId, playerIds}` (1–5 distinct IDs).
@@ -16,7 +29,7 @@ The private serverConfig/recovery_{uid}/operations receipt retains the exact
 result for retry; the same key cannot change club or participants. Random draws
 are stable across transaction retries. The gated UI retains selection/request ID
 on uncertain failures and uses no direct database mutation for recovery.
-Staff study, perk selection, other training/items and protection of source fields
+Perk selection, other training/items and protection of source fields
 still need migration. Do not enable this endpoint under the legacy public rules.
 
 `node tests/staff-recovery-ui.mjs` verifies the real action/dashboard with an

@@ -3,6 +3,35 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Authoritative assistant perk offers and choice — 2026-11-12
+
+- Confirmed remote 5995310 and clean workspace, no concurrent branch change.
+  Its full GitHub validations 43309569640 and 43309560914 succeeded after pinning
+  Ubuntu 24.04. Main remains c1bf386 / 2.9.11; no deployment performed.
+- Added authenticated assistant-perks and assistant-perk-choose. Active binding,
+  ownership, assistant profile and valid pending points are checked transactionally.
+  A server-generated subset of up to three unlearned canonical skills is persisted
+  under serverConfig/assistantPerks_{uid}; reload does not reroll it. New offers
+  follow completed choices. Empty pool/pending points consume nothing.
+- Choice accepts only offer revision and perk ID. Unoffered/stale choices and
+  injected effect values fail; concurrent different choices consume one point.
+  Private revision receipts make same-choice retries idempotent even after a new
+  offer is generated. Skill effects come from the canonical catalog, not payload.
+- Secure AssistantDashboard uses AssistantPerks, showing server offers and
+  retaining a failed choice for explicit retry. Generic legacy assistant skill
+  writer is blocked in secure mode; default mode remains unchanged. This client
+  guard is not database security. Other staff roles still use legacy perk flows.
+- 210 unit tests pass. Full Auth/Firestore emulator passes including real-token
+  persisted offers, concurrent choice and one-time point consumption. Mobile
+  harness covers lost-response same-choice retry and zero database access.
+  Secure frontend build passes. New GitHub CI is pending after this commit.
+- Estimate: 73% complete / 27% remaining, approximate effort assessment after the
+  recovery/study/perk paths; not a deployment-readiness metric. Credentials,
+  legacy source writes, other training/items, employment, weekly/season/national
+  integration, registration/account migration, indexes/scheduler still block
+  release. Next: coach/solo training and inventory transactions, plus remaining
+  staff-role perk migration. All production gates remain disabled.
+
 ## Assistant study migration and CI runner repair — 2026-11-12
 
 - Confirmed remote c502ffb and clean local tree before work; no concurrent change.

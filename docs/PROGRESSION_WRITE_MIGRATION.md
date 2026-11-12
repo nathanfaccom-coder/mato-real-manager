@@ -30,7 +30,8 @@ those candidates include reads and non-Firestore methods, not 1,452 vulnerabilit
 - Do not solve this by deleting training, items, weekly payments or season finance.
   Port and verify their behavior before denying their legacy mutations.
 - AssistantDashboard.handleStudy now uses an authenticated receipt-backed study
-  transaction in secure mode (unit/emulator/mobile tested). Assistant perk choice,
-  inventory and employment still mutate source fields; protection remains pending.
-- Next implementation priority: staff perk offers/choice, coach/solo training and items,
+  transaction in secure mode (unit/emulator/mobile tested). Assistant perk offers
+  and choices now use persisted server options and atomic point consumption.
+  Other staff roles, inventory and employment still mutate source fields.
+- Next implementation priority: other staff perk flows, coach/solo training and items,
   weekly/season jobs and national match integration.

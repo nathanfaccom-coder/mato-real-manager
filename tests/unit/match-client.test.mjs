@@ -47,3 +47,9 @@ test('recovery adapter sends only request and participant IDs, never client rewa
  await client.study({requestId:'r',xp:999,energy:100,uid:'forged'});
  assert.deepEqual(sent,{url:'https://example.test/staff-study',payload:{requestId:'r'}});
  });
+
+test('perk adapter sends only offered revision and perk ID, not client effect values',async()=>{
+ const calls=[];const client=createMatchClient({auth:{currentUser:{getIdToken:async()=> 'token'}},endpoint:'https://example.test',fetchImpl:async(url,opts)=>{calls.push({url,payload:JSON.parse(opts.body)});return Response.json({});}});
+ await client.assistantPerks();await client.chooseAssistantPerk({revision:3,perkId:'ICE_BATH',value:999,uid:'other'});
+ assert.deepEqual(calls,[{url:'https://example.test/assistant-perks',payload:{}},{url:'https://example.test/assistant-perk-choose',payload:{revision:3,perkId:'ICE_BATH'}}]);
+});

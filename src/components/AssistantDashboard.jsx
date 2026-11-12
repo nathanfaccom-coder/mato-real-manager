@@ -1,3 +1,4 @@
+import {AssistantPerks} from './AssistantPerks.jsx';
 import {matchApi,secureGameLogin} from '../services/game-auth.js';
 import React, { useState, useEffect } from "react";
 import { firebase } from "../services/firebase.js";
@@ -265,7 +266,8 @@ export const AssistantDashboard = ({
         </button>
       </div>
 
-      {showPerkSelection && (
+      {showPerkSelection && secureGameLogin && <AssistantPerks staffId={assistant.id} pendingPerks={assistant.pendingPerks} />}
+      {showPerkSelection && !secureGameLogin && (
         <div
           className="card pulse-border"
           style={{ background: "rgba(41, 121, 255, 0.1)", marginBottom: 15 }}

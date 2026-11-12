@@ -43,6 +43,16 @@ export async function verifyStaffRecovery({db,auth,handle,ownerToken}) {
  assert.deepEqual(studyResults.map(r=>r.duplicate).sort(),[false,true]);assert.equal(studyResults[0].gain,studyResults[1].gain);
  const studied=(await db.doc('users/recovery-staff').get()).data();
  assert.equal(studied.energy,0);assert.equal(studied.level,3);assert.equal(studied.pendingPerks,1);assert.equal(studied.xp,studyResults[0].gain-10);
+ const perksRequest=(route,body)=>handle(new Request(`https://example.test/${route}`,{method:'POST',headers:{Authorization:`Bearer ${idToken}`,'Content-Type':'application/json'},body:JSON.stringify(body)}));
+ const offered=await perksRequest('assistant-perks',{});assert.equal(offered.status,200);const offer=await offered.json();assert.equal(offer.options.length,3);
+ const offeredAgain=await perksRequest('assistant-perks',{});assert.deepEqual(await offeredAgain.json(),offer);
+ const choice={revision:offer.revision,perkId:offer.options[0].id};
+ const chosen=await Promise.all([perksRequest('assistant-perk-choose',choice),perksRequest('assistant-perk-choose',choice)]);
+ for(const r of chosen)assert.equal(r.status,200,await r.clone().text());
+ const choices=await Promise.all(chosen.map(r=>r.json()));assert.deepEqual(choices.map(r=>r.duplicate).sort(),[false,true]);
+ const skilled=(await db.doc('users/recovery-staff').get()).data();assert.equal(skilled.pendingPerks,0);assert.equal(skilled.perks.length,1);assert.equal(skilled.perks[0].id,choice.perkId);
+ assert.equal((await perksRequest('assistant-perk-choose',{...choice,value:999})).status,400);
+ console.log('PASS: real-token persisted perk offer, concurrent choice consumes exactly one point, forged perk value denied.');
  console.log('PASS: real-token study concurrent retry charges once, stable XP, level and perk committed together.');
  console.log('PASS: authenticated recovery, role/forged reward/participant lock denial, concurrent retry receipt, atomic cost and XP, no overspend, revoked binding denial.');
 }

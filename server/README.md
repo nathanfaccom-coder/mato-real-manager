@@ -3,6 +3,23 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Assistant perk offers and selection (gated; not deployed)
+
+`POST .../assistant-perks` accepts an empty object and returns a persisted random
+subset of up to three unlearned catalog skills, with a revision. It requires the
+current verified active ASSISTANT binding, ownership and profile. Refreshing does
+not reroll the offer. No pending points or no remaining skills returns no options.
+`POST .../assistant-perk-choose` accepts only `{revision, perkId}` and atomically
+validates the offer, appends the canonical skill, consumes one pending point and
+records a receipt. Concurrent different selections cannot spend the same point;
+same-choice retries return the receipt, including after the next offer is created.
+Client-provided effects, stale/unoffered choices and invalid profiles are denied.
+
+The secure assistant dashboard renders these offers and can retry a lost response.
+Other staff roles and public source-field protection still need migration. The
+new serverConfig documents use the existing recursive server-only candidate
+boundary; production rules have not been changed or claimed secure.
+
 ## Assistant study (gated; not deployed)
 
 `POST .../staff-study` accepts only `{requestId}`. The verified ASSISTANT must have
@@ -14,7 +31,7 @@ Staff progression and the private serverConfig/study_{uid}/operations receipt
 commit atomically; retries return the original award, concurrent recovery/study
 cannot overspend. The secure dashboard retains uncertain request IDs and does
 not write study rewards directly. Default login mode retains legacy behavior.
-Perk choice and protection of legacy source fields are still release blockers.
+Other staff perk flows and protection of legacy source fields remain blockers.
 
 ## Assistant recovery (gated; not deployed)
 

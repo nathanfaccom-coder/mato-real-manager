@@ -3,6 +3,26 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Assistant recovery (gated; not deployed)
+
+`POST .../staff-recovery` accepts only `{requestId, playerIds}` (1–5 distinct IDs).
+Verified current ASSISTANT binding/ownership/employment and active club are required.
+The transaction rejects team/player match locks and players outside the club.
+It derives perk effects and random XP/mood on the server; caps player energy at
+100, preserves injured players, charges staff once and updates staff progression
+and the club activity log atomically. All-injured sessions have no cost/staff XP.
+
+The private serverConfig/recovery_{uid}/operations receipt retains the exact
+result for retry; the same key cannot change club or participants. Random draws
+are stable across transaction retries. The gated UI retains selection/request ID
+on uncertain failures and uses no direct database mutation for recovery.
+Staff study, perk selection, other training/items and protection of source fields
+still need migration. Do not enable this endpoint under the legacy public rules.
+
+`node tests/staff-recovery-ui.mjs` verifies the real action/dashboard with an
+isolated API and database-access rejection at 390px. The full emulator suite
+includes authenticated recovery and concurrent receipt/cost tests.
+
 ## Competition standings (gated; not deployed)
 
 `POST .../competition-standings` accepts competitionId and seasonId from an

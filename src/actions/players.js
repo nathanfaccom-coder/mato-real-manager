@@ -507,6 +507,28 @@ export function createPlayersActions(context, actions) {
   };
 
   const handleAssistantRegen = async (playerIds) => {
+    if (context.automaticMatches) {
+      const selected = [...playerIds].sort();
+      const key = JSON.stringify([user.data.id, selected]);
+      const ref = context.recoveryRequestRef;
+      if (ref.current?.busy) return false;
+      if (ref.current?.key !== key) ref.current = {key, requestId: crypto.randomUUID()};
+      const pending = ref.current;
+      pending.busy = true;
+      setLoading(true);
+      try {
+        const result = await context.recoverPlayers({requestId: pending.requestId, playerIds: selected});
+        ref.current = null;
+        alert(`Sessão de recuperação confirmada! Custo: ${result.cost}⚡\n\n${result.rows.map(r => r.skipped ? `⚠️ ${r.name}: sob cuidados do DM.` : `🔋 ${r.name}: +${r.energyRecovered}⚡ (+${r.xp} XP)${r.happy ? " 🤩" : ""}`).join("\n")}`);
+        return true;
+      } catch (error) {
+        alert(`${error.message} Tente novamente com os mesmos jogadores para consultar o pedido sem duplicá-lo.`);
+        return false;
+      } finally {
+        pending.busy = false;
+        setLoading(false);
+      }
+    }
     const assistant = user.data;
     const activePerks = assistant.perks || [];
 

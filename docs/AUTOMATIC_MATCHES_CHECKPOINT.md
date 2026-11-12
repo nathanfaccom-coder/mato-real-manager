@@ -3,6 +3,39 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Assistant recovery transaction validated — 2026-11-12
+
+- Recovered the repository from remote 6ec92300d79548b203e2219ca75ea9630c678e86
+  after scratch cleanup. The previous uncommitted recovery implementation was lost;
+  reconstructed and tested it. Previous standings CI runs 41051535655 and
+  41051526798 both completed successfully. Main remains c1bf386 (2.9.11).
+- Added gated staff-recovery API. Current verified binding, ownership, assistant
+  employment, active club, selected players and team/player match locks are checked
+  in one transaction. Only requestId and 1–5 distinct player IDs are accepted.
+  Server calculates coffee/ice/light-work/good-vibes perks, capped energy, XP,
+  assistant cost/level/perk and the club's bounded activity log. Injured players
+  are skipped; an all-injured selection causes no cost or staff XP.
+- Private receipts under serverConfig/recovery_{uid}/operations deduplicate retries.
+  Same receipt with changed participants/club is rejected. Randomness is sampled
+  once before transaction retries. Concurrent distinct requests cannot overspend.
+- Gated assistant action uses the API only. An uncertain response retains request
+  ID and selected players, concurrent clicks are ignored, and confirmation clears
+  the selection. Default build retains legacy recovery. Energy color now respects
+  coffee's lower cost. Other assistant study/perk/item mutations are NOT migrated.
+- Validation: 200 unit tests pass; full Auth/Firestore emulator suite passes,
+  including real-token recovery, simultaneous retries and distinct requests,
+  role/injection/lock/revoked-binding denial and exact one-time energy/XP changes.
+  Mobile browser harness passes at 390px with throwing database stub, network
+  failure/retry and double-click checks. Normal build passes. New harness is in CI.
+- Not published or activated. Estimate remains 72% complete / 28% remaining:
+  recovering lost work and closing one mutation path does not justify declaring
+  the broad migration nearly complete. No live rules, credentials or data changed.
+- Next: authoritative staff study/perk selection and coach/solo training/items;
+  weekly/season jobs, national integration, remaining registration/account/source
+  protection and deploy credentials/indexes/scheduler remain release blockers.
+  Source XP/energy/perks are still publicly mutable under the old rules; this API
+  cannot provide production integrity until those rules and paths are migrated.
+
 ## Authoritative league/state standings connected — 2026-10-30
 
 - Added authenticated, bounded competition-standings projection from server-owned

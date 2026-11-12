@@ -19,7 +19,6 @@ export const AssistantDashboard = ({
   const [selectedPlayers, setSelectedPlayers] = useState([]);
 
   const energy = assistant.energy !== undefined ? assistant.energy : 100;
-  const isExhausted = energy < 20;
   const myItems = (sales || []).filter((s) => s.buyerId === assistant.id);
 
   const xpNext = assistant.level * 100;
@@ -37,6 +36,7 @@ export const AssistantDashboard = ({
   const activePerks = assistant.perks || [];
   const hasCoffee = activePerks.some((p) => p.id === "COFFEE_LOVER");
   const costToTrain = hasCoffee ? 10 : 20;
+  const isExhausted = energy < costToTrain;
 
   const handleTogglePlayer = (pid) => {
     if (selectedPlayers.includes(pid))
@@ -309,11 +309,11 @@ export const AssistantDashboard = ({
 
               <button
                 className="btn btn-blue"
-                onClick={() => {
+                onClick={async () => {
                   if (selectedPlayers.length === 0)
                     return alert("Selecione os jogadores (Max 5).");
-                  onTrainRegen(selectedPlayers);
-                  setSelectedPlayers([]);
+                  const confirmed = await onTrainRegen(selectedPlayers);
+                  if (confirmed !== false) setSelectedPlayers([]);
                 }}
               >
                 INICIAR REGENERATIVO (-{costToTrain}⚡)

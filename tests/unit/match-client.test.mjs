@@ -35,3 +35,9 @@ test('correction requests refresh identity and strip XP, participation and priva
  assert.deepEqual(refresh,[true,true]);assert.deepEqual(calls[0],{matchId:'m'});
  assert.deepEqual(calls[1].players.p,{goals:0,assists:0,tackles:0,saves:0,yellows:0,reds:0,rating:6});assert.equal(calls[1].uid,undefined);
 });
+
+test('recovery adapter sends only request and participant IDs, never client rewards',async()=>{
+ let sent;const client=createMatchClient({auth:{currentUser:{getIdToken:async()=> 'token'}},endpoint:'https://example.test',fetchImpl:async(url,opts)=>{sent={url,payload:JSON.parse(opts.body)};return Response.json({});}});
+ await client.recover({requestId:'r',playerIds:['p'],xp:999,energy:100,uid:'forged'});
+ assert.deepEqual(sent,{url:'https://example.test/staff-recovery',payload:{requestId:'r',playerIds:['p']}});
+});

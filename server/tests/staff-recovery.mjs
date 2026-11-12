@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';
+export async function verifyStaffRecovery({db,auth,handle,ownerToken}) {
+ assert.equal(process.env.FIREBASE_AUTH_EMULATOR_HOST,'127.0.0.1:19099');
+ await auth.createUser({uid:'recovery-user',email:'recovery@example.test',emailVerified:true});
+ const signed=await fetch('http://127.0.0.1:19099/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=fake',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:await auth.createCustomToken('recovery-user'),returnSecureToken:true})});
+ const {idToken}=await signed.json();assert.ok(idToken);
+ await db.doc('authAccounts/recovery-user').set({active:true,type:'ASSISTANT',entityId:'recovery-staff',revision:1});
+ await db.doc('accountEntityOwners/users_recovery-staff').set({uid:'recovery-user',type:'ASSISTANT',entityId:'recovery-staff'});
+ await db.doc('users/recovery-staff').set({status:'ACTIVE',type:'ASSISTANT',teamId:'recovery-team',energy:20,xp:0,level:1});
+ await db.doc('teams/recovery-team').set({status:'ACTIVE',trainingLogs:[]});
+ await db.doc('players/recovery-player').set({teamId:'recovery-team',energy:60,xp:0,name:'Recovery'});
+ const input={requestId:'recover-once',playerIds:['recovery-player']};
+ const request=(payload=input,token=idToken)=>handle(new Request('https://example.test/staff-recovery',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(payload)}));
+ assert.equal((await request(input,ownerToken)).status,400);
+ assert.equal((await request({...input,xp:999})).status,400);
+ await db.doc('matchParticipantLocks/player_recovery-player').set({runId:'national-or-club'});
+ assert.equal((await request()).status,400);
+ assert.equal((await db.doc('users/recovery-staff').get()).data().energy,20);
+ await db.doc('matchParticipantLocks/player_recovery-player').delete();
+ const responses=await Promise.all([request(),request()]);
+ for(const r of responses)assert.equal(r.status,200,await r.clone().text());
+ const results=await Promise.all(responses.map(r=>r.json()));
+ assert.deepEqual(results.map(r=>r.duplicate).sort(),[false,true]);assert.deepEqual(results[0].rows,results[1].rows);
+ const player=(await db.doc('players/recovery-player').get()).data();
+ assert.equal(player.energy,85);assert.equal(player.xp,results[0].rows[0].xp);assert.ok(player.xp>=1&&player.xp<=3);
+ assert.equal((await db.doc('users/recovery-staff').get()).data().energy,0);
+ assert.equal((await db.doc('users/recovery-staff').get()).data().xp,20);
+ assert.equal((await db.doc('teams/recovery-team').get()).data().trainingLogs.length,1);
+ assert.equal((await db.collection('serverConfig/recovery_recovery-user/operations').get()).size,1);
+ await db.doc('users/recovery-staff').update({energy:20});
+ const distinct=await Promise.all(['second','third'].map(requestId=>request({...input,requestId})));
+ assert.deepEqual(distinct.map(r=>r.status).sort(),[200,400]);
+ assert.equal((await db.doc('players/recovery-player').get()).data().energy,100);
+ assert.equal((await db.doc('users/recovery-staff').get()).data().xp,40);
+ await db.doc('authAccounts/recovery-user').update({active:false});
+ assert.equal((await request()).status,400);
+ console.log('PASS: authenticated recovery, role/forged reward/participant lock denial, concurrent retry receipt, atomic cost and XP, no overspend, revoked binding denial.');
+}

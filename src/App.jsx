@@ -601,6 +601,7 @@ export function App() {
   }, [teams, players, companies, coaches, user?.data?.id, user?.type]);
 
   const buyingRef = React.useRef(false);
+  const recoveryRequestRef = React.useRef(null);
   const [chatMessages, setChatMessages] = useState([]);
 
   const {
@@ -678,6 +679,8 @@ export function App() {
     user,
     products,
     buyingRef,
+    recoveryRequestRef,
+    recoverPlayers: input => matchApi().recover(input),
     setSales,
     posts,
     setChatMessages,

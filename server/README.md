@@ -3,6 +3,22 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Staff consumables (gated; not deployed)
+
+`POST .../staff-consume` accepts `{requestId,itemId}` only. The server selects
+COACH/DOCTOR/SCOUT/ASSISTANT from the verified binding and matching active users
+profile; client role/effects are rejected. It verifies entity ownership, current
+club lock and inventory ownership. Categories energy/SAUDE/CONSUMIVEL preserve
+existing staff UI support. Free staff retain access.
+
+Uses the same atomic inventory/toxicity/receipt engine as player consumption, with
+separate role-bound receipts under serverConfig/staffConsume_{uid}/operations.
+Staff-specific rules remain: missing energy defaults to 100, full energy blocks
+before risk effects, and both sickness and vomiting zero energy without creating
+player injuries or changing mood. Secure action retries uncertain requests and
+removes inventory only after confirmation. Source sales/profile rules and purchase
+provenance remain deployment blockers.
+
 ## Player consumables (gated; not deployed)
 
 `POST .../consume-item` accepts only `{requestId,itemId}`. Verified PLAYER identity,
@@ -16,7 +32,7 @@ Server time uses America/Sao_Paulo days, with legacy browser date-string support
 Existing third-use 40% intoxication and fourth+ 95% vomiting remain, including the
 intoxication block and injury shape. Injury recovery is not redefined here. Secure
 client keeps uncertain request IDs and waits for confirmation to remove inventory.
-Purchases, source-field rules and staff consumables remain migration blockers.
+Purchases and source-field rules remain migration blockers.
 
 ## Equipment (gated; not deployed)
 

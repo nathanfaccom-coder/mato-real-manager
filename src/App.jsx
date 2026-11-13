@@ -602,6 +602,7 @@ export function App() {
 
   const buyingRef = React.useRef(false);
   const recoveryRequestRef = React.useRef(null);
+  const staffConsumeRequestRef = React.useRef(null);
   const consumeRequestRef = React.useRef(null);
   const equipRequestRef = React.useRef(null);
   const soloRequestRef = React.useRef(null);
@@ -683,6 +684,8 @@ export function App() {
     products,
     buyingRef,
     recoveryRequestRef,
+    staffConsumeRequestRef,
+    consumeStaffItem: input => matchApi().consumeStaffItem(input),
     consumeRequestRef,
     consumeItem: input => matchApi().consumeItem(input),
     equipRequestRef,

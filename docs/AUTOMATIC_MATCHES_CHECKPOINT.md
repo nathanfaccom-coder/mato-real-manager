@@ -3,6 +3,29 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Authenticated staff consumables — 2026-11-13
+
+- Remote 21d37f5 and clean workspace checked before edits; no competing process.
+  Prior GitHub checks 43423644770/43423634491 succeeded.
+- Added staff-consume with server-derived COACH/DOCTOR/SCOUT/ASSISTANT identity,
+  matching active users profile and ownership, active club/match lock checks,
+  canonical owned inventory and separate role-bound retry receipts. Payload only
+  requestId/itemId; role/power/energy cannot be supplied by the browser.
+- Reuses the tested daily toxicity transaction while preserving distinct staff
+  rules: absent energy defaults to 100, full energy blocks before risk effects,
+  sickness and vomiting zero energy without player injury/mood changes. Existing
+  energy/SAUDE/CONSUMIVEL categories and free staff access retained.
+- Secure handleCoachUseItem uses API and preserves uncertain request IDs; it only
+  removes inventory after confirmation. Default production flow unchanged.
+- 245 unit tests, browser lost-response retry harness, secure build and full real
+  Auth/Firestore emulator pass. Includes all four staff roles, changed-role receipt
+  rejection, foreign items, forged values, locks and concurrent once-only use.
+- Approximate estimate remains 74% / 26%. Next: coach training and secure purchase
+  provenance, then employment/economy, weekly/season/national paths, account/source
+  migration and restrictive rules, credentials/indexes/scheduler/deployment.
+  Source writes remain insecure: no production gates/rules/data/deployment changed.
+  Check new GitHub CI after push. Update is NOT published.
+
 ## Authenticated player consumables — 2026-11-13
 
 - Recovered uncommitted consumable work and verified remote 1b581ee unchanged;

@@ -15,7 +15,7 @@ those candidates include reads and non-Firestore methods, not 1,452 vulnerabilit
 | 1 | `src/actions/competition.js`: `handleSeasonTurnAdvanced` | Attributes/overall, career snapshot, season stats, contracts and prizes | Resumable server season-close job; protect active matches and define correction cutoff. Preserve all finance/contract effects. |
 | 2 | `src/actions/players.js`: `handleCoachTrain`, `handlePlayerSoloTrain` | XP, attributes, overall, energy, injuries, consumed equipment | Solo training migrated: verified player identity, match locks, server randomness, costs/XP/attributes, equipped-snapshot consumption and receipt. Equip now verifies owned sales and atomically moves the canonical snapshot; coach training and purchase/source-field provenance still pending. |
 | 2 | `src/actions/players.js`: `handleAssistantRegen` | Player energy/XP and assistant energy/XP | Implemented gated staff-recovery transaction, current employment/ownership and locks, authoritative perks/cost/XP and retry ledger; unit/emulator/mobile tests pass. Source-data rules still pending. |
-| 2 | `src/actions/players.js`: `handleUseItem`, `handleCoachUseItem` | Energy, toxicity, equipment and inventory | Equip migrated to authenticated ownership/category/power checks, match locks and atomic inventory/profile/receipt transaction. Player consumables now validate owned inventory and atomically apply server-derived energy/toxicity/risk with receipt and locks. Staff items remain pending; sales provenance still requires purchase and source-rule migration. |
+| 2 | `src/actions/players.js`: `handleUseItem`, `handleCoachUseItem` | Energy, toxicity, equipment and inventory | Equip migrated to authenticated ownership/category/power checks, match locks and atomic inventory/profile/receipt transaction. Player consumables now validate owned inventory and atomically apply server-derived energy/toxicity/risk with receipt and locks. Staff consumables now use verified staff roles and matching users profiles with separate receipts, retaining their zero-energy sickness rule. Sales provenance still requires purchase and source-rule migration. |
 | 2 | `src/national/service.js`: result settlement | Player nationalStats, energy, trophies | Integrate national snapshots/fixtures into the same automatic ledger; avoid separate flat fatigue charge. |
 | 3 | `src/actions/players.js`: `savePlayer` and other administrative editors | Broad player record | Narrow field-specific ADM operations, audited, with privileged progression fields denied to profile edits. |
 | 3 | `src/actions/competition.js`: calendar CRUD/generation | Fixture identity, status, scoreboard, competition | Server calendar lifecycle; private approval alone does not protect public source fixtures. |
@@ -37,7 +37,7 @@ those candidates include reads and non-Firestore methods, not 1,452 vulnerabilit
   and server-derived nutrition bonus. Medical evaluation now checks current club,
   patient injury and match locks in a receipt-backed transaction. Inventory,
   employment and other inventory/economy paths still mutate source fields.
-- Next implementation priority: coach training, staff consumables, purchases and employment,
+- Next implementation priority: coach training, purchases and employment,
   weekly/season jobs and national match integration.
 
 ## Surgery migration

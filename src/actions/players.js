@@ -153,6 +153,19 @@ export function createPlayersActions(context, actions) {
       !["COACH", "DOCTOR", "SCOUT", "ASSISTANT"].includes(user.type)
     )
       return;
+    if(context.automaticMatches){
+      const ref=context.staffConsumeRequestRef,key=JSON.stringify([user.type,user.data.id,item.id]);
+      if(ref.current?.busy)return;
+      if(ref.current?.key!==key)ref.current={key,requestId:crypto.randomUUID()};
+      const pending=ref.current;pending.busy=true;setLoading(true);
+      try{
+        const result=await context.consumeStaffItem({requestId:pending.requestId,itemId:item.id});
+        ref.current=null;setSales(prev=>prev.filter(s=>s.id!==result.itemId));
+        alert(result.outcome==='SUCCESS'?`⚡ Energia recuperada: +${result.energyRecovered}% (Total: ${result.energy}%).${result.toxicity>=2?' Cuidado com novos consumos hoje!':''}`:result.outcome==='SICK'?'🤢 Enjoo forte! Sua energia zerou.':'🤮 Vômito! Sua energia zerou.');
+      }catch(error){alert(`${error.message} Repita o mesmo item para consultar o pedido sem duplicá-lo.`);}
+      finally{pending.busy=false;setLoading(false);}
+      return;
+    }
     // 1. Configuração do Dia e Toxicidade
     const today = new Date().toDateString();
     const lastDate = user.data.lastToxicityDate || "";

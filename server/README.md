@@ -3,6 +3,22 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Equipment (gated; not deployed)
+
+`POST .../equip-item` accepts only `{requestId,itemId}`. Verified active PLAYER
+binding/ownership resolves the player; current inventory ownership, category
+(CHUTEIRA/LUVAS), integer bonus and player/team match locks are checked in one
+transaction. The stored sale supplies name/category/power/image; no item effects
+come from the request. Sale deletion, equipped snapshot and private receipt under
+`serverConfig/equip_{uid}/operations` commit together. Replays return the original
+receipt even after training has consumed the snapshot; they never restore it.
+Replacement preserves the existing no-refund behavior for the old equipment.
+
+The secure UI retains uncertain request IDs and changes inventory only after an
+API confirmation. Default mode is unchanged. This verifies ownership against
+stored sales, not their provenance under legacy public rules. Purchases, product
+fields, sales and equipped snapshots must be protected before activation.
+
 ## Individual training (gated; not deployed)
 
 `POST .../solo-training` accepts `{requestId,type}` for one of ten existing focuses.
@@ -14,8 +30,8 @@ equipment consumption and bounded club log are atomic and retry-safe.
 
 Equipped items were already removed from sales when equipped. This operation
 consumes the current equipped snapshot, never a sales document named by its ID.
-That snapshot's provenance still needs secure inventory/equip migration and source
-rules before activation. The secure action sends no player/reward payload and
+Equip now checks stored inventory ownership atomically. Purchase provenance and
+source-field rules still need migration before activation. The secure action sends no player/reward payload and
 retains uncertain request/type. Ordinary production mode retains legacy behavior.
 
 ## Surgery review and execution (gated; not deployed)

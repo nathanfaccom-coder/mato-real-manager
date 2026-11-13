@@ -3,6 +3,33 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Atomic owned equipment — 2026-11-13
+
+- Remote HEAD 8812ef0 and clean local tree checked before changes. Prior GitHub
+  runs 43384924489 and 43384916726 succeeded. No concurrent process detected.
+- Added equip-item accepting only requestId/itemId. Verified PLAYER binding and
+  entity owner resolve the subject; active profile, current club/player locks,
+  owned sale, CHUTEIRA/LUVAS category and canonical integer power are required.
+- Stored sale supplies the equipped snapshot. Delete sale, replace equipment and
+  save private receipt atomically; preserves existing replacement without refund.
+  Repeated requests cannot duplicate equipment, and replay after training does
+  not restore the already-consumed snapshot. Different simultaneous requests
+  cannot consume the same inventory entry twice. Foreign sales remain untouched.
+- Secure action sends no player/reward/item metadata, retains uncertain requests,
+  and removes the inventory entry only after API confirmation. Normal mode unchanged.
+- 235 unit tests pass, including equip-to-training lifecycle and concurrency.
+  Full Auth/Firestore emulator passes with real-token route, forged/foreign item
+  rejection, match lock and simultaneous retry. Browser harness validates lost
+  response retry with identical ID, canonical name and no direct DB access.
+  Secure build and diff checks pass. Check new GitHub CI after push.
+- Important boundary: stored sale ownership is verified, but source sales/products
+  and equippedItem remain publicly mutable in legacy rules. Secure purchase and
+  source-field/account migration are still required; no production gates enabled.
+- Estimate remains 74% complete / 26% remaining (approximate). Next: coach training,
+  consumables, purchases/employment/economy, weekly/season/national integration,
+  account/source rules, secure server configuration, indexes/scheduler/deployment.
+  No live data/rules/deployment modified; update is NOT published.
+
 ## Authenticated individual training — 2026-11-13
 
 - Verified remote c630b39 and clean workspace; main remains c1bf386 / 2.9.11.

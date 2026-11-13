@@ -17,6 +17,9 @@ export function App(){
  if(location.search==='?doctorStudy')return React.createElement(DoctorDashboard,{doctor:{...assistant,type:'DOCTOR',energy:20},team,players:[],offers:[],sales:[]});
  if(location.search==='?coachPerks'||location.search==='?doctorPerks')return React.createElement(AssistantPerks,{staffId:'s',pendingPerks:1,staffRole:location.search==='?coachPerks'?'COACH':'DOCTOR'});
  if(location.search==='?perks')return React.createElement(AssistantPerks,{staffId:'s',pendingPerks:1});
+ const equipRequestRef=React.useRef(null);
+ const {handleUseItem}=createPlayersActions({automaticMatches:true,user:{type:'PLAYER',data:{id:'p'}},setLoading:()=>{},setSales:fn=>{window.__inventory=fn(window.__inventory||[{id:'item'}]);},equipRequestRef,equipItem:async input=>{window.__equips=window.__equips||[];window.__equips.push(input);if(window.__equips.length===1)throw Error('Resposta do equipamento perdida');return {itemId:'item',name:'Nome do servidor'};}},{});
+ window.__equip=()=>handleUseItem({id:'item',power:999,productName:'Nome forjado'},'EQUIP');
  const recoveryRequestRef=React.useRef(null),soloRequestRef=React.useRef(null);
  const {handleAssistantRegen,handlePlayerSoloTrain}=createPlayersActions({soloRequestRef,trainSolo:async input=>{window.__solo=window.__solo||[];window.__solo.push(input);if(window.__solo.length===1)throw Error('Resposta do treino perdida');return {injured:false,xp:12,energyCost:35,equipmentBonus:4};},automaticMatches:true,user:{type:'ASSISTANT',data:assistant},players,teams:[team],setLoading:()=>{},recoveryRequestRef,recoverPlayers:async input=>{window.__calls.push(input);await new Promise(r=>setTimeout(r,100));if(window.__calls.length===1)throw Error('Resposta perdida');return {cost:10,rows:[{playerId:'p',name:'Atleta',energyRecovered:10,xp:2}]};}},{});
  window.__recover=handleAssistantRegen;
@@ -34,6 +37,8 @@ try{
  const page=await browser.newPage({viewport:{width:390,height:844}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/app.html`);
+ await page.evaluate(()=>window.__equip());assert.equal(await page.evaluate(()=>window.__inventory),undefined);
+ await page.evaluate(()=>window.__equip());const equips=await page.evaluate(()=>window.__equips);assert.deepEqual(equips[0],equips[1]);assert.deepEqual(Object.keys(equips[0]).sort(),['itemId','requestId']);assert.deepEqual(await page.evaluate(()=>window.__inventory),[]);assert.match((await page.evaluate(()=>window.__alerts)).at(-1),/Nome do servidor/);assert.equal(await page.evaluate(()=>window.__writes||0),0);await page.evaluate(()=>{window.__alerts=[];});
  await page.evaluate(()=>window.__soloTrain());await page.evaluate(()=>window.__soloTrain());
  const solo=await page.evaluate(()=>window.__solo);assert.equal(solo.length,2);assert.deepEqual(solo[0],solo[1]);assert.equal(solo[0].playerId,undefined);await page.evaluate(()=>{window.__alerts=[];});
  await page.getByText('Atleta',{exact:true}).click();

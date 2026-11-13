@@ -602,6 +602,7 @@ export function App() {
 
   const buyingRef = React.useRef(false);
   const recoveryRequestRef = React.useRef(null);
+  const soloRequestRef = React.useRef(null);
   const [chatMessages, setChatMessages] = useState([]);
 
   const {
@@ -680,6 +681,8 @@ export function App() {
     products,
     buyingRef,
     recoveryRequestRef,
+    soloRequestRef,
+    trainSolo: input => matchApi().trainSolo(input),
     recoverPlayers: input => matchApi().recover(input),
     setSales,
     posts,

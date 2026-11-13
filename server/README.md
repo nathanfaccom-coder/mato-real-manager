@@ -3,6 +3,21 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Individual training (gated; not deployed)
+
+`POST .../solo-training` accepts `{requestId,type}` for one of ten existing focuses.
+The current verified PLAYER binding/ownership resolves the subject. Active profile,
+current energy/injury and team/player match locks are required; free players can
+train. Server randomness preserves 2% injury risk, energy costs, 8–15 base XP,
+equipment bonus and attribute evolution capped at 99. Receipt, player progression,
+equipment consumption and bounded club log are atomic and retry-safe.
+
+Equipped items were already removed from sales when equipped. This operation
+consumes the current equipped snapshot, never a sales document named by its ID.
+That snapshot's provenance still needs secure inventory/equip migration and source
+rules before activation. The secure action sends no player/reward payload and
+retains uncertain request/type. Ordinary production mode retains legacy behavior.
+
 ## Surgery review and execution (gated; not deployed)
 
 `POST .../surgery-review` accepts `{playerId}` and returns procedure terms and a

@@ -902,6 +902,18 @@ export function createPlayersActions(context, actions) {
   };
 
   const handlePlayerSoloTrain = async (player, type) => {
+    if(context.automaticMatches){
+      const ref=context.soloRequestRef,key=JSON.stringify([user.data.id,type]);
+      if(ref.current?.busy)return;
+      if(ref.current?.key!==key)ref.current={key,requestId:crypto.randomUUID()};
+      const pending=ref.current;pending.busy=true;setLoading(true);
+      try{
+        const result=await context.trainSolo({requestId:pending.requestId,type});ref.current=null;
+        alert(result.injured?`❌ Lesão no treino: ${result.injury}. 1 jogo fora. Energia: -${result.energyCost}.`:`Treino confirmado! Energia: -${result.energyCost}. XP: +${result.xp}. Bônus de equipamento: +${result.equipmentBonus}.`);
+      }catch(error){alert(`${error.message} Repita o mesmo treino para consultar o pedido sem duplicá-lo.`);}
+      finally{pending.busy=false;setLoading(false);}
+      return;
+    }
     const currentEnergy = player.energy !== undefined ? player.energy : 100;
 
     if (currentEnergy < 35)

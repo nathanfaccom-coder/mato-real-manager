@@ -3,6 +3,35 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Authenticated individual training — 2026-11-13
+
+- Verified remote c630b39 and clean workspace; main remains c1bf386 / 2.9.11.
+  Prior full GitHub runs 43378541135 and 43378532975 succeeded. No concurrent
+  branch update or production activation.
+- Added solo-training accepting requestId/type only. Verified PLAYER binding and
+  ownership resolve the subject; client player IDs/rewards/attributes are denied.
+  Current active profile, energy, injury, team and player match locks are checked
+  transactionally. Free players retain individual training access.
+- Preserves ten training focuses, 2% light-injury risk (20 energy, no XP/equipment
+  consumption), otherwise 35 energy, 8–15 base XP plus equipped percentage bonus,
+  15% growth per unique focused attribute capped at 99 and shared overall formula.
+  XP/energy/attributes/equipment/log and private receipt commit together; retries
+  cannot reroll or repeat rewards, concurrent requests cannot overspend energy.
+- Equipping already removes a sales item. Training now consumes only the equipped
+  snapshot and never deletes a sales record using its embedded ID. Tests preserve
+  an unrelated sale with that ID. Equipped power is validated from the current
+  player document, not input, but equipment provenance/source-field protection
+  still depends on the pending equip/inventory migration and restrictive rules.
+- Secure player action uses API and retains uncertain request/type, no client
+  player identity. Default mode is unchanged. 231 unit tests, browser action
+  failure/retry test and secure build pass. Full Auth/Firestore emulator passes,
+  including real-token training, forged rewards/locks and simultaneous retry with
+  one energy/XP/equipment effect. Check the new GitHub CI after push.
+- Estimate stays 74% / 26%, approximate. Next: coach training, equip/consume and
+  marketplace inventory provenance, employment/economy, weekly/season/national
+  integration, account/source migration, credentials/indexes/scheduler/deployment.
+  No live rules/data/gates changed; not ready for publication.
+
 ## Server surgery review and atomic execution — 2026-11-13
 
 - Resumed preserved uncommitted surgery code after interruption. Remote cf50d4a

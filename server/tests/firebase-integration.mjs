@@ -1,3 +1,4 @@
+import {verifySoloTraining} from './solo-training.mjs';
 import {verifyStaffRecovery} from './staff-recovery.mjs';
 import {verifyPlayerRegistration} from './player-registration.mjs';
 import {verifyIdentityLifecycle} from './identity-lifecycle.mjs';
@@ -137,6 +138,7 @@ try {
  console.log('PASS: authenticated standings reflect corrected official results with no duplicate appearances.');
  console.log('PASS: recent ADM correction is atomic under concurrent requests; club denied, career/score/revision updated, fatigue preserved.');
  await verifyStaffRecovery({db,auth,handle,ownerToken:idToken});
+ await verifySoloTraining({db,auth,handle});
  await auth.updateUser(OWNER_UID,{disabled:true});
  assert.equal((await handle(request())).status,401);
  console.log('PASS: real Auth emulator token, REST SDK transactions, retry deduplication, simultaneous settlement, exact XP/energy, lock release, deny-all fixture, disabled-user rejection.');

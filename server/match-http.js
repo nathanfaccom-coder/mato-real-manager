@@ -1,3 +1,4 @@
+import {trainSolo} from './solo-training.js';
 import {surgery} from './medical-surgery.js';
 import {evaluatePlayer} from './medical-evaluation.js';
 import {assistantPerks} from './assistant-perks.js';
@@ -25,7 +26,7 @@ export function createMatchHandler({db,auth,enabled=false,origin='https://nathan
   if(request.method!=='POST')return respond(405,{error:'Método não permitido.'});
   if(!enabled)return respond(503,{error:'Integração automática ainda não liberada.'});
   const route=new URL(request.url).pathname.split('/').filter(Boolean).at(-1);
-  if(!['surgery-review','surgery-execute','medical-evaluate','doctor-study','staff-perks','staff-perk-choose','assistant-perks','assistant-perk-choose','staff-study','staff-recovery','competition-standings','match-correction-review','match-correct','match-view','match-list','fixture-review','fixture-approve','start','command','account-bind','account-state','account-review','player-apply','player-application','player-application-review','player-application-decide','session'].includes(route))return respond(404,{error:'Operação não encontrada.'});
+  if(!['solo-training','surgery-review','surgery-execute','medical-evaluate','doctor-study','staff-perks','staff-perk-choose','assistant-perks','assistant-perk-choose','staff-study','staff-recovery','competition-standings','match-correction-review','match-correct','match-view','match-list','fixture-review','fixture-approve','start','command','account-bind','account-state','account-review','player-apply','player-application','player-application-review','player-application-decide','session'].includes(route))return respond(404,{error:'Operação não encontrada.'});
   const bearer=request.headers.get('authorization')||'';
   if(!/^Bearer [^\s]{1,8192}$/.test(bearer))return respond(401,{error:'Entre na sua conta.'});
   let identity;
@@ -48,7 +49,8 @@ export function createMatchHandler({db,auth,enabled=false,origin='https://nathan
   } catch {return respond(400,{error:'Pedido inválido.'});}
   try {
    let result;
-   if(route==='surgery-review')result=await surgery(db,identity.uid,input);
+   if(route==='solo-training')result=await trainSolo(db,identity.uid,input);
+   else if(route==='surgery-review')result=await surgery(db,identity.uid,input);
    else if(route==='surgery-execute')result=await surgery(db,identity.uid,input,{execute:true});
    else if(route==='medical-evaluate')result=await evaluatePlayer(db,identity.uid,input);
    else if(route==='doctor-study')result=await studyStaff(db,identity.uid,input,{doctor:true});

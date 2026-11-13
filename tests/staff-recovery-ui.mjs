@@ -17,9 +17,10 @@ export function App(){
  if(location.search==='?doctorStudy')return React.createElement(DoctorDashboard,{doctor:{...assistant,type:'DOCTOR',energy:20},team,players:[],offers:[],sales:[]});
  if(location.search==='?coachPerks'||location.search==='?doctorPerks')return React.createElement(AssistantPerks,{staffId:'s',pendingPerks:1,staffRole:location.search==='?coachPerks'?'COACH':'DOCTOR'});
  if(location.search==='?perks')return React.createElement(AssistantPerks,{staffId:'s',pendingPerks:1});
- const recoveryRequestRef=React.useRef(null);
- const {handleAssistantRegen}=createPlayersActions({automaticMatches:true,user:{type:'ASSISTANT',data:assistant},players,teams:[team],setLoading:()=>{},recoveryRequestRef,recoverPlayers:async input=>{window.__calls.push(input);await new Promise(r=>setTimeout(r,100));if(window.__calls.length===1)throw Error('Resposta perdida');return {cost:10,rows:[{playerId:'p',name:'Atleta',energyRecovered:10,xp:2}]};}},{});
+ const recoveryRequestRef=React.useRef(null),soloRequestRef=React.useRef(null);
+ const {handleAssistantRegen,handlePlayerSoloTrain}=createPlayersActions({soloRequestRef,trainSolo:async input=>{window.__solo=window.__solo||[];window.__solo.push(input);if(window.__solo.length===1)throw Error('Resposta do treino perdida');return {injured:false,xp:12,energyCost:35,equipmentBonus:4};},automaticMatches:true,user:{type:'ASSISTANT',data:assistant},players,teams:[team],setLoading:()=>{},recoveryRequestRef,recoverPlayers:async input=>{window.__calls.push(input);await new Promise(r=>setTimeout(r,100));if(window.__calls.length===1)throw Error('Resposta perdida');return {cost:10,rows:[{playerId:'p',name:'Atleta',energyRecovered:10,xp:2}]};}},{});
  window.__recover=handleAssistantRegen;
+ window.__soloTrain=()=>handlePlayerSoloTrain({id:'forged-client-player'},'CHUTE');
  return React.createElement(AssistantDashboard,{assistant,team,players,offers:[],sales:[],onTrainRegen:handleAssistantRegen});
 }`;
 let browser;
@@ -33,6 +34,8 @@ try{
  const page=await browser.newPage({viewport:{width:390,height:844}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/app.html`);
+ await page.evaluate(()=>window.__soloTrain());await page.evaluate(()=>window.__soloTrain());
+ const solo=await page.evaluate(()=>window.__solo);assert.equal(solo.length,2);assert.deepEqual(solo[0],solo[1]);assert.equal(solo[0].playerId,undefined);await page.evaluate(()=>{window.__alerts=[];});
  await page.getByText('Atleta',{exact:true}).click();
  const button=page.getByRole('button',{name:/INICIAR REGENERATIVO/});
  await button.click();await page.waitForFunction(()=>window.__alerts.length===1);

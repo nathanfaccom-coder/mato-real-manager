@@ -3,6 +3,20 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Medical evaluation (gated; not deployed)
+
+`POST .../medical-evaluate` accepts only `{requestId, playerId}`. It requires the
+verified active DOCTOR binding/ownership, active employment and club, same-club
+injured patient and no team/player match locks. The server derives 10 energy cost
+(or 5 with FAST_DIAGNOSIS), +5 staff XP and the existing level-based healing chance.
+Only injuries outside the moderate/severe/extreme catalogs can heal, matching the
+legacy category rule. Success removes injury and resets recoveryLeft while
+preserving other patient fields. Staff progression, healing and the private
+serverConfig/evaluation_{uid}/operations receipt commit together. Retries cannot
+reroll or charge twice; changing patient/club on the same receipt is rejected.
+The secure medical dashboard uses the API and retains uncertain request IDs.
+Surgery/supplies and source-field protection remain activation blockers.
+
 ## Medical research (gated; not deployed)
 
 `POST .../doctor-study` accepts only `{requestId}` and requires a current active

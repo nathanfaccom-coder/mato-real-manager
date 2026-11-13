@@ -73,6 +73,16 @@ export async function verifyStaffRecovery({db,auth,handle,ownerToken}) {
  const researched=(await db.doc('users/recovery-staff').get()).data();assert.equal(researched.energy,0);assert.equal(researched.xp,research[0].gain-10);assert.equal(researched.level,3);assert.equal(researched.pendingPerks,1);
  assert.equal((await perksRequest('doctor-study',{requestId:'forged',gain:900})).status,400);
  assert.equal((await perksRequest('staff-study',{requestId:'wrong-role'})).status,400);
+ await db.doc('users/recovery-staff').update({energy:10,xp:0,level:40,perks:[]});
+ await db.doc('players/recovery-player').update({injury:'Fadiga Muscular',recoveryLeft:1});
+ const evaluation={requestId:'evaluate-once',playerId:'recovery-player'};
+ const evaluations=await Promise.all([perksRequest('medical-evaluate',evaluation),perksRequest('medical-evaluate',evaluation)]);
+ for(const response of evaluations)assert.equal(response.status,200,await response.clone().text());
+ const evaluated=await Promise.all(evaluations.map(r=>r.json()));assert.deepEqual(evaluated.map(r=>r.duplicate).sort(),[false,true]);assert.ok(evaluated.every(r=>r.healed));
+ const healed=(await db.doc('players/recovery-player').get()).data();assert.equal(healed.recoveryLeft,0);assert.equal(healed.injury,undefined);assert.equal(healed.energy,100);
+ assert.equal((await db.doc('users/recovery-staff').get()).data().energy,0);assert.equal((await db.doc('users/recovery-staff').get()).data().xp,5);
+ assert.equal((await perksRequest('medical-evaluate',{...evaluation,requestId:'forged',healed:true})).status,400);
+ console.log('PASS: real-token medical evaluation heals and removes injury atomically, simultaneous retry charges once, forged result denied.');
  console.log('PASS: medical study real-token concurrent retry applies nutrition XP, energy, level and perk once.');
  console.log('PASS: coach/doctor verified-role catalogs, cross-role choice denied, concurrent choice consumes one point.');
  console.log('PASS: real-token persisted perk offer, concurrent choice consumes exactly one point, forged perk value denied.');

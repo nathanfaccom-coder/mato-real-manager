@@ -3,6 +3,32 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Transactional medical evaluation — 2026-11-12
+
+- Verified remote 1cdb839 and clean workspace before editing; main remains
+  c1bf386 / production 2.9.11. Prior full GitHub runs 43344557376 and
+  43344552090 succeeded. No concurrent branch change, activation or deployment.
+- Added medical-evaluate accepting only requestId/playerId. Verified active DOCTOR
+  binding/ownership, current employment, active club, same-club injured player,
+  team/player match locks and current staff progression are checked in one
+  transaction. Invalid or already recovered patients cannot generate staff XP.
+- Preserved cost 10 (FAST_DIAGNOSIS 5), +5 staff XP, level/perk progression and
+  light-injury success probability 0.2 + level*0.02. Moderate/severe/extreme
+  catalog injuries cannot heal through evaluation. Legacy noncatalog named
+  injuries retain the existing light-category fallback. A successful evaluation
+  removes only injury and resets recoveryLeft; other player fields are preserved.
+- Receipt under serverConfig/evaluation_{uid}/operations prevents repeat charge,
+  XP or reroll after lost response, and rejects reuse for another patient/club.
+  Secure DoctorDashboard sends only IDs and retains uncertain request for retry.
+  Default mode retains its prior flow. This does not protect public source fields.
+- 218 unit tests pass and mobile real-dashboard harness passes with zero direct
+  DB access and lost-response retry. Secure build passes. Full emulator integration
+  passed, including concurrent real-token healing, field removal and exact
+  one-time staff cost/XP. New GitHub CI must be checked after the push.
+- Estimate stays 73% / 27%, approximate. Surgery/supplies remain unported, along
+  with training/items/employment, weekly/season/national flows, identity/source
+  migration and production credentials/indexes/scheduler. No live data changed.
+
 ## Medical study migration — 2026-11-12
 
 - Confirmed clean workspace and remote cabb462, with no concurrent branch change.

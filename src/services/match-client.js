@@ -12,6 +12,7 @@ export function createMatchClient({auth,endpoint,fetchImpl=fetch}) {
   return result;
  }
  return {
+  evaluatePlayer:({requestId,playerId})=>request('medical-evaluate',{requestId,playerId}),
   doctorStudy:({requestId})=>request('doctor-study',{requestId}),
   staffPerks:()=>request('staff-perks',{}),
   chooseStaffPerk:({revision,perkId})=>request('staff-perk-choose',{revision,perkId}),

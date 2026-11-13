@@ -34,7 +34,8 @@ those candidates include reads and non-Firestore methods, not 1,452 vulnerabilit
   and choices now use persisted server options and atomic point consumption.
   Coach/doctor perk offers and choices also use role-verified server catalogs.
   Medical study now uses the same transactional service with verified DOCTOR role
-  and server-derived nutrition bonus. Inventory, evaluations/surgery and employment
-  still mutate source fields.
-- Next implementation priority: coach/solo training, medical evaluation/surgery and items,
+  and server-derived nutrition bonus. Medical evaluation now checks current club,
+  patient injury and match locks in a receipt-backed transaction. Inventory,
+  surgery and employment still mutate source fields.
+- Next implementation priority: coach/solo training, medical surgery/supplies and items,
   weekly/season jobs and national match integration.

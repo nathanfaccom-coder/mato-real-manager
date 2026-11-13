@@ -94,7 +94,24 @@ export const DoctorDashboard = ({
     alert(`📚 Você estudou novos tratamentos e ganhou ${xpGain} XP!`);
   };
 
+  const evaluationRequest = React.useRef(null);
   const handleEvaluate = async (p) => {
+    if (secureGameLogin) {
+      if (evaluationRequest.current?.busy) return;
+      const key = JSON.stringify([doctor.id, p.id]);
+      if (evaluationRequest.current?.key !== key)
+        evaluationRequest.current = {key, requestId: crypto.randomUUID()};
+      const pending = evaluationRequest.current;
+      pending.busy = true;
+      try {
+        const result = await matchApi().evaluatePlayer({requestId: pending.requestId, playerId: p.id});
+        evaluationRequest.current = null;
+        alert(`${result.healed ? "✨ DIAGNÓSTICO PRECISO! Jogador liberado." : "📋 Avaliação concluída. O atleta ainda precisa de tratamento."} Custo: ${result.cost}⚡. +${result.xp} XP. Nível ${result.level}.`);
+      } catch (error) {
+        alert(`${error.message} Tente novamente com o mesmo jogador para consultar o pedido sem duplicá-lo.`);
+      } finally { pending.busy = false; }
+      return;
+    }
     const cost = hasFastDiag ? 5 : 10;
     if (energy < cost) return alert(`Energia insuficiente. (Custo: ${cost}⚡)`);
 

@@ -68,3 +68,12 @@ server and enforce the existing 0–100 power range and price floor. Review chan
 to category/power on existing stock so paid production cannot be silently upgraded.
 Purchase bindings use TEAM (backend), not USER (UI alias from resolveGameAccount).
 The integration test must create a TEAM binding through account-bind before buying.
+
+## Manufacturing implementation
+
+Secure CompanyDashboard now sends quantity to a verified COMPANY endpoint instead
+of debiting first and saving absolute stock. Server-derived cost, balance, current
+stock increment, product and news commit with a retry receipt. Effect changes on
+existing stock are rejected until sold out; a separate product can be created.
+Default UI keeps legacy mechanics. Product deletion, legacy action entry points,
+profile/catalog source rules and account/inventory migration remain pending.

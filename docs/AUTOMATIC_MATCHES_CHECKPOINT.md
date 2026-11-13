@@ -3,6 +3,30 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Atomic COMPANY manufacturing — 2026-11-13
+
+- Verified remote fc2a1e3 and clean workspace; prior GitHub checks 43472379505 and
+  43472365871 passed. No competing local process detected.
+- Added manufacture with verified COMPANY binding/entity ownership and current
+  active company. Server derives getProdCost, enforces existing power 0–100,
+  quantity 1–200, price floor, exact-cent funds and product ownership. Current
+  stock increments atomically; browser cannot supply final stock, cost or company.
+- Debit, product, launch/promotion news and private replay receipt commit together.
+  Category/power cannot change while existing stock remains: sell it out or create
+  another product, preventing unpaid upgrades to cheaply manufactured units.
+- Secure CompanyDashboard sends quantity, waits for confirmed result and retains
+  identical requests/forms after network uncertainty; skips legacy separate debit
+  and save calls. Default behavior unchanged. Compressed photos supported with
+  bounded 600KB route body / 500K-character image; other routes retain 8KB limit.
+- 264 unit tests, real Auth/Firestore full integration, browser company-form retry
+  and secure build pass. After image-limit adjustment, HTTP unit checks and targeted
+  real emulator manufacturing with >8KB image and oversized-body rejection pass.
+- Estimate remains approximately 75% / 25%. Next: product deletion and remaining
+  legacy product actions/source rules, employment/economy, weekly/season/national
+  integration, account/inventory migration, credentials/indexes/scheduler/deployment.
+  No production gates/data/rules/deployments changed. Update NOT published; check
+  new GitHub CI after push.
+
 ## Purchase TEAM binding regression fixed — 2026-11-13
 
 - Resumed preserved uncommitted fix; remote 0c64fdd unchanged and no concurrent

@@ -3,6 +3,23 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Manufacturing (gated; not deployed)
+
+`POST .../manufacture` accepts requestId, nullable productId, name/desc/img,
+cat/power/price and quantity. Verified COMPANY binding/ownership and active company
+are required. Server getProdCost determines the debit; category, power 0–100,
+quantity 1–200, exact-cent price floor, current balance and product ownership are
+validated. Existing stock is incremented from current state, never browser totals.
+Changing category/power requires zero existing stock (or a separate new product),
+so cheap old units cannot be upgraded without manufacturing cost.
+
+Debit, product/stock, launch or promotion news and private receipt commit atomically.
+Identical retries return the same product and never charge again. Secure company
+form keeps its values/request after uncertain responses and closes on confirmation;
+it bypasses the old separate debit and onSaveProd writes. Images up to 500,000
+characters fit the bounded 600,000-byte manufacture request; other routes keep
+8,192-byte limits. Product deletion and source rules remain migration blockers.
+
 ## Purchases and gifts (gated; not deployed)
 
 `POST .../purchase` accepts `{requestId,productId,sellerId,giftPlayerId,expectedPrice}`

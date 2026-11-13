@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+export async function verifyManufacturing({db,auth,handle,ownerToken}){
+ await auth.createUser({uid:'manufacturer',email:'manufacturer@example.test',emailVerified:true});await db.doc('companies/manufacturer').set({status:'ACTIVE',balance:10000,name:'Fábrica'});
+ const bind=await handle(new Request('https://example.test/account-bind',{method:'POST',headers:{Authorization:`Bearer ${ownerToken}`,'Content-Type':'application/json'},body:JSON.stringify({uid:'manufacturer',type:'COMPANY',entityId:'manufacturer'})}));assert.equal(bind.status,200,await bind.clone().text());
+ const signed=await fetch('http://127.0.0.1:19099/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=fake',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:await auth.createCustomToken('manufacturer'),returnSecureToken:true})});const {idToken}=await signed.json();assert.ok(idToken);
+ const input={requestId:'once',productId:null,name:'Chuteira',desc:'',img:'data:image/webp;base64,'+'A'.repeat(10000),cat:'CHUTEIRA',power:10,price:1200,quantity:2};
+ const request=body=>handle(new Request('https://example.test/manufacture',{method:'POST',headers:{Authorization:`Bearer ${idToken}`,'Content-Type':'application/json'},body:JSON.stringify(body)}));assert.equal((await request({...input,img:'A'.repeat(600001)})).status,413);assert.equal((await request({...input,cost:0})).status,400);assert.equal((await request({...input,price:1})).status,400);
+ const responses=await Promise.all([request(input),request(input)]);for(const r of responses)assert.equal(r.status,200,await r.clone().text());const results=await Promise.all(responses.map(r=>r.json()));assert.deepEqual(results.map(r=>r.duplicate).sort(),[false,true]);assert.equal(results[0].productId,results[1].productId);assert.equal((await db.doc('companies/manufacturer').get()).data().balance,8000);assert.equal((await db.doc('products/'+results[0].productId).get()).data().stock,2);
+ assert.equal((await request({...input,requestId:'upgrade',productId:results[0].productId,power:11})).status,400);assert.equal((await db.doc('companies/manufacturer').get()).data().balance,8000);
+ console.log('PASS: migrated COMPANY manufactures once with atomic debit/stock, rejects forged costs and unpaid stock upgrades.');
+}

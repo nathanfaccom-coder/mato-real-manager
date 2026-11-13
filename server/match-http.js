@@ -1,3 +1,4 @@
+import {manufacture} from './manufacturing.js';
 import {purchase} from './purchases.js';
 import {trainCoach} from './coach-training.js';
 import {consumeItem} from './consumables.js';
@@ -30,7 +31,7 @@ export function createMatchHandler({db,auth,enabled=false,origin='https://nathan
   if(request.method!=='POST')return respond(405,{error:'Método não permitido.'});
   if(!enabled)return respond(503,{error:'Integração automática ainda não liberada.'});
   const route=new URL(request.url).pathname.split('/').filter(Boolean).at(-1);
-  if(!['purchase','coach-training','staff-consume','consume-item','equip-item','solo-training','surgery-review','surgery-execute','medical-evaluate','doctor-study','staff-perks','staff-perk-choose','assistant-perks','assistant-perk-choose','staff-study','staff-recovery','competition-standings','match-correction-review','match-correct','match-view','match-list','fixture-review','fixture-approve','start','command','account-bind','account-state','account-review','player-apply','player-application','player-application-review','player-application-decide','session'].includes(route))return respond(404,{error:'Operação não encontrada.'});
+  if(!['manufacture','purchase','coach-training','staff-consume','consume-item','equip-item','solo-training','surgery-review','surgery-execute','medical-evaluate','doctor-study','staff-perks','staff-perk-choose','assistant-perks','assistant-perk-choose','staff-study','staff-recovery','competition-standings','match-correction-review','match-correct','match-view','match-list','fixture-review','fixture-approve','start','command','account-bind','account-state','account-review','player-apply','player-application','player-application-review','player-application-decide','session'].includes(route))return respond(404,{error:'Operação não encontrada.'});
   const bearer=request.headers.get('authorization')||'';
   if(!/^Bearer [^\s]{1,8192}$/.test(bearer))return respond(401,{error:'Entre na sua conta.'});
   let identity;
@@ -46,14 +47,15 @@ export function createMatchHandler({db,auth,enabled=false,origin='https://nathan
   try {
    const reader=request.body?.getReader();if(!reader)throw Error();
    const chunks=[];let size=0;
-   while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>8192){await reader.cancel();return respond(413,{error:'Pedido muito grande.'});}chunks.push(value);}
+   while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>(route==='manufacture'?600000:8192)){await reader.cancel();return respond(413,{error:'Pedido muito grande.'});}chunks.push(value);}
    const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
    input=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
    if(!input||typeof input!=='object'||Array.isArray(input))throw Error();
   } catch {return respond(400,{error:'Pedido inválido.'});}
   try {
    let result;
-   if(route==='purchase')result=await purchase(db,identity.uid,input);
+   if(route==='manufacture')result=await manufacture(db,identity.uid,input);
+   else if(route==='purchase')result=await purchase(db,identity.uid,input);
    else if(route==='coach-training')result=await trainCoach(db,identity.uid,input);
    else if(route==='staff-consume')result=await consumeItem(db,identity.uid,input,{staff:true});
    else if(route==='consume-item')result=await consumeItem(db,identity.uid,input);

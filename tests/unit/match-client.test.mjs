@@ -53,3 +53,9 @@ test('perk adapter sends only offered revision and perk ID, not client effect va
  await client.assistantPerks();await client.chooseAssistantPerk({revision:3,perkId:'ICE_BATH',value:999,uid:'other'});
  assert.deepEqual(calls,[{url:'https://example.test/assistant-perks',payload:{}},{url:'https://example.test/assistant-perk-choose',payload:{revision:3,perkId:'ICE_BATH'}}]);
 });
+
+test('staff skill adapter omits role and arbitrary effect multipliers',async()=>{
+ const calls=[];const client=createMatchClient({auth:{currentUser:{getIdToken:async()=> 'token'}},endpoint:'https://example.test',fetchImpl:async(url,opts)=>{calls.push({url,payload:JSON.parse(opts.body)});return Response.json({});}});
+ await client.staffPerks();await client.chooseStaffPerk({revision:2,perkId:'GOLDEN_HANDS',role:'DOCTOR',value:100,multiplier:999});
+ assert.deepEqual(calls,[{url:'https://example.test/staff-perks',payload:{}},{url:'https://example.test/staff-perk-choose',payload:{revision:2,perkId:'GOLDEN_HANDS'}}]);
+});

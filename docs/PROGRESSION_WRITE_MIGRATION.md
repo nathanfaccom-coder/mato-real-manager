@@ -32,6 +32,7 @@ those candidates include reads and non-Firestore methods, not 1,452 vulnerabilit
 - AssistantDashboard.handleStudy now uses an authenticated receipt-backed study
   transaction in secure mode (unit/emulator/mobile tested). Assistant perk offers
   and choices now use persisted server options and atomic point consumption.
-  Other staff roles, inventory and employment still mutate source fields.
-- Next implementation priority: other staff perk flows, coach/solo training and items,
+  Coach/doctor perk offers and choices also use role-verified server catalogs.
+  Inventory, medical/study actions and employment still mutate source fields.
+- Next implementation priority: coach/solo training, medical actions/studies and items,
   weekly/season jobs and national match integration.

@@ -52,6 +52,20 @@ export async function verifyStaffRecovery({db,auth,handle,ownerToken}) {
  const choices=await Promise.all(chosen.map(r=>r.json()));assert.deepEqual(choices.map(r=>r.duplicate).sort(),[false,true]);
  const skilled=(await db.doc('users/recovery-staff').get()).data();assert.equal(skilled.pendingPerks,0);assert.equal(skilled.perks.length,1);assert.equal(skilled.perks[0].id,choice.perkId);
  assert.equal((await perksRequest('assistant-perk-choose',{...choice,value:999})).status,400);
+ for(const role of ['COACH','DOCTOR']){
+  await db.doc('authAccounts/recovery-user').update({type:role});
+  await db.doc('accountEntityOwners/users_recovery-staff').update({type:role});
+  await db.doc('users/recovery-staff').update({type:role,perks:[],pendingPerks:1});
+  assert.equal((await perksRequest('assistant-perks',{})).status,400);
+  const response=await perksRequest('staff-perks',{});assert.equal(response.status,200);const offered=await response.json();assert.equal(offered.options.length,3);
+  assert.equal((await perksRequest('staff-perk-choose',{revision:offered.revision,perkId:'ICE_BATH'})).status,400);
+  const input={revision:offered.revision,perkId:offered.options[0].id};
+  const responses=await Promise.all([perksRequest('staff-perk-choose',input),perksRequest('staff-perk-choose',input)]);
+  for(const response of responses)assert.equal(response.status,200,await response.clone().text());
+  assert.deepEqual((await Promise.all(responses.map(r=>r.json()))).map(r=>r.duplicate).sort(),[false,true]);
+  const profile=(await db.doc('users/recovery-staff').get()).data();assert.equal(profile.pendingPerks,0);assert.deepEqual(profile.perks,[offered.options[0]]);
+ }
+ console.log('PASS: coach/doctor verified-role catalogs, cross-role choice denied, concurrent choice consumes one point.');
  console.log('PASS: real-token persisted perk offer, concurrent choice consumes exactly one point, forged perk value denied.');
  console.log('PASS: real-token study concurrent retry charges once, stable XP, level and perk committed together.');
  console.log('PASS: authenticated recovery, role/forged reward/participant lock denial, concurrent retry receipt, atomic cost and XP, no overspend, revoked binding denial.');

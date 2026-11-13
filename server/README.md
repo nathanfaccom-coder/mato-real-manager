@@ -3,6 +3,18 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Coach and doctor skill selection (gated; not deployed)
+
+`POST .../staff-perks` accepts `{}`; `POST .../staff-perk-choose` accepts only
+`{revision, perkId}`. They use the same transactional offer/receipt implementation
+as assistant skills, but require verified COACH or DOCTOR bindings and matching
+ownership/profile roles. The server selects the canonical role catalog and denies
+cross-role skills or client-provided effect multipliers. Offers and receipts live
+under serverConfig/staffPerks_{role}_{uid}, separate from assistant history.
+The secure coach and doctor dashboards render persisted options and safely retry
+choices. Default mode remains unchanged; legacy database rules and other medical,
+training, inventory and employment mutations still block production activation.
+
 ## Assistant perk offers and selection (gated; not deployed)
 
 `POST .../assistant-perks` accepts an empty object and returns a persisted random
@@ -16,7 +28,7 @@ same-choice retries return the receipt, including after the next offer is create
 Client-provided effects, stale/unoffered choices and invalid profiles are denied.
 
 The secure assistant dashboard renders these offers and can retry a lost response.
-Other staff roles and public source-field protection still need migration. The
+Other staff operations and public source-field protection still need migration. The
 new serverConfig documents use the existing recursive server-only candidate
 boundary; production rules have not been changed or claimed secure.
 

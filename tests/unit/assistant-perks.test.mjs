@@ -24,3 +24,18 @@ test('requires verified binding/ownership/active assistant and valid pending poi
 test('all learned or zero pending returns no options without consuming points',async()=>{
  for(const patch of [{perks:ASSISTANT_PERKS},{pendingPerks:0}]){const s=seed();s['users/s']={...s['users/s'],...patch};const db=memoryDB(s);assert.deepEqual(await assistantPerks(db,'u',{}),{revision:null,options:[]});assert.deepEqual(db.values.get('users/s'),s['users/s']);}
 });
+
+test('coach and doctor offers use own catalog and reject role injection or cross-role skills',async()=>{
+ for(const role of ['COACH','DOCTOR']){
+  const s=seed();s['authAccounts/u'].type=role;s['accountEntityOwners/users_s'].type=role;s['users/s'].type=role;
+  const db=memoryDB(s),offer=await assistantPerks(db,'u',{}, {staffRoles:true});
+  assert.equal(offer.options.length,3);assert.ok(offer.options.every(p=>!ASSISTANT_PERKS.some(a=>a.id===p.id)));
+  await assert.rejects(assistantPerks(db,'u',{}));
+  await assert.rejects(assistantPerks(db,'u',{role:'ASSISTANT'},{staffRoles:true}));
+  await assert.rejects(assistantPerks(db,'u',{revision:offer.revision,perkId:'ICE_BATH'},{staffRoles:true,choose:true}));
+  const input={revision:offer.revision,perkId:offer.options[0].id};
+  const results=await Promise.all([assistantPerks(db,'u',input,{staffRoles:true,choose:true}),assistantPerks(db,'u',input,{staffRoles:true,choose:true})]);
+  assert.deepEqual(results.map(r=>r.duplicate),[false,true]);assert.equal(db.values.get('users/s').pendingPerks,1);assert.deepEqual(db.values.get('users/s').perks,[offer.options[0]]);
+ }
+ await assert.rejects(assistantPerks(memoryDB(seed()),'u',{}, {staffRoles:true}));
+});

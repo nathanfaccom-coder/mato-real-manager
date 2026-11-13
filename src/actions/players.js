@@ -872,7 +872,7 @@ export function createPlayersActions(context, actions) {
   };
 
   const handleEvolveCoachPerk = async (perk) => {
-    if (context.automaticMatches && user.type === "ASSISTANT")
+    if (context.automaticMatches && ["ASSISTANT", "COACH", "DOCTOR"].includes(user.type))
       return alert("Escolha uma habilidade nas opções confirmadas pelo servidor.");
     // Atualiza no Banco de Dados
     await db

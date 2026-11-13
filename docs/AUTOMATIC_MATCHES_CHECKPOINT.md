@@ -3,6 +3,29 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Coach and doctor skill selection migration — 2026-11-12
+
+- Verified remote 25f7948 and clean workspace before editing, no concurrent
+  branch change. Full GitHub runs 43319632027 and 43319621499 succeeded for that
+  commit. Main remains c1bf386 / production 2.9.11.
+- Shared persisted-offer transaction now supports COACH and DOCTOR through
+  staff-perks/staff-perk-choose. The current verified binding selects the catalog;
+  no client role or effect values are accepted. Ownership and profile role must
+  match. Offers/receipts are isolated by role and UID; existing assistant receipt
+  paths and endpoints are preserved. Cross-profession skills are rejected.
+- Secure coach/doctor dashboards now use the server offer component; the legacy
+  generic perk writer is blocked for all three migrated roles in secure mode.
+  Default mode retains its prior UI/behavior. This guard is not database security.
+- 212 unit tests pass; full Auth/Firestore emulator suite passes, including real
+  coach/doctor identity bindings, cross-role rejection, simultaneous choices and
+  one-time point consumption. Mobile harness exercises both role API paths with
+  zero database access; secure build passes. New GitHub CI awaits the pushed SHA.
+- Estimate stays 73% complete / 27% remaining. Still not published/activated.
+  Next: coach/solo training, item consumption, medical actions/studies and staff
+  employment; weekly/season/national flows and public source-data/account migration
+  remain blockers, as do server credentials, indexes and scheduler/deployment.
+  No live rules, credentials, database data or activation gates changed.
+
 ## Authoritative assistant perk offers and choice — 2026-11-12
 
 - Confirmed remote 5995310 and clean workspace, no concurrent branch change.

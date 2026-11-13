@@ -1,3 +1,5 @@
+import {AssistantPerks} from './AssistantPerks.jsx';
+import {secureGameLogin} from '../services/game-auth.js';
 import React, { useState, useEffect } from "react";
 import { firebase } from "../services/firebase.js";
 import { DOCTOR_PERKS } from "../game/DOCTOR_PERKS.js";
@@ -533,7 +535,8 @@ export const DoctorDashboard = ({
         </button>
       </div>
 
-      {showPerkSelection && (
+      {showPerkSelection && secureGameLogin && <AssistantPerks staffId={doctor.id} pendingPerks={doctor.pendingPerks} staffRole="DOCTOR" />}
+          {showPerkSelection && !secureGameLogin && (
         <div
           className="card pulse-border"
           style={{ background: "rgba(0, 230, 118, 0.1)", marginBottom: 15 }}

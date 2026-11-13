@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createServer} from 'vite';
 import {chromium} from '@playwright/test';
 const harness=`import React from 'react';
+import {DoctorDashboard} from './components/DoctorDashboard.jsx';
 import {AssistantDashboard} from './components/AssistantDashboard.jsx';
 import {AssistantPerks} from './components/AssistantPerks.jsx';
 import {createPlayersActions} from './actions/players.js';
@@ -10,6 +11,7 @@ const assistant={id:'s',type:'ASSISTANT',name:'Auxiliar',teamId:'t',energy:10,xp
 const team={id:'t',name:'Clube'},players=[{id:'p',name:'Atleta',teamId:'t',energy:90}];
 window.__calls=[];window.__alerts=[];window.alert=text=>window.__alerts.push(text);
 export function App(){
+ if(location.search==='?doctorStudy')return React.createElement(DoctorDashboard,{doctor:{...assistant,type:'DOCTOR',energy:20},team,players:[],offers:[],sales:[]});
  if(location.search==='?coachPerks'||location.search==='?doctorPerks')return React.createElement(AssistantPerks,{staffId:'s',pendingPerks:1,staffRole:location.search==='?coachPerks'?'COACH':'DOCTOR'});
  if(location.search==='?perks')return React.createElement(AssistantPerks,{staffId:'s',pendingPerks:1});
  const recoveryRequestRef=React.useRef(null);
@@ -20,7 +22,7 @@ export function App(){
 let browser;
 const server=await createServer({server:{host:'127.0.0.1',port:0,open:false},plugins:[{name:'isolated-recovery',enforce:'pre',transform(code,id){
  if(id.endsWith('/src/App.jsx'))return harness;
- if(id.endsWith('/src/services/game-auth.js'))return `export const secureGameLogin=true;export const matchApi=()=>({staffPerks:async()=>window.__chosen?{revision:null,options:[]}:{revision:4,options:[{id:'ROLE_SKILL',name:'Especialidade',desc:'Bônus da profissão.'}]},chooseStaffPerk:async input=>{window.__staffChoice=input;window.__chosen=true;return {pendingPerks:0};},assistantPerks:async()=>window.__chosen?{revision:null,options:[]}:{revision:7,options:[{id:'ICE_BATH',name:'Crioterapia',desc:'Recupera energia.'},{id:'GOOD_VIBES',name:'Resenha',desc:'Melhora humor.'}]},chooseAssistantPerk:async input=>{window.__choices=window.__choices||[];window.__choices.push(input);if(window.__choices.length===1)throw Error('Resposta de escolha perdida');window.__chosen=true;return {pendingPerks:0};},study:async input=>{window.__studies=window.__studies||[];window.__studies.push(input);await new Promise(r=>setTimeout(r,100));if(window.__studies.length===1)throw Error('Resposta de estudo perdida');return {gain:12,cost:20,level:3,leveledUp:true};}});`;
+ if(id.endsWith('/src/services/game-auth.js'))return `export const secureGameLogin=true;export const matchApi=()=>({doctorStudy:async input=>{window.__medical=window.__medical||[];window.__medical.push(input);if(window.__medical.length===1)throw Error('Resposta médica perdida');return {gain:29,cost:20,level:3,leveledUp:true};},staffPerks:async()=>window.__chosen?{revision:null,options:[]}:{revision:4,options:[{id:'ROLE_SKILL',name:'Especialidade',desc:'Bônus da profissão.'}]},chooseStaffPerk:async input=>{window.__staffChoice=input;window.__chosen=true;return {pendingPerks:0};},assistantPerks:async()=>window.__chosen?{revision:null,options:[]}:{revision:7,options:[{id:'ICE_BATH',name:'Crioterapia',desc:'Recupera energia.'},{id:'GOOD_VIBES',name:'Resenha',desc:'Melhora humor.'}]},chooseAssistantPerk:async input=>{window.__choices=window.__choices||[];window.__choices.push(input);if(window.__choices.length===1)throw Error('Resposta de escolha perdida');window.__chosen=true;return {pendingPerks:0};},study:async input=>{window.__studies=window.__studies||[];window.__studies.push(input);await new Promise(r=>setTimeout(r,100));if(window.__studies.length===1)throw Error('Resposta de estudo perdida');return {gain:12,cost:20,level:3,leveledUp:true};}});`;
  if(id.endsWith('/src/services/firebase.js'))return `const deny=()=>{window.__writes=(window.__writes||0)+1;throw Error('Unexpected database access');};export const db=new Proxy({},{get:()=>deny});export const firebase={firestore:deny};`;
 }}]});
 try{
@@ -62,5 +64,13 @@ try{
   assert.equal(await page.evaluate(()=>window.__writes||0),0);
  }
  assert.deepEqual(errors,[]);
+ await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/app.html?doctorStudy`);
+ await page.getByRole('button',{name:'ESTUDAR',exact:true}).click();
+ await page.getByRole('button',{name:/LER ARTIGOS/}).click();
+ await page.waitForFunction(()=>window.__alerts.some(a=>a.includes('Resposta médica perdida')));
+ await page.getByRole('button',{name:/LER ARTIGOS/}).click();
+ await page.waitForFunction(()=>window.__alerts.some(a=>a.includes('Pesquisa confirmada: +29 XP')));
+ const medical=await page.evaluate(()=>window.__medical);assert.equal(medical.length,2);assert.deepEqual(medical[0],medical[1]);
+ assert.equal(await page.evaluate(()=>window.__writes||0),0);assert.deepEqual(errors,[]);
  console.log('PASS: mobile recovery and study use API only, preserve request IDs after lost responses, recovery selection clears only on confirmation, duplicate clicks prevented.');
 }finally{await browser?.close();await server.close();}

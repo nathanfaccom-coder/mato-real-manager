@@ -3,6 +3,18 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Medical research (gated; not deployed)
+
+`POST .../doctor-study` accepts only `{requestId}` and requires a current active
+DOCTOR binding, matching ownership and profile. It reuses study's transaction,
+club-lock check and input validation with a separate doctorStudy_{uid} receipt
+namespace. It derives 10–24 base XP, rounds the 20% SPORTS_NUTRITION bonus and
+charges 20 energy once. Level/perk rules remain unchanged. Neither role nor bonus
+amount may come from the client. Secure DoctorDashboard retries the same request
+on uncertain failure and displays confirmed XP. Default mode is unchanged.
+Medical evaluation, surgery, supplies and public source-field rules still require
+migration before this or other progression endpoints may be activated.
+
 ## Coach and doctor skill selection (gated; not deployed)
 
 `POST .../staff-perks` accepts `{}`; `POST .../staff-perk-choose` accepts only

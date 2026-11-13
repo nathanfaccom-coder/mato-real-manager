@@ -3,6 +3,33 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Medical study migration — 2026-11-12
+
+- Confirmed clean workspace and remote cabb462, with no concurrent branch change.
+  Full GitHub runs 43336953263 and 43336946380 succeeded for that commit.
+  Main remains c1bf386 / production 2.9.11; no activation or deployment.
+- Added doctor-study to the existing transactional study service. Only requestId
+  is accepted; verified DOCTOR binding, ownership/profile, current energy and club
+  lock are checked. Medical receipts have a separate namespace from assistant
+  study. Role cannot be supplied or changed by a request.
+- Preserved 20-energy cost, random 10–24 base XP, rounded 20% SPORTS_NUTRITION
+  bonus, single level-up and one perk every third level. Bonus is derived from
+  the current stored skill ID and fixed game rule, never client effect values.
+- Secure DoctorDashboard uses confirmed server results and retains uncertain
+  request IDs; default mode retains the legacy study flow. Evaluations, surgeries,
+  supplies and employment remain direct paths and are not claimed migrated.
+- 214 unit tests pass, including nutrition rounding, role separation and concurrent
+  overspend prevention. Full Auth/Firestore emulator passes with concurrent
+  medical research, one cost/reward/level/perk and forged-field rejection.
+  Mobile real-dashboard harness verifies lost-response retry and no direct DB
+  write; secure build passes. New remote CI remains to be checked after push.
+- Estimate remains 73% / 27% (approximate). Next medical evaluation rule to port:
+  cost 10 or FAST_DIAGNOSIS 5, staff +5 XP, light-injury healing probability
+  0.2 + level*0.02, player injury removal; validate current club/ownership/injury,
+  match locks and use an atomic receipt. Surgery has separate supplies/cost rules.
+  Coach/solo training, inventory, weekly/season/national integration, source-data
+  and identity migration, server credentials/indexes/scheduler remain blockers.
+
 ## Coach and doctor skill selection migration — 2026-11-12
 
 - Verified remote 25f7948 and clean workspace before editing, no concurrent

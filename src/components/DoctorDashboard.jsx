@@ -1,5 +1,5 @@
 import {AssistantPerks} from './AssistantPerks.jsx';
-import {secureGameLogin} from '../services/game-auth.js';
+import {secureGameLogin,matchApi} from '../services/game-auth.js';
 import React, { useState, useEffect } from "react";
 import { firebase } from "../services/firebase.js";
 import { DOCTOR_PERKS } from "../game/DOCTOR_PERKS.js";
@@ -47,7 +47,23 @@ export const DoctorDashboard = ({
   const hasColdBlood = activePerks.some((p) => p.id === "COLD_BLOOD");
   const hasDiscount = activePerks.some((p) => p.id === "VIP_DISCOUNT");
 
+  const studyRequest = React.useRef(null);
   const handleStudy = async () => {
+    if (secureGameLogin) {
+      if (studyRequest.current?.busy) return;
+      if (studyRequest.current?.staffId !== doctor.id)
+        studyRequest.current = {staffId: doctor.id, requestId: crypto.randomUUID()};
+      const pending = studyRequest.current;
+      pending.busy = true;
+      try {
+        const result = await matchApi().doctorStudy({requestId: pending.requestId});
+        studyRequest.current = null;
+        alert(`📚 Pesquisa confirmada: +${result.gain} XP, -${result.cost}⚡.${result.leveledUp ? ` Nível ${result.level} alcançado!` : ""}`);
+      } catch (error) {
+        alert(`${error.message} Tente novamente para consultar a mesma pesquisa sem duplicar o custo.`);
+      } finally { pending.busy = false; }
+      return;
+    }
     if (energy < 20)
       return alert("Você está exausto! Tome um energético antes de estudar.");
     let xpGain = Math.floor(Math.random() * 15) + 10;

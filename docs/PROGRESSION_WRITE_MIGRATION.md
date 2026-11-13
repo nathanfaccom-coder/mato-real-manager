@@ -33,6 +33,8 @@ those candidates include reads and non-Firestore methods, not 1,452 vulnerabilit
   transaction in secure mode (unit/emulator/mobile tested). Assistant perk offers
   and choices now use persisted server options and atomic point consumption.
   Coach/doctor perk offers and choices also use role-verified server catalogs.
-  Inventory, medical/study actions and employment still mutate source fields.
-- Next implementation priority: coach/solo training, medical actions/studies and items,
+  Medical study now uses the same transactional service with verified DOCTOR role
+  and server-derived nutrition bonus. Inventory, evaluations/surgery and employment
+  still mutate source fields.
+- Next implementation priority: coach/solo training, medical evaluation/surgery and items,
   weekly/season jobs and national match integration.

@@ -65,6 +65,15 @@ export async function verifyStaffRecovery({db,auth,handle,ownerToken}) {
   assert.deepEqual((await Promise.all(responses.map(r=>r.json()))).map(r=>r.duplicate).sort(),[false,true]);
   const profile=(await db.doc('users/recovery-staff').get()).data();assert.equal(profile.pendingPerks,0);assert.deepEqual(profile.perks,[offered.options[0]]);
  }
+ await db.doc('users/recovery-staff').update({energy:20,xp:190,level:2,pendingPerks:0,perks:[{id:'SPORTS_NUTRITION'}]});
+ const doctorStudy=()=>perksRequest('doctor-study',{requestId:'medical-study'});
+ const researches=await Promise.all([doctorStudy(),doctorStudy()]);
+ for(const response of researches)assert.equal(response.status,200,await response.clone().text());
+ const research=await Promise.all(researches.map(r=>r.json()));assert.deepEqual(research.map(r=>r.duplicate).sort(),[false,true]);assert.equal(research[0].gain,research[1].gain);assert.ok(research[0].gain>=12&&research[0].gain<=29);
+ const researched=(await db.doc('users/recovery-staff').get()).data();assert.equal(researched.energy,0);assert.equal(researched.xp,research[0].gain-10);assert.equal(researched.level,3);assert.equal(researched.pendingPerks,1);
+ assert.equal((await perksRequest('doctor-study',{requestId:'forged',gain:900})).status,400);
+ assert.equal((await perksRequest('staff-study',{requestId:'wrong-role'})).status,400);
+ console.log('PASS: medical study real-token concurrent retry applies nutrition XP, energy, level and perk once.');
  console.log('PASS: coach/doctor verified-role catalogs, cross-role choice denied, concurrent choice consumes one point.');
  console.log('PASS: real-token persisted perk offer, concurrent choice consumes exactly one point, forged perk value denied.');
  console.log('PASS: real-token study concurrent retry charges once, stable XP, level and perk committed together.');

@@ -25,3 +25,17 @@ test('unemployed assistant can study; existing above-30 study progression is pre
  db.values.set('users/s',{...db.values.get('users/s'),teamId:'t',energy:20});
  await recoverPlayers(db,'u',{requestId:'after-study',playerIds:['p']});assert.equal(db.values.get('users/s').level,31);assert.equal(db.values.get('users/s').xp,25);
 });
+
+test('doctor study preserves nutrition rounding and uses separate verified-role receipt',async()=>{
+ const s=seed();for(const key of ['authAccounts/u','accountEntityOwners/users_s','users/s'])s[key].type='DOCTOR';s['users/s'].perks=[{id:'SPORTS_NUTRITION',value:999}];
+ const db=memoryDB(s);await assert.rejects(studyStaff(db,'u',input,options));
+ const results=await Promise.all([studyStaff(db,'u',input,{...options,doctor:true}),studyStaff(db,'u',input,{doctor:true,draw:()=>10})]);
+ assert.deepEqual(results.map(r=>r.duplicate),[false,true]);assert.equal(results[0].gain,29);assert.equal(results[1].gain,29);assert.equal(db.values.get('users/s').xp,19);assert.equal(db.values.get('users/s').energy,0);assert.equal(db.values.get('users/s').pendingPerks,1);
+ assert.ok(db.values.has('serverConfig/doctorStudy_u/operations/r'));assert.equal(db.values.has('serverConfig/study_u/operations/r'),false);
+ await assert.rejects(studyStaff(memoryDB(seed()),'u',input,{doctor:true}));
+});
+test('doctor study without nutrition uses base XP and distinct requests cannot overspend',async()=>{
+ const s=seed();for(const key of ['authAccounts/u','accountEntityOwners/users_s','users/s'])s[key].type='DOCTOR';
+ const db=memoryDB(s);const results=await Promise.allSettled(['one','two'].map(requestId=>studyStaff(db,'u',{requestId},{doctor:true,draw:()=>10})));
+ assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(db.values.get('users/s').xp,0);assert.equal(db.values.get('users/s').energy,0);
+});

@@ -2,7 +2,7 @@ export function createMatchClient({auth,endpoint,fetchImpl=fetch}) {
  async function request(route,payload) {
   const identity=auth.currentUser;
   if(!identity)throw Error('Entre na sua conta para acompanhar partidas.');
-  const token=await identity.getIdToken(route==='fixture-review'||route==='fixture-approve'||route==='match-correction-review'||route==='match-correct');
+  const token=await identity.getIdToken(route==='admin-product-delete'||route==='fixture-review'||route==='fixture-approve'||route==='match-correction-review'||route==='match-correct');
   if(auth.currentUser!==identity)throw Error('A sessão mudou. Entre novamente.');
   const response=await fetchImpl(`${endpoint}/${route}`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(payload),credentials:'omit',redirect:'error',cache:'no-store',signal:AbortSignal.timeout(20000)});
   if(response.status===401)throw Error((route.startsWith('fixture-')||route==='match-correction-review'||route==='match-correct')?'Confirme novamente sua senha de ADM para continuar.':'Sessão expirada. Entre novamente.');
@@ -13,6 +13,7 @@ export function createMatchClient({auth,endpoint,fetchImpl=fetch}) {
   return result;
  }
  return {
+  deleteProduct:({requestId,productId,admin=false})=>request(admin?'admin-product-delete':'product-delete',{requestId,productId}),
   manufacture:({requestId,productId,name,desc,img,cat,power,price,quantity})=>request('manufacture',{requestId,productId,name,desc,img,cat,power,price,quantity}),
   purchase:({requestId,productId,sellerId,giftPlayerId,expectedPrice})=>request('purchase',{requestId,productId,sellerId,giftPlayerId,expectedPrice}),
   trainCoach:({requestId,type,playerIds})=>request('coach-training',{requestId,type,playerIds}),

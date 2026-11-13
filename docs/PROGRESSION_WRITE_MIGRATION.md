@@ -77,3 +77,12 @@ stock increment, product and news commit with a retry receipt. Effect changes on
 existing stock are rejected until sold out; a separate product can be created.
 Default UI keeps legacy mechanics. Product deletion, legacy action entry points,
 profile/catalog source rules and account/inventory migration remain pending.
+
+## Product deletion implementation
+
+Company and shopping ADM delete handlers now use separate authenticated routes,
+with ownership or companies permission checked server-side. ADM requires recent
+authentication. Deletion and audit receipt are atomic; purchased inventory and
+balances remain intact. Replays are safe and stale purchase/restock cannot recreate
+the product. Remaining catalog protection requires restricting legacy direct writes
+and completing source/account migration; client routing alone is not DB protection.

@@ -3,6 +3,21 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Product deletion (gated; not deployed)
+
+`POST .../product-delete` accepts `{requestId,productId}` and requires the verified
+active COMPANY owner of the product. `POST .../admin-product-delete` accepts the
+same shape but requires recent authentication and the owner ADM or an active ADM
+with companies permission. Client-supplied role/company fields are rejected.
+
+Deletion and private audit receipt commit atomically. The receipt retains actor,
+product company/name/stock, timestamp and result. Repeats return the same outcome;
+a different product cannot reuse the request. Revocation is checked on replay.
+Inventory already purchased and company balance remain unchanged; no production
+refund is created. Transactions conflict with purchase/restock of the same product,
+preventing stale writes from resurrecting it. Both client deletion entry points
+use the server in secure mode and retain uncertain requests. Legacy mode unchanged.
+
 ## Manufacturing (gated; not deployed)
 
 `POST .../manufacture` accepts requestId, nullable productId, name/desc/img,
@@ -18,7 +33,7 @@ Identical retries return the same product and never charge again. Secure company
 form keeps its values/request after uncertain responses and closes on confirmation;
 it bypasses the old separate debit and onSaveProd writes. Images up to 500,000
 characters fit the bounded 600,000-byte manufacture request; other routes keep
-8,192-byte limits. Product deletion and source rules remain migration blockers.
+8,192-byte limits. Source rules remain migration blockers.
 
 ## Purchases and gifts (gated; not deployed)
 

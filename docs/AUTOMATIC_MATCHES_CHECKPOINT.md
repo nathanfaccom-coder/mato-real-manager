@@ -3,6 +3,30 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Authenticated product deletion — 2026-11-13
+
+- Resumed preserved uncommitted deletion work and confirmed completed logs. Remote
+  5655552 unchanged; no competing process. Prior GitHub checks 43482539864 and
+  43482527778 succeeded.
+- Added product-delete for verified active COMPANY owner and admin-product-delete
+  for owner ADM or active companies-permission ADM. Administrative route requires
+  recent authentication. Request accepts only requestId/productId; company/role
+  payload injection is rejected and authorization is checked even on replay.
+- Product deletion and private audit receipt commit atomically, retaining actor,
+  timestamp and removed product company/name/stock. No refund or purchased inventory
+  removal. Replays are safe; another product cannot reuse the request. Deleted
+  catalog cannot be restored by a stale restock or bought by stale checkout.
+- Both company and shopping deletion entry points use the authenticated action in
+  secure mode, preserving uncertain request IDs. Legacy behavior remains available
+  only in default mode; this routing does not protect publicly writable source data.
+- 270 unit tests, full real Auth/Firestore integration, browser lost-response retry
+  and secure build pass. Covers ownership, ADM permission/revocation/recent login,
+  repeated deletion, existing inventory, no refunds and rejected stale operations.
+- Estimate remains approximately 75% / 25%. Next: remaining legacy catalog/profile
+  writes and source rules, employment/contracts and economy, weekly/season/national
+  integration, account/inventory migration and secure backend/frontend deployment.
+  No live data/rules/gates changed. Update NOT published; check new CI after push.
+
 ## Atomic COMPANY manufacturing — 2026-11-13
 
 - Verified remote fc2a1e3 and clean workspace; prior GitHub checks 43472379505 and

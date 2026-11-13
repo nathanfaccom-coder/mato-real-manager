@@ -601,6 +601,7 @@ export function App() {
   }, [teams, players, companies, coaches, user?.data?.id, user?.type]);
 
   const purchaseRequestRef = React.useRef(null);
+  const productDeleteRequestRef = React.useRef(null);
   const buyingRef = React.useRef(false);
   const recoveryRequestRef = React.useRef(null);
   const staffConsumeRequestRef = React.useRef(null);
@@ -636,6 +637,7 @@ export function App() {
     requestSponsorship,
     processSponsorship,
     buyProduct,
+    deleteProduct,
     handleCoachIndication,
     saveTactics,
     handleCoachUseItem,
@@ -685,6 +687,8 @@ export function App() {
     user,
     products,
     buyingRef,
+    productDeleteRequestRef,
+    deleteProductRequest: input => matchApi().deleteProduct(input),
     purchaseRequestRef,
     purchase: input => matchApi().purchase(input),
     recoveryRequestRef,
@@ -1511,10 +1515,7 @@ export function App() {
             players={players}
             teams={teams}
             onBuy={buyProduct}
-            onDeleteProd={async (id) => {
-              if (confirm("Admin: Excluir produto?"))
-                await db.collection("products").doc(id).delete();
-            }}
+            onDeleteProd={deleteProduct}
           />
         )}
 
@@ -1668,10 +1669,7 @@ export function App() {
               sales={sales || []}
               teams={teams}
               onSaveProd={saveProduct}
-              onDeleteProd={async (id) => {
-                if (confirm("Excluir produto?"))
-                  await db.collection("products").doc(id).delete();
-              }}
+              onDeleteProd={deleteProduct}
               onProcessSpons={processSponsorship}
             />
           )}

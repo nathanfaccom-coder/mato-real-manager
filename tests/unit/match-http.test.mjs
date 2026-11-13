@@ -44,3 +44,9 @@ test('session endpoint uses only verified uid and rejects client-selected identi
  db.values.get('authAccounts/u').active=false;
  assert.equal((await session({})).status,400);
 });
+test('ADM product deletion requires recent authentication before database access',async()=>{
+ for(const auth_time of [undefined,Date.now()/1000-301,Date.now()/1000+30]){
+  const handler=createMatchHandler({enabled:true,auth:{verifyIdToken:async()=>({uid:'adm',auth_time})},db:{collection(){throw Error('must not access database');}}});
+  const response=await handler(new Request('https://example.test/admin-product-delete',{method:'POST',headers:{authorization:'Bearer token','content-type':'application/json'},body:JSON.stringify({requestId:'r',productId:'p'})}));assert.equal(response.status,401);
+ }
+});

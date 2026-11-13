@@ -674,6 +674,18 @@ export function createPlayersActions(context, actions) {
   };
 
   const handleCoachTrain = async (playerIds, type) => {
+    if(context.automaticMatches){
+      const ids=[...playerIds].sort(),ref=context.coachTrainRequestRef,key=JSON.stringify([user.data.id,type,ids]);
+      if(ref.current?.busy)return;
+      if(ref.current?.key!==key)ref.current={key,requestId:crypto.randomUUID()};
+      const pending=ref.current;pending.busy=true;setLoading(true);
+      try{
+        const result=await context.trainCoach({requestId:pending.requestId,type,playerIds:ids});ref.current=null;
+        alert(`Atividade confirmada! Energia: -${result.cost}. XP do técnico: +${result.coachXP}. Nível: ${result.level}.\n${result.rows.map(r=>`${r.name}: ${r.skipped?'não treinou':r.injured?r.injury:`+${r.xp} XP${r.learned?`; aprendeu ${r.learned}`:''}`}`).join('\n')}`);
+      }catch(error){alert(`${error.message} Repita a mesma seleção e treino para consultar o pedido sem duplicá-lo.`);}
+      finally{pending.busy=false;setLoading(false);}
+      return;
+    }
     const currentCoach = user.data;
     const coachEnergy =
       currentCoach.energy !== undefined ? currentCoach.energy : 100;

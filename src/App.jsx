@@ -605,6 +605,7 @@ export function App() {
   const staffConsumeRequestRef = React.useRef(null);
   const consumeRequestRef = React.useRef(null);
   const equipRequestRef = React.useRef(null);
+  const coachTrainRequestRef = React.useRef(null);
   const soloRequestRef = React.useRef(null);
   const [chatMessages, setChatMessages] = useState([]);
 
@@ -690,6 +691,8 @@ export function App() {
     consumeItem: input => matchApi().consumeItem(input),
     equipRequestRef,
     equipItem: input => matchApi().equipItem(input),
+    coachTrainRequestRef,
+    trainCoach: input => matchApi().trainCoach(input),
     soloRequestRef,
     trainSolo: input => matchApi().trainSolo(input),
     recoverPlayers: input => matchApi().recover(input),

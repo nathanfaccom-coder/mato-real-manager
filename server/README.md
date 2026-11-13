@@ -3,6 +3,25 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Coach training and study (gated; not deployed)
+
+`POST .../coach-training` accepts `{requestId,type,playerIds}`. Training selects
+1–5 unique same-club players and an existing focus; STUDY requires an empty list.
+Verified COACH binding/entity ownership, active profile/club, current energy and
+team/player locks are checked. Free coaches can study. Canonical perk IDs resolve
+server catalog values, never mutable browser bonuses. CT and affinity bonuses,
+equipment, synergy/youth multipliers, critical gains, attribute cap, 1% injury risk,
+position learning and coach XP/level/perk/affinity progression are retained.
+
+Coach/player changes, equipment snapshot consumption, ten-entry club log and
+private serverConfig/coachTraining_{uid}/operations receipt are atomic. Random draws
+are fixed across transaction retries. Same selection/focus/request replays results;
+a reused request with another selection/focus fails. Injured/exhausted players are
+skipped; the existing 20-energy session cost remains (study costs 30). Injury keeps
+equipment, charges 15 player energy and earns no coach XP for that player. Training
+never deletes sales by an embedded equipped ID. Secure UI keeps uncertain request
+IDs. Production activation still requires purchase/source/account/rules migration.
+
 ## Staff consumables (gated; not deployed)
 
 `POST .../staff-consume` accepts `{requestId,itemId}` only. The server selects

@@ -3,6 +3,33 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Atomic coach training and study — 2026-11-13
+
+- Remote c9b42ba and clean workspace verified before edits; no competing process.
+  Previous GitHub checks 43432533243/43432524796 passed.
+- Added coach-training with verified COACH binding/ownership, current profile and
+  club, same-club 1–5 unique players, server catalog focus, and team/player locks.
+  STUDY requires no players and preserves free coach access. Client cannot supply
+  rewards, attributes, energy or perk values. Server resolves learned perk IDs
+  against catalog, deduplicating IDs instead of trusting stored effect payloads.
+- Preserves CT/affinity/equipment, synergy/youth/critical bonuses, attribute cap,
+  1% injury (15 energy, equipment retained), ordinary 25 player energy with perk,
+  20 coach energy per session, skipped injured/exhausted players, 30-energy study,
+  coach XP/level/perk/affinity progression and position learning/deferred boosts.
+- One transaction commits coach/players, consumed equipped snapshots, ten-entry
+  club log and private receipt. Random draws stable across DB retries; same request
+  replays, changed selection/focus denied. Training does not delete arbitrary sales
+  using embedded equipped IDs. Secure UI retains uncertain request and selection.
+- 252 unit tests pass, including combined bonuses/critical, injury, learned/partial
+  positions, cap, study, concurrent retries/energy and no-write rejection. Full
+  Auth/Firestore emulator, browser lost-response harness and secure build pass.
+- Estimate revised to about 75% complete / 25% remaining, effort estimate only.
+  Next blockers: purchases/provenance and employment/economy, weekly/season and
+  national result integration, source/account migration and restrictive rules,
+  credentials/indexes/scheduler and deployment. Existing public source writes mean
+  this is NOT ready to activate. No production data/rules/gates/deployments changed.
+  Check new GitHub CI after push. Production update NOT published.
+
 ## Authenticated staff consumables — 2026-11-13
 
 - Remote 21d37f5 and clean workspace checked before edits; no competing process.

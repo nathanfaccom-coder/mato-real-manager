@@ -3,6 +3,30 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Authenticated player consumables — 2026-11-13
+
+- Recovered uncommitted consumable work and verified remote 1b581ee unchanged;
+  no concurrent process. Prior GitHub runs 43393420408/43393414081 passed.
+- Added consume-item: verified PLAYER identity/ownership, active player/club,
+  match locks, owned sale, SAUDE/CONSUMIVEL category and valid canonical power.
+  Request carries only requestId/itemId. Inventory deletion, energy/toxicity,
+  injury/mood and private receipt commit atomically. Replays never reroll effects.
+- Preserves existing 40% sickness on third daily use, 95% vomiting on fourth+,
+  energy cap, full-energy refusal on ordinary success, intoxication consumption
+  block and injury shape. RNG is fixed across transaction retries. Brazil day
+  comes from server time; legacy Date.toDateString dates are recognized during
+  migration. Does not change injury recovery/season processing yet.
+- Secure client retains ambiguous request IDs, uses canonical response messages
+  and removes inventory only after confirmation. Default production path unchanged.
+- 241 unit tests pass, including probabilities, midnight boundary, legacy dates,
+  no-write rejection and competing different items sharing daily toxicity count.
+  Full Auth/Firestore integration passes real-token concurrent consumption and
+  forged/foreign-item/lock rejection. Browser retry harness and secure build pass.
+- Estimate stays 74% / 26% (approximate). Purchase provenance, staff consumables,
+  coach training, employment/finance, weekly/season/national flows, source/account
+  migration, restrictive rules and deployment remain. No live rules, data or gates
+  changed; production update NOT published. Next CI check after this commit push.
+
 ## Atomic owned equipment — 2026-11-13
 
 - Remote HEAD 8812ef0 and clean local tree checked before changes. Prior GitHub

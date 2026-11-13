@@ -273,6 +273,20 @@ export function createPlayersActions(context, actions) {
   const handleUseItem = async (item, action) => {
     if (!user.data || user.type !== "PLAYER") return;
 
+    if(context.automaticMatches && action === "CONSUME"){
+      const ref=context.consumeRequestRef,key=JSON.stringify([user.data.id,item.id]);
+      if(ref.current?.busy)return;
+      if(ref.current?.key!==key)ref.current={key,requestId:crypto.randomUUID()};
+      const pending=ref.current;pending.busy=true;setLoading(true);
+      try{
+        const result=await context.consumeItem({requestId:pending.requestId,itemId:item.id});
+        ref.current=null;setSales(prev=>prev.filter(s=>s.id!==result.itemId));
+        alert(result.outcome==='VOMIT'?'🤮 Seu corpo rejeitou o excesso: energia zerada e humor piorado.':result.outcome==='SICK'?'🤢 Intoxicação alimentar! Você terá que se recuperar naturalmente.':`⚡ Energia recuperada: +${result.energyRecovered}% (Total: ${result.energy}%).${result.toxicity>=2?' Atenção: novos consumos hoje têm risco de intoxicação ou vômito.':''}`);
+      }catch(error){alert(`${error.message} Repita o mesmo item para consultar o pedido sem duplicá-lo.`);}
+      finally{pending.busy=false;setLoading(false);}
+      return;
+    }
+
     if(context.automaticMatches && action === "EQUIP"){
       const ref=context.equipRequestRef,key=JSON.stringify([user.data.id,item.id]);
       if(ref.current?.busy)return;

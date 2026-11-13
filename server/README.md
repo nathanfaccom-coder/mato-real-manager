@@ -3,6 +3,21 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Player consumables (gated; not deployed)
+
+`POST .../consume-item` accepts only `{requestId,itemId}`. Verified PLAYER identity,
+entity owner, active profile/club, match locks, sale ownership and SAUDE/CONSUMIVEL
+category are checked in a transaction. Stored inventory supplies the bonus. Energy
+(cap 100), daily toxicity, sickness/vomiting, item deletion and private receipt
+under `serverConfig/consume_{uid}/operations` commit together. Identical retries
+return the original effect. Different items serialize the same daily counter.
+
+Server time uses America/Sao_Paulo days, with legacy browser date-string support.
+Existing third-use 40% intoxication and fourth+ 95% vomiting remain, including the
+intoxication block and injury shape. Injury recovery is not redefined here. Secure
+client keeps uncertain request IDs and waits for confirmation to remove inventory.
+Purchases, source-field rules and staff consumables remain migration blockers.
+
 ## Equipment (gated; not deployed)
 
 `POST .../equip-item` accepts only `{requestId,itemId}`. Verified active PLAYER

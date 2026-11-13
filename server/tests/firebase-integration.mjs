@@ -1,3 +1,4 @@
+import {verifyConsumables} from './consumables.mjs';
 import {verifyEquipment} from './equipment.mjs';
 import {verifySoloTraining} from './solo-training.mjs';
 import {verifyStaffRecovery} from './staff-recovery.mjs';
@@ -141,6 +142,7 @@ try {
  await verifyStaffRecovery({db,auth,handle,ownerToken:idToken});
  await verifySoloTraining({db,auth,handle});
  await verifyEquipment({db,auth,handle});
+ await verifyConsumables({db,auth,handle});
  await auth.updateUser(OWNER_UID,{disabled:true});
  assert.equal((await handle(request())).status,401);
  console.log('PASS: real Auth emulator token, REST SDK transactions, retry deduplication, simultaneous settlement, exact XP/energy, lock release, deny-all fixture, disabled-user rejection.');

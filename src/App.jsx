@@ -602,6 +602,7 @@ export function App() {
 
   const buyingRef = React.useRef(false);
   const recoveryRequestRef = React.useRef(null);
+  const consumeRequestRef = React.useRef(null);
   const equipRequestRef = React.useRef(null);
   const soloRequestRef = React.useRef(null);
   const [chatMessages, setChatMessages] = useState([]);
@@ -682,6 +683,8 @@ export function App() {
     products,
     buyingRef,
     recoveryRequestRef,
+    consumeRequestRef,
+    consumeItem: input => matchApi().consumeItem(input),
     equipRequestRef,
     equipItem: input => matchApi().equipItem(input),
     soloRequestRef,

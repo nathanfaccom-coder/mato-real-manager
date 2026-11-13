@@ -13,6 +13,7 @@ export function createMatchClient({auth,endpoint,fetchImpl=fetch}) {
   return result;
  }
  return {
+  consumeItem:({requestId,itemId})=>request('consume-item',{requestId,itemId}),
   equipItem:({requestId,itemId})=>request('equip-item',{requestId,itemId}),
   trainSolo:({requestId,type})=>request('solo-training',{requestId,type}),
   reviewSurgery:playerId=>request('surgery-review',{playerId}),

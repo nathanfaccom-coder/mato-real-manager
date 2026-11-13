@@ -6,12 +6,15 @@ export function createMatchClient({auth,endpoint,fetchImpl=fetch}) {
   if(auth.currentUser!==identity)throw Error('A sessão mudou. Entre novamente.');
   const response=await fetchImpl(`${endpoint}/${route}`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(payload),credentials:'omit',redirect:'error',cache:'no-store',signal:AbortSignal.timeout(20000)});
   if(response.status===401)throw Error((route.startsWith('fixture-')||route==='match-correction-review'||route==='match-correct')?'Confirme novamente sua senha de ADM para continuar.':'Sessão expirada. Entre novamente.');
+  if(route==='surgery-execute'&&response.status===409)throw Object.assign(Error('As condições mudaram. Confira a cirurgia novamente.'),{code:'SURGERY_REVIEW_REQUIRED'});
   if(!response.ok)throw Error('Não foi possível consultar ou atualizar a partida. Confira a conexão e sua autorização.');
   const result=await response.json();
   if(auth.currentUser!==identity)throw Error('A sessão mudou. Entre novamente.');
   return result;
  }
  return {
+  reviewSurgery:playerId=>request('surgery-review',{playerId}),
+  operate:({requestId,playerId,procedureId,quote})=>request('surgery-execute',{requestId,playerId,procedureId,quote}),
   evaluatePlayer:({requestId,playerId})=>request('medical-evaluate',{requestId,playerId}),
   doctorStudy:({requestId})=>request('doctor-study',{requestId}),
   staffPerks:()=>request('staff-perks',{}),

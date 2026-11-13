@@ -36,14 +36,15 @@ those candidates include reads and non-Firestore methods, not 1,452 vulnerabilit
   Medical study now uses the same transactional service with verified DOCTOR role
   and server-derived nutrition bonus. Medical evaluation now checks current club,
   patient injury and match locks in a receipt-backed transaction. Inventory,
-  surgery and employment still mutate source fields.
-- Next implementation priority: coach/solo training, medical surgery/supplies and items,
+  employment and other inventory/economy paths still mutate source fields.
+- Next implementation priority: coach/solo training, inventory/equipment consumption and employment,
   weekly/season jobs and national match integration.
 
-## Surgery preparation
+## Surgery migration
 
-The shared surgery policy now supplies both display and charge calculations in
-DoctorDashboard, including actual post-coverage cost and exact cent rounding.
-This is not server authorization: the legacy action still writes surgery funds,
-fees, injury, progression, logs and news. Move all those effects into one trusted
-transaction before enabling automatic progression under restrictive rules.
+Surgery review/execution now uses verified identity, current club/patient/locks,
+source-bound quote and a receipt-backed transaction for funds, fee, injury, staff
+progression, logs and failure news. Secure UI reviews and confirms server values;
+unknown network errors retain the request, explicit stale-review 409 requires a
+new review. Default build retains old writes. This is not protection against
+legacy public source-field mutations; rules/account migration remains mandatory.

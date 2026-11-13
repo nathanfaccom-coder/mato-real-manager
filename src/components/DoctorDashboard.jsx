@@ -159,7 +159,34 @@ export const DoctorDashboard = ({
     }
   };
 
+  const surgeryRequest = React.useRef(null);
   const handleSurgery = async (p) => {
+    if (secureGameLogin) {
+      if (surgeryRequest.current?.busy) return;
+      const key = JSON.stringify([doctor.id,p.id]);
+      if (surgeryRequest.current?.key !== key) surgeryRequest.current = {key};
+      const pending = surgeryRequest.current;
+      pending.busy = true;
+      try {
+        if (!pending.payload) {
+          const review = await matchApi().reviewSurgery(p.id);
+          const choice = prompt(review.options.map((s,i)=>`${i+1}) ${s.name}\nCusto: ${fmt(s.finalCost)} | Reduz: ${s.timeRed} jogos\nChance: ${(s.chance*100).toFixed(0)}%${s.affordable ? "" : " — fundos insuficientes"}`).join("\n\n"));
+          if (!choice || !/^[1-9]$/.test(choice.trim())) { surgeryRequest.current=null; return; }
+          const selected = review.options[Number(choice.trim())-1];
+          if (!selected) { surgeryRequest.current=null; return; }
+          if (!selected.affordable) { surgeryRequest.current=null; return alert("O jogador não tem fundos suficientes."); }
+          if (!confirm(`Confirmar ${selected.name}? Custo: ${fmt(selected.finalCost)}. Energia: -40⚡. Honorários em caso de sucesso: ${fmt(selected.doctorFee)}.`)) { surgeryRequest.current=null; return; }
+          pending.payload = {requestId:crypto.randomUUID(),playerId:p.id,procedureId:selected.procedureId,quote:selected.quote};
+        }
+        const result = await matchApi().operate(pending.payload);
+        surgeryRequest.current = null;
+        alert(`${result.success ? "✅ CIRURGIA UM SUCESSO!" : "⚠️ Houve complicações na cirurgia."} Restam ${result.recoveryLeft} jogos de recuperação. Cobrança: ${fmt(result.charged)}. Honorários: ${fmt(result.doctorFee)}. XP: ${result.xpChange}.`);
+      } catch (error) {
+        if(error.code==='SURGERY_REVIEW_REQUIRED') { surgeryRequest.current=null; return alert(error.message); }
+        alert(`${error.message} Tente novamente com o mesmo paciente para consultar o pedido sem repetir a cobrança.`);
+      } finally { pending.busy=false; }
+      return;
+    }
     if (energy < 40)
       return alert(
         "Uma cirurgia exige muita concentração! Você precisa de pelo menos 40⚡.",

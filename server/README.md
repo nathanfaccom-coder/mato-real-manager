@@ -3,15 +3,23 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
-## Surgery policy preparation (no trusted surgery endpoint yet)
+## Surgery review and execution (gated; not deployed)
 
-`src/medical/surgery-policy.js` centralizes existing procedures and computes cost,
-coverage, fee, chance and outcome modifiers. DoctorDashboard already uses it to
-show the actual post-coverage charge, rounded exactly to cents. It is a shared
-pure calculation, not authorization or a transactional surgery implementation.
-The next server path must review current source state and atomically debit funds,
-charge staff energy, apply injury/progression/fee/log/news effects and store a
-retry receipt. Legacy surgery writes remain an activation blocker.
+`POST .../surgery-review` accepts `{playerId}` and returns procedure terms and a
+source-bound quote. `POST .../surgery-execute` accepts only
+`{requestId, playerId, procedureId, quote}`. Both verify current active DOCTOR
+binding/ownership/employment, club, injured patient and match locks. Review uses
+shared surgery policy; raw staff/player finances and private metadata are omitted.
+Changed quoted state or affordability returns 409 before writes. The UI then
+requires another review and confirmation; uncertain network errors reuse the same
+request. Private serverConfig/surgery_{uid}/operations receipts replay outcomes.
+
+Execution atomically debits hospital fund before player balance, charges energy,
+updates injury and doctor progression, pays fee only on success, resets donors on
+success, records bounded team log and failure news unless cold-blood applies.
+All existing success/failure/skill effects are retained. Concurrent requests cannot
+repeat the same reviewed source state. Source-data rules and wider migration are
+still blockers: do not activate this under legacy public-write permissions.
 
 ## Medical evaluation (gated; not deployed)
 

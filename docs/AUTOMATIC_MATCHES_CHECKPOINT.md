@@ -3,6 +3,38 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Server surgery review and atomic execution — 2026-11-13
+
+- Resumed preserved uncommitted surgery code after interruption. Remote cf50d4a
+  remained unchanged; no competing process or branch update. Prior full GitHub
+  runs 43358669916 and 43358663435 passed. Main remains c1bf386 / 2.9.11.
+- Added surgery-review/surgery-execute with verified DOCTOR binding, ownership,
+  employment, active club, same-club injured patient and team/player match locks.
+  Review returns canonical procedures, cost, chance, fee and affordability with
+  a quote hash tied to sporting/financial source state. Execute accepts IDs,
+  requestId and quote only. Changed quote/affordability yields 409 with no writes.
+- One transaction debits hospitalFund before player balance, charges 40 energy,
+  applies injury/progression/donors/mood, pays success-only fee, appends bounded
+  team log, emits failure news when appropriate and saves a private receipt.
+  Existing +50 success XP / -20 failure XP floor, level/perks, cold-blood behavior
+  and catalog procedure effects are preserved. Currency mutations use cents.
+  Same receipt returns original outcome; competing distinct requests cannot
+  reuse a changed source state. Random draw remains stable across DB retries.
+- Secure DoctorDashboard reviews server facts before procedure confirmation;
+  unknown network failure retains request/quote and retries it. Explicit 409
+  clears stale review and requires another review/confirmation on next attempt.
+  Default mode retains legacy surgery. Source-field rules are still unprotected;
+  this development flow is not safe for production activation yet.
+- 227 unit tests pass (success/failure/cold blood/funds/fees/stale state/concurrency
+  and adapter ambiguity). Full real Auth/Firestore emulator passes, including
+  simultaneous surgery and 409 with no mutation. Mobile dashboard harness passes
+  lost response reuse and explicit stale-review renewal with no direct DB writes.
+  Secure build passes; new GitHub CI awaits pushed commit.
+- Estimate now 74% complete / 26% remaining, approximate effort only. Next blockers:
+  coach/solo training and inventory/equipment consumption, employment/economy,
+  weekly/season/national paths, full source-data/account migration, production
+  credentials, indexes and scheduler. No live rules/data/gates changed.
+
 ## Shared surgery policy and accurate displayed cost — 2026-11-13
 
 - Verified clean workspace, remote bdb04ca and unchanged main c1bf386 (2.9.11).

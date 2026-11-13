@@ -59,3 +59,12 @@ test('staff skill adapter omits role and arbitrary effect multipliers',async()=>
  await client.staffPerks();await client.chooseStaffPerk({revision:2,perkId:'GOLDEN_HANDS',role:'DOCTOR',value:100,multiplier:999});
  assert.deepEqual(calls,[{url:'https://example.test/staff-perks',payload:{}},{url:'https://example.test/staff-perk-choose',payload:{revision:2,perkId:'GOLDEN_HANDS'}}]);
 });
+
+test('surgery adapter sends only reviewed identifiers and distinguishes stale review from uncertain response',async()=>{
+ const auth={currentUser:{getIdToken:async()=> 'token'}},calls=[];
+ const client=createMatchClient({auth,endpoint:'https://example.test',fetchImpl:async(url,opts)=>{calls.push(JSON.parse(opts.body));return new Response('{}',{status:409});}});
+ await assert.rejects(client.operate({requestId:'r',playerId:'p',procedureId:'PRP',quote:'reviewed',success:true,cost:0}),e=>e.code==='SURGERY_REVIEW_REQUIRED');
+ assert.deepEqual(calls[0],{requestId:'r',playerId:'p',procedureId:'PRP',quote:'reviewed'});
+ const uncertain=createMatchClient({auth,endpoint:'https://example.test',fetchImpl:async()=>{throw Error('network');}});
+ await assert.rejects(uncertain.operate(calls[0]),e=>!e.code);
+});

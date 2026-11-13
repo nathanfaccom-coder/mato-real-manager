@@ -37,7 +37,7 @@ those candidates include reads and non-Firestore methods, not 1,452 vulnerabilit
   and server-derived nutrition bonus. Medical evaluation now checks current club,
   patient injury and match locks in a receipt-backed transaction. Inventory,
   employment and other inventory/economy paths still mutate source fields.
-- Next implementation priority: purchases and employment,
+- Next implementation priority: product/source inventory protection and employment,
   weekly/season jobs and national match integration.
 
 ## Surgery migration
@@ -48,3 +48,12 @@ progression, logs and failure news. Secure UI reviews and confirms server values
 unknown network errors retain the request, explicit stale-review 409 requires a
 new review. Default build retains old writes. This is not protection against
 legacy public source-field mutations; rules/account migration remains mandatory.
+
+## Purchase migration
+
+Secure purchases/gifts now derive buyer identity and item effects on the server.
+Exact-cent payment, seller credit, inventory/stock, gift fame/news/daily count and
+receipt are atomic. The expected price is checked, and uncertain retries reuse the
+same request. Typed new inventory prevents cross-role ID collisions in equip/use.
+Product management, old inventory and public source-field rules still require
+migration; a verified purchase does not make forgeable catalog data trustworthy.

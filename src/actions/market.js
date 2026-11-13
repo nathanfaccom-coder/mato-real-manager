@@ -211,13 +211,16 @@ export function createMarketActions(context, actions) {
     buyingRef.current = true;
     setLoading(true);
     try {
-      const result = await purchaseProduct(db, firebase.firestore.FieldValue, {
+      const key=JSON.stringify([user.type,user.data.id,prod.id,seller.id,giftTarget?.id??null,price]);
+      if(context.automaticMatches&&context.purchaseRequestRef.current?.key!==key)context.purchaseRequestRef.current={key,requestId:crypto.randomUUID()};
+      const result = context.automaticMatches ? await context.purchase({requestId:context.purchaseRequestRef.current.requestId,productId:prod.id,sellerId:seller.id,giftPlayerId:giftTarget?.id??null,expectedPrice:price}) : await purchaseProduct(db, firebase.firestore.FieldValue, {
         user,
         productId: prod.id,
         sellerId: seller.id,
         giftTarget,
         expectedPrice: price,
       });
+      if(context.automaticMatches)context.purchaseRequestRef.current=null;
       let msg = giftTarget
         ? `✅ Presente enviado com sucesso para ${giftTarget.name}!`
         : "✅ Compra realizada com sucesso!";

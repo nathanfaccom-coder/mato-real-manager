@@ -3,6 +3,31 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Authenticated atomic purchases and gifts — 2026-11-13
+
+- Remote 98370e1 and clean workspace verified before edits; prior GitHub checks
+  43443795399/43443785037 succeeded. No competing local process detected.
+- Added purchase endpoint with verified USER/PLAYER/staff binding and ownership.
+  Current account, product/seller, recipient, exact-cent balances/expected price,
+  stock and applicable match locks are checked transactionally. No client-provided
+  rewards, buyer role or product effects accepted. Changed price refuses purchase.
+- Debit, seller credit, stock, canonical sale, gift fame/tracker/news and private
+  receipt are atomic. Same receipt returns the original sale; different details
+  cannot reuse a key. Preserves seven gifts/day with Brazil server day and legacy
+  date compatibility, gift immediate fame and ordinary luxury-use behavior.
+- New items include buyerType; equip/consume reject incompatible typed ownership
+  even if different collections share an entity ID. Old untyped inventory still
+  needs source migration. Secure buy action keeps uncertain request IDs and sends
+  only IDs/expected price; default production flow unchanged.
+- 259 unit tests pass, including exact cents, all six buyer roles, gifts/self-gifts,
+  daily limit, concurrent stock/payment, typed-item collision and no-write denial.
+  Full real Auth/Firestore emulator, browser retry harness and secure build pass.
+- Estimate stays about 75% complete / 25% remaining. Next: protect product editing
+  and legacy inventory/source fields, employment/finance, weekly/season/national
+  paths, account/rules migration, secure credentials/indexes/scheduler/deployment.
+  Purchase validation alone cannot trust publicly editable product data. No live
+  data/rules/gates/deployment changed. Update NOT published; check new CI after push.
+
 ## Atomic coach training and study — 2026-11-13
 
 - Remote c9b42ba and clean workspace verified before edits; no competing process.

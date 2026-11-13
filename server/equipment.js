@@ -29,7 +29,7 @@ export async function equipItem(db, uid, input, {now=Date.now()}={}) {
    if((await read(ref('teams',player.teamId)))?.status!=='ACTIVE')throw Error('Clube indisponível.');
   }
   const itemRef=ref('sales',input.itemId), item=await read(itemRef);
-  if(!item || item.buyerId!==account.entityId)throw Error('Item indisponível no seu inventário.');
+  if(!item || item.buyerId!==account.entityId || (item.buyerType&&item.buyerType!==account.type))throw Error('Item indisponível no seu inventário.');
   if(!['CHUTEIRA','LUVAS'].includes(item.cat))throw Error('Este item não pode ser equipado.');
   // Product forms can store integer powers as strings. Never parse a prefix
   // such as "50invalid" or allow negative/fractional/non-finite bonuses.

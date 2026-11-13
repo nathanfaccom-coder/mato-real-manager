@@ -36,7 +36,7 @@ export async function consumeItem(db, uid, input, {now=Date.now(),draw=randomInt
    if((await read(ref('teams',player.teamId)))?.status!=='ACTIVE')throw Error('Clube indisponível.');
   }
   const itemRef=ref('sales',input.itemId), item=await read(itemRef);
-  if(!item || item.buyerId!==account.entityId)throw Error('Item indisponível no seu inventário.');
+  if(!item || item.buyerId!==account.entityId || (item.buyerType&&item.buyerType!==account.type))throw Error('Item indisponível no seu inventário.');
   if(!(staff?['energy','SAUDE','CONSUMIVEL']:['SAUDE','CONSUMIVEL']).includes(item.cat))throw Error('Este item não pode ser consumido.');
   const raw=item.power??0;
   const power=typeof raw==='number'?raw:typeof raw==='string'&&/^\d+$/.test(raw)?Number(raw):NaN;

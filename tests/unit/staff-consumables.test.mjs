@@ -26,3 +26,6 @@ test('staff consumption rejects wrong role, owner, item, profile and club lock w
 test('role changes cannot replay a receipt belonging to a previous staff role',async()=>{
  const db=memoryDB(seed());await consume(db);for(const path of ['authAccounts/u','accountEntityOwners/users_s','users/s'])db.values.get(path).type='DOCTOR';await assert.rejects(consume(db),/utilizado/);
 });
+test('typed player inventory is not consumable by staff with the same entity ID',async()=>{
+ const s=seed();s['sales/item'].buyerType='PLAYER';await assert.rejects(consume(memoryDB(s)));
+});

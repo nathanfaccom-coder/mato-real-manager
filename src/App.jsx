@@ -600,6 +600,7 @@ export function App() {
     }
   }, [teams, players, companies, coaches, user?.data?.id, user?.type]);
 
+  const purchaseRequestRef = React.useRef(null);
   const buyingRef = React.useRef(false);
   const recoveryRequestRef = React.useRef(null);
   const staffConsumeRequestRef = React.useRef(null);
@@ -684,6 +685,8 @@ export function App() {
     user,
     products,
     buyingRef,
+    purchaseRequestRef,
+    purchase: input => matchApi().purchase(input),
     recoveryRequestRef,
     staffConsumeRequestRef,
     consumeStaffItem: input => matchApi().consumeStaffItem(input),

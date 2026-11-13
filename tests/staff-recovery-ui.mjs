@@ -7,6 +7,7 @@ import {DoctorDashboard} from './components/DoctorDashboard.jsx';
 import {AssistantDashboard} from './components/AssistantDashboard.jsx';
 import {AssistantPerks} from './components/AssistantPerks.jsx';
 import {createPlayersActions} from './actions/players.js';
+import {createMarketActions} from './actions/market.js';
 const assistant={id:'s',type:'ASSISTANT',name:'Auxiliar',teamId:'t',energy:10,xp:0,level:1,perks:[{id:'COFFEE_LOVER'}]};
 const team={id:'t',name:'Clube'},players=[{id:'p',name:'Atleta',teamId:'t',energy:90}];
 window.__calls=[];window.__alerts=[];window.alert=text=>window.__alerts.push(text);
@@ -17,6 +18,9 @@ export function App(){
  if(location.search==='?doctorStudy')return React.createElement(DoctorDashboard,{doctor:{...assistant,type:'DOCTOR',energy:20},team,players:[],offers:[],sales:[]});
  if(location.search==='?coachPerks'||location.search==='?doctorPerks')return React.createElement(AssistantPerks,{staffId:'s',pendingPerks:1,staffRole:location.search==='?coachPerks'?'COACH':'DOCTOR'});
  if(location.search==='?perks')return React.createElement(AssistantPerks,{staffId:'s',pendingPerks:1});
+ const purchaseRequestRef=React.useRef(null),buyingRef=React.useRef(false);
+ const {buyProduct}=createMarketActions({automaticMatches:true,user:{type:'PLAYER',data:{id:'p'}},buyingRef,purchaseRequestRef,setLoading:()=>{},purchase:async input=>{window.__purchases=window.__purchases||[];window.__purchases.push(input);if(window.__purchases.length===1)throw Error('Resposta perdida');return {fameBonus:0};}},{});
+ window.__buy=()=>{window.confirm=()=>true;return buyProduct({id:'product',name:'Produto',price:20.05,power:999},{id:'seller'});};
  const equipRequestRef=React.useRef(null),consumeRequestRef=React.useRef(null);
  const {handleUseItem}=createPlayersActions({automaticMatches:true,user:{type:'PLAYER',data:{id:'p'}},setLoading:()=>{},setSales:fn=>{window.__inventory=fn(window.__inventory||[{id:'item'}]);},consumeRequestRef,consumeItem:async input=>{window.__consumes=window.__consumes||[];window.__consumes.push(input);if(window.__consumes.length===1)throw Error('Resposta do consumo perdida');return {itemId:'drink',outcome:'SUCCESS',energy:100,energyRecovered:20,toxicity:2};},equipRequestRef,equipItem:async input=>{window.__equips=window.__equips||[];window.__equips.push(input);if(window.__equips.length===1)throw Error('Resposta do equipamento perdida');return {itemId:'item',name:'Nome do servidor'};}},{});
  window.__consume=()=>handleUseItem({id:'drink',power:999},'CONSUME');
@@ -48,6 +52,7 @@ try{
  await page.evaluate(()=>window.__staffConsume());assert.equal(await page.evaluate(()=>window.__staffInventory),undefined);
  await page.evaluate(()=>window.__staffConsume());const staffConsumes=await page.evaluate(()=>window.__staffConsumes);assert.deepEqual(staffConsumes[0],staffConsumes[1]);assert.deepEqual(Object.keys(staffConsumes[0]).sort(),['itemId','requestId']);assert.deepEqual(await page.evaluate(()=>window.__staffInventory),[]);assert.match((await page.evaluate(()=>window.__alerts)).at(-1),/energia zerou/);assert.equal(await page.evaluate(()=>window.__writes||0),0);await page.evaluate(()=>{window.__alerts=[];});
  await page.evaluate(()=>window.__coachTrain());await page.evaluate(()=>window.__coachTrain());const trains=await page.evaluate(()=>window.__coachTrains);assert.deepEqual(trains[0],trains[1]);assert.deepEqual(Object.keys(trains[0]).sort(),['playerIds','requestId','type']);assert.match((await page.evaluate(()=>window.__alerts)).at(-1),/aprendeu ATA/);assert.equal(await page.evaluate(()=>window.__writes||0),0);await page.evaluate(()=>{window.__alerts=[];});
+ await page.evaluate(()=>window.__buy());await page.evaluate(()=>window.__buy());const purchases=await page.evaluate(()=>window.__purchases);assert.deepEqual(purchases[0],purchases[1]);assert.deepEqual(Object.keys(purchases[0]).sort(),['expectedPrice','giftPlayerId','productId','requestId','sellerId']);assert.equal(await page.evaluate(()=>window.__writes||0),0);await page.evaluate(()=>{window.__alerts=[];});
  await page.evaluate(()=>window.__soloTrain());await page.evaluate(()=>window.__soloTrain());
  const solo=await page.evaluate(()=>window.__solo);assert.equal(solo.length,2);assert.deepEqual(solo[0],solo[1]);assert.equal(solo[0].playerId,undefined);await page.evaluate(()=>{window.__alerts=[];});
  await page.getByText('Atleta',{exact:true}).click();

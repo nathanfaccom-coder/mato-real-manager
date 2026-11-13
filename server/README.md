@@ -3,6 +3,25 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Purchases and gifts (gated; not deployed)
+
+`POST .../purchase` accepts `{requestId,productId,sellerId,giftPlayerId,expectedPrice}`
+(giftPlayerId is null for an ordinary purchase). Verified USER/PLAYER/staff binding
+resolves the buyer collection and ownership. Current buyer, seller and recipient,
+product seller, stock, exact-cent balances, agreed price and applicable match locks
+are checked transactionally. A changed price requires the user to review it again.
+
+Debit, seller credit, stock, canonical inventory item, gift fame/tracker/news and
+private receipt under serverConfig/purchase_{uid}/operations commit together.
+Duplicate requests return the original sale; changed purchase details cannot reuse
+a receipt. Preserves seven gifts/day with server Brazil date and legacy date-string
+compatibility, gift-only immediate fame, ordinary luxury use behavior and gift
+news. Client repeats ambiguous requests instead of charging again. New inventory
+records carry buyerType; equip/consume reject incompatible typed ownership.
+
+This verifies purchase against stored product data. Product editing, source-field
+rules and old inventory/account migration remain mandatory before activation.
+
 ## Coach training and study (gated; not deployed)
 
 `POST .../coach-training` accepts `{requestId,type,playerIds}`. Training selects

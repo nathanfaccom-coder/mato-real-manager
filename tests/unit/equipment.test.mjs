@@ -27,3 +27,6 @@ test('equip rejects forged payload, foreign inventory, invalid binding, locks an
 test('free players can equip gloves without an image or bonus',async()=>{
  const s=seed();s['players/p'].teamId='FREE';s['sales/item']={buyerId:'p',cat:'LUVAS',productName:'Luvas'};const db=memoryDB(s);await equipItem(db,'u',input);assert.deepEqual(db.values.get('players/p').equippedItem,{id:'item',name:'Luvas',cat:'LUVAS',power:0});
 });
+test('typed inventory cannot be equipped by another role with an overlapping entity ID',async()=>{
+ const s=seed();s['sales/item'].buyerType='COACH';await assert.rejects(equipItem(memoryDB(s),'u',input));
+});

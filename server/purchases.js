@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {validDocumentId} from '../src/matches/validate.js';
 import {brazilDay} from '../src/matches/policy.js';
-const collections={USER:'teams',PLAYER:'players',COACH:'users',DOCTOR:'users',SCOUT:'users',ASSISTANT:'users'};
+const collections={TEAM:'teams',PLAYER:'players',COACH:'users',DOCTOR:'users',SCOUT:'users',ASSISTANT:'users'};
 const fameCats=new Set(['VEICULO','IMOVEL','TECNOLOGIA','LUXO']);
 const cents=value=>{if(typeof value!=='number'||!Number.isFinite(value)||!Number.isSafeInteger(Math.round(value*100))||Math.abs(value*100-Math.round(value*100))>0.00001)throw Error('Valor monetário inválido.');return Math.round(value*100);};
 export async function purchase(db,uid,input,{now=Date.now()}={}){

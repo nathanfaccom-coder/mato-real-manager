@@ -6,8 +6,10 @@ The Supabase synthetic probe passed, but live match automation is NOT enabled.
 ## Purchases and gifts (gated; not deployed)
 
 `POST .../purchase` accepts `{requestId,productId,sellerId,giftPlayerId,expectedPrice}`
-(giftPlayerId is null for an ordinary purchase). Verified USER/PLAYER/staff binding
-resolves the buyer collection and ownership. Current buyer, seller and recipient,
+(giftPlayerId is null for an ordinary purchase). Verified TEAM/PLAYER/staff binding
+resolves the buyer collection and ownership. TEAM is the server binding; USER
+is only the trusted-session UI alias and is rejected by the purchase endpoint.
+Current buyer, seller and recipient,
 product seller, stock, exact-cent balances, agreed price and applicable match locks
 are checked transactionally. A changed price requires the user to review it again.
 

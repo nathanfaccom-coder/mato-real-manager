@@ -3,6 +3,27 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Purchase TEAM binding regression fixed — 2026-11-13
+
+- Resumed preserved uncommitted fix; remote 0c64fdd unchanged and no concurrent
+  process. Previous GitHub runs 43452151368/43452140912 succeeded.
+- Found and corrected backend purchase using legacy UI role USER instead of the
+  actual authAccounts TEAM role. resolveGameAccount maps TEAM to USER only for the
+  client. Purchase now accepts verified TEAM and rejects fabricated USER bindings.
+- Strengthened integration test to create a club binding through actual account-bind
+  using owner authentication, then sign in as that club and purchase concurrently.
+  Checks team match lock, exact cents, once-only debit/stock and TEAM inventory type.
+  Unit fixtures corrected to match the real schema; 260 unit tests pass and full
+  Auth/Firestore emulator completes successfully. No frontend changes in this fix.
+- Product audit found CompanyDashboard debits production directly before calling
+  onSaveProd without awaiting, while saveProduct separately writes absolute stock
+  and emits news. Next: authenticated atomic COMPANY manufacturing using getProdCost,
+  enforce existing 0–100 power and price floor, examine upgrading existing stock
+  effects, migrate deletion/product ownership and protect catalog source fields.
+- Estimate remains about 75% / 25%. Employment/economy, weekly/season/national,
+  account/source rules and secure deployment still pending. No live gates/data/rules
+  changed. Update NOT published. Check new CI after push.
+
 ## Authenticated atomic purchases and gifts — 2026-11-13
 
 - Remote 98370e1 and clean workspace verified before edits; prior GitHub checks

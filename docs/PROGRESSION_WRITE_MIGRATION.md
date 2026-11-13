@@ -57,3 +57,14 @@ receipt are atomic. The expected price is checked, and uncertain retries reuse t
 same request. Typed new inventory prevents cross-role ID collisions in equip/use.
 Product management, old inventory and public source-field rules still require
 migration; a verified purchase does not make forgeable catalog data trustworthy.
+
+## Product manufacturing follow-up
+
+CompanyDashboard currently debits production cost directly before calling
+onSaveProd without awaiting it; saveProduct then writes absolute stock and emits
+news separately. Port the entire debit + stock increment + product write + news
+as one authenticated COMPANY transaction. Derive cost using getProdCost on the
+server and enforce the existing 0–100 power range and price floor. Review changes
+to category/power on existing stock so paid production cannot be silently upgraded.
+Purchase bindings use TEAM (backend), not USER (UI alias from resolveGameAccount).
+The integration test must create a TEAM binding through account-bind before buying.

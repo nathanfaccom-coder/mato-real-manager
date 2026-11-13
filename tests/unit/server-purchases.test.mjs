@@ -21,5 +21,9 @@ test('competing purchases cannot oversell; invalid identity, lock, money, price 
  await assert.rejects(purchase(memoryDB(seed()),'u',{...input,power:900},{now}));
 });
 test('team and all staff buyers resolve balance from verified identity rather than client role',async()=>{
- for(const role of ['USER','COACH','DOCTOR','SCOUT','ASSISTANT']){const s=seed(),collection=role==='USER'?'teams':'users';s['authAccounts/u'].type=role;delete s['accountEntityOwners/players_p'];s[`accountEntityOwners/${collection}_p`]={uid:'u',type:role,entityId:'p'};s[`${collection}/p`]={status:'ACTIVE',type:role,balance:100.10};const db=memoryDB(s);const r=await purchase(db,'u',input,{now});assert.equal(db.values.get(`${collection}/p`).balance,80.05);assert.equal(db.values.get('players/p').balance,100.10);assert.equal(db.values.get('sales/'+r.saleId).buyerType,role);}
+ for(const role of ['TEAM','COACH','DOCTOR','SCOUT','ASSISTANT']){const s=seed(),collection=role==='TEAM'?'teams':'users';s['authAccounts/u'].type=role;delete s['accountEntityOwners/players_p'];s[`accountEntityOwners/${collection}_p`]={uid:'u',type:role,entityId:'p'};s[`${collection}/p`]={status:'ACTIVE',type:role,balance:100.10};const db=memoryDB(s);const r=await purchase(db,'u',input,{now});assert.equal(db.values.get(`${collection}/p`).balance,80.05);assert.equal(db.values.get('players/p').balance,100.10);assert.equal(db.values.get('sales/'+r.saleId).buyerType,role);}
+});
+
+test('legacy UI role USER is not accepted as a trusted server binding',async()=>{
+ const s=seed();s['authAccounts/u'].type='USER';const db=memoryDB(s),before=structuredClone([...db.values]);await assert.rejects(purchase(db,'u',input,{now}),/Vínculo/);assert.deepEqual([...db.values],before);
 });

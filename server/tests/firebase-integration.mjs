@@ -148,7 +148,7 @@ try {
  await verifyConsumables({db,auth,handle});
  await verifyStaffConsumables({db,auth,handle});
  await verifyCoachTraining({db,auth,handle});
- await verifyPurchases({db,auth,handle});
+ await verifyPurchases({db,auth,handle,ownerToken:idToken});
  await auth.updateUser(OWNER_UID,{disabled:true});
  assert.equal((await handle(request())).status,401);
  console.log('PASS: real Auth emulator token, REST SDK transactions, retry deduplication, simultaneous settlement, exact XP/energy, lock release, deny-all fixture, disabled-user rejection.');

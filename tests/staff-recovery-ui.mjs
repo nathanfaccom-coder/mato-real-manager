@@ -11,6 +11,7 @@ const assistant={id:'s',type:'ASSISTANT',name:'Auxiliar',teamId:'t',energy:10,xp
 const team={id:'t',name:'Clube'},players=[{id:'p',name:'Atleta',teamId:'t',energy:90}];
 window.__calls=[];window.__alerts=[];window.alert=text=>window.__alerts.push(text);
 export function App(){
+ if(location.search==='?surgeryQuote')return React.createElement(DoctorDashboard,{doctor:{...assistant,type:'DOCTOR',energy:100,level:5,perks:[{id:'VIP_DISCOUNT'}]},team:{...team,healthPlan:{coverage:50}},players:[{id:'p',name:'Paciente',teamId:'t',injury:'Estiramento G2',recoveryLeft:5,overall:60,healthPlan:{coverage:80}}],offers:[],sales:[]});
  if(location.search==='?doctorEvaluate')return React.createElement(DoctorDashboard,{doctor:{...assistant,type:'DOCTOR',energy:20},team,players:[{id:'p',name:'Paciente',teamId:'t',injury:'Fadiga Muscular',recoveryLeft:1,overall:60}],offers:[],sales:[]});
  if(location.search==='?doctorStudy')return React.createElement(DoctorDashboard,{doctor:{...assistant,type:'DOCTOR',energy:20},team,players:[],offers:[],sales:[]});
  if(location.search==='?coachPerks'||location.search==='?doctorPerks')return React.createElement(AssistantPerks,{staffId:'s',pendingPerks:1,staffRole:location.search==='?coachPerks'?'COACH':'DOCTOR'});
@@ -79,6 +80,11 @@ try{
  await page.getByRole('button',{name:/AVALIAR/}).click();
  await page.waitForFunction(()=>window.__alerts.some(a=>a.includes('DIAGNÓSTICO PRECISO')));
  const evaluations=await page.evaluate(()=>window.__evaluations);assert.equal(evaluations.length,2);assert.deepEqual(evaluations[0],evaluations[1]);assert.equal(evaluations[0].playerId,'p');
+ assert.equal(await page.evaluate(()=>window.__writes||0),0);assert.deepEqual(errors,[]);
+ await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/app.html?surgeryQuote`);
+ await page.evaluate(()=>{window.prompt=text=>{window.__surgeryQuote=text;return null;};});
+ await page.getByRole('button',{name:/OPERAR/}).click();
+ const quote=await page.evaluate(()=>window.__surgeryQuote);assert.match(quote,/270[.]000/);assert.match(quote,/Artroscopia/);assert.match(quote,/Custo após convênio/);
  assert.equal(await page.evaluate(()=>window.__writes||0),0);assert.deepEqual(errors,[]);
  console.log('PASS: mobile recovery and study use API only, preserve request IDs after lost responses, recovery selection clears only on confirmation, duplicate clicks prevented.');
 }finally{await browser?.close();await server.close();}

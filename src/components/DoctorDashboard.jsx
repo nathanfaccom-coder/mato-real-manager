@@ -1,3 +1,4 @@
+import {SURGERY_OPTIONS,surgeryCategory,surgeryTerms} from '../medical/surgery-policy.js';
 import {AssistantPerks} from './AssistantPerks.jsx';
 import {secureGameLogin,matchApi} from '../services/game-auth.js';
 import React, { useState, useEffect } from "react";
@@ -42,10 +43,7 @@ export const DoctorDashboard = ({
   const activePerks = doctor.perks || [];
   const hasNutri = activePerks.some((p) => p.id === "SPORTS_NUTRITION");
   const hasFastDiag = activePerks.some((p) => p.id === "FAST_DIAGNOSIS");
-  const hasGoldenHands = activePerks.some((p) => p.id === "GOLDEN_HANDS");
-  const hasMiracle = activePerks.some((p) => p.id === "MIRACLE_WORKER");
   const hasColdBlood = activePerks.some((p) => p.id === "COLD_BLOOD");
-  const hasDiscount = activePerks.some((p) => p.id === "VIP_DISCOUNT");
 
   const studyRequest = React.useRef(null);
   const handleStudy = async () => {
@@ -167,66 +165,14 @@ export const DoctorDashboard = ({
         "Uma cirurgia exige muita concentração! Você precisa de pelo menos 40⚡.",
       );
 
-    let category = "LEVE";
-    const injuryName = typeof p.injury === "object" ? p.injury.label : p.injury;
-    if (INJURIES_DB.MODERADA.includes(injuryName)) category = "MODERADA";
-    if (INJURIES_DB.GRAVE.includes(injuryName)) category = "GRAVE";
-    if (INJURIES_DB.EXTREMA.includes(injuryName)) category = "EXTREMA";
-
-    if (category === "LEVE" || injuryName === "Intoxicação Alimentar")
-      return alert("Lesões clínicas não operáveis.");
-
-    const SURGERY_OPTIONS = {
-      MODERADA: [
-        {
-          name: "Fisioterapia PRP",
-          timeRed: 2,
-          cost: 750000,
-          baseSuccess: 0.85,
-        },
-      ],
-      GRAVE: [
-        { name: "Artroscopia", timeRed: 3, cost: 1500000, baseSuccess: 0.8 },
-        {
-          name: "Sutura Meniscal",
-          timeRed: 4,
-          cost: 3500000,
-          baseSuccess: 0.7,
-        },
-      ],
-      EXTREMA: [
-        {
-          name: "Enxerto Ligamentar",
-          timeRed: 6,
-          cost: 8000000,
-          baseSuccess: 0.65,
-        },
-        {
-          name: "Cirurgia Robótica",
-          timeRed: 8,
-          cost: 15000000,
-          baseSuccess: 0.5,
-        },
-      ],
-    };
-
+    const category = surgeryCategory(p.injury);
+    if (category === "LEVE") return alert("Lesões clínicas não operáveis.");
     const options = SURGERY_OPTIONS[category];
 
-    const lvlBonus = doctor.level * 0.02;
-    const exhaustionPenalty = energy < 30 ? 0.3 : energy < 50 ? 0.15 : 0;
-
-    const lista = options
-      .map((s, idx) => {
-        let finalChance = s.baseSuccess + lvlBonus - exhaustionPenalty;
-        if (hasGoldenHands) finalChance += 0.1;
-        finalChance = Math.min(0.99, Math.max(0.1, finalChance));
-
-        let surgeryCost = s.cost;
-        if (hasDiscount) surgeryCost = surgeryCost * 0.9;
-
-        return `${idx + 1}) ${s.name}\nCusto do Convênio: ${fmt(surgeryCost)} | Reduz: ${s.timeRed} ${hasMiracle ? "+1" : ""} jogos\nSua Chance de Sucesso: ${(finalChance * 100).toFixed(0)}%`;
-      })
-      .join("\n\n");
+    let quoted;
+    try { quoted = options.map(s => surgeryTerms({procedureId:s.id,doctor,player:p,team})); }
+    catch(error) { return alert(error.message); }
+    const lista = quoted.map((s,idx) => `${idx+1}) ${s.name}\nCusto após convênio: ${fmt(s.finalCost)} | Reduz: ${s.timeRed} jogos\nSua Chance de Sucesso: ${(s.chance*100).toFixed(0)}%`).join("\n\n");
 
     const escolha = prompt(
       `🔪 CENTRO CIRÚRGICO - Paciente: ${p.name}\nSua Energia: ${energy}% (Fadiga afeta precisão!)\n\nEscolha o procedimento (1-${options.length}):\n\n${lista}`,
@@ -236,19 +182,10 @@ export const DoctorDashboard = ({
       const cirurgia = options[parseInt(escolha) - 1];
       if (!cirurgia) return;
 
-      let finalChance = cirurgia.baseSuccess + lvlBonus - exhaustionPenalty;
-      if (hasGoldenHands) finalChance += 0.1;
-      finalChance = Math.min(0.99, Math.max(0.1, finalChance));
-
-      let baseCost = cirurgia.cost;
-      if (hasDiscount) baseCost = baseCost * 0.9;
-
-      const teamCoverage = team?.healthPlan?.coverage || 0;
-      const playerCoverage = p.healthPlan?.coverage || 0;
-      const bestCoverage = Math.max(teamCoverage, playerCoverage);
-      const finalCost = baseCost - baseCost * (bestCoverage / 100);
-
-      const doctorFee = baseCost * 0.1;
+      const terms = quoted[parseInt(escolha) - 1];
+      const finalChance = terms.chance;
+      const finalCost = terms.finalCost;
+      const doctorFee = terms.doctorFee;
 
       if ((p.hospitalFund || 0) + (p.balance || 0) < finalCost) {
         return alert(
@@ -284,8 +221,7 @@ export const DoctorDashboard = ({
       const success = Math.random() < finalChance;
 
       if (success) {
-        let tempoReduzido = cirurgia.timeRed;
-        if (hasMiracle) tempoReduzido += 1;
+        const tempoReduzido = terms.timeRed;
 
         const novoTempo = Math.max(0, p.recoveryLeft - tempoReduzido);
         let newXp = (doctor.xp || 0) + 50;
@@ -332,8 +268,7 @@ export const DoctorDashboard = ({
         );
       } else {
         // ERRO MÉDICO!
-        let penalty = 2;
-        if (hasColdBlood) penalty = 0;
+        const penalty = terms.failurePenalty;
 
         // LOG DO DIÁRIO
         let newLogs = [...(team?.trainingLogs || [])];

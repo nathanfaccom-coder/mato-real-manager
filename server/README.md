@@ -3,6 +3,16 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Surgery policy preparation (no trusted surgery endpoint yet)
+
+`src/medical/surgery-policy.js` centralizes existing procedures and computes cost,
+coverage, fee, chance and outcome modifiers. DoctorDashboard already uses it to
+show the actual post-coverage charge, rounded exactly to cents. It is a shared
+pure calculation, not authorization or a transactional surgery implementation.
+The next server path must review current source state and atomically debit funds,
+charge staff energy, apply injury/progression/fee/log/news effects and store a
+retry receipt. Legacy surgery writes remain an activation blocker.
+
 ## Medical evaluation (gated; not deployed)
 
 `POST .../medical-evaluate` accepts only `{requestId, playerId}`. It requires the

@@ -3,6 +3,33 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Shared surgery policy and accurate displayed cost — 2026-11-13
+
+- Verified clean workspace, remote bdb04ca and unchanged main c1bf386 (2.9.11).
+  Full GitHub runs 43352100602 and 43352095299 succeeded for prior evaluation.
+- Extracted the five existing procedures into src/medical/surgery-policy.js, with
+  category matching, level/fatigue/golden-hands chance, discount, best team/player
+  coverage, fees, healing bonus and cold-blood penalty. DoctorDashboard now uses
+  this one policy instead of duplicated calculations. Existing outcomes/writes
+  remain in the legacy action; surgery has NOT been moved to a trusted API yet.
+- Procedure selection now shows actual cost after health-plan coverage. Previously
+  its displayed amount omitted coverage even though the later charge applied it.
+  Payable amount rounds once to cents using decimal rational arithmetic; a test
+  exposed and fixed binary floating-point error at a half-cent boundary.
+  Invalid coverage/energy/level and incompatible procedures fail before charging.
+- 222 unit tests pass, covering all catalog categories/procedures, discount plus
+  coverage, fee basis, fatigue/skill chance and cent rounding. Mobile harness
+  confirms 270.000 quoted for discounted arthroscopy with 80% coverage and no DB
+  write on cancellation. Secure build passes. No new emulator mutation test was
+  required for this policy/UI-only change; server surgery remains outstanding.
+- Estimate remains 73% / 27%. Next: server quote/review and receipt-backed surgery
+  transaction, verifying doctor identity/club/patient/locks and source revisions;
+  debit hospitalFund before balance, pay fees only on success, apply doctor XP,
+  injury/mood/donors/logs and failure news atomically. Preserve surgery outcomes:
+  success +50 XP/fee, failure -20 XP floor zero, both cost 40 energy and charge
+  patient; COLD_BLOOD prevents extra injury and failure news. Public source-field
+  rules and wider training/economy/season/auth/deployment blockers still apply.
+
 ## Transactional medical evaluation — 2026-11-12
 
 - Verified remote 1cdb839 and clean workspace before editing; main remains

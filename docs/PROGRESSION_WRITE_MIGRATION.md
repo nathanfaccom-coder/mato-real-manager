@@ -39,3 +39,11 @@ those candidates include reads and non-Firestore methods, not 1,452 vulnerabilit
   surgery and employment still mutate source fields.
 - Next implementation priority: coach/solo training, medical surgery/supplies and items,
   weekly/season jobs and national match integration.
+
+## Surgery preparation
+
+The shared surgery policy now supplies both display and charge calculations in
+DoctorDashboard, including actual post-coverage cost and exact cent rounding.
+This is not server authorization: the legacy action still writes surgery funds,
+fees, injury, progression, logs and news. Move all those effects into one trusted
+transaction before enabling automatic progression under restrictive rules.

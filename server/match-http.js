@@ -1,3 +1,4 @@
+import {dismissStaff} from './staff-dismissal.js';
 import {deleteProduct} from './product-deletion.js';
 import {manufacture} from './manufacturing.js';
 import {purchase} from './purchases.js';
@@ -32,7 +33,7 @@ export function createMatchHandler({db,auth,enabled=false,origin='https://nathan
   if(request.method!=='POST')return respond(405,{error:'Método não permitido.'});
   if(!enabled)return respond(503,{error:'Integração automática ainda não liberada.'});
   const route=new URL(request.url).pathname.split('/').filter(Boolean).at(-1);
-  if(!['product-delete','admin-product-delete','manufacture','purchase','coach-training','staff-consume','consume-item','equip-item','solo-training','surgery-review','surgery-execute','medical-evaluate','doctor-study','staff-perks','staff-perk-choose','assistant-perks','assistant-perk-choose','staff-study','staff-recovery','competition-standings','match-correction-review','match-correct','match-view','match-list','fixture-review','fixture-approve','start','command','account-bind','account-state','account-review','player-apply','player-application','player-application-review','player-application-decide','session'].includes(route))return respond(404,{error:'Operação não encontrada.'});
+  if(!['staff-dismiss-review','staff-dismiss','product-delete','admin-product-delete','manufacture','purchase','coach-training','staff-consume','consume-item','equip-item','solo-training','surgery-review','surgery-execute','medical-evaluate','doctor-study','staff-perks','staff-perk-choose','assistant-perks','assistant-perk-choose','staff-study','staff-recovery','competition-standings','match-correction-review','match-correct','match-view','match-list','fixture-review','fixture-approve','start','command','account-bind','account-state','account-review','player-apply','player-application','player-application-review','player-application-decide','session'].includes(route))return respond(404,{error:'Operação não encontrada.'});
   const bearer=request.headers.get('authorization')||'';
   if(!/^Bearer [^\s]{1,8192}$/.test(bearer))return respond(401,{error:'Entre na sua conta.'});
   let identity;
@@ -55,7 +56,8 @@ export function createMatchHandler({db,auth,enabled=false,origin='https://nathan
   } catch {return respond(400,{error:'Pedido inválido.'});}
   try {
    let result;
-   if(route==='product-delete'||route==='admin-product-delete')result=await deleteProduct(db,identity.uid,input,{admin:route==='admin-product-delete'});
+   if(route==='staff-dismiss-review'||route==='staff-dismiss')result=await dismissStaff(db,identity.uid,input,{execute:route==='staff-dismiss'});
+   else if(route==='product-delete'||route==='admin-product-delete')result=await deleteProduct(db,identity.uid,input,{admin:route==='admin-product-delete'});
    else if(route==='manufacture')result=await manufacture(db,identity.uid,input);
    else if(route==='purchase')result=await purchase(db,identity.uid,input);
    else if(route==='coach-training')result=await trainCoach(db,identity.uid,input);
@@ -95,6 +97,7 @@ export function createMatchHandler({db,auth,enabled=false,origin='https://nathan
    }
    return respond(200,result);
   } catch (error) {
+   if(route==='staff-dismiss'&&error?.code==='STAFF_DISMISS_REVIEW_REQUIRED')return respond(409,{error:'Confira novamente as condições da rescisão.'});
    if(route==='surgery-execute'&&error?.code==='SURGERY_REVIEW_REQUIRED')return respond(409,{error:'Confira novamente as condições da cirurgia.'});
    // Avoid reflecting database paths, credentials or arbitrary internal errors.
    return respond(400,{error:'Não foi possível aplicar o pedido. Verifique sua permissão e o estado da partida.'});

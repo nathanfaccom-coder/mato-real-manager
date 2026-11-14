@@ -3,6 +3,29 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Reviewed atomic staff dismissal — 2026-11-13
+
+- Verified remote b1e559f and clean workspace; no competing process. Prior GitHub
+  checks 43526536693 and 43526525992 passed.
+- Added staff-dismiss-review/staff-dismiss for verified TEAM owner and current
+  same-club COACH/DOCTOR/SCOUT/ASSISTANT. Server derives four-salary fine, checks
+  current funds and team match lock; review returns fine/name/affordability with
+  quote bound to current salary, contract and balances, not raw financial data.
+- Execute takes IDs/quote only. Changed state returns 409 with no writes. Team
+  debit, staff credit, FREE assignment, zero contract, salary reset to 2500 and
+  private audited receipt commit atomically. Retry after release replays the same
+  result without payment; a new request cannot dismiss an already freed staff.
+- Secure handleFireCoach confirms server-reviewed terms, retains uncertain request
+  and quote after network errors, clears review only on explicit stale-state 409.
+  Legacy mode unchanged. This is not protection against public source mutations.
+- 274 unit tests, full Auth/Firestore emulator, mobile browser retry/stale-review
+  renewal and secure build pass. Covers all staff roles, exact-cent payments,
+  ownership/locks/forged fine, concurrent requests, changed financial conditions.
+- Estimate remains about 75% complete / 25% remaining. Next contract paths: buyout,
+  hiring, raise and negotiated departure; then wider economy, weekly/season/national,
+  source/account/rules migration and deployment. No live rules/data/gates changed.
+  Update NOT published. Check new GitHub CI after push.
+
 ## Authenticated product deletion — 2026-11-13
 
 - Resumed preserved uncommitted deletion work and confirmed completed logs. Remote

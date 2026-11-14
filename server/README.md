@@ -3,6 +3,22 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Staff dismissal (gated; not deployed)
+
+`POST .../staff-dismiss-review` accepts `{staffId}` and derives the existing
+four-week salary fine from current same-club staff data. Verified TEAM binding,
+entity ownership, active club/staff and team match lock are checked. It returns
+name, fine, affordability and a quote bound to the current contract/salary/balances.
+`POST .../staff-dismiss` accepts `{requestId,staffId,quote}` only. Changed reviewed
+state yields 409 before mutation. All COACH/DOCTOR/SCOUT/ASSISTANT roles are covered.
+
+Exact-cent team debit, staff payment, FREE team assignment, zero contract, base
+salary reset (2500) and private audit receipt commit atomically. Same request returns
+the original outcome even after release, preventing double payment. Secure client
+confirms server terms, keeps uncertain requests and reviews again after explicit
+409. Default legacy behavior remains. Buyout, raises, negotiated exits, hiring,
+contract source protection and wider account/rules migration are still pending.
+
 ## Product deletion (gated; not deployed)
 
 `POST .../product-delete` accepts `{requestId,productId}` and requires the verified

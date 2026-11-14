@@ -602,6 +602,7 @@ export function App() {
 
   const purchaseRequestRef = React.useRef(null);
   const productDeleteRequestRef = React.useRef(null);
+  const staffDismissRequestRef = React.useRef(null);
   const buyingRef = React.useRef(false);
   const recoveryRequestRef = React.useRef(null);
   const staffConsumeRequestRef = React.useRef(null);
@@ -687,6 +688,9 @@ export function App() {
     user,
     products,
     buyingRef,
+    staffDismissRequestRef,
+    reviewStaffDismissal: id => matchApi().reviewStaffDismissal(id),
+    dismissStaff: input => matchApi().dismissStaff(input),
     productDeleteRequestRef,
     deleteProductRequest: input => matchApi().deleteProduct(input),
     purchaseRequestRef,

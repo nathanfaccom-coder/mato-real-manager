@@ -14,6 +14,23 @@ export function createPlayersActions(context, actions) {
     context;
 
   const handleFireCoach = async (coach) => {
+    if(context.automaticMatches){
+      const ref=context.staffDismissRequestRef,key=JSON.stringify([user.data.id,coach.id]);
+      if(ref.current?.busy)return;
+      if(ref.current?.key!==key)ref.current={key};
+      const pending=ref.current;pending.busy=true;setLoading(true);
+      try{
+        if(!pending.request){
+          const review=await context.reviewStaffDismissal(coach.id);
+          if(!review.affordable){alert('Saldo insuficiente para pagar a rescisão!');ref.current=null;return;}
+          if(!confirm(`Demitir ${review.name}? Multa rescisória: ${fmt(review.fine)}.`)){ref.current=null;return;}
+          pending.request={requestId:crypto.randomUUID(),staffId:coach.id,quote:review.quote};
+        }
+        const result=await context.dismissStaff(pending.request);ref.current=null;alert(`Profissional desligado. Multa de ${fmt(result.fine)} paga.`);
+      }catch(error){if(error.code==='STAFF_DISMISS_REVIEW_REQUIRED')ref.current=null;alert(`${error.message} Tente novamente para consultar ou revisar a rescisão.`);}
+      finally{pending.busy=false;setLoading(false);}
+      return;
+    }
     const team = user.data;
     const currentSalary = parseFloat(coach.salary) || 2500;
     const fine = currentSalary * 4; // Multa = 4 semanas de salário

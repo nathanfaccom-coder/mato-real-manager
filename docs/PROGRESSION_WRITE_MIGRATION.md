@@ -86,3 +86,12 @@ authentication. Deletion and audit receipt are atomic; purchased inventory and
 balances remain intact. Replays are safe and stale purchase/restock cannot recreate
 the product. Remaining catalog protection requires restricting legacy direct writes
 and completing source/account migration; client routing alone is not DB protection.
+
+## Staff contract migration — dismissal
+
+handleFireCoach now uses server review/execute in secure mode. Verified TEAM
+ownership and current same-club staff determine the four-salary fine. Source-bound
+quote, match lock, exact-cent debit/payment, release/base salary and audit receipt
+are enforced transactionally. Unknown response retains request, explicit 409
+renews review and confirmation. Hiring, buyout, raises and negotiated departures
+remain direct-write paths to migrate before locking employment/finance fields.

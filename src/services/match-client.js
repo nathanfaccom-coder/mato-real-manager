@@ -6,6 +6,7 @@ export function createMatchClient({auth,endpoint,fetchImpl=fetch}) {
   if(auth.currentUser!==identity)throw Error('A sessão mudou. Entre novamente.');
   const response=await fetchImpl(`${endpoint}/${route}`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(payload),credentials:'omit',redirect:'error',cache:'no-store',signal:AbortSignal.timeout(20000)});
   if(response.status===401)throw Error((route.startsWith('fixture-')||route==='match-correction-review'||route==='match-correct')?'Confirme novamente sua senha de ADM para continuar.':'Sessão expirada. Entre novamente.');
+  if(route==='staff-dismiss'&&response.status===409)throw Object.assign(Error('As condições mudaram. Confira a rescisão novamente.'),{code:'STAFF_DISMISS_REVIEW_REQUIRED'});
   if(route==='surgery-execute'&&response.status===409)throw Object.assign(Error('As condições mudaram. Confira a cirurgia novamente.'),{code:'SURGERY_REVIEW_REQUIRED'});
   if(!response.ok)throw Error('Não foi possível consultar ou atualizar a partida. Confira a conexão e sua autorização.');
   const result=await response.json();
@@ -13,6 +14,8 @@ export function createMatchClient({auth,endpoint,fetchImpl=fetch}) {
   return result;
  }
  return {
+  reviewStaffDismissal:staffId=>request('staff-dismiss-review',{staffId}),
+  dismissStaff:({requestId,staffId,quote})=>request('staff-dismiss',{requestId,staffId,quote}),
   deleteProduct:({requestId,productId,admin=false})=>request(admin?'admin-product-delete':'product-delete',{requestId,productId}),
   manufacture:({requestId,productId,name,desc,img,cat,power,price,quantity})=>request('manufacture',{requestId,productId,name,desc,img,cat,power,price,quantity}),
   purchase:({requestId,productId,sellerId,giftPlayerId,expectedPrice})=>request('purchase',{requestId,productId,sellerId,giftPlayerId,expectedPrice}),

@@ -1,3 +1,4 @@
+import {verifyStaffBuyout} from './staff-buyout.mjs';
 import {verifyStaffDismissal} from './staff-dismissal.mjs';
 import {verifyManufacturing} from './manufacturing.mjs';
 import {verifyPurchases} from './purchases.mjs';
@@ -153,6 +154,7 @@ try {
  await verifyPurchases({db,auth,handle,ownerToken:idToken});
  await verifyManufacturing({db,auth,handle,ownerToken:idToken});
  await verifyStaffDismissal({db,auth,handle});
+ await verifyStaffBuyout({db,auth,handle});
  await auth.updateUser(OWNER_UID,{disabled:true});
  assert.equal((await handle(request())).status,401);
  console.log('PASS: real Auth emulator token, REST SDK transactions, retry deduplication, simultaneous settlement, exact XP/energy, lock release, deny-all fixture, disabled-user rejection.');

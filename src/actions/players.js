@@ -65,6 +65,23 @@ export function createPlayersActions(context, actions) {
   };
 
   const handleCoachSelfActions = async (action, coach) => {
+    if(context.automaticMatches&&action==='BUYOUT'){
+      const ref=context.staffBuyoutRequestRef,key=JSON.stringify([user.type,user.data.id]);
+      if(ref.current?.busy)return;
+      if(ref.current?.key!==key)ref.current={key};
+      const pending=ref.current;pending.busy=true;setLoading(true);
+      try{
+        if(!pending.request){
+          const review=await context.reviewStaffBuyout();
+          if(!review.affordable){alert(`Saldo insuficiente! Você precisa de ${fmt(review.fine)}.`);ref.current=null;return;}
+          if(!confirm(`Pagar ${fmt(review.fine)} ao ${review.teamName} para ficar livre?`)){ref.current=null;return;}
+          pending.request={requestId:crypto.randomUUID(),quote:review.quote};
+        }
+        const result=await context.buyoutStaff(pending.request);ref.current=null;alert(`Multa de ${fmt(result.fine)} paga! Você está livre no mercado.`);
+      }catch(error){if(error.code==='STAFF_BUYOUT_REVIEW_REQUIRED')ref.current=null;alert(`${error.message} Tente novamente para consultar ou revisar a rescisão.`);}
+      finally{pending.busy=false;setLoading(false);}
+      return;
+    }
     const team = teams.find((t) => t.id === coach.teamId);
     if (!team) return;
 

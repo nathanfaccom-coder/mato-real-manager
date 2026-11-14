@@ -95,3 +95,12 @@ quote, match lock, exact-cent debit/payment, release/base salary and audit recei
 are enforced transactionally. Unknown response retains request, explicit 409
 renews review and confirmation. Hiring, buyout, raises and negotiated departures
 remain direct-write paths to migrate before locking employment/finance fields.
+
+## Staff contract migration — self buyout
+
+Secure BUYOUT now derives the authenticated staff subject and current clause/club
+on the server, reviews terms before confirmation and atomically pays the club and
+releases the contract. Exact-cent fallback is ten salaries, matching existing rule.
+Receipt replay works after the profile becomes FREE; stale quotes require another
+review. No client staff ID, clause, team or balance is accepted. Hiring, raise and
+negotiated-departure paths still require migration before source writes are denied.

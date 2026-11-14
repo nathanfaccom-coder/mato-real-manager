@@ -3,6 +3,22 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Staff-paid contract buyout (gated; not deployed)
+
+`POST .../staff-buyout-review` takes an empty object; authenticated active staff
+binding and matching profile determine the subject, not a client staff/team ID.
+Current club, ownership and match lock are verified. The existing clause is used,
+or ten salaries when clause is absent/zero. Review returns fine, club name,
+affordability and a quote tied to current contract and finances.
+
+`POST .../staff-buyout` takes `{requestId,quote}`. Exact-cent staff debit, club
+credit, FREE assignment, zero contract, salary reset to 2500 and private audit
+receipt commit atomically. Replays work after release without paying again; stale
+conditions return 409. All four staff roles are supported. Secure UI confirms
+server terms, retains uncertain requests and renews confirmation after explicit
+409, without relying on a stale browser club lookup or page reload. Hiring,
+raises, negotiated exits and source/account/rules migration remain pending.
+
 ## Staff dismissal (gated; not deployed)
 
 `POST .../staff-dismiss-review` accepts `{staffId}` and derives the existing
@@ -16,7 +32,7 @@ Exact-cent team debit, staff payment, FREE team assignment, zero contract, base
 salary reset (2500) and private audit receipt commit atomically. Same request returns
 the original outcome even after release, preventing double payment. Secure client
 confirms server terms, keeps uncertain requests and reviews again after explicit
-409. Default legacy behavior remains. Buyout, raises, negotiated exits, hiring,
+409. Default legacy behavior remains. Raises, negotiated exits, hiring,
 contract source protection and wider account/rules migration are still pending.
 
 ## Product deletion (gated; not deployed)

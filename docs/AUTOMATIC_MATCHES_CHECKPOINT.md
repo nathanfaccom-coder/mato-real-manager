@@ -3,6 +3,28 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Authenticated staff-paid buyout — 2026-11-14
+
+- Resumed local work against unchanged remote 84be907; prior GitHub checks
+  43534181965 and 43534005796 succeeded. No competing writer found.
+- Added staff-buyout-review/staff-buyout for verified COACH/DOCTOR/SCOUT/ASSISTANT.
+  Server derives current club and fine (explicit clause, otherwise ten salaries),
+  checks ownership, active profiles, match lock and exact-cent balances. Client
+  cannot select another staff member or supply financial amounts.
+- Quote binds current contract and balances. Changed conditions return 409 with
+  no writes; staff debit, club credit, contract release and private audit receipt
+  commit atomically. Concurrent requests pay once; retry after release replays.
+- Secure client retains the same request after uncertain network errors and
+  requires fresh review after explicit 409. Legacy mode remains unchanged.
+- Validation: 278 unit tests, full Auth/Firestore emulator suite, browser retry
+  and stale-review renewal checks, secure build and diff whitespace check pass.
+- Still development only: public legacy source writes are not protected by these
+  endpoints. No production data, rules, gates or version changed. Next: hiring,
+  raises/negotiated departure, wider economy, weekly/season/national operations,
+  account/source/rules migration, secure configuration and deployment.
+- Estimate remains approximately 75% complete / 25% remaining; not a measured
+  release metric. Check GitHub CI for this commit after push.
+
 ## Reviewed atomic staff dismissal — 2026-11-13
 
 - Verified remote b1e559f and clean workspace; no competing process. Prior GitHub

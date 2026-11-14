@@ -104,3 +104,12 @@ releases the contract. Exact-cent fallback is ten salaries, matching existing ru
 Receipt replay works after the profile becomes FREE; stale quotes require another
 review. No client staff ID, clause, team or balance is accepted. Hiring, raise and
 negotiated-departure paths still require migration before source writes are denied.
+
+## Staff contract proposals
+
+RAISE and RESIGN_REQ submission now uses authenticated staff-contract-request in
+secure mode. Server derives the current staff/club and validates the requested
+salary; proposal creation and retry receipt are atomic. Submission never changes
+salary or contract. The client retains uncertain requests and avoids direct writes.
+Director decisions and hiring remain pending; source offers are still publicly
+writable under legacy rules, so serverCreated cannot be trusted as authorization.

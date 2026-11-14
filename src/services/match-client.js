@@ -6,6 +6,7 @@ export function createMatchClient({auth,endpoint,fetchImpl=fetch}) {
   if(auth.currentUser!==identity)throw Error('A sessão mudou. Entre novamente.');
   const response=await fetchImpl(`${endpoint}/${route}`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(payload),credentials:'omit',redirect:'error',cache:'no-store',signal:AbortSignal.timeout(20000)});
   if(response.status===401)throw Error((route.startsWith('fixture-')||route==='match-correction-review'||route==='match-correct')?'Confirme novamente sua senha de ADM para continuar.':'Sessão expirada. Entre novamente.');
+  if(route==='staff-contract-request'&&response.status===409)throw Object.assign(Error('Pedido recusado. Confira seu vínculo e o salário antes de tentar novamente.'),{code:'STAFF_CONTRACT_REQUEST_REJECTED'});
   if(route==='staff-buyout'&&response.status===409)throw Object.assign(Error('As condições mudaram. Confira a rescisão novamente.'),{code:'STAFF_BUYOUT_REVIEW_REQUIRED'});
   if(route==='staff-dismiss'&&response.status===409)throw Object.assign(Error('As condições mudaram. Confira a rescisão novamente.'),{code:'STAFF_DISMISS_REVIEW_REQUIRED'});
   if(route==='surgery-execute'&&response.status===409)throw Object.assign(Error('As condições mudaram. Confira a cirurgia novamente.'),{code:'SURGERY_REVIEW_REQUIRED'});
@@ -15,6 +16,7 @@ export function createMatchClient({auth,endpoint,fetchImpl=fetch}) {
   return result;
  }
  return {
+  requestStaffContract:({requestId,kind,requestedSalary})=>request('staff-contract-request',{requestId,kind,requestedSalary}),
   reviewStaffBuyout:()=>request('staff-buyout-review',{}),
   buyoutStaff:({requestId,quote})=>request('staff-buyout',{requestId,quote}),
   reviewStaffDismissal:staffId=>request('staff-dismiss-review',{staffId}),

@@ -3,6 +3,28 @@
 Status: development only; not released. Production remains 2.9.11.
 Base production commit: c1bf3866a99011be0a34e76db19343666ed2fb02.
 
+## Authenticated staff contract proposal submission — 2026-11-14
+
+- Verified clean workspace and unchanged remote 7e69614; no competing process.
+  Previous GitHub checks 43540060480 and 43540054974 passed.
+- Migrated RAISE and RESIGN_REQ submission to staff-contract-request. Verified
+  staff binding/ownership, current active club/profile and match lock determine
+  authoritative sender/recipient/names/current salary. Raises require positive
+  exact-cent amount above current salary; resignation requires null salary.
+- Proposal and private replay receipt commit atomically; concurrent same-request
+  submissions create one offer. No contract, salary or balance changes at submission.
+  Existing offer shapes are preserved. Separate request IDs remain separate offers.
+- Secure action bypasses legacy writes and stale browser club lookup. Lost-response
+  retry retains the same request; explicit validation 409 clears it for correction.
+  Generic internal failures retain the request because their outcome may be unknown.
+- 281 unit tests, full Auth/Firestore emulator suite, mobile browser lost-response
+  retry/rejected-request renewal and secure build pass; diff whitespace clean.
+- Not deployed. Director decisions, hiring, wider economy, weekly/season/national,
+  account/source/rules migration and secure deployment remain release blockers.
+  serverCreated is metadata, never authorization under the current public rules.
+  Production data, rules, gates and version unchanged. Estimate remains approximate
+  75% complete / 25% remaining. Check this commit's GitHub CI after push.
+
 ## Authenticated staff-paid buyout — 2026-11-14
 
 - Resumed local work against unchanged remote 84be907; prior GitHub checks

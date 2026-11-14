@@ -3,6 +3,21 @@
 Production is still 2.9.11. This directory is not included in the browser bundle.
 The Supabase synthetic probe passed, but live match automation is NOT enabled.
 
+## Staff contract proposals (gated; not deployed)
+
+`POST .../staff-contract-request` accepts `{requestId,kind,requestedSalary}`.
+Kinds are RAISE (positive exact-cent salary greater than current) and RESIGN_REQ
+(null salary). Verified staff binding, ownership, active profile/current club and
+match lock are checked. Sender, recipient, names and current salary come from the
+server. Proposal and private replay receipt commit atomically; no salary, money
+or employment changes occur at submission. Repeating an uncertain request creates
+no duplicate offer. A different request ID is a distinct proposal.
+
+Secure client bypasses legacy database writes, retains uncertain requests and
+clears explicitly rejected input for correction. Director acceptance/rejection and
+hiring still require migration; `serverCreated` is metadata, not authorization.
+Public legacy offer/source writes remain a release blocker.
+
 ## Staff-paid contract buyout (gated; not deployed)
 
 `POST .../staff-buyout-review` takes an empty object; authenticated active staff

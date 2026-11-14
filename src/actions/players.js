@@ -65,6 +65,27 @@ export function createPlayersActions(context, actions) {
   };
 
   const handleCoachSelfActions = async (action, coach) => {
+    if(context.automaticMatches&&['RAISE','RESIGN_REQ'].includes(action)){
+      const ref=context.staffContractRequestRef,key=JSON.stringify([user.type,user.data.id,action]);
+      if(ref.current?.busy)return;
+      if(ref.current&&ref.current.key!==key){alert('Conclua a tentativa do pedido anterior antes de enviar outro.');return;}
+      if(!ref.current)ref.current={key};
+      const pending=ref.current;pending.busy=true;setLoading(true);
+      try{
+        if(!pending.request){
+          let requestedSalary=null;
+          if(action==='RAISE'){
+            const ask=await promptMoney('Qual o novo salário semanal desejado?',user.data.salary);
+            if(!ask){ref.current=null;return;}
+            requestedSalary=Number(ask);
+          }else if(!confirm('Enviar pedido de demissão amigável? O clube pode recusar.')){ref.current=null;return;}
+          pending.request={requestId:crypto.randomUUID(),kind:action,requestedSalary};
+        }
+        await context.requestStaffContract(pending.request);ref.current=null;alert('Pedido enviado à diretoria!');
+      }catch(error){if(error.code==='STAFF_CONTRACT_REQUEST_REJECTED')ref.current=null;alert(error.message);}
+      finally{pending.busy=false;setLoading(false);}
+      return;
+    }
     if(context.automaticMatches&&action==='BUYOUT'){
       const ref=context.staffBuyoutRequestRef,key=JSON.stringify([user.type,user.data.id]);
       if(ref.current?.busy)return;

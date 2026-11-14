@@ -603,6 +603,7 @@ export function App() {
   const purchaseRequestRef = React.useRef(null);
   const productDeleteRequestRef = React.useRef(null);
   const staffDismissRequestRef = React.useRef(null);
+  const staffContractRequestRef = React.useRef(null);
   const staffBuyoutRequestRef = React.useRef(null);
   const buyingRef = React.useRef(false);
   const recoveryRequestRef = React.useRef(null);
@@ -689,6 +690,8 @@ export function App() {
     user,
     products,
     buyingRef,
+    staffContractRequestRef,
+    requestStaffContract: input => matchApi().requestStaffContract(input),
     staffBuyoutRequestRef,
     reviewStaffBuyout: () => matchApi().reviewStaffBuyout(),
     buyoutStaff: input => matchApi().buyoutStaff(input),

@@ -1,3 +1,5 @@
+import {AssistantPerks} from './AssistantPerks.jsx';
+import {matchApi,secureGameLogin} from '../services/game-auth.js';
 import React, { useState, useEffect } from "react";
 import { firebase } from "../services/firebase.js";
 import { ASSISTANT_PERKS } from "../game/ASSISTANT_PERKS.js";
@@ -19,7 +21,6 @@ export const AssistantDashboard = ({
   const [selectedPlayers, setSelectedPlayers] = useState([]);
 
   const energy = assistant.energy !== undefined ? assistant.energy : 100;
-  const isExhausted = energy < 20;
   const myItems = (sales || []).filter((s) => s.buyerId === assistant.id);
 
   const xpNext = assistant.level * 100;
@@ -37,6 +38,7 @@ export const AssistantDashboard = ({
   const activePerks = assistant.perks || [];
   const hasCoffee = activePerks.some((p) => p.id === "COFFEE_LOVER");
   const costToTrain = hasCoffee ? 10 : 20;
+  const isExhausted = energy < costToTrain;
 
   const handleTogglePlayer = (pid) => {
     if (selectedPlayers.includes(pid))
@@ -46,7 +48,23 @@ export const AssistantDashboard = ({
     else alert("Máximo de 5 jogadores na banheira de gelo!");
   };
 
+  const studyRequest = React.useRef(null);
   const handleStudy = async () => {
+    if (secureGameLogin) {
+      if (studyRequest.current?.busy) return;
+      if (studyRequest.current?.staffId !== assistant.id)
+        studyRequest.current = {staffId: assistant.id, requestId: crypto.randomUUID()};
+      const pending = studyRequest.current;
+      pending.busy = true;
+      try {
+        const result = await matchApi().study({requestId: pending.requestId});
+        studyRequest.current = null;
+        alert(`📚 Estudo confirmado: +${result.gain} XP, -${result.cost}⚡.${result.leveledUp ? ` Nível ${result.level} alcançado!` : ""}`);
+      } catch (error) {
+        alert(`${error.message} Tente novamente para consultar o mesmo estudo sem duplicar o custo.`);
+      } finally { pending.busy = false; }
+      return;
+    }
     if (energy < 20) return alert("Você está exausto! Tome um energético.");
     let xpGain = Math.floor(Math.random() * 15) + 10;
 
@@ -248,7 +266,8 @@ export const AssistantDashboard = ({
         </button>
       </div>
 
-      {showPerkSelection && (
+      {showPerkSelection && secureGameLogin && <AssistantPerks staffId={assistant.id} pendingPerks={assistant.pendingPerks} />}
+      {showPerkSelection && !secureGameLogin && (
         <div
           className="card pulse-border"
           style={{ background: "rgba(41, 121, 255, 0.1)", marginBottom: 15 }}
@@ -309,11 +328,11 @@ export const AssistantDashboard = ({
 
               <button
                 className="btn btn-blue"
-                onClick={() => {
+                onClick={async () => {
                   if (selectedPlayers.length === 0)
                     return alert("Selecione os jogadores (Max 5).");
-                  onTrainRegen(selectedPlayers);
-                  setSelectedPlayers([]);
+                  const confirmed = await onTrainRegen(selectedPlayers);
+                  if (confirmed !== false) setSelectedPlayers([]);
                 }}
               >
                 INICIAR REGENERATIVO (-{costToTrain}⚡)

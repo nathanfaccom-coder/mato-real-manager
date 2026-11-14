@@ -1,3 +1,5 @@
+import {evolveSeason} from '../game/progression.js';
+import {careerOf} from '../matches/policy.js';
 import { isMainAdmin } from "../admin/permissions.js";
 import { COMPANY_TYPES } from "../game/COMPANY_TYPES.js";
 import { fmt } from "../game/fmt.js";
@@ -343,39 +345,8 @@ export function createAdministrationActions(context, actions) {
       players.forEach((p) => {
         let u = {};
 
-        // 3.1.1. SISTEMA DE EVOLUÇÃO DE ATRIBUTOS
-        const totalXP = (p.xp || 0) + (p.pendingXP || 0);
-        const pointsToDistribute = Math.floor(totalXP / 100);
-        const remainderXP = totalXP % 100;
-
-        if (p.attributes && pointsToDistribute !== 0) {
-          let newAttrs = { ...p.attributes };
-          const keys = Object.keys(newAttrs);
-          const absPoints = Math.abs(pointsToDistribute);
-          const isPositive = pointsToDistribute > 0;
-
-          for (let i = 0; i < absPoints; i++) {
-            const randomKey = keys[Math.floor(Math.random() * keys.length)];
-            if (isPositive) {
-              if (newAttrs[randomKey] < 99) newAttrs[randomKey]++;
-            } else {
-              if (newAttrs[randomKey] > 1) newAttrs[randomKey]--;
-            }
-          }
-
-          u.attributes = newAttrs;
-          const vals = Object.values(newAttrs);
-          const newOverall = Math.round(
-            vals.reduce((acc, curr) => acc + curr, 0) / vals.length,
-          );
-
-          u.overall = newOverall;
-          u.xp = remainderXP;
-          u.pendingXP = 0;
-        } else {
-          u.xp = 0;
-          u.pendingXP = 0;
-        }
+        Object.assign(u, evolveSeason(p));
+        u.career = careerOf(p);
 
         // 3.1.2. ENVELHECIMENTO DE CONTRATOS (JOGADORES)
         let nc = (parseInt(p.contract) || 0) - 1;

@@ -1,3 +1,5 @@
+import {AssistantPerks} from './AssistantPerks.jsx';
+import {secureGameLogin} from '../services/game-auth.js';
 import { MoneyInput } from '../money/MoneyInput.jsx';
 import { CoachNumbers } from "../simulation/CoachNumbers.jsx";
 import { TacticsEditor } from "./TacticsEditor.jsx";
@@ -520,7 +522,8 @@ export const CoachDashboard = ({
             )}
           </div>
           {/* AVISOS DE NOVO NÍVEL (MOVIDOS PARA CÁ) */}
-          {showPerkSelection && (
+          {showPerkSelection && secureGameLogin && <AssistantPerks staffId={coach.id} pendingPerks={coach.pendingPerks} staffRole="COACH" />}
+          {showPerkSelection && !secureGameLogin && (
             <div
               className="card pulse-border"
               style={{ background: "rgba(255, 215, 0, 0.1)", marginBottom: 15 }}

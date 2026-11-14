@@ -1,3 +1,6 @@
+import {SURGERY_OPTIONS,surgeryCategory,surgeryTerms} from '../medical/surgery-policy.js';
+import {AssistantPerks} from './AssistantPerks.jsx';
+import {secureGameLogin,matchApi} from '../services/game-auth.js';
 import React, { useState, useEffect } from "react";
 import { firebase } from "../services/firebase.js";
 import { DOCTOR_PERKS } from "../game/DOCTOR_PERKS.js";
@@ -40,12 +43,25 @@ export const DoctorDashboard = ({
   const activePerks = doctor.perks || [];
   const hasNutri = activePerks.some((p) => p.id === "SPORTS_NUTRITION");
   const hasFastDiag = activePerks.some((p) => p.id === "FAST_DIAGNOSIS");
-  const hasGoldenHands = activePerks.some((p) => p.id === "GOLDEN_HANDS");
-  const hasMiracle = activePerks.some((p) => p.id === "MIRACLE_WORKER");
   const hasColdBlood = activePerks.some((p) => p.id === "COLD_BLOOD");
-  const hasDiscount = activePerks.some((p) => p.id === "VIP_DISCOUNT");
 
+  const studyRequest = React.useRef(null);
   const handleStudy = async () => {
+    if (secureGameLogin) {
+      if (studyRequest.current?.busy) return;
+      if (studyRequest.current?.staffId !== doctor.id)
+        studyRequest.current = {staffId: doctor.id, requestId: crypto.randomUUID()};
+      const pending = studyRequest.current;
+      pending.busy = true;
+      try {
+        const result = await matchApi().doctorStudy({requestId: pending.requestId});
+        studyRequest.current = null;
+        alert(`📚 Pesquisa confirmada: +${result.gain} XP, -${result.cost}⚡.${result.leveledUp ? ` Nível ${result.level} alcançado!` : ""}`);
+      } catch (error) {
+        alert(`${error.message} Tente novamente para consultar a mesma pesquisa sem duplicar o custo.`);
+      } finally { pending.busy = false; }
+      return;
+    }
     if (energy < 20)
       return alert("Você está exausto! Tome um energético antes de estudar.");
     let xpGain = Math.floor(Math.random() * 15) + 10;
@@ -76,7 +92,24 @@ export const DoctorDashboard = ({
     alert(`📚 Você estudou novos tratamentos e ganhou ${xpGain} XP!`);
   };
 
+  const evaluationRequest = React.useRef(null);
   const handleEvaluate = async (p) => {
+    if (secureGameLogin) {
+      if (evaluationRequest.current?.busy) return;
+      const key = JSON.stringify([doctor.id, p.id]);
+      if (evaluationRequest.current?.key !== key)
+        evaluationRequest.current = {key, requestId: crypto.randomUUID()};
+      const pending = evaluationRequest.current;
+      pending.busy = true;
+      try {
+        const result = await matchApi().evaluatePlayer({requestId: pending.requestId, playerId: p.id});
+        evaluationRequest.current = null;
+        alert(`${result.healed ? "✨ DIAGNÓSTICO PRECISO! Jogador liberado." : "📋 Avaliação concluída. O atleta ainda precisa de tratamento."} Custo: ${result.cost}⚡. +${result.xp} XP. Nível ${result.level}.`);
+      } catch (error) {
+        alert(`${error.message} Tente novamente com o mesmo jogador para consultar o pedido sem duplicá-lo.`);
+      } finally { pending.busy = false; }
+      return;
+    }
     const cost = hasFastDiag ? 5 : 10;
     if (energy < cost) return alert(`Energia insuficiente. (Custo: ${cost}⚡)`);
 
@@ -126,72 +159,47 @@ export const DoctorDashboard = ({
     }
   };
 
+  const surgeryRequest = React.useRef(null);
   const handleSurgery = async (p) => {
+    if (secureGameLogin) {
+      if (surgeryRequest.current?.busy) return;
+      const key = JSON.stringify([doctor.id,p.id]);
+      if (surgeryRequest.current?.key !== key) surgeryRequest.current = {key};
+      const pending = surgeryRequest.current;
+      pending.busy = true;
+      try {
+        if (!pending.payload) {
+          const review = await matchApi().reviewSurgery(p.id);
+          const choice = prompt(review.options.map((s,i)=>`${i+1}) ${s.name}\nCusto: ${fmt(s.finalCost)} | Reduz: ${s.timeRed} jogos\nChance: ${(s.chance*100).toFixed(0)}%${s.affordable ? "" : " — fundos insuficientes"}`).join("\n\n"));
+          if (!choice || !/^[1-9]$/.test(choice.trim())) { surgeryRequest.current=null; return; }
+          const selected = review.options[Number(choice.trim())-1];
+          if (!selected) { surgeryRequest.current=null; return; }
+          if (!selected.affordable) { surgeryRequest.current=null; return alert("O jogador não tem fundos suficientes."); }
+          if (!confirm(`Confirmar ${selected.name}? Custo: ${fmt(selected.finalCost)}. Energia: -40⚡. Honorários em caso de sucesso: ${fmt(selected.doctorFee)}.`)) { surgeryRequest.current=null; return; }
+          pending.payload = {requestId:crypto.randomUUID(),playerId:p.id,procedureId:selected.procedureId,quote:selected.quote};
+        }
+        const result = await matchApi().operate(pending.payload);
+        surgeryRequest.current = null;
+        alert(`${result.success ? "✅ CIRURGIA UM SUCESSO!" : "⚠️ Houve complicações na cirurgia."} Restam ${result.recoveryLeft} jogos de recuperação. Cobrança: ${fmt(result.charged)}. Honorários: ${fmt(result.doctorFee)}. XP: ${result.xpChange}.`);
+      } catch (error) {
+        if(error.code==='SURGERY_REVIEW_REQUIRED') { surgeryRequest.current=null; return alert(error.message); }
+        alert(`${error.message} Tente novamente com o mesmo paciente para consultar o pedido sem repetir a cobrança.`);
+      } finally { pending.busy=false; }
+      return;
+    }
     if (energy < 40)
       return alert(
         "Uma cirurgia exige muita concentração! Você precisa de pelo menos 40⚡.",
       );
 
-    let category = "LEVE";
-    const injuryName = typeof p.injury === "object" ? p.injury.label : p.injury;
-    if (INJURIES_DB.MODERADA.includes(injuryName)) category = "MODERADA";
-    if (INJURIES_DB.GRAVE.includes(injuryName)) category = "GRAVE";
-    if (INJURIES_DB.EXTREMA.includes(injuryName)) category = "EXTREMA";
-
-    if (category === "LEVE" || injuryName === "Intoxicação Alimentar")
-      return alert("Lesões clínicas não operáveis.");
-
-    const SURGERY_OPTIONS = {
-      MODERADA: [
-        {
-          name: "Fisioterapia PRP",
-          timeRed: 2,
-          cost: 750000,
-          baseSuccess: 0.85,
-        },
-      ],
-      GRAVE: [
-        { name: "Artroscopia", timeRed: 3, cost: 1500000, baseSuccess: 0.8 },
-        {
-          name: "Sutura Meniscal",
-          timeRed: 4,
-          cost: 3500000,
-          baseSuccess: 0.7,
-        },
-      ],
-      EXTREMA: [
-        {
-          name: "Enxerto Ligamentar",
-          timeRed: 6,
-          cost: 8000000,
-          baseSuccess: 0.65,
-        },
-        {
-          name: "Cirurgia Robótica",
-          timeRed: 8,
-          cost: 15000000,
-          baseSuccess: 0.5,
-        },
-      ],
-    };
-
+    const category = surgeryCategory(p.injury);
+    if (category === "LEVE") return alert("Lesões clínicas não operáveis.");
     const options = SURGERY_OPTIONS[category];
 
-    const lvlBonus = doctor.level * 0.02;
-    const exhaustionPenalty = energy < 30 ? 0.3 : energy < 50 ? 0.15 : 0;
-
-    const lista = options
-      .map((s, idx) => {
-        let finalChance = s.baseSuccess + lvlBonus - exhaustionPenalty;
-        if (hasGoldenHands) finalChance += 0.1;
-        finalChance = Math.min(0.99, Math.max(0.1, finalChance));
-
-        let surgeryCost = s.cost;
-        if (hasDiscount) surgeryCost = surgeryCost * 0.9;
-
-        return `${idx + 1}) ${s.name}\nCusto do Convênio: ${fmt(surgeryCost)} | Reduz: ${s.timeRed} ${hasMiracle ? "+1" : ""} jogos\nSua Chance de Sucesso: ${(finalChance * 100).toFixed(0)}%`;
-      })
-      .join("\n\n");
+    let quoted;
+    try { quoted = options.map(s => surgeryTerms({procedureId:s.id,doctor,player:p,team})); }
+    catch(error) { return alert(error.message); }
+    const lista = quoted.map((s,idx) => `${idx+1}) ${s.name}\nCusto após convênio: ${fmt(s.finalCost)} | Reduz: ${s.timeRed} jogos\nSua Chance de Sucesso: ${(s.chance*100).toFixed(0)}%`).join("\n\n");
 
     const escolha = prompt(
       `🔪 CENTRO CIRÚRGICO - Paciente: ${p.name}\nSua Energia: ${energy}% (Fadiga afeta precisão!)\n\nEscolha o procedimento (1-${options.length}):\n\n${lista}`,
@@ -201,19 +209,10 @@ export const DoctorDashboard = ({
       const cirurgia = options[parseInt(escolha) - 1];
       if (!cirurgia) return;
 
-      let finalChance = cirurgia.baseSuccess + lvlBonus - exhaustionPenalty;
-      if (hasGoldenHands) finalChance += 0.1;
-      finalChance = Math.min(0.99, Math.max(0.1, finalChance));
-
-      let baseCost = cirurgia.cost;
-      if (hasDiscount) baseCost = baseCost * 0.9;
-
-      const teamCoverage = team?.healthPlan?.coverage || 0;
-      const playerCoverage = p.healthPlan?.coverage || 0;
-      const bestCoverage = Math.max(teamCoverage, playerCoverage);
-      const finalCost = baseCost - baseCost * (bestCoverage / 100);
-
-      const doctorFee = baseCost * 0.1;
+      const terms = quoted[parseInt(escolha) - 1];
+      const finalChance = terms.chance;
+      const finalCost = terms.finalCost;
+      const doctorFee = terms.doctorFee;
 
       if ((p.hospitalFund || 0) + (p.balance || 0) < finalCost) {
         return alert(
@@ -249,8 +248,7 @@ export const DoctorDashboard = ({
       const success = Math.random() < finalChance;
 
       if (success) {
-        let tempoReduzido = cirurgia.timeRed;
-        if (hasMiracle) tempoReduzido += 1;
+        const tempoReduzido = terms.timeRed;
 
         const novoTempo = Math.max(0, p.recoveryLeft - tempoReduzido);
         let newXp = (doctor.xp || 0) + 50;
@@ -297,8 +295,7 @@ export const DoctorDashboard = ({
         );
       } else {
         // ERRO MÉDICO!
-        let penalty = 2;
-        if (hasColdBlood) penalty = 0;
+        const penalty = terms.failurePenalty;
 
         // LOG DO DIÁRIO
         let newLogs = [...(team?.trainingLogs || [])];
@@ -533,7 +530,8 @@ export const DoctorDashboard = ({
         </button>
       </div>
 
-      {showPerkSelection && (
+      {showPerkSelection && secureGameLogin && <AssistantPerks staffId={doctor.id} pendingPerks={doctor.pendingPerks} staffRole="DOCTOR" />}
+          {showPerkSelection && !secureGameLogin && (
         <div
           className="card pulse-border"
           style={{ background: "rgba(0, 230, 118, 0.1)", marginBottom: 15 }}

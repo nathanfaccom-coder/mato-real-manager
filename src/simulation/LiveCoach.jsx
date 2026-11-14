@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import {secureGameLogin,matchApi} from '../services/game-auth.js';
+import React, { useState, useRef } from 'react';
 import { db } from '../services/firebase.js';
 import { FORMATIONS } from '../game/FORMATIONS.js';
 import { POSTURES, controlsTeam } from './live-tactics.js';
 import { timeAtElapsed, timelineDurationMs } from './timeline.js';
 export function LiveCoach({ user, record, match, time }) {
+  const commandRequest=useRef(null);
   const [formation,setFormation] = useState('');
   const [posture,setPosture] = useState('neutral');
   const [playerId,setPlayerId] = useState('');
@@ -28,6 +30,20 @@ export function LiveCoach({ user, record, match, time }) {
   async function send(kind) {
     setBusy(true);setMessage('');
     try {
+      if(record.serverOwned){
+        const payload={matchId:record.id,kind};
+        if(kind==='tactics')Object.assign(payload,{formation:formation||frame.formations?.[side]||team.formation,posture});
+        else if(kind==='substitutions')Object.assign(payload,{changes});
+        else {
+          if(!penalty||!playerId)throw Error('Escolha o cobrador antes do fim do prazo.');
+          Object.assign(payload,{playerId,penaltyAt:penalty.t});
+        }
+        const fingerprint=JSON.stringify(payload);
+        if(commandRequest.current?.fingerprint!==fingerprint)commandRequest.current={fingerprint,requestId:crypto.randomUUID()};
+        await matchApi().command({...payload,requestId:commandRequest.current.requestId});
+        commandRequest.current=null;
+      } else {
+      if(secureGameLogin)throw Error('Esta transmissão antiga não aceita comandos.');
       await db.runTransaction(async tx => {
         const ref = db.collection('friendlyBroadcasts').doc(record.id);
         const doc = await tx.get(ref);
@@ -55,6 +71,7 @@ export function LiveCoach({ user, record, match, time }) {
         }
         tx.update(ref,{ commands: [...commands,command] });
       });
+      }
       if (kind === 'substitutions') setChanges([]);
       setMessage(kind === 'substitutions' ? 'Trocas enviadas. Aguardando a próxima paralisação.' : kind === 'tactics' ? 'Comando enviado. Aplicação na próxima saída de bola.' : 'Escolha enviada para esta cobrança.');
     } catch(e) {setMessage(e.message);} finally {setBusy(false);}

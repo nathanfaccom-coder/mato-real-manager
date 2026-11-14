@@ -1,3 +1,4 @@
+import {secureGameLogin,matchApi} from '../services/game-auth.js';
 import { MoneyInput } from '../money/MoneyInput.jsx';
 import React, { useState, useEffect } from "react";
 import { firebase, db } from "../services/firebase.js";
@@ -16,6 +17,7 @@ export const CompanyDashboard = ({
   onDeleteProd,
   onProcessSpons,
 }) => {
+  const manufacturingRef=React.useRef(null);
   const [tab, setTab] = useState("PRODS");
   // Estado do Produto em Edição (Inicia com Power 0 e Stock 1)
   const [editP, setEditP] = useState(null);
@@ -650,6 +652,19 @@ export const CompanyDashboard = ({
               <button
                 className="btn btn-green"
                 onClick={async () => {
+                  if(secureGameLogin){
+                    const payload={productId:editP.id??null,name:editP.name??'',desc:editP.desc??'',img:editP.img??'',cat:editP.cat,power:Number(editP.power??0),price:Number(editP.price),quantity:Number(editP.stock??1)};
+                    const key=JSON.stringify([company.id,payload]);
+                    if(manufacturingRef.current?.busy)return;
+                    if(manufacturingRef.current?.key!==key)manufacturingRef.current={key,requestId:crypto.randomUUID()};
+                    const pending=manufacturingRef.current;pending.busy=true;
+                    try{
+                      const result=await matchApi().manufacture({requestId:pending.requestId,...payload});manufacturingRef.current=null;setEditP(null);
+                      alert(`Produção confirmada: ${result.quantity} unidades. Custo: ${fmt(result.cost)}.`);
+                    }catch(error){alert(`${error.message} Tente novamente sem alterar o produto para consultar o pedido sem cobrar duas vezes.`);}
+                    finally{pending.busy=false;}
+                    return;
+                  }
                   const uCost = getProdCost(editP.cat, editP.power);
                   const qty = parseInt(editP.stock) || 1;
                   const tCost = uCost * qty;

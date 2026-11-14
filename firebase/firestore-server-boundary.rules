@@ -1,0 +1,63 @@
+// PROTOTYPE: server namespace boundary only; NOT full game protection.
+// Do not activate automatic rewards with this partial transition policy alone.
+// No production deployment is performed by the emulator tests.
+// Assumed data model:
+// adminProfiles/{uid}: name(2..80), login(3..32), permissions(enum list <=8),
+// active(bool), createdAt(number). Only principal manages these existing records.
+// authAccounts/{uid}: type/entityId/active/revision and server audit timestamps.
+// accountEntityOwners/{collection_entity}: uid/type/entityId/createdAt.
+// accountBindingAudit/{uid_revision}: identity, revision, actor, action, reason.
+// serverConfig/{feature}: enabled(bool), schemaVersion(int), server-only switches.
+// matchRuns/{id}: trusted snapshot, seed, schedule, commands, status, lease/retry.
+// matchParticipantLocks/{id}: active match ownership and scheduling metadata.
+// matchResults/{id}, matchResultAudit/{id_revision}: report, rewards, revision.
+// friendlyDailyXP/{player_day}: playerId/day/granted numeric daily allowance.
+// playerSeasons/{id}, playerCompetitions/{id}, competitionStandings/{id}:
+// server-produced career/season/competition aggregates.
+// playerApplications/{uid}: private profile application with Instagram, status,
+// revision, generated playerId and decision. playerApplicationAudit/{uid_revision}:
+// server-owned application transition audit; no public credential fields.
+// All fields in those 14 namespaces are opaque to clients: all client reads and
+// writes (including principal, descendants and queries) are denied. Server SDK
+// IAM bypasses Rules; application validators authorize and validate server writes.
+// Legacy teams/players/users/etc still contain credentials and arbitrary game
+// fields; their public policy is retained ONLY to avoid breaking existing flows.
+// That is a known critical vulnerability, not an approved final data model.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function serverOnly(collection) {
+      return collection in ['authAccounts', 'accountEntityOwners', 'accountBindingAudit',
+        'serverConfig', 'matchRuns', 'matchResults', 'matchResultAudit',
+        'matchParticipantLocks', 'friendlyDailyXP', 'playerSeasons',
+        'playerCompetitions', 'competitionStandings', 'playerApplications', 'playerApplicationAudit'];
+    }
+    function principal() {
+      return request.auth != null && request.auth.uid == 'NEXLYzsJfLPsTxzp3LKHKwaPhEZ2';
+    }
+    function validProfile() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['name', 'login', 'permissions', 'active', 'createdAt'])
+        && d.name is string && d.name.size() >= 2 && d.name.size() <= 80
+        && d.login is string && d.login.matches('^[a-z0-9][a-z0-9._-]{2,31}$')
+        && d.active is bool && d.createdAt is number
+        && d.permissions is list && d.permissions.size() <= 8
+        && d.permissions.hasOnly(['teams', 'finance', 'press', 'companies', 'staff', 'calendar', 'competitions', 'nationalTeams']);
+    }
+    match /adminProfiles/{uid} {
+      allow get: if principal() || (request.auth != null && request.auth.uid == uid);
+      allow list: if principal();
+      allow create, update: if principal() && uid != 'NEXLYzsJfLPsTxzp3LKHKwaPhEZ2' && validProfile();
+      allow delete: if principal() && uid != 'NEXLYzsJfLPsTxzp3LKHKwaPhEZ2';
+    }
+    // TRANSITION ONLY: preserve existing game behavior without breaking legacy
+    // accounts. The rest of the game remains public, as before. UI permissions
+    // are not a security boundary for these collections. Never describe this
+    // file as complete protection of the game or its economic operations.
+    // This excludes adminProfiles at every depth, so the broad legacy rule
+    // cannot override the protected account-management rules above.
+    match /{collection}/{document=**} {
+      allow read, write: if collection != 'adminProfiles' && !serverOnly(collection);
+    }
+  }
+}

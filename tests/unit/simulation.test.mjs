@@ -42,9 +42,11 @@ test("complete match is deterministic, immutable and all statistics follow its e
   assert.deepEqual(a.events, b.events);
   assert.deepEqual(a.frames, b.frames);
   assert.equal(JSON.stringify(snapshot), before);
-  assert.equal(a.frames.length, 5401);
+  const expectedDuration = 5400 + snapshot.addedTime.reduce((sum, minutes) => sum + minutes * 60, 0);
+  assert.equal(a.durationSeconds, expectedDuration);
+  assert.equal(a.frames.length, expectedDuration + 1);
   assert.equal(a.frames[0].t, 0);
-  assert.equal(a.frames.at(-1).t, 5400);
+  assert.equal(a.frames.at(-1).t, expectedDuration);
   for (const side of [0, 1])
     assert.equal(
       a.score[side],

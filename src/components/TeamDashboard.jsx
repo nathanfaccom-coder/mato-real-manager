@@ -249,7 +249,7 @@ export const TeamDashboard = ({
               </div>
 
               <div className="divider-soft">
-                <AttributeGrid attrs={p.attributes} pendingXP={p.pendingXP} />
+                <AttributeGrid attrs={p.attributes} pendingXP={p.pendingXP} xp={p.xp} overall={p.overall} />
               </div>
 
               {/* --- CONTROLES DE AÇÃO (ADMIN VS DONO DO TIME) --- */}

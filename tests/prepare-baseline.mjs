@@ -1,33 +1,15 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { execFileSync } from "node:child_process";
-import { transform } from "esbuild";
-const original = execFileSync(
-  "git",
-  ["show", "9b3f279480b532650eeeb7faeed879fe367f2378:index.html"],
-  { encoding: "utf8", maxBuffer: 5000000 },
-);
-const code = original.match(
-  /<script type="text\/babel">([\s\S]*?)<\/script>/,
-)[1];
-const compiled = await transform(code, {
-  loader: "jsx",
-  jsx: "transform",
-  target: "es2020",
-});
-await mkdir("tests/.baseline", { recursive: true });
-let html = original
-  .replace("<head>", '<head><base href="/">')
-  .replace(/\s*<script src="https:\/\/(?:unpkg.com|www.gstatic.com)[^\n]+/g, "")
-  .replace(/\s*<script src="scripts\/emergency.js"><\/script>/, "")
-  .replace(
-    /<script type="text\/babel">[\s\S]*?<\/script>/,
-    '<script type="module" src="/tests/.baseline/main.js"></script>',
-  );
-await writeFile("tests/.baseline/index.html", html);
-await writeFile(
-  "tests/.baseline/main.js",
-  `import React from 'react';\nimport ReactDOM from 'react-dom/client';\nimport firebase from '../fixtures/firebase.js';\n${compiled.code}`,
-);
-console.log(
-  "Baseline prepared from original commit; uses isolated test database.",
-);
+import {mkdir,rm,writeFile,readFile} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+// Fixed last published production source, not HEAD or an automatically accepted
+// screenshot. Both versions run against the same isolated Firebase fixture.
+const production='c1bf3866a99011be0a34e76db19343666ed2fb02';
+const target='tests/.baseline';
+await rm(target,{recursive:true,force:true});
+await mkdir(target,{recursive:true});
+const archive=execFileSync('git',['archive',production,'app.html','src','styles','assets','pwa','scripts'],{maxBuffer:50_000_000});
+execFileSync('tar',['-xf','-','-C',target],{input:archive});
+const html=await readFile(`${target}/app.html`,'utf8');
+if(!html.includes('src="/src/main.jsx"'))throw Error('Production entrypoint changed; review baseline setup.');
+await writeFile(`${target}/app.html`,html.replace('src="/src/main.jsx"','src="/tests/.baseline/src/main.jsx"'));
+await writeFile(`${target}/PRODUCTION_COMMIT`,production+'\n');
+console.log(`Visual baseline pinned to published 2.9.11 (${production}).`);

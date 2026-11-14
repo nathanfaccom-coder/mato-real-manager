@@ -1,3 +1,7 @@
+import {secureGameLogin,matchApi} from '../services/game-auth.js';
+import {MatchCorrectionPanel} from '../admin/MatchCorrectionPanel.jsx';
+import {RecordedMatchSummary} from '../matches/RecordedMatchSummary.jsx';
+import {CompetitionStandings} from '../matches/CompetitionStandings.jsx';
 import { LiveCoach } from "./LiveCoach.jsx";
 import { LineupPresentation } from './LineupPresentation.jsx';
 import React, { useState, useMemo, useEffect, useRef } from "react";
@@ -25,7 +29,9 @@ const durationOf = (record) =>
     : record?.durationMs || 360000) + (record?.preMatchMs || 0);
 const PREMATCH_MS = 28000;
 const minute = (t, match, stage) => formatMatchClock(t, match, stage);
-export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
+export function Broadcast({ user, teams, players, onBack, watchOnly = false, initialMatchId = null }) {
+  const startRequest = useRef(null);
+  const [correctionId,setCorrectionId]=useState(null);
   const [home, setHome] = useState(""),
     [away, setAway] = useState(""),
     [record, setRecord] = useState(null),
@@ -48,24 +54,54 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
     clock = useRef(0),
     elapsedClock = useRef(0);
   const creator = canAdmin(user, "competitions") && !watchOnly;
-  useEffect(
-    () =>
-      db
-        .collection("friendlyBroadcasts")
-        .orderBy("startedAt", "desc")
-        .limit(10)
-        .onSnapshot(
-          (s) => setRecords(s.docs.map((d) => ({ ...d.data(), id: d.id }))),
-          () => setError("Não foi possível carregar as transmissões."),
-        ),
-    [],
-  );
+  async function refreshMatches() {
+    try { setRecords((await matchApi().list()).matches); }
+    catch(e) { setError(e.message); }
+  }
   useEffect(() => {
-    if (!record?.id || record.playbackIntroAt) return;
+    if (secureGameLogin) {
+      let cancelled=false;
+      matchApi().list().then(data=>{if(!cancelled)setRecords(data.matches);}).catch(e=>{if(!cancelled)setError(e.message);});
+      return ()=>{cancelled=true;};
+    }
+    return db.collection('friendlyBroadcasts').orderBy('startedAt','desc').limit(10)
+      .onSnapshot(s=>setRecords(s.docs.map(d=>({...d.data(),id:d.id}))),()=>setError('Não foi possível carregar as transmissões.'));
+  }, []);
+  useEffect(() => {
+    if(!secureGameLogin || !initialMatchId)return;
+    let cancelled=false;
+    matchApi().read(initialMatchId).then(data=>{if(!cancelled)watch(data);}).catch(e=>{if(!cancelled)setError(e.message);});
+    return ()=>{cancelled=true;};
+  }, [initialMatchId]);
+  useEffect(() => {
+    if (!record?.id) return;
+    if(record.serverOwned){
+      let cancelled=false,timer;
+      async function poll(){
+        if(cancelled)return;
+        if(document.visibilityState==='hidden'){timer=setTimeout(poll,15000);return;}
+        try {
+          const updated=await matchApi().read(record.id);
+          if(cancelled)return;
+          setRecord(previous=>previous?.id!==updated.id?previous:
+            previous.status===updated.status && previous.commands?.length===updated.commands.length && previous.result?.revision===updated.result?.revision?previous:{...previous,...updated});
+          if(updated.result)return;
+        } catch(e){if(!cancelled)setError(e.message);}
+        if(!cancelled)timer=setTimeout(poll,15000);
+      }
+      timer=setTimeout(poll,15000);
+      return ()=>{cancelled=true;clearTimeout(timer);};
+    }
+    if(secureGameLogin || record.playbackIntroAt)return;
     return db.collection('friendlyBroadcasts').doc(record.id).onSnapshot(doc => {
       if (doc.exists) setRecord(previous => previous?.id === doc.id ? {...previous,...doc.data(),id:doc.id} : previous);
     }, () => setError('Conexão com os comandos ao vivo interrompida.'));
-  }, [record?.id, record?.playbackIntroAt]);
+  }, [record?.id, record?.serverOwned, record?.playbackIntroAt]);
+  async function openRecord(r) {
+    setBusy(true);
+    try { watch(r.serverOwned ? await matchApi().read(r.id) : r); }
+    catch(e){setError(e.message);}finally{setBusy(false);}
+  }
   const prepared = useMemo(() => {
     if (!record) return {};
     try {
@@ -145,7 +181,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
       const kickoffAt = (record?.playbackIntroAt ?? record?.startedAt ?? 0) + preMatchMs;
       if (record?.id && !record?.playbackIntroAt)
         elapsedClock.current = Math.max(0, Date.now() - record.startedAt - preMatchMs);
-      else if (playing && Date.now() >= kickoffAt)
+      else if (playing && (presentationSkipped || Date.now() >= kickoffAt))
         elapsedClock.current += elapsed * rate;
       const next = timeAtElapsed(match, elapsedClock.current);
       clock.current = next.time;
@@ -158,7 +194,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
     };
     id = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(id);
-  }, [match, playing, rate, record, duration]);
+  }, [match, playing, rate, record, duration, presentationSkipped]);
   function watch(r) {
     audio.current?.activate();
     const ended = Boolean(r.id && Date.now() >= r.startedAt + durationOf(r));
@@ -194,6 +230,16 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
     setBusy(true);
     setError("");
     try {
+      if(shared && secureGameLogin){
+        const pairing=JSON.stringify([home,away]);
+        if(startRequest.current?.pairing!==pairing)startRequest.current={pairing,requestId:crypto.randomUUID()};
+        const created=await matchApi().start({requestId:startRequest.current.requestId,homeId:home,awayId:away});
+        const saved=await matchApi().read(created.matchId);
+        startRequest.current=null;
+        watch(saved);
+        await refreshMatches();
+        return;
+      }
       const snapshot = prepare();
       const r = {
         snapshot,
@@ -247,13 +293,15 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
   const recentBroadcasts = (
     <>
       <h3>Transmissões recentes</h3>
+      {secureGameLogin && <button className="btn btn-ghost" onClick={refreshMatches}>Atualizar lista</button>}
       {records.length === 0 && <p>Nenhum amistoso transmitido ainda.</p>}
       {records.map((r) => (
         <button
           key={r.id}
           className="btn btn-ghost"
           style={{ display: "block", width: "100%", marginBottom: 8 }}
-          onClick={() => watch(r)}
+          disabled={busy}
+          onClick={() => openRecord(r)}
         >
           {r.snapshot?.home?.name} × {r.snapshot?.away?.name} ·{" "}
           {now < r.startedAt + durationOf(r) ? "AO VIVO" : "REVER PARTIDA"}
@@ -266,6 +314,20 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
       <button className="btn btn-ghost" onClick={onBack}>
         ← VOLTAR AO PAINEL
       </button>
+      {record?.serverOwned && <div className="card" role="status">
+        <strong>{record.kind==='OFFICIAL'?'Jogo oficial':'Amistoso'}</strong>
+        <p>{record.result ? `Resultado registrado: ${record.result.score[0]} × ${record.result.score[1]}. XP e cansaço aplicados.` : now>=record.endsAt ? 'Partida encerrada. Aguardando o registro do resultado pelo jogo.' : 'Partida em andamento. Resultado e recompensas serão registrados ao final.'}</p>
+      </div>}
+      {record?.serverOwned && record.result && <>
+        <RecordedMatchSummary record={record}/>
+        {record.kind==='OFFICIAL'&&record.competitionId&&record.seasonId&&<details><summary>CLASSIFICAÇÃO DA COMPETIÇÃO</summary><CompetitionStandings key={`${record.id}_${record.result.revision}`} competitionId={record.competitionId} seasonId={record.seasonId}/></details>}
+        <button className="btn btn-ghost" disabled={busy} onClick={async()=>{
+          setBusy(true);setError('');
+          try{const fresh=await matchApi().read(record.id);setRecord(current=>current?.id===fresh.id?{...current,...fresh}:current);}catch(e){setError(e.message);}finally{setBusy(false);}
+        }}>ATUALIZAR SÚMULA REGISTRADA</button>
+      </>}
+      {secureGameLogin && record?.result && canAdmin(user,'competitions') && <button className="btn btn-blue" onClick={()=>setCorrectionId(record.id)}>CORRIGIR SÚMULA</button>}
+      {secureGameLogin && correctionId && canAdmin(user,'competitions') && <MatchCorrectionPanel key={correctionId} matchId={correctionId} onClose={()=>setCorrectionId(null)} onSaved={async()=>{const fresh=await matchApi().read(correctionId);setRecord(current=>current?.id===fresh.id?{...current,...fresh}:current);}}/>}
       <MatchAudio
         ref={audio}
         match={match}
@@ -286,13 +348,11 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
       <h2>
         Mato Real TV{" "}
         <small style={{ fontSize: 12, color: "#53d8a2" }}>
-          AMISTOSOS • EXPERIMENTAL
+          {secureGameLogin ? 'OFICIAIS E AMISTOSOS' : 'AMISTOSOS • EXPERIMENTAL'}
         </small>
       </h2>
       <p>
-        Partida inteira em pixel art, com os atletas e uniformes atuais. Nesta
-        etapa, o amistoso gera sua própria súmula; não altera campeonatos,
-        energia ou overall.
+        {secureGameLogin ? 'Partidas transmitidas registram resultado, experiência e cansaço pelo jogo. Amistosos rendem experiência reduzida. A prévia local não gera recompensas.' : 'Partida inteira em pixel art, com os atletas e uniformes atuais. Nesta etapa, o amistoso gera sua própria súmula; não altera campeonatos, energia ou overall.'}
       </p>
       <p>
         <small>
@@ -337,7 +397,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
             </p>
             <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "12px 0" }}>
               <input type="checkbox" checked={penaltiesOnDraw} onChange={(e) => setPenaltiesOnDraw(e.target.checked)} />
-              Se terminar empatado, decidir nos pênaltis
+              {secureGameLogin ? 'Decidir nos pênaltis (somente na prévia local)' : 'Se terminar empatado, decidir nos pênaltis'}
             </label>
             {lineup.map((team, i) => (
               <details key={i}>
@@ -653,7 +713,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
                 min="0"
                 max={durationSeconds}
                 value={time}
-                style={{ width: "100%" }}
+                style={{ width: "100%", margin: 0, boxSizing: "border-box", display: "block" }}
                 onChange={(e) => seekMatch(e.target.value)}
               />
             </label>
@@ -663,7 +723,7 @@ export function Broadcast({ user, teams, players, onBack, watchOnly = false }) {
               <small>{n}</small>
             </p>
           ))}
-          {ended && (
+          {ended && !record?.serverOwned && (
             <section
               data-testid="player-ratings"
               aria-label="Notas dos jogadores"

@@ -1,3 +1,4 @@
+import {overallFor} from '../game/progression.js';
 import { promptMoney } from '../money/promptMoney.jsx';
 import { guardedBatch } from "../services/guardedWrites.js";
 import { POS_TRAINING_MAP } from "../game/POS_TRAINING_MAP.js";
@@ -13,6 +14,23 @@ export function createPlayersActions(context, actions) {
     context;
 
   const handleFireCoach = async (coach) => {
+    if(context.automaticMatches){
+      const ref=context.staffDismissRequestRef,key=JSON.stringify([user.data.id,coach.id]);
+      if(ref.current?.busy)return;
+      if(ref.current?.key!==key)ref.current={key};
+      const pending=ref.current;pending.busy=true;setLoading(true);
+      try{
+        if(!pending.request){
+          const review=await context.reviewStaffDismissal(coach.id);
+          if(!review.affordable){alert('Saldo insuficiente para pagar a rescisão!');ref.current=null;return;}
+          if(!confirm(`Demitir ${review.name}? Multa rescisória: ${fmt(review.fine)}.`)){ref.current=null;return;}
+          pending.request={requestId:crypto.randomUUID(),staffId:coach.id,quote:review.quote};
+        }
+        const result=await context.dismissStaff(pending.request);ref.current=null;alert(`Profissional desligado. Multa de ${fmt(result.fine)} paga.`);
+      }catch(error){if(error.code==='STAFF_DISMISS_REVIEW_REQUIRED')ref.current=null;alert(`${error.message} Tente novamente para consultar ou revisar a rescisão.`);}
+      finally{pending.busy=false;setLoading(false);}
+      return;
+    }
     const team = user.data;
     const currentSalary = parseFloat(coach.salary) || 2500;
     const fine = currentSalary * 4; // Multa = 4 semanas de salário
@@ -47,6 +65,44 @@ export function createPlayersActions(context, actions) {
   };
 
   const handleCoachSelfActions = async (action, coach) => {
+    if(context.automaticMatches&&['RAISE','RESIGN_REQ'].includes(action)){
+      const ref=context.staffContractRequestRef,key=JSON.stringify([user.type,user.data.id,action]);
+      if(ref.current?.busy)return;
+      if(ref.current&&ref.current.key!==key){alert('Conclua a tentativa do pedido anterior antes de enviar outro.');return;}
+      if(!ref.current)ref.current={key};
+      const pending=ref.current;pending.busy=true;setLoading(true);
+      try{
+        if(!pending.request){
+          let requestedSalary=null;
+          if(action==='RAISE'){
+            const ask=await promptMoney('Qual o novo salário semanal desejado?',user.data.salary);
+            if(!ask){ref.current=null;return;}
+            requestedSalary=Number(ask);
+          }else if(!confirm('Enviar pedido de demissão amigável? O clube pode recusar.')){ref.current=null;return;}
+          pending.request={requestId:crypto.randomUUID(),kind:action,requestedSalary};
+        }
+        await context.requestStaffContract(pending.request);ref.current=null;alert('Pedido enviado à diretoria!');
+      }catch(error){if(error.code==='STAFF_CONTRACT_REQUEST_REJECTED')ref.current=null;alert(error.message);}
+      finally{pending.busy=false;setLoading(false);}
+      return;
+    }
+    if(context.automaticMatches&&action==='BUYOUT'){
+      const ref=context.staffBuyoutRequestRef,key=JSON.stringify([user.type,user.data.id]);
+      if(ref.current?.busy)return;
+      if(ref.current?.key!==key)ref.current={key};
+      const pending=ref.current;pending.busy=true;setLoading(true);
+      try{
+        if(!pending.request){
+          const review=await context.reviewStaffBuyout();
+          if(!review.affordable){alert(`Saldo insuficiente! Você precisa de ${fmt(review.fine)}.`);ref.current=null;return;}
+          if(!confirm(`Pagar ${fmt(review.fine)} ao ${review.teamName} para ficar livre?`)){ref.current=null;return;}
+          pending.request={requestId:crypto.randomUUID(),quote:review.quote};
+        }
+        const result=await context.buyoutStaff(pending.request);ref.current=null;alert(`Multa de ${fmt(result.fine)} paga! Você está livre no mercado.`);
+      }catch(error){if(error.code==='STAFF_BUYOUT_REVIEW_REQUIRED')ref.current=null;alert(`${error.message} Tente novamente para consultar ou revisar a rescisão.`);}
+      finally{pending.busy=false;setLoading(false);}
+      return;
+    }
     const team = teams.find((t) => t.id === coach.teamId);
     if (!team) return;
 
@@ -152,6 +208,19 @@ export function createPlayersActions(context, actions) {
       !["COACH", "DOCTOR", "SCOUT", "ASSISTANT"].includes(user.type)
     )
       return;
+    if(context.automaticMatches){
+      const ref=context.staffConsumeRequestRef,key=JSON.stringify([user.type,user.data.id,item.id]);
+      if(ref.current?.busy)return;
+      if(ref.current?.key!==key)ref.current={key,requestId:crypto.randomUUID()};
+      const pending=ref.current;pending.busy=true;setLoading(true);
+      try{
+        const result=await context.consumeStaffItem({requestId:pending.requestId,itemId:item.id});
+        ref.current=null;setSales(prev=>prev.filter(s=>s.id!==result.itemId));
+        alert(result.outcome==='SUCCESS'?`⚡ Energia recuperada: +${result.energyRecovered}% (Total: ${result.energy}%).${result.toxicity>=2?' Cuidado com novos consumos hoje!':''}`:result.outcome==='SICK'?'🤢 Enjoo forte! Sua energia zerou.':'🤮 Vômito! Sua energia zerou.');
+      }catch(error){alert(`${error.message} Repita o mesmo item para consultar o pedido sem duplicá-lo.`);}
+      finally{pending.busy=false;setLoading(false);}
+      return;
+    }
     // 1. Configuração do Dia e Toxicidade
     const today = new Date().toDateString();
     const lastDate = user.data.lastToxicityDate || "";
@@ -271,6 +340,34 @@ export function createPlayersActions(context, actions) {
 
   const handleUseItem = async (item, action) => {
     if (!user.data || user.type !== "PLAYER") return;
+
+    if(context.automaticMatches && action === "CONSUME"){
+      const ref=context.consumeRequestRef,key=JSON.stringify([user.data.id,item.id]);
+      if(ref.current?.busy)return;
+      if(ref.current?.key!==key)ref.current={key,requestId:crypto.randomUUID()};
+      const pending=ref.current;pending.busy=true;setLoading(true);
+      try{
+        const result=await context.consumeItem({requestId:pending.requestId,itemId:item.id});
+        ref.current=null;setSales(prev=>prev.filter(s=>s.id!==result.itemId));
+        alert(result.outcome==='VOMIT'?'🤮 Seu corpo rejeitou o excesso: energia zerada e humor piorado.':result.outcome==='SICK'?'🤢 Intoxicação alimentar! Você terá que se recuperar naturalmente.':`⚡ Energia recuperada: +${result.energyRecovered}% (Total: ${result.energy}%).${result.toxicity>=2?' Atenção: novos consumos hoje têm risco de intoxicação ou vômito.':''}`);
+      }catch(error){alert(`${error.message} Repita o mesmo item para consultar o pedido sem duplicá-lo.`);}
+      finally{pending.busy=false;setLoading(false);}
+      return;
+    }
+
+    if(context.automaticMatches && action === "EQUIP"){
+      const ref=context.equipRequestRef,key=JSON.stringify([user.data.id,item.id]);
+      if(ref.current?.busy)return;
+      if(ref.current?.key!==key)ref.current={key,requestId:crypto.randomUUID()};
+      const pending=ref.current;pending.busy=true;setLoading(true);
+      try{
+        const result=await context.equipItem({requestId:pending.requestId,itemId:item.id});
+        ref.current=null;setSales(prev=>prev.filter(s=>s.id!==result.itemId));
+        alert(`🛡️ Item equipado: ${result.name}\nEle será consumido automaticamente no próximo treino.`);
+      }catch(error){alert(`${error.message} Repita o mesmo item para consultar o pedido sem duplicá-lo.`);}
+      finally{pending.busy=false;setLoading(false);}
+      return;
+    }
 
     // 1. TRAVA A TELA (LOADING)
     setLoading(true);
@@ -506,6 +603,28 @@ export function createPlayersActions(context, actions) {
   };
 
   const handleAssistantRegen = async (playerIds) => {
+    if (context.automaticMatches) {
+      const selected = [...playerIds].sort();
+      const key = JSON.stringify([user.data.id, selected]);
+      const ref = context.recoveryRequestRef;
+      if (ref.current?.busy) return false;
+      if (ref.current?.key !== key) ref.current = {key, requestId: crypto.randomUUID()};
+      const pending = ref.current;
+      pending.busy = true;
+      setLoading(true);
+      try {
+        const result = await context.recoverPlayers({requestId: pending.requestId, playerIds: selected});
+        ref.current = null;
+        alert(`Sessão de recuperação confirmada! Custo: ${result.cost}⚡\n\n${result.rows.map(r => r.skipped ? `⚠️ ${r.name}: sob cuidados do DM.` : `🔋 ${r.name}: +${r.energyRecovered}⚡ (+${r.xp} XP)${r.happy ? " 🤩" : ""}`).join("\n")}`);
+        return true;
+      } catch (error) {
+        alert(`${error.message} Tente novamente com os mesmos jogadores para consultar o pedido sem duplicá-lo.`);
+        return false;
+      } finally {
+        pending.busy = false;
+        setLoading(false);
+      }
+    }
     const assistant = user.data;
     const activePerks = assistant.perks || [];
 
@@ -610,6 +729,18 @@ export function createPlayersActions(context, actions) {
   };
 
   const handleCoachTrain = async (playerIds, type) => {
+    if(context.automaticMatches){
+      const ids=[...playerIds].sort(),ref=context.coachTrainRequestRef,key=JSON.stringify([user.data.id,type,ids]);
+      if(ref.current?.busy)return;
+      if(ref.current?.key!==key)ref.current={key,requestId:crypto.randomUUID()};
+      const pending=ref.current;pending.busy=true;setLoading(true);
+      try{
+        const result=await context.trainCoach({requestId:pending.requestId,type,playerIds:ids});ref.current=null;
+        alert(`Atividade confirmada! Energia: -${result.cost}. XP do técnico: +${result.coachXP}. Nível: ${result.level}.\n${result.rows.map(r=>`${r.name}: ${r.skipped?'não treinou':r.injured?r.injury:`+${r.xp} XP${r.learned?`; aprendeu ${r.learned}`:''}`}`).join('\n')}`);
+      }catch(error){alert(`${error.message} Repita a mesma seleção e treino para consultar o pedido sem duplicá-lo.`);}
+      finally{pending.busy=false;setLoading(false);}
+      return;
+    }
     const currentCoach = user.data;
     const coachEnergy =
       currentCoach.energy !== undefined ? currentCoach.energy : 100;
@@ -645,7 +776,7 @@ export function createPlayersActions(context, actions) {
 
     let trainedAttrs = [];
     if (type === "FISICO_BASE")
-      trainedAttrs = ["stamina", "balance", "condition", "strength"];
+      trainedAttrs = ["stamina", "balance", "condition", "balance"];
     else if (type === "VELOCIDADE")
       trainedAttrs = ["speed", "accel", "agility", "dribbleSpd"];
     else if (type === "IMPULSAO")
@@ -668,7 +799,7 @@ export function createPlayersActions(context, actions) {
     else if (type === "MENTAL")
       trainedAttrs = ["teamwork", "mentality", "response"];
     else if (type === "BOLA_PARADA")
-      trainedAttrs = ["freeKick", "curve", "header", "penalties"];
+      trainedAttrs = ["freeKick", "curve", "header", "shotTech"];
     else if (type === "GOLEIRO")
       trainedAttrs = ["gk", "response", "jump", "longPass"];
     else if (type === "STUDY") trainedAttrs = [];
@@ -743,7 +874,7 @@ export function createPlayersActions(context, actions) {
       }
 
       let newAttrs = { ...(p.attributes || {}) };
-      trainedAttrs.forEach((attr) => {
+      [...new Set(trainedAttrs)].forEach((attr) => {
         if ((newAttrs[attr] || 50) < 99) {
           if (Math.random() < xpGain / 80)
             newAttrs[attr] = (newAttrs[attr] || 50) + 1;
@@ -754,6 +885,7 @@ export function createPlayersActions(context, actions) {
         xp: (p.xp || 0) + xpGain,
         energy: newEnergy,
         attributes: newAttrs,
+        overall: overallFor(p.position, newAttrs, p.overall),
       };
 
       // --- LÓGICA DE APRENDER NOVA POSIÇÃO ---
@@ -848,6 +980,8 @@ export function createPlayersActions(context, actions) {
   };
 
   const handleEvolveCoachPerk = async (perk) => {
+    if (context.automaticMatches && ["ASSISTANT", "COACH", "DOCTOR"].includes(user.type))
+      return alert("Escolha uma habilidade nas opções confirmadas pelo servidor.");
     // Atualiza no Banco de Dados
     await db
       .collection("users")
@@ -876,6 +1010,18 @@ export function createPlayersActions(context, actions) {
   };
 
   const handlePlayerSoloTrain = async (player, type) => {
+    if(context.automaticMatches){
+      const ref=context.soloRequestRef,key=JSON.stringify([user.data.id,type]);
+      if(ref.current?.busy)return;
+      if(ref.current?.key!==key)ref.current={key,requestId:crypto.randomUUID()};
+      const pending=ref.current;pending.busy=true;setLoading(true);
+      try{
+        const result=await context.trainSolo({requestId:pending.requestId,type});ref.current=null;
+        alert(result.injured?`❌ Lesão no treino: ${result.injury}. 1 jogo fora. Energia: -${result.energyCost}.`:`Treino confirmado! Energia: -${result.energyCost}. XP: +${result.xp}. Bônus de equipamento: +${result.equipmentBonus}.`);
+      }catch(error){alert(`${error.message} Repita o mesmo treino para consultar o pedido sem duplicá-lo.`);}
+      finally{pending.busy=false;setLoading(false);}
+      return;
+    }
     const currentEnergy = player.energy !== undefined ? player.energy : 100;
 
     if (currentEnergy < 35)
@@ -905,7 +1051,7 @@ export function createPlayersActions(context, actions) {
 
     let trainedAttrs = [];
     if (type === "FISICO_BASE")
-      trainedAttrs = ["stamina", "balance", "condition", "strength"];
+      trainedAttrs = ["stamina", "balance", "condition", "balance"];
     else if (type === "VELOCIDADE")
       trainedAttrs = ["speed", "accel", "agility", "dribbleSpd"];
     else if (type === "IMPULSAO")
@@ -928,7 +1074,7 @@ export function createPlayersActions(context, actions) {
     else if (type === "MENTAL")
       trainedAttrs = ["teamwork", "mentality", "response"];
     else if (type === "BOLA_PARADA")
-      trainedAttrs = ["freeKick", "curve", "header", "penalties"];
+      trainedAttrs = ["freeKick", "curve", "header", "shotTech"];
     else if (type === "GOLEIRO")
       trainedAttrs = ["gk", "response", "jump", "longPass"];
 
@@ -949,7 +1095,7 @@ export function createPlayersActions(context, actions) {
 
     let newAttrs = { ...(player.attributes || {}) };
     let evolved = false;
-    trainedAttrs.forEach((attr) => {
+    [...new Set(trainedAttrs)].forEach((attr) => {
       if ((newAttrs[attr] || 50) < 99 && Math.random() < 0.15) {
         newAttrs[attr] = (newAttrs[attr] || 50) + 1;
         evolved = true;
@@ -961,6 +1107,7 @@ export function createPlayersActions(context, actions) {
       xp: (player.xp || 0) + xpGain,
       energy: newEnergy,
       attributes: newAttrs,
+      overall: overallFor(player.position, newAttrs, player.overall),
     });
 
     // ESCREVE NO DIÁRIO DO CLUBE

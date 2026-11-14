@@ -15,5 +15,5 @@ export function createGameActions(context) {
   Object.assign(actions, createPlayersActions(context, actions));
   Object.assign(actions, createSocialActions(context, actions));
   Object.assign(actions, createFinanceActions(context, actions));
-  return guardAdminActions(actions, context.user);
+  return guardAdminActions(actions, context.user, undefined, {automaticMatches:context.automaticMatches===true});
 }

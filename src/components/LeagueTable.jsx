@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
+import {LinkedCompetitionStandings} from '../matches/CompetitionStandings.jsx';
 
-export const LeagueTable = ({ teams, serie, estado, onInspectTeam }) => {
+export const LeagueTable = ({ teams, serie, estado, onInspectTeam, automaticMatches=false, matches=[] }) => {
+  if(automaticMatches)return <LinkedCompetitionStandings matches={matches} serie={serie} estado={estado} teams={teams} onInspectTeam={onInspectTeam}/>;
   const isEstadual = serie === "ESTADUAL";
 
   const list = teams

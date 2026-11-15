@@ -1,3 +1,12 @@
+## 2026-11-15 — Canonical exact-cent staff proposal values (chat-normal automation)
+
+- Commits `9061643` and `30a9f98` normalize accepted RAISE amounts to canonical two-decimal values before writing both the offer and the replay receipt. This avoids persisting floating-point sub-cent artifacts; RESIGN_REQ continues to store a null requested salary.
+- Commit `f383e19` adds regression coverage for canonical persisted amounts, idempotent retries with equivalent exact-cent values, and null amicable-release receipts.
+- The existing request validation, verified identity, ownership, transaction and disabled production gates remain in place. This does not migrate director decisions or protect legacy public offer writes.
+- GitHub connector confirmed commits; tests are **not executed** in this run because this container cannot resolve github.com to clone the repository. Run `node --test tests/unit/staff-contract-request.test.mjs` and the full unit/emulator/mobile/build suites before merging.
+- No backend activation, database migration or release. Production remains gated at the last confirmed 2.9.11; estimated completion remains 75% / 25% pending.
+- Next: authenticated contract decisions/hiring and public legacy write protections, then weekly/season jobs and national fixtures.
+
 ## 2026-11-15 — Staff contract proposal role labels (chat-normal automation)
 
 - Commit `f25ab6d` fixes the proposal description to identify COACH/DOCTOR/SCOUT/ASSISTANT as técnico/médico/olheiro/auxiliar, instead of incorrectly describing every profession as técnico. Both RAISE and RESIGN_REQ keep their existing offer types, fields, authorization, receipt/idempotency and financial behavior.

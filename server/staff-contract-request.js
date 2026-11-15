@@ -39,19 +39,22 @@ export async function requestStaffContract(db, uid, input, {now = Date.now()} = 
     const team = await read(ref('teams', staff.teamId));
     if (team?.status !== 'ACTIVE') throw reject('Clube indisponível.');
     if (await read(ref('matchParticipantLocks', `team_${staff.teamId}`))) throw reject('Clube em partida.');
+    const currentSalaryCents = typeof staff.salary === 'number' && Number.isFinite(staff.salary)
+      ? Math.round(staff.salary * 100) : NaN;
+    const currentSalary = Number.isSafeInteger(currentSalaryCents) ? currentSalaryCents / 100 : NaN;
     if (input.kind === 'RAISE' && (typeof staff.salary !== 'number' || !Number.isFinite(staff.salary) || staff.salary < 0 ||
-        !Number.isSafeInteger(Math.round(staff.salary * 100)) ||
-        Math.abs(staff.salary * 100 - Math.round(staff.salary * 100)) > 0.00001 ||
-        canonicalSalary <= staff.salary)) throw reject('O salário atual é inválido ou o aumento não supera o valor vigente.');
+        !Number.isSafeInteger(currentSalaryCents) ||
+        Math.abs(staff.salary * 100 - currentSalaryCents) > 0.00001 ||
+        canonicalSalary <= currentSalary)) throw reject('O salário atual é inválido ou o aumento não supera o valor vigente.');
     const teamName = typeof team.name === 'string' ? team.name : 'Clube';
     const coachName = typeof staff.name === 'string' ? staff.name : 'Profissional';
     const roleLabel = {COACH: 'técnico', DOCTOR: 'médico', SCOUT: 'olheiro', ASSISTANT: 'auxiliar'}[account.type];
-    const money = n => n.toLocaleString('pt-BR', {maximumFractionDigits: 2});
+    const money = n => n.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     const offer = {type: input.kind === 'RAISE' ? 'COACH_RAISE' : 'COACH_RESIGN',
       recipientId: staff.teamId, senderId: account.entityId, teamName, coachName,
       status: 'PENDING', date: now, serverCreated: true,
-      description: input.kind === 'RAISE' ? `💰 **PEDIDO DE AUMENTO**\nO ${roleLabel} **${coachName}** pede um reajuste salarial.\nAtual: ${money(staff.salary)} ➝ Pedido: ${money(canonicalSalary)}` : `👋 **PEDIDO DE DESLIGAMENTO**\nO ${roleLabel} **${coachName}** deseja rescindir o contrato amigavelmente (sem multa).`};
-    if (input.kind === 'RAISE') Object.assign(offer, {currentSalary: staff.salary, requestedSalary: canonicalSalary});
+      description: input.kind === 'RAISE' ? `💰 **PEDIDO DE AUMENTO**\nO ${roleLabel} **${coachName}** pede um reajuste salarial.\nAtual: ${money(currentSalary)} ➝ Pedido: ${money(canonicalSalary)}` : `👋 **PEDIDO DE DESLIGAMENTO**\nO ${roleLabel} **${coachName}** deseja rescindir o contrato amigavelmente (sem multa).`};
+    if (input.kind === 'RAISE') Object.assign(offer, {currentSalary, requestedSalary: canonicalSalary});
     const result = {offerId: offerRef.id, duplicate: false};
     tx.set(offerRef, offer);
     tx.set(receiptRef, {staffId: account.entityId, role: account.type, kind: input.kind, requestedSalary: canonicalSalary, createdAt: now, result});

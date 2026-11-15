@@ -23,13 +23,15 @@ export async function requestStaffContract(db, uid, input, {now = Date.now()} = 
     const owner = await read(ref('accountEntityOwners', `users_${account.entityId}`));
     if (owner?.uid !== uid || owner.type !== account.type || owner.entityId !== account.entityId) throw reject('Titular inválido.');
     const staff = await read(ref('users', account.entityId));
-    if (staff?.status !== 'ACTIVE' || staff.type !== account.type) throw reject('Profissional indisponível.');
     const receiptRef = ref(`serverConfig/staffContractRequest_${uid}/operations`, input.requestId);
     const receipt = await read(receiptRef);
     if (receipt) {
       if (receipt.staffId !== account.entityId || receipt.role !== account.type || receipt.kind !== input.kind || receipt.requestedSalary !== salary) throw reject('Pedido já utilizado.');
       return {...receipt.result, duplicate: true};
     }
+    // A confirmed receipt remains replayable after dismissal or contract changes.
+    // Identity and entity ownership above must still be valid on every retry.
+    if (staff?.status !== 'ACTIVE' || staff.type !== account.type) throw reject('Profissional indisponível.');
     if (!validDocumentId(staff.teamId) || staff.teamId === 'FREE') throw reject('Profissional sem clube.');
     const team = await read(ref('teams', staff.teamId));
     if (team?.status !== 'ACTIVE') throw reject('Clube indisponível.');

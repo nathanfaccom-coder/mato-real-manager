@@ -85,3 +85,24 @@ test('amicable release retains null requested salary in its receipt',async()=>{
  const receipt=db.values.get('serverConfig/staffContractRequest_u/operations/release-null');
  assert.equal(receipt.requestedSalary,null);
 });
+
+test('raise offer canonicalizes a valid floating-point salary and renders two decimals',async()=>{
+ const state=seed();
+ state['users/c'].salary=2500.01000000001;
+ const db=memoryDB(state);
+ const {offerId}=await requestStaffContract(db,'u',{requestId:'canonical-current',kind:'RAISE',requestedSalary:2500.02});
+ const offer=db.values.get('offers/'+offerId);
+ assert.equal(offer.currentSalary,2500.01);
+ assert.equal(offer.requestedSalary,2500.02);
+ assert.match(offer.description,/Atual: 2\\.500,01 ➝ Pedido: 2\\.500,02/);
+ assert.equal(db.values.get('users/c').salary,2500.01000000001);
+});
+
+test('raise requires a real increase above the canonical current salary',async()=>{
+ const state=seed();
+ state['users/c'].salary=2500.01000000001;
+ const db=memoryDB(state);
+ const before=structuredClone([...db.values]);
+ await assert.rejects(requestStaffContract(db,'u',{requestId:'same-cents',kind:'RAISE',requestedSalary:2500.01}));
+ assert.deepEqual([...db.values],before);
+});

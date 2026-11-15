@@ -1,3 +1,10 @@
+## 2026-11-15 — CI browser smoke setup resilience (chat-normal automation)
+
+- Commit `ef1508f` changes `.github/workflows/validate.yml`: gives `npm ci` a step ID and installs Chromium with `always() && steps.npm_dependencies.outcome == 'success'`. Previously a failing `npm test` skipped browser installation, while two `if: always()` smoke scripts still ran and failed due to missing Chromium, masking the root failure.
+- The fix preserves unit/build/e2e gating and existing browser smoke coverage. It does not suppress unit test failures or mark a failing run green. Dependency installation must succeed before Chromium is provisioned.
+- GitHub connector confirmed the workflow commit; CI results for this new commit must still be checked. Direct local clone was unavailable due to GitHub DNS resolution, so no local tests or hosted deployment were performed in this run.
+- No gameplay, XP, Firestore rules, credentials, production data, feature gates or version changed. Prior CI success was reported for run 43730131897; the new workflow change needs its own verification. Public legacy writes, account migration, authenticated contract decisions/hiring, weekly/season/national jobs and hosted staging remain blockers. Estimate remains approximately 75% / 25%, not a measured release metric.
+
 ## 2026-11-15 — GitHub Actions regression triage (chat-normal automation)
 
 - Inspected actual GitHub Actions run 43724491815 (commit b68786a): **288/289 unit tests passed**. The sole failure was an incorrectly double-escaped regex in the new salary display test; the displayed production string was correct. Fixed the assertion in commit `d350d9b` without changing server behavior.

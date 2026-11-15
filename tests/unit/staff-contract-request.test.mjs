@@ -94,7 +94,7 @@ test('raise offer canonicalizes a valid floating-point salary and renders two de
  const offer=db.values.get('offers/'+offerId);
  assert.equal(offer.currentSalary,2500.01);
  assert.equal(offer.requestedSalary,2500.02);
- assert.match(offer.description,/Atual: 2\\.500,01 ➝ Pedido: 2\\.500,02/);
+ assert.match(offer.description,/Atual: 2\.500,01 ➝ Pedido: 2\.500,02/);
  assert.equal(db.values.get('users/c').salary,2500.01000000001);
 });
 

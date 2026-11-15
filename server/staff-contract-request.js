@@ -4,11 +4,14 @@ const reject = message => Object.assign(Error(message), {code: 'STAFF_CONTRACT_R
 // Creates a proposal only. Salary and employment change only through a decision.
 export async function requestStaffContract(db, uid, input, {now = Date.now()} = {}) {
   const salary = input?.requestedSalary;
+  // Store canonical cents, never a floating-point sub-cent value in an offer or receipt.
+  const salaryCents = typeof salary === 'number' && Number.isFinite(salary) ? Math.round(salary * 100) : NaN;
+  const canonicalSalary = Number.isSafeInteger(salaryCents) ? salaryCents / 100 : NaN;
   if (!validDocumentId(uid) || !input || Array.isArray(input) ||
       Object.keys(input).some(k => !['requestId', 'kind', 'requestedSalary'].includes(k)) ||
       !validDocumentId(input.requestId) || !['RAISE', 'RESIGN_REQ'].includes(input.kind) ||
       (input.kind === 'RAISE' ? typeof salary !== 'number' || !Number.isFinite(salary) || salary <= 0 ||
-        !Number.isSafeInteger(Math.round(salary * 100)) || Math.abs(salary * 100 - Math.round(salary * 100)) > 0.00001 : salary !== null)) {
+        !Number.isSafeInteger(salaryCents) || Math.abs(salary * 100 - salaryCents) > 0.00001 : salary !== null)) {
     throw reject('Pedido inválido.');
   }
   const offerRef = db.collection('offers').doc();
@@ -26,7 +29,7 @@ export async function requestStaffContract(db, uid, input, {now = Date.now()} = 
     const receiptRef = ref(`serverConfig/staffContractRequest_${uid}/operations`, input.requestId);
     const receipt = await read(receiptRef);
     if (receipt) {
-      if (receipt.staffId !== account.entityId || receipt.role !== account.type || receipt.kind !== input.kind || receipt.requestedSalary !== salary) throw reject('Pedido já utilizado.');
+      if (receipt.staffId !== account.entityId || receipt.role !== account.type || receipt.kind !== input.kind || receipt.requestedSalary !== canonicalSalary) throw reject('Pedido já utilizado.');
       return {...receipt.result, duplicate: true};
     }
     // A confirmed receipt remains replayable after dismissal or contract changes.
@@ -39,7 +42,7 @@ export async function requestStaffContract(db, uid, input, {now = Date.now()} = 
     if (input.kind === 'RAISE' && (typeof staff.salary !== 'number' || !Number.isFinite(staff.salary) || staff.salary < 0 ||
         !Number.isSafeInteger(Math.round(staff.salary * 100)) ||
         Math.abs(staff.salary * 100 - Math.round(staff.salary * 100)) > 0.00001 ||
-        salary <= staff.salary)) throw reject('O salário atual é inválido ou o aumento não supera o valor vigente.');
+        canonicalSalary <= staff.salary)) throw reject('O salário atual é inválido ou o aumento não supera o valor vigente.');
     const teamName = typeof team.name === 'string' ? team.name : 'Clube';
     const coachName = typeof staff.name === 'string' ? staff.name : 'Profissional';
     const roleLabel = {COACH: 'técnico', DOCTOR: 'médico', SCOUT: 'olheiro', ASSISTANT: 'auxiliar'}[account.type];
@@ -47,11 +50,11 @@ export async function requestStaffContract(db, uid, input, {now = Date.now()} = 
     const offer = {type: input.kind === 'RAISE' ? 'COACH_RAISE' : 'COACH_RESIGN',
       recipientId: staff.teamId, senderId: account.entityId, teamName, coachName,
       status: 'PENDING', date: now, serverCreated: true,
-      description: input.kind === 'RAISE' ? `💰 **PEDIDO DE AUMENTO**\nO ${roleLabel} **${coachName}** pede um reajuste salarial.\nAtual: ${money(staff.salary)} ➝ Pedido: ${money(salary)}` : `👋 **PEDIDO DE DESLIGAMENTO**\nO ${roleLabel} **${coachName}** deseja rescindir o contrato amigavelmente (sem multa).`};
-    if (input.kind === 'RAISE') Object.assign(offer, {currentSalary: staff.salary, requestedSalary: salary});
+      description: input.kind === 'RAISE' ? `💰 **PEDIDO DE AUMENTO**\nO ${roleLabel} **${coachName}** pede um reajuste salarial.\nAtual: ${money(staff.salary)} ➝ Pedido: ${money(canonicalSalary)}` : `👋 **PEDIDO DE DESLIGAMENTO**\nO ${roleLabel} **${coachName}** deseja rescindir o contrato amigavelmente (sem multa).`};
+    if (input.kind === 'RAISE') Object.assign(offer, {currentSalary: staff.salary, requestedSalary: canonicalSalary});
     const result = {offerId: offerRef.id, duplicate: false};
     tx.set(offerRef, offer);
-    tx.set(receiptRef, {staffId: account.entityId, role: account.type, kind: input.kind, requestedSalary: salary, createdAt: now, result});
+    tx.set(receiptRef, {staffId: account.entityId, role: account.type, kind: input.kind, requestedSalary: canonicalSalary, createdAt: now, result});
     return result;
   });
 }

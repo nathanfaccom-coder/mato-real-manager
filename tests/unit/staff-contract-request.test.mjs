@@ -66,3 +66,22 @@ test('request replay still rejects revoked account or transferred entity owner',
   assert.deepEqual([...db.values],before);
  }
 });
+
+test('raise proposal persists canonical cents and replay compares canonical amount',async()=>{
+ const db=memoryDB(seed());
+ const requestedSalary=3000.01000000001;
+ const first=await requestStaffContract(db,'u',{requestId:'canonical-cents',kind:'RAISE',requestedSalary});
+ const offer=db.values.get('offers/'+first.offerId);
+ assert.equal(offer.requestedSalary,3000.01);
+ const receipt=db.values.get('serverConfig/staffContractRequest_u/operations/canonical-cents');
+ assert.equal(receipt.requestedSalary,3000.01);
+ const again=await requestStaffContract(db,'u',{requestId:'canonical-cents',kind:'RAISE',requestedSalary:3000.01});
+ assert.deepEqual(again,{offerId:first.offerId,duplicate:true});
+ assert.equal([...db.values.keys()].filter(p=>p.startsWith('offers/')).length,1);
+});
+test('amicable release retains null requested salary in its receipt',async()=>{
+ const db=memoryDB(seed());
+ await requestStaffContract(db,'u',{requestId:'release-null',kind:'RESIGN_REQ',requestedSalary:null});
+ const receipt=db.values.get('serverConfig/staffContractRequest_u/operations/release-null');
+ assert.equal(receipt.requestedSalary,null);
+});

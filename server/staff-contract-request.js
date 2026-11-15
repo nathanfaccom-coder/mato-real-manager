@@ -6,7 +6,7 @@ export async function requestStaffContract(db, uid, input, {now = Date.now()} = 
   const salary = input?.requestedSalary;
   // Store canonical cents, never a floating-point sub-cent value in an offer or receipt.
   const salaryCents = typeof salary === 'number' && Number.isFinite(salary) ? Math.round(salary * 100) : NaN;
-  const canonicalSalary = Number.isSafeInteger(salaryCents) ? salaryCents / 100 : NaN;
+  const canonicalSalary = salary === null ? null : Number.isSafeInteger(salaryCents) ? salaryCents / 100 : NaN;
   if (!validDocumentId(uid) || !input || Array.isArray(input) ||
       Object.keys(input).some(k => !['requestId', 'kind', 'requestedSalary'].includes(k)) ||
       !validDocumentId(input.requestId) || !['RAISE', 'RESIGN_REQ'].includes(input.kind) ||

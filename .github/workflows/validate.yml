@@ -13,10 +13,14 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - run: npm ci
+      - id: npm_dependencies
+        run: npm ci
       - run: npm test
       - run: npm run build
+      # Browser smoke tests run even when unit tests fail; provision Chromium
+      # independently so a unit failure does not produce misleading browser errors.
       - run: npx playwright install --with-deps chromium
+        if: ${{ always() && steps.npm_dependencies.outcome == 'success' }}
       - run: node tests/build-smoke.mjs
       - run: npm run test:e2e
       - run: node tests/staff-recovery-ui.mjs

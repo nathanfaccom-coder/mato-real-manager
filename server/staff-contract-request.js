@@ -29,7 +29,7 @@ export async function requestStaffContract(db, uid, input, {now = Date.now()} = 
     const receiptRef = ref(`serverConfig/staffContractRequest_${uid}/operations`, input.requestId);
     const receipt = await read(receiptRef);
     if (receipt) {
-      if (receipt.staffId !== account.entityId || receipt.role !== account.type || receipt.kind !== input.kind || receipt.requestedSalary !== canonicalSalary) throw reject('Pedido já utilizado.');
+      if (receipt.staffId !== account.entityId || receipt.role !== account.type || receipt.bindingRevision !== account.revision || receipt.kind !== input.kind || receipt.requestedSalary !== canonicalSalary) throw reject('Pedido já utilizado.');
       return {...receipt.result, duplicate: true};
     }
     // A confirmed receipt remains replayable after dismissal or contract changes.
@@ -57,7 +57,7 @@ export async function requestStaffContract(db, uid, input, {now = Date.now()} = 
     if (input.kind === 'RAISE') Object.assign(offer, {currentSalary, requestedSalary: canonicalSalary});
     const result = {offerId: offerRef.id, duplicate: false};
     tx.set(offerRef, offer);
-    tx.set(receiptRef, {staffId: account.entityId, role: account.type, kind: input.kind, requestedSalary: canonicalSalary, createdAt: now, result});
+    tx.set(receiptRef, {staffId: account.entityId, role: account.type, bindingRevision: account.revision, kind: input.kind, requestedSalary: canonicalSalary, createdAt: now, result});
     return result;
   });
 }

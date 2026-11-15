@@ -1,3 +1,9 @@
+## 2026-11-15 — Staff raise persisted-salary validation (chat-normal automation)
+
+- Commits `211cd1e` and `f445d1f` reject corrupt persisted salary values (NaN, Infinity, negative, fractional-cent or unsafe integer cents) before creating a staff raise proposal, and add focused regression cases. This prevents malformed salary descriptions/offers from entering the contract workflow.
+- Source and regression test committed to `feature/automatic-match-records`, PR #14. GitHub Actions returned no pull-request workflow runs for `f445d1f`; tests have **not** been executed in this automation run. Run `node --test tests/unit/staff-contract-request.test.mjs` and the full suite in a checkout before merging.
+- This change does **not** complete staff contract decision/hiring migration, source-field rules, or deployment. Production remains gated; do not enable automatic XP or publish based on this patch.
+
 # Automatic matches — implementation checkpoint
 
 Status: development only; not released. Production remains 2.9.11.

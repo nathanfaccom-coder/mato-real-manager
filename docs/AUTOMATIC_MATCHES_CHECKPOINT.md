@@ -1,3 +1,10 @@
+## 2026-11-15 — Staff contract proposal role labels (chat-normal automation)
+
+- Commit `f25ab6d` fixes the proposal description to identify COACH/DOCTOR/SCOUT/ASSISTANT as técnico/médico/olheiro/auxiliar, instead of incorrectly describing every profession as técnico. Both RAISE and RESIGN_REQ keep their existing offer types, fields, authorization, receipt/idempotency and financial behavior.
+- Commit `9198443` adds a role-by-kind regression matrix (four roles × two request kinds). No change to production gates or database rules.
+- GitHub connector wrote both files successfully. Tests **not executed** in this run: the container cannot resolve github.com to clone the repository; run `node --test tests/unit/staff-contract-request.test.mjs`, the full unit suite, Firebase emulator suite and secure client build in a connected runner before merge.
+- This is a small correctness fix, not a release-blocker resolution. Production remains gated at 2.9.11; estimate remains roughly 75% done / 25% outstanding. Next prioritize authenticated contract decisions and hiring, public legacy write protections, weekly/season jobs and national matches.
+
 ## 2026-11-15 — Contract request replay after employment changes (chat-normal automation)
 
 - Commits `1da3bc4` and `9c2b85a`: authenticated, same-owner retries now recover the original staff-contract request receipt even if the staff member has since been dismissed, their salary changed, or their staff type changed. Previously the staff ACTIVE/type guard ran before receipt lookup, so a successfully committed proposal could appear failed on a later network retry.

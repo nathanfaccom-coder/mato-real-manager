@@ -1,3 +1,10 @@
+## 2026-11-15 — Contract request replay after employment changes (chat-normal automation)
+
+- Commits `1da3bc4` and `9c2b85a`: authenticated, same-owner retries now recover the original staff-contract request receipt even if the staff member has since been dismissed, their salary changed, or their staff type changed. Previously the staff ACTIVE/type guard ran before receipt lookup, so a successfully committed proposal could appear failed on a later network retry.
+- Existing account activation, binding revision, ownership and receipt payload checks remain before replay. New regression tests cover post-request dismissal, salary/type changes, revoked accounts and ownership transfers; no second offer or financial mutation should occur.
+- The regression tests were committed but **not executed in this run** (the connector exposes no checkout/runner, and direct GitHub network access from the local container failed DNS resolution). Next: execute `node --test tests/unit/staff-contract-request.test.mjs`, the full suite, emulator and mobile integration in a connected runner.
+- No backend/frontend deployment, production credential/rules migration, or XP activation. Production remains gated and should not be published based on this patch.
+
 ## 2026-11-15 — Staff raise persisted-salary validation (chat-normal automation)
 
 - Commits `211cd1e` and `f445d1f` reject corrupt persisted salary values (NaN, Infinity, negative, fractional-cent or unsafe integer cents) before creating a staff raise proposal, and add focused regression cases. This prevents malformed salary descriptions/offers from entering the contract workflow.

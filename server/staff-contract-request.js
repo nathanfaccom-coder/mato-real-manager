@@ -34,7 +34,10 @@ export async function requestStaffContract(db, uid, input, {now = Date.now()} = 
     const team = await read(ref('teams', staff.teamId));
     if (team?.status !== 'ACTIVE') throw reject('Clube indisponível.');
     if (await read(ref('matchParticipantLocks', `team_${staff.teamId}`))) throw reject('Clube em partida.');
-    if (input.kind === 'RAISE' && (typeof staff.salary !== 'number' || !Number.isFinite(staff.salary) || salary <= staff.salary)) throw reject('O valor deve ser maior que o salário atual.');
+    if (input.kind === 'RAISE' && (typeof staff.salary !== 'number' || !Number.isFinite(staff.salary) || staff.salary < 0 ||
+        !Number.isSafeInteger(Math.round(staff.salary * 100)) ||
+        Math.abs(staff.salary * 100 - Math.round(staff.salary * 100)) > 0.00001 ||
+        salary <= staff.salary)) throw reject('O salário atual é inválido ou o aumento não supera o valor vigente.');
     const teamName = typeof team.name === 'string' ? team.name : 'Clube';
     const coachName = typeof staff.name === 'string' ? staff.name : 'Profissional';
     const money = n => n.toLocaleString('pt-BR', {maximumFractionDigits: 2});

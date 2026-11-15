@@ -1,3 +1,10 @@
+## 2026-11-15 — Canonical persisted salary in staff raise proposals (chat-normal automation)
+
+- Commit `96542cc` canonicalizes a validated existing staff salary to exact cents before writing `currentSalary`, comparing against the requested raise and rendering the proposal. Monetary descriptions now consistently show two decimal places. It does not change the staff salary document or settle contracts.
+- Commit `ec7dc44` adds tests for a representational floating-point artifact in the stored salary, two-decimal display, no mutation of the source salary, and rejecting a raise that equals the current canonical cents.
+- GitHub connector confirmed both commits in the feature branch. Tests were added but **not executed in this run**; run `node --test tests/unit/staff-contract-request.test.mjs`, full unit/emulator/mobile/build suites before merging. No production data/rules, credentials, backend gate or release changed.
+- Public legacy writes, authenticated contract decisions/hiring, weekly/season jobs, national fixtures, secure hosted credentials and final staging remain blockers. Production remains unactivated; estimated completion unchanged at approximately 75% / 25%.
+
 ## 2026-11-15 — Canonical exact-cent staff proposal values (chat-normal automation)
 
 - Commits `9061643` and `30a9f98` normalize accepted RAISE amounts to canonical two-decimal values before writing both the offer and the replay receipt. This avoids persisting floating-point sub-cent artifacts; RESIGN_REQ continues to store a null requested salary.

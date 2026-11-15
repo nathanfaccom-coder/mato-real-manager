@@ -28,3 +28,27 @@ test('raise rejects corrupt persisted salaries instead of issuing an invalid pro
   assert.deepEqual([...db.values],before);
  }
 });
+
+test('confirmed request receipt survives dismissal or salary change without a second offer',async()=>{
+ for(const patch of [{status:'FREE',teamId:'FREE'}, {salary:9999}, {type:'PLAYER'}]){
+  const db=memoryDB(seed());
+  const first=await requestStaffContract(db,'u',input);
+  db.values.set('users/c',{...db.values.get('users/c'),...patch});
+  const before=structuredClone([...db.values]);
+  const replay=await requestStaffContract(db,'u',input);
+  assert.deepEqual(replay,{offerId:first.offerId,duplicate:true});
+  assert.deepEqual([...db.values],before);
+  assert.equal([...db.values.keys()].filter(p=>p.startsWith('offers/')).length,1);
+ }
+});
+
+test('request replay still rejects revoked account or transferred entity owner',async()=>{
+ for(const [path,patch] of [['authAccounts/u',{active:false}],['accountEntityOwners/users_c',{uid:'other'}]]){
+  const db=memoryDB(seed());
+  await requestStaffContract(db,'u',input);
+  db.values.set(path,{...db.values.get(path),...patch});
+  const before=structuredClone([...db.values]);
+  await assert.rejects(requestStaffContract(db,'u',input));
+  assert.deepEqual([...db.values],before);
+ }
+});

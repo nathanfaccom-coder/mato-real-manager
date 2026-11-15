@@ -19,3 +19,12 @@ test('invalid amounts, forged identity and changed ownership or club lock never 
  for(const patch of [{requestedSalary:2500},{requestedSalary:NaN},{requestedSalary:3000.001},{staffId:'other'},{kind:'BUYOUT'},{kind:'RESIGN_REQ'}]){const db=memoryDB(seed()),before=structuredClone([...db.values]);await assert.rejects(requestStaffContract(db,'u',{...input,...patch}));assert.deepEqual([...db.values],before);}
  for(const [path,patch] of [['authAccounts/u',{active:false}],['accountEntityOwners/users_c',{uid:'other'}],['users/c',{teamId:'FREE'}],['users/c',{type:'PLAYER'}],['teams/t',{status:'PENDING'}],['matchParticipantLocks/team_t',{runId:'m'}]]){const s=seed();s[path]={...s[path],...patch};const db=memoryDB(s),before=structuredClone([...db.values]);await assert.rejects(requestStaffContract(db,'u',input));assert.deepEqual([...db.values],before);}
 });
+
+test('raise rejects corrupt persisted salaries instead of issuing an invalid proposal', async()=>{
+ for(const salary of [NaN, Infinity, -1, 2500.001, Number.MAX_SAFE_INTEGER]){
+  const state=seed();state['users/c'].salary=salary;
+  const db=memoryDB(state),before=structuredClone([...db.values]);
+  await assert.rejects(requestStaffContract(db,'u',{requestId:'corrupt-salary',kind:'RAISE',requestedSalary:3000.01}));
+  assert.deepEqual([...db.values],before);
+ }
+});

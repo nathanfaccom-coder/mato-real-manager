@@ -42,11 +42,12 @@ export async function requestStaffContract(db, uid, input, {now = Date.now()} = 
         salary <= staff.salary)) throw reject('O salário atual é inválido ou o aumento não supera o valor vigente.');
     const teamName = typeof team.name === 'string' ? team.name : 'Clube';
     const coachName = typeof staff.name === 'string' ? staff.name : 'Profissional';
+    const roleLabel = {COACH: 'técnico', DOCTOR: 'médico', SCOUT: 'olheiro', ASSISTANT: 'auxiliar'}[account.type];
     const money = n => n.toLocaleString('pt-BR', {maximumFractionDigits: 2});
     const offer = {type: input.kind === 'RAISE' ? 'COACH_RAISE' : 'COACH_RESIGN',
       recipientId: staff.teamId, senderId: account.entityId, teamName, coachName,
       status: 'PENDING', date: now, serverCreated: true,
-      description: input.kind === 'RAISE' ? `💰 **PEDIDO DE AUMENTO**\nO técnico **${coachName}** pede um reajuste salarial.\nAtual: ${money(staff.salary)} ➝ Pedido: ${money(salary)}` : `👋 **PEDIDO DE DESLIGAMENTO**\nO técnico **${coachName}** deseja rescindir o contrato amigavelmente (sem multa).`};
+      description: input.kind === 'RAISE' ? `💰 **PEDIDO DE AUMENTO**\nO ${roleLabel} **${coachName}** pede um reajuste salarial.\nAtual: ${money(staff.salary)} ➝ Pedido: ${money(salary)}` : `👋 **PEDIDO DE DESLIGAMENTO**\nO ${roleLabel} **${coachName}** deseja rescindir o contrato amigavelmente (sem multa).`};
     if (input.kind === 'RAISE') Object.assign(offer, {currentSalary: staff.salary, requestedSalary: salary});
     const result = {offerId: offerRef.id, duplicate: false};
     tx.set(offerRef, offer);

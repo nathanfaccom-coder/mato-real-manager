@@ -1,3 +1,10 @@
+## 2026-11-15 — GitHub Actions regression triage (chat-normal automation)
+
+- Inspected actual GitHub Actions run 43724491815 (commit b68786a): **288/289 unit tests passed**. The sole failure was an incorrectly double-escaped regex in the new salary display test; the displayed production string was correct. Fixed the assertion in commit `d350d9b` without changing server behavior.
+- The same run's two browser smoke scripts failed because the prior `npm test` step stopped the workflow before `npx playwright install --with-deps chromium`; both browser steps use `if: always()` and consequently ran without Chromium installed. This is a downstream CI setup failure, not evidence of a UI regression. A green unit step should allow browser installation; confirm on the next Actions run.
+- This is a tested-CI diagnosis and test-only correction, **not** a published feature or proof that the full suite now passes. Verify next run, including browser smoke and build, before implementing higher-risk contract decisions.
+- No Firebase rules, Supabase secrets, production data, XP activation or release changed. Public legacy write vulnerabilities, account migration, contract decisions/hiring, weekly/season/national jobs and staging remain blockers. Keep approximate 75%/25% estimate unchanged.
+
 ## 2026-11-15 — Canonical persisted salary in staff raise proposals (chat-normal automation)
 
 - Commit `96542cc` canonicalizes a validated existing staff salary to exact cents before writing `currentSalary`, comparing against the requested raise and rendering the proposal. Monetary descriptions now consistently show two decimal places. It does not change the staff salary document or settle contracts.

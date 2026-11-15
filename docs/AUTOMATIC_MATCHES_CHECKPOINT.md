@@ -1,3 +1,10 @@
+## 2026-11-15 — Staff proposal receipt bound to account revision (chat-normal automation)
+
+- Commits `be0d8d2` and `407f0af`: staff-contract-request now records the verified authAccounts binding revision in its private receipt and requires the same revision for replay. This prevents an old request ID from being accepted after an account binding is reissued, while unchanged bindings still replay without duplicating an offer.
+- Added a unit regression that creates an offer, increments the account revision and verifies the old receipt is rejected without creating another offer or changing stored data. Legacy receipts without a revision fail closed on replay; a new request ID can be submitted under a valid active binding.
+- Changes were committed through the GitHub connector. Tests have not been executed in this run; verify GitHub Actions and the unit/emulator/mobile/build suites before merging. No production rules, secrets, economy, XP, gates, or deployment were changed.
+- Authenticated director decisions and hiring, public legacy write restrictions, weekly/season/national jobs, source/account migration and secure deployment remain blockers. Approximate progress stays 75% / 25%.
+
 ## 2026-11-15 — CI browser smoke setup resilience (chat-normal automation)
 
 - Commit `ef1508f` changes `.github/workflows/validate.yml`: gives `npm ci` a step ID and installs Chromium with `always() && steps.npm_dependencies.outcome == 'success'`. Previously a failing `npm test` skipped browser installation, while two `if: always()` smoke scripts still ran and failed due to missing Chromium, masking the root failure.

@@ -1,11 +1,13 @@
+import {xpCost} from '../game/progression.js';
 import React, { useState, useEffect } from "react";
 import { ATTR_LABELS } from "../game/ATTR_LABELS.js";
 import { getAttrColor } from "../game/getAttrColor.js";
 
-export const AttributeGrid = ({ attrs, pendingXP }) => {
+export const AttributeGrid = ({ attrs, pendingXP, xp = 0, overall = 50 }) => {
   if (!attrs) return <small>Atributos não gerados.</small>;
 
-  const pointsToAdd = pendingXP ? Math.floor(pendingXP / 100) : 0;
+  const total = xp + (pendingXP || 0);
+  const pointsToAdd = Math.trunc(total / xpCost(overall));
   const projectionText =
     pointsToAdd !== 0
       ? pointsToAdd > 0

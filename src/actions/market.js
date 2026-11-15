@@ -118,6 +118,18 @@ export function createMarketActions(context, actions) {
     );
   };
 
+  const deleteProduct = async (productId) => {
+    if(!confirm("Excluir produto?"))return;
+    if(!context.automaticMatches){await db.collection("products").doc(productId).delete();return;}
+    const ref=context.productDeleteRequestRef,admin=user.type==='ADMIN',key=JSON.stringify([user.type,user.data.id,productId]);
+    if(ref.current?.busy)return;
+    if(ref.current?.key!==key)ref.current={key,requestId:crypto.randomUUID()};
+    const pending=ref.current;pending.busy=true;setLoading(true);
+    try{await context.deleteProductRequest({requestId:pending.requestId,productId,admin});ref.current=null;alert("Produto excluído.");}
+    catch(error){alert(`${error.message} Repita a exclusão do mesmo produto para consultar o pedido.`);}
+    finally{pending.busy=false;setLoading(false);}
+  };
+
   const saveProduct = async (p) => {
     const price = parseFloat(p.price);
     const payload = {
@@ -211,13 +223,16 @@ export function createMarketActions(context, actions) {
     buyingRef.current = true;
     setLoading(true);
     try {
-      const result = await purchaseProduct(db, firebase.firestore.FieldValue, {
+      const key=JSON.stringify([user.type,user.data.id,prod.id,seller.id,giftTarget?.id??null,price]);
+      if(context.automaticMatches&&context.purchaseRequestRef.current?.key!==key)context.purchaseRequestRef.current={key,requestId:crypto.randomUUID()};
+      const result = context.automaticMatches ? await context.purchase({requestId:context.purchaseRequestRef.current.requestId,productId:prod.id,sellerId:seller.id,giftPlayerId:giftTarget?.id??null,expectedPrice:price}) : await purchaseProduct(db, firebase.firestore.FieldValue, {
         user,
         productId: prod.id,
         sellerId: seller.id,
         giftTarget,
         expectedPrice: price,
       });
+      if(context.automaticMatches)context.purchaseRequestRef.current=null;
       let msg = giftTarget
         ? `✅ Presente enviado com sucesso para ${giftTarget.name}!`
         : "✅ Compra realizada com sucesso!";
@@ -1120,6 +1135,7 @@ export function createMarketActions(context, actions) {
     requestSponsorship,
     processSponsorship,
     buyProduct,
+    deleteProduct,
     handleAcceptCoachOffer,
     handleRejectCoachOffer,
     sendOffer,

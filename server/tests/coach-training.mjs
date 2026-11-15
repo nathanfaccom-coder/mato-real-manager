@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+export async function verifyCoachTraining({db,auth,handle}){
+ await auth.createUser({uid:'training-coach',email:'training-coach@example.test',emailVerified:true});
+ const signed=await fetch('http://127.0.0.1:19099/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=fake',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:await auth.createCustomToken('training-coach'),returnSecureToken:true})});const {idToken}=await signed.json();assert.ok(idToken);
+ await db.doc('authAccounts/training-coach').set({active:true,type:'COACH',entityId:'training-coach',revision:1});await db.doc('accountEntityOwners/users_training-coach').set({uid:'training-coach',type:'COACH',entityId:'training-coach'});
+ await db.doc('users/training-coach').set({status:'ACTIVE',type:'COACH',teamId:'training-team',energy:100,xp:0,level:1});await db.doc('teams/training-team').set({status:'ACTIVE',ctLevel:1});await db.doc('players/training-player').set({status:'ACTIVE',teamId:'training-team',energy:100,xp:0,position:'ATA'});
+ const request=body=>handle(new Request('https://example.test/coach-training',{method:'POST',headers:{Authorization:`Bearer ${idToken}`,'Content-Type':'application/json'},body:JSON.stringify(body)}));const input={requestId:'once',type:'CHUTE',playerIds:['training-player']};
+ assert.equal((await request({...input,xp:999})).status,400);await db.doc('matchParticipantLocks/team_training-team').set({runId:'m'});assert.equal((await request(input)).status,400);await db.doc('matchParticipantLocks/team_training-team').delete();
+ const rs=await Promise.all([request(input),request(input)]);for(const r of rs)assert.equal(r.status,200,await r.clone().text());const result=await Promise.all(rs.map(r=>r.json()));assert.deepEqual(result.map(r=>r.duplicate).sort(),[false,true]);assert.deepEqual({...result[0],duplicate:false},{...result[1],duplicate:false});
+ const p=(await db.doc('players/training-player').get()).data();assert.equal(p.energy,result[0].rows[0].injured?85:75);assert.equal(p.xp,result[0].rows[0].xp??0);assert.equal((await db.doc('users/training-coach').get()).data().energy,80);assert.equal((await db.collection('serverConfig/coachTraining_training-coach/operations').get()).size,1);
+ console.log('PASS: authenticated coach training rejects forged XP and locks; simultaneous retries apply player and coach progression exactly once.');
+}

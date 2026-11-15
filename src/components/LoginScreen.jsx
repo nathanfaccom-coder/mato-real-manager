@@ -1,3 +1,6 @@
+import {SecureAccessForm} from "./SecureAccessForm.jsx";
+import {SecurePlayerRegistration} from './SecurePlayerRegistration.jsx';
+import {secureGameLogin} from "../services/game-auth.js";
 import { MoneyInput } from '../money/MoneyInput.jsx';
 import { AppearanceEditor } from "../simulation/Editors.jsx";
 import { NationalitySelect } from "../national/NationalitySelect.jsx";
@@ -205,6 +208,7 @@ export const LoginScreen = ({
       {/* --- FIM DO CABEÇALHO --- */}
 
       <nav className="login-tabs" aria-label="Acesso e cadastros">
+        {secureGameLogin&&<button className={`tab ${tab==='SECURE_PLAYER'?'active':''}`} aria-pressed={tab==='SECURE_PLAYER'} onClick={()=>setTab('SECURE_PLAYER')}>NOVO JOGADOR</button>}
         <button
           type="button"
           className={`tab ${tab === "LOGIN" ? "active" : ""}`}
@@ -213,6 +217,7 @@ export const LoginScreen = ({
         >
           ENTRAR
         </button>
+        {!secureGameLogin && <>
         <button
           type="button"
           className={`tab ${tab === "CREATE" ? "active" : ""}`}
@@ -253,10 +258,13 @@ export const LoginScreen = ({
         >
           JOGADOR
         </button>
+        </>}
       </nav>
 
       {tab === "LOGIN" && (
         <div>
+          {secureGameLogin && <SecureAccessForm onLogin={onLogin}/>}
+          {!secureGameLogin && <>
           <div className="login-tab-buttons" role="group" aria-label="Tipo de conta">
             <button
               className={`btn ${subTab === "TEAM" ? "btn-green" : "btn-ghost"}`}
@@ -709,6 +717,7 @@ export const LoginScreen = ({
             </div>
           )}
 
+          </>}
           <div className="login-footer-actions">
             <button className="btn btn-blue" onClick={onVisitor}>
               ENTRAR COMO VISITANTE
@@ -785,6 +794,8 @@ export const LoginScreen = ({
           </div>
         </div>
       )}
+
+      {secureGameLogin&&tab==='SECURE_PLAYER'&&<SecurePlayerRegistration/>}
 
       {tab === "CREATE" && (
         <div>

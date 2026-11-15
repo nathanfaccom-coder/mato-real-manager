@@ -47,7 +47,10 @@ export const MODAL_PERMISSIONS = {
   PRIZES: "finance",
 };
 export function allowAdminModal(user, modal) {
-  if (!isSubAdmin(user) || !modal) return true;
+  if (!modal) return true;
+  if (['MATCH_PERFORMANCE','MATCH_REPORT','TEAM_TABLE','STATS','TEAM_STANDINGS'].includes(modal.type))
+    return canAdmin(user, 'competitions');
+  if (!isSubAdmin(user)) return true;
   if (["VIEW_LINEUP", "VIEW_PLAYER"].includes(modal.type)) return true;
   return canAdmin(user, MODAL_PERMISSIONS[modal.type]);
 }
@@ -71,13 +74,20 @@ export function guardAdminActions(
   actions,
   user,
   notify = (message) => alert(message),
+  { automaticMatches = false } = {},
 ) {
-  if (!isSubAdmin(user)) return actions;
+  const protectedActions = new Set(['saveMatchStats','updateTeamStats','handleSaveMatch','handleDeleteMatch','generateFixtures']);
   return Object.fromEntries(
     Object.entries(actions).map(([name, fn]) => [
       name,
       (...args) => {
-        if (!canAdmin(user, ACTION_PERMISSIONS[name])) {
+        // Rollout safeguard, not database authorization. These legacy writers
+        // bypass the server result ledger and must never run in automatic mode.
+        if (automaticMatches && ['saveMatchStats','updateTeamStats'].includes(name)) {
+          notify('Use a súmula registrada na Central de Jogos para corrigir resultados. O jogo atualiza XP e classificação pelo servidor.');
+          return;
+        }
+        if ((isSubAdmin(user) || protectedActions.has(name)) && !canAdmin(user, ACTION_PERMISSIONS[name])) {
           notify("Você não tem permissão para esta função.");
           return;
         }

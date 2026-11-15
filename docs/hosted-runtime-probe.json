@@ -1,0 +1,46 @@
+{
+  "project": "pyqmrzpgjepazitrjwpc",
+  "plan": "free",
+  "date": "2026-10-26",
+  "unauthenticatedStatus": 401,
+  "reportParity": "Exact equality with local engine for all six seeds",
+  "samples": [
+    {
+      "seed": 1,
+      "wallMs": 222.950555,
+      "participants": 28,
+      "frames": 197
+    },
+    {
+      "seed": 2,
+      "wallMs": 168.735274,
+      "participants": 28,
+      "frames": 193
+    },
+    {
+      "seed": 3,
+      "wallMs": 153.2216210000006,
+      "participants": 28,
+      "frames": 201
+    },
+    {
+      "seed": 10,
+      "wallMs": 234.26644700000003,
+      "participants": 28,
+      "frames": 203
+    },
+    {
+      "seed": 20,
+      "wallMs": 230.704872,
+      "participants": 28,
+      "frames": 197
+    },
+    {
+      "seed": 30,
+      "wallMs": 222.852745,
+      "participants": 28,
+      "frames": 187
+    }
+  ],
+  "scope": "Synthetic simulation and report only; excludes database writes, Firebase auth, scheduling and retries. Wall time is not CPU time; peak memory not measured."
+}

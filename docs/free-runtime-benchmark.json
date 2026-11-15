@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-26",
+  "kind": "local-feasibility-only",
+  "note": "Not measured on hosted Supabase. CPU and memory must be validated there with authentication and Firestore operations. Max heap/RSS are sampled after each game, not continuous peaks. Runs were concurrent with local tests; absolute timings are environment-specific.",
+  "benchmarks": [
+    {
+      "runtime": "Node v24.22.1",
+      "scope": "Local summary simulation + report only. Excludes authentication, database, retries and hosted platform overhead.",
+      "samples": 30,
+      "cpuMs": {
+        "median": 274.884,
+        "p95": 419.242,
+        "max": 444.495
+      },
+      "maxWallMs": 311.1844359999998,
+      "maxHeapMiB": 72.92206573486328,
+      "maxRssMiB": 216.0390625
+    },
+    {
+      "runtime": "Deno 2.9.6",
+      "scope": "Local summary simulation + report only. Excludes authentication, database, retries and hosted platform overhead.",
+      "samples": 30,
+      "cpuMs": {
+        "median": 255.163,
+        "p95": 409.497,
+        "max": 440.815
+      },
+      "maxWallMs": 285.17334400000004,
+      "maxHeapMiB": 55.36134338378906,
+      "maxRssMiB": 194.84375
+    }
+  ]
+}

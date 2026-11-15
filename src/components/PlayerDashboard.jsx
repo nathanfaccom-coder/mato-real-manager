@@ -1,3 +1,6 @@
+import {secureGameLogin} from '../services/game-auth.js';
+import {MatchCareer} from './MatchCareer.jsx';
+import {xpCost as getXpCostDisplay} from '../game/progression.js';
 import { AppearanceEditor } from "../simulation/Editors.jsx";
 import { NationalCareer } from "../national/NationalCareer.jsx";
 import React, { useState, useEffect } from "react";
@@ -17,21 +20,12 @@ export const PlayerDashboard = ({
   setModal,
 }) => {
   const [newPass, setNewPass] = useState("");
+  const [passwordBusy,setPasswordBusy]=useState(false);
   const [tab, setTab] = useState("PERFIL");
   const [trainType, setTrainType] = useState("FISICO_BASE");
 
   // Itens na Mochila (filtra sales onde eu sou comprador)
   const myItems = (sales || []).filter((s) => s.buyerId === player.id);
-
-  const getXpCostDisplay = (ovr) => {
-    if (ovr <= 50) return 50;
-    if (ovr <= 60) return 80;
-    if (ovr <= 70) return 150;
-    if (ovr <= 80) return 300;
-    if (ovr <= 85) return 600;
-    if (ovr <= 90) return 1000;
-    return 2000;
-  };
 
   const currentCost = getXpCostDisplay(player.overall || 50);
   const xpCurrent = (player.xp || 0) + (player.pendingXP || 0);
@@ -245,7 +239,7 @@ export const PlayerDashboard = ({
                   }}
                 >
                   <i className="fas fa-arrow-up" style={{ marginRight: 2 }}></i>
-                  {projectedOvIncrease}
+                  ≈{projectedOvIncrease}
                 </span>
               )}
             </div>
@@ -295,7 +289,7 @@ export const PlayerDashboard = ({
         >
           <div
             style={{
-              width: `${xpRest}%`,
+              width: `${100*xpRest/currentCost}%`,
               height: "100%",
               background: "linear-gradient(90deg, var(--warning), gold)",
               transition: "1s",
@@ -316,6 +310,7 @@ export const PlayerDashboard = ({
         </div>
       </div>
 
+      <MatchCareer player={player} />
       <div
         style={{
           display: "flex",
@@ -574,6 +569,10 @@ export const PlayerDashboard = ({
 
           <div className="card">
             <h4>🔐 Segurança</h4>
+            {secureGameLogin ? <>
+              <p>Receba no e-mail da sua conta as instruções para redefinir a senha.</p>
+              <button className="btn btn-purple" disabled={passwordBusy} onClick={async()=>{setPasswordBusy(true);try{await onUpdatePassword();}finally{setPasswordBusy(false);}}}>RECUPERAR SENHA POR E-MAIL</button>
+            </> :
             <div style={{ display: "flex", gap: 5 }}>
               <input
                 className="input-field"
@@ -595,6 +594,7 @@ export const PlayerDashboard = ({
                 ALTERAR
               </button>
             </div>
+            }
           </div>
         </div>
       )}

@@ -106,3 +106,16 @@ test('raise requires a real increase above the canonical current salary',async()
  await assert.rejects(requestStaffContract(db,'u',{requestId:'same-cents',kind:'RAISE',requestedSalary:2500.01}));
  assert.deepEqual([...db.values],before);
 });
+
+test('confirmed staff proposal receipt cannot replay after a binding revision changes',async()=>{
+ const db=memoryDB(seed());
+ const first=await requestStaffContract(db,'u',input);
+ const receipt=db.values.get('serverConfig/staffContractRequest_u/operations/r');
+ assert.equal(receipt.bindingRevision,1);
+ db.values.set('authAccounts/u',{...db.values.get('authAccounts/u'),revision:2});
+ const before=structuredClone([...db.values]);
+ await assert.rejects(requestStaffContract(db,'u',input),{code:'STAFF_CONTRACT_REQUEST_REJECTED'});
+ assert.deepEqual([...db.values],before);
+ assert.equal([...db.values.keys()].filter(p=>p.startsWith('offers/')).length,1);
+ assert.ok(first.offerId);
+});

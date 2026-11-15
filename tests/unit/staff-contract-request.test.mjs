@@ -15,6 +15,20 @@ test('contract request derives identities and current salary, creates only one o
 test('all staff roles can request amicable release without changing contract',async()=>{
  for(const type of ['COACH','DOCTOR','SCOUT','ASSISTANT']){const s=seed();for(const k of ['authAccounts/u','accountEntityOwners/users_c','users/c'])s[k].type=type;const db=memoryDB(s);const r=await requestStaffContract(db,'u',{requestId:'r',kind:'RESIGN_REQ',requestedSalary:null});assert.equal(db.values.get('offers/'+r.offerId).type,'COACH_RESIGN');assert.equal(db.values.get('users/c').teamId,'t');}
 });
+test('staff proposal descriptions use the actual role for every supported profession',async()=>{
+ const labels={COACH:'técnico',DOCTOR:'médico',SCOUT:'olheiro',ASSISTANT:'auxiliar'};
+ for(const [type,label] of Object.entries(labels)){
+  for(const kind of ['RAISE','RESIGN_REQ']){
+   const s=seed();for(const k of ['authAccounts/u','accountEntityOwners/users_c','users/c'])s[k].type=type;
+   const db=memoryDB(s);
+   const request={requestId:'role-description',kind,requestedSalary:kind==='RAISE'?3000.01:null};
+   const {offerId}=await requestStaffContract(db,'u',request);
+   const description=db.values.get('offers/'+offerId).description;
+   assert.ok(description.includes(`O ${label} **Técnico**`),`${type} ${kind}: ${description}`);
+  }
+ }
+});
+
 test('invalid amounts, forged identity and changed ownership or club lock never create proposals',async()=>{
  for(const patch of [{requestedSalary:2500},{requestedSalary:NaN},{requestedSalary:3000.001},{staffId:'other'},{kind:'BUYOUT'},{kind:'RESIGN_REQ'}]){const db=memoryDB(seed()),before=structuredClone([...db.values]);await assert.rejects(requestStaffContract(db,'u',{...input,...patch}));assert.deepEqual([...db.values],before);}
  for(const [path,patch] of [['authAccounts/u',{active:false}],['accountEntityOwners/users_c',{uid:'other'}],['users/c',{teamId:'FREE'}],['users/c',{type:'PLAYER'}],['teams/t',{status:'PENDING'}],['matchParticipantLocks/team_t',{runId:'m'}]]){const s=seed();s[path]={...s[path],...patch};const db=memoryDB(s),before=structuredClone([...db.values]);await assert.rejects(requestStaffContract(db,'u',input));assert.deepEqual([...db.values],before);}
